@@ -1,0 +1,350 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────
+
+enum UserRole {
+  MEMBER
+  COACH
+  STAFF
+  MANAGER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum MemberTier {
+  FREE
+  MEMBERSHIP
+  PREMIUM
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  SUSPENDED
+}
+
+enum TrainingLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum ClassType {
+  REGULAR
+  PREMIUM
+}
+
+enum ScheduleStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum EnrollmentStatus {
+  BOOKED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum InvoiceStatus {
+  ISSUED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────
+// AUTH / USER
+// ─────────────────────────────────────────
+
+model User {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  password    String
+  fullName    String
+  phone       String?   @unique
+  gender      Gender?
+  dateOfBirth DateTime?
+  role        UserRole  @default(MEMBER)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  memberProfile  MemberProfile?
+  coachProfile   CoachProfile?
+  managerProfile ManagerProfile?
+  refreshTokens  RefreshToken[]
+  createdPayments Payment[]      @relation("PaymentCreatedBy")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────
+// PROFILES
+// ─────────────────────────────────────────
+
+model MemberProfile {
+  id                 String        @id @default(uuid())
+  userId             String        @unique
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fitnessGoal        String?
+  trainingLevel      TrainingLevel?
+  trainingPreference String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  subscriptions MembershipSubscription[]
+  enrollments   Enrollment[]
+  payments      Payment[]
+  invoices      Invoice[]
+}
+
+model CoachProfile {
+  id              String  @id @default(uuid())
+  userId          String  @unique
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialization  String?
+  experienceYears Int?
+  bio             String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  classes ClassMember[]
+}
+
+model ManagerProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────
+// MEMBERSHIP
+// ─────────────────────────────────────────
+
+model MembershipPlan {
+  id           String     @id @default(uuid())
+  name         String
+  description  String?
+  price        Decimal    @db.Decimal(12, 2)
+  durationDays Int
+  tier         MemberTier // MEMBERSHIP or PREMIUM
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  subscriptions MembershipSubscription[]
+}
+
+model MembershipSubscription {
+  id        String           @id @default(uuid())
+  memberId  String
+  member    MemberProfile    @relation(fields: [memberId], references: [id])
+  planId    String
+  plan      MembershipPlan   @relation(fields: [planId], references: [id])
+  tier      MemberTier       // copied from plan at time of subscription
+  startDate DateTime
+  endDate   DateTime
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  payments Payment[]
+
+  @@index([memberId])
+  @@index([planId])
+  @@index([status])
+  @@index([endDate])
+}
+
+// ─────────────────────────────────────────
+// SPORTS & ROOMS
+// ─────────────────────────────────────────
+
+model Sport {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  classes Class[]
+}
+
+model Room {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  capacity  Int
+  location  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  schedules ClassSchedule[]
+}
+
+// ─────────────────────────────────────────
+// CLASS
+// ─────────────────────────────────────────
+
+model Class {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  sportId     String
+  sport       Sport     @relation(fields: [sportId], references: [id])
+  capacity    Int
+  classType   ClassType @default(REGULAR)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  coaches     ClassMember[]
+  schedules   ClassSchedule[]
+  enrollments Enrollment[]
+
+  @@index([sportId])
+}
+
+// Coach assignment to class (many-to-many)
+model ClassMember {
+  id        String       @id @default(uuid())
+  classId   String
+  class     Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  coachId   String
+  coach     CoachProfile @relation(fields: [coachId], references: [id])
+  isPrimary Boolean      @default(false)
+  createdAt DateTime     @default(now())
+
+  @@unique([classId, coachId])
+  @@index([classId])
+  @@index([coachId])
+}
+
+model ClassSchedule {
+  id        String         @id @default(uuid())
+  classId   String
+  class     Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  roomId    String
+  room      Room           @relation(fields: [roomId], references: [id])
+  startTime DateTime
+  endTime   DateTime
+  status    ScheduleStatus @default(SCHEDULED)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  enrollments Enrollment[]
+
+  @@index([classId])
+  @@index([roomId])
+  @@index([startTime, endTime])
+}
+
+// ─────────────────────────────────────────
+// ENROLLMENT
+// ─────────────────────────────────────────
+
+model Enrollment {
+  id          String           @id @default(uuid())
+  memberId    String
+  member      MemberProfile    @relation(fields: [memberId], references: [id])
+  classId     String
+  class       Class            @relation(fields: [classId], references: [id])
+  scheduleId  String
+  schedule    ClassSchedule    @relation(fields: [scheduleId], references: [id])
+  status      EnrollmentStatus @default(BOOKED)
+  bookedAt    DateTime         @default(now())
+  cancelledAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([memberId, scheduleId])
+  @@index([memberId])
+  @@index([scheduleId])
+  @@index([classId])
+}
+
+// ─────────────────────────────────────────
+// PAYMENT & INVOICE
+// ─────────────────────────────────────────
+
+model Payment {
+  id              String                  @id @default(uuid())
+  memberId        String
+  member          MemberProfile           @relation(fields: [memberId], references: [id])
+  subscriptionId  String?
+  subscription    MembershipSubscription? @relation(fields: [subscriptionId], references: [id])
+  amount          Decimal                 @db.Decimal(12, 2)
+  method          PaymentMethod
+  status          PaymentStatus           @default(PENDING)
+  transactionCode String?                 @unique
+  note            String?
+  paidAt          DateTime?
+  createdById     String?
+  createdBy       User?                   @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  invoice Invoice?
+
+  @@index([memberId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique
+  memberId      String
+  member        MemberProfile @relation(fields: [memberId], references: [id])
+  paymentId     String        @unique
+  payment       Payment       @relation(fields: [paymentId], references: [id])
+  subtotal      Decimal       @db.Decimal(12, 2)
+  discount      Decimal       @db.Decimal(12, 2) @default(0)
+  total         Decimal       @db.Decimal(12, 2)
+  status        InvoiceStatus @default(ISSUED)
+  issuedAt      DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([memberId])
+  @@index([issuedAt])
+}
