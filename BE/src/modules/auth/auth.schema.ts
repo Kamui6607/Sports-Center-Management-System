@@ -1,12 +1,19 @@
 import { z } from "zod";
 
 export const RegisterSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().email("Invalid email address").transform(v => v.toLowerCase().trim()),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  fullName: z.string().min(2, "Full name must be at least 2 characters"),
-  phone: z.string().regex(/^[0-9+\-() ]*$/, "Phone must not contain special characters").optional(),
+  fullName: z.string().min(2, "Full name must be at least 2 characters").max(100).transform(v => v.trim()),
+  phone: z.string()
+    .regex(/^[0-9+]{9,15}$/, "Phone must be 9-15 digits (optionally starting with +)")
+    .optional()
+    .or(z.literal("").transform(() => undefined))
+    .optional(),
   gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
-  dateOfBirth: z.string().optional(),
+  dateOfBirth: z.string()
+    .refine(v => !v || !isNaN(Date.parse(v)), "Invalid date of birth")
+    .refine(v => !v || new Date(v) <= new Date(), "Date of birth cannot be in the future")
+    .optional(),
 });
 
 export const LoginSchema = z.object({
@@ -19,13 +26,20 @@ export const RefreshTokenSchema = z.object({
 });
 
 export const UpdateProfileSchema = z.object({
-  fullName: z.string().min(2).optional(),
-  phone: z.string().regex(/^[0-9+\-() ]*$/, "Phone must not contain special characters").optional(),
+  fullName: z.string().min(2).max(100).transform(v => v.trim()).optional(),
+  phone: z.string()
+    .regex(/^[0-9+]{9,15}$/, "Phone must be 9-15 digits (optionally starting with +)")
+    .optional()
+    .or(z.literal("").transform(() => undefined))
+    .optional(),
   gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
-  dateOfBirth: z.string().optional(),
-  fitnessGoal: z.string().optional(),
+  dateOfBirth: z.string()
+    .refine(v => !v || !isNaN(Date.parse(v)), "Invalid date of birth")
+    .refine(v => !v || new Date(v) <= new Date(), "Date of birth cannot be in the future")
+    .optional(),
+  fitnessGoal: z.string().max(500).optional(),
   trainingLevel: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]).optional(),
-  trainingPreference: z.string().optional(),
+  trainingPreference: z.string().max(500).optional(),
 });
 
 export const ChangePasswordSchema = z.object({

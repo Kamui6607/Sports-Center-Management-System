@@ -3,7 +3,7 @@ import { z } from "zod";
 export const CreateClassSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
-  sportId: z.string().min(1),
+  sportIds: z.array(z.string().min(1)).min(1, "Must assign at least one sport"),
   capacity: z.number().int().positive().max(200),
   classType: z.enum(["REGULAR", "PREMIUM"]).default("REGULAR"),
 });
@@ -11,7 +11,7 @@ export const CreateClassSchema = z.object({
 export const UpdateClassSchema = z.object({
   name: z.string().min(2).optional(),
   description: z.string().optional(),
-  sportId: z.string().optional(),
+  sportIds: z.array(z.string().min(1)).min(1, "Must assign at least one sport").optional(),
   capacity: z.number().int().positive().max(200).optional(),
   classType: z.enum(["REGULAR", "PREMIUM"]).optional(),
   isActive: z.boolean().optional(),

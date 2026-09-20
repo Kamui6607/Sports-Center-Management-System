@@ -92,9 +92,49 @@ export async function getUserById(id: string) {
   return user;
 }
 
-export async function updateUser(id: string, data: UpdateUserInput) {
+export async function updateUser(id: string, data: UpdateUserInput, requesterId: string) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError("User not found", 404);
+
+  if (id === requesterId) {
+    if (data.isActive === false) throw new AppError("Cannot deactivate your own account", 400);
+    if (data.role && data.role !== user.role) throw new AppError("Cannot change your own role", 400);
+  }
+
+  if (user.role === "MANAGER" && (data.isActive === false || (data.role && data.role !== "MANAGER"))) {
+    const activeManagers = await prisma.user.count({
+      where: { role: "MANAGER", isActive: true }
+    });
+    if (activeManagers <= 1) {
+      throw new AppError("Cannot deactivate or demote the last active MANAGER", 400);
+    }
+  }
+
+  // BR-16: 1 user 1 role - Prevent role change if active engagements exist
+  if (data.role && data.role !== user.role) {
+    if (user.role === "MEMBER") {
+      const activeSubs = await prisma.membershipSubscription.count({
+        where: { member: { userId: id }, status: "ACTIVE" }
+      });
+      if (activeSubs > 0) throw new AppError("Cannot change role: MEMBER has active subscriptions. Cancel them first.", 400);
+
+      const bookedEnrollments = await prisma.enrollment.count({
+        where: { member: { userId: id }, status: "BOOKED" }
+      });
+      if (bookedEnrollments > 0) throw new AppError("Cannot change role: MEMBER has upcoming booked classes. Cancel them first.", 400);
+    }
+    
+    if (user.role === "COACH") {
+      const upcomingSchedules = await prisma.classSchedule.count({
+        where: { 
+          class: { coaches: { some: { coach: { userId: id } } } }, 
+          status: "SCHEDULED", 
+          startTime: { gt: new Date() } 
+        }
+      });
+      if (upcomingSchedules > 0) throw new AppError("Cannot change role: COACH is assigned to upcoming classes.", 400);
+    }
+  }
 
   const profileUpdate =
     data.role === "COACH"
@@ -125,6 +165,15 @@ export async function deactivateUser(id: string, requesterId: string) {
 
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError("User not found", 404);
+
+  if (user.role === "MANAGER") {
+    const activeManagers = await prisma.user.count({
+      where: { role: "MANAGER", isActive: true }
+    });
+    if (activeManagers <= 1) {
+      throw new AppError("Cannot deactivate the last active MANAGER", 400);
+    }
+  }
 
   return prisma.user.update({
     where: { id },

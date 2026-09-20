@@ -32,3 +32,9 @@ export async function deleteSchedule(req: Request, res: Response, next: NextFunc
     sendSuccess(res, schedule, "Schedule cancelled successfully");
   } catch (err) { next(err); }
 }
+export async function completeSchedule(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schedule = await schedulesService.completeSchedule(req.params.id as string);
+    sendSuccess(res, schedule, "Schedule marked as completed");
+  } catch (err) { next(err); }
+}

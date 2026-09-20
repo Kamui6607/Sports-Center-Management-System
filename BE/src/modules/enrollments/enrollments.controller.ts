@@ -19,7 +19,7 @@ export async function bookClass(req: Request, res: Response, next: NextFunction)
         return;
       }
       memberProfileId = profile.id;
-    } else {
+    } else if (role === "MANAGER" || role === "STAFF") {
       // MANAGER or STAFF must provide memberId
       if (!bodyMemberId) {
         sendError(res, "memberId is required for staff/manager booking", 400);
@@ -34,6 +34,9 @@ export async function bookClass(req: Request, res: Response, next: NextFunction)
         return;
       }
       memberProfileId = profile.id;
+    } else {
+      sendError(res, "Forbidden: Coaches cannot book classes for members", 403);
+      return;
     }
 
     const enrollment = await enrollmentsService.bookClass(scheduleId, memberProfileId, role);

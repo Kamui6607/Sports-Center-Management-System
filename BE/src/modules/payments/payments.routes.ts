@@ -100,7 +100,7 @@ router.get(
  */
 router.get(
   "/:id",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate,
   paymentsController.getPaymentById
 );
 

@@ -18,6 +18,10 @@ export const UpdateStatusSchema = z.object({
   status: z.enum(["ACTIVE", "EXPIRED", "CANCELLED", "SUSPENDED"]),
 });
 
+export const CancelSubscriptionSchema = z.object({
+  reason: z.string().min(1, "Vui lòng nhập lý do hủy gói").max(500).optional(),
+});
+
 export const SubscriptionQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
@@ -26,3 +30,4 @@ export const SubscriptionQuerySchema = z.object({
 
 export type CreateSubscriptionInput = z.infer<typeof CreateSubscriptionSchema>;
 export type RenewSubscriptionInput = z.infer<typeof RenewSubscriptionSchema>;
+export type CancelSubscriptionInput = z.infer<typeof CancelSubscriptionSchema>;

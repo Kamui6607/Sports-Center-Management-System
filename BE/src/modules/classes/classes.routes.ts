@@ -110,7 +110,7 @@ router.get("/:id", authenticate, classesController.getClassById);
  *             type: object
  *             required:
  *               - name
- *               - sportId
+ *               - sportIds
  *               - capacity
  *             properties:
  *               name:
@@ -118,8 +118,11 @@ router.get("/:id", authenticate, classesController.getClassById);
  *                 example: "Morning Yoga"
  *               description:
  *                 type: string
- *               sportId:
- *                 type: string
+ *               sportIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
  *               capacity:
  *                 type: integer
  *                 example: 20
@@ -138,7 +141,7 @@ router.get("/:id", authenticate, classesController.getClassById);
 router.post(
   "/",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   validate(CreateClassSchema),
   classesController.createClass
 );
@@ -166,8 +169,11 @@ router.post(
  *                 type: string
  *               description:
  *                 type: string
- *               sportId:
- *                 type: string
+ *               sportIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
  *               capacity:
  *                 type: integer
  *               classType:
@@ -186,7 +192,7 @@ router.post(
 router.patch(
   "/:id",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   validate(UpdateClassSchema),
   classesController.updateClass
 );
@@ -214,7 +220,7 @@ router.patch(
 router.delete(
   "/:id",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   classesController.deleteClass
 );
 
@@ -222,7 +228,7 @@ router.delete(
  * @swagger
  * /classes/{id}/coaches:
  *   post:
- *     summary: Assign coach to class
+ *     summary: Assign coach to class (Sends COACH_CHANGED notification to enrolled members)
  *     tags: [Classes]
  *     parameters:
  *       - in: path
@@ -258,7 +264,7 @@ router.delete(
 router.post(
   "/:id/coaches",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   validate(AssignCoachSchema),
   classesController.assignCoach
 );
@@ -267,7 +273,7 @@ router.post(
  * @swagger
  * /classes/{id}/coaches/{coachId}:
  *   delete:
- *     summary: Remove coach from class
+ *     summary: Remove coach from class (Sends COACH_CHANGED notification to enrolled members)
  *     tags: [Classes]
  *     parameters:
  *       - in: path
@@ -293,7 +299,7 @@ router.post(
 router.delete(
   "/:id/coaches/:coachId",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   classesController.removeCoach
 );
 

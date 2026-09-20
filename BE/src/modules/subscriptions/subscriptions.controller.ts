@@ -20,7 +20,8 @@ export async function getMemberSubscriptions(req: Request, res: Response, next: 
   try {
     const { subscriptions, pagination } = await subsService.getMemberSubscriptions(
       req.params.memberId as string,
-      req.query
+      req.query,
+      req.user!
     );
     sendSuccess(res, subscriptions, "Subscriptions retrieved successfully", 200, pagination);
   } catch (err) { next(err); }
@@ -37,5 +38,16 @@ export async function updateSubscriptionStatus(req: Request, res: Response, next
   try {
     const sub = await subsService.updateSubscriptionStatus(req.params.id as string, req.body.status);
     sendSuccess(res, sub, "Subscription status updated");
+  } catch (err) { next(err); }
+}
+
+export async function cancelSubscriptionBySelf(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await subsService.cancelSubscriptionBySelf(
+      req.params.id as string,
+      req.user!.id,
+      req.body.reason,
+    );
+    sendSuccess(res, result, result.message);
   } catch (err) { next(err); }
 }

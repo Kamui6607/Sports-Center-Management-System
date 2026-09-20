@@ -25,7 +25,7 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
 
 export async function updateUser(req: Request, res: Response, next: NextFunction) {
   try {
-    const user = await usersService.updateUser(req.params.id as string, req.body);
+    const user = await usersService.updateUser(req.params.id as string, req.body, req.user!.id);
     sendSuccess(res, user, "User updated successfully");
   } catch (err) { next(err); }
 }

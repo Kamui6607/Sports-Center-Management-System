@@ -144,7 +144,7 @@ router.get("/:id", authenticate, schedulesController.getScheduleById);
 router.post(
   "/",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   validate(CreateScheduleSchema),
   schedulesController.createSchedule
 );
@@ -192,7 +192,7 @@ router.post(
 router.patch(
   "/:id",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   validate(UpdateScheduleSchema),
   schedulesController.updateSchedule
 );
@@ -220,8 +220,34 @@ router.patch(
 router.delete(
   "/:id",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   schedulesController.deleteSchedule
+);
+
+/**
+ * @swagger
+ * /class-schedules/{id}/complete:
+ *   patch:
+ *     summary: Mark a schedule as COMPLETED (only after endTime)
+ *     tags: [Class Schedules]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { $ref: "#/components/responses/ScheduleOk" }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *       500: { $ref: "#/components/responses/ServerError" }
+ */
+router.patch(
+  "/:id/complete",
+  authenticate,
+  authorize("MANAGER", "STAFF"),
+  schedulesController.completeSchedule
 );
 
 export default router;

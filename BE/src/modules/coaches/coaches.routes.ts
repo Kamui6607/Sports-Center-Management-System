@@ -53,7 +53,6 @@ const router = Router();
 router.get(
   "/",
   authenticate,
-  authorize("MANAGER", "STAFF"),
   validate(CoachQuerySchema, "query"),
   coachController.listCoaches
 );

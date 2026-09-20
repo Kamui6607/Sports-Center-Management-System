@@ -1,0 +1,779 @@
+// Generated from Swagger. Response types describe documented examples, not exhaustive schemas.
+export type PostUsersRequest = {
+  email: string;
+  password: string;
+  fullName: string;
+  role: "MEMBER" | "COACH" | "STAFF" | "MANAGER";
+  fitnessGoal?: string;
+  trainingLevel?: "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
+  trainingPreference?: string;
+};
+export type PostSubscriptionsRequest = {
+  memberId: string;
+  planId: string;
+  startDate?: string;
+  paymentMethod: "CASH" | "BANK_TRANSFER";
+  note?: string;
+};
+export type PostSubscriptionsIdRenewRequest = {
+  planId: string;
+  paymentMethod: "CASH" | "BANK_TRANSFER";
+  note?: string;
+};
+export type PatchSubscriptionsIdStatusRequest = {
+  status: "ACTIVE" | "EXPIRED" | "CANCELLED" | "SUSPENDED";
+};
+export type PostSportsRequest = { name: string; description?: string };
+export type PatchSportsIdRequest = {
+  name?: string;
+  description?: string;
+  isActive?: boolean;
+};
+export type PostRoomsRequest = {
+  name: string;
+  capacity: number;
+  location?: string;
+};
+export type PatchRoomsIdRequest = {
+  name?: string;
+  capacity?: number;
+  location?: string;
+  isActive?: boolean;
+};
+export type PostPaymentsRequest = {
+  memberId: string;
+  subscriptionId?: string;
+  amount: number;
+  method: "CASH" | "BANK_TRANSFER";
+  status?: "PENDING" | "SUCCESS" | "FAILED";
+  note?: string;
+  transactionCode?: string;
+};
+export type PatchPaymentsIdStatusRequest = {
+  status: "PENDING" | "SUCCESS" | "FAILED" | "REFUNDED";
+};
+export type PostMembershipPlansRequest = {
+  name: string;
+  description?: string;
+  price: number;
+  durationDays: number;
+  tier: "MEMBERSHIP" | "PREMIUM";
+};
+export type PostEnrollmentsRequest = { scheduleId: string; memberId?: string };
+export type PatchCoachesIdRequest = {
+  specialization?: string;
+  experienceYears?: number;
+  bio?: string;
+};
+export type PostClassesRequest = {
+  name: string;
+  description?: string;
+  sportId: string;
+  capacity: number;
+  classType?: "REGULAR" | "PREMIUM";
+};
+export type PatchClassesIdRequest = {
+  name?: string;
+  description?: string;
+  sportId?: string;
+  capacity?: number;
+  classType?: "REGULAR" | "PREMIUM";
+  isActive?: boolean;
+};
+export type PostClassesIdCoachesRequest = {
+  coachId: string;
+  isPrimary?: boolean;
+};
+export type PostClassSchedulesRequest = {
+  classId: string;
+  roomId: string;
+  startTime: string;
+  endTime: string;
+};
+export type PatchClassSchedulesIdRequest = {
+  roomId?: string;
+  startTime?: string;
+  endTime?: string;
+  status?: "SCHEDULED" | "CANCELLED" | "COMPLETED";
+};
+export type PostAuthRegisterRequest = {
+  email: string;
+  password: string;
+  fullName: string;
+  phone?: string;
+  gender?: "MALE" | "FEMALE" | "OTHER";
+  dateOfBirth?: string;
+};
+export type PostAuthLoginRequest = { email: string; password: string };
+export type PostAuthLogoutRequest = { refreshToken: string };
+export type PostAuthRefreshTokenRequest = { refreshToken: string };
+export type PatchAuthMeRequest = {
+  fullName?: string;
+  phone?: string;
+  gender?: "MALE" | "FEMALE" | "OTHER";
+  fitnessGoal?: string;
+  trainingLevel?: "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
+  trainingPreference?: string;
+};
+export type PatchAuthMeChangePasswordRequest = {
+  currentPassword: string;
+  newPassword: string;
+};
+export type BadRequest = {
+  success: boolean;
+  message: string;
+  errors: Array<{ field: string; message: string }>;
+};
+export type Unauthorized = { success: boolean; message: string };
+export type Forbidden = { success: boolean; message: string };
+export type NotFound = { success: boolean; message: string };
+export type Conflict = { success: boolean; message: string };
+export type ServerError = { success: boolean; message: string };
+export type LoginOk = {
+  success: boolean;
+  message: string;
+  data: { accessToken: string; refreshToken: string };
+};
+export type RegisterCreated = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    email: string;
+    fullName: string;
+    phone: string;
+    gender: string;
+    dateOfBirth: string;
+    role: string;
+    isActive: boolean;
+    memberProfile: { id: string; trainingLevel: string };
+  };
+};
+export type RefreshOk = {
+  success: boolean;
+  message: string;
+  data: { accessToken: string };
+};
+export type MessageOk = {
+  success: boolean;
+  message: string;
+  data: unknown | null;
+};
+export type ProfileOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    email: string;
+    fullName: string;
+    phone: string;
+    gender: string;
+    dateOfBirth: string;
+    role: string;
+    isActive: boolean;
+    createdAt: string;
+    memberProfile: { id: string; fitnessGoal: string; trainingLevel: string };
+    coachProfile: unknown | null;
+    managerProfile: unknown | null;
+  };
+};
+export type UserListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    email: string;
+    fullName: string;
+    phone: string;
+    gender: string;
+    dateOfBirth: unknown | null;
+    role: string;
+    isActive: boolean;
+    createdAt: string;
+    memberProfile: unknown | null;
+    coachProfile: unknown | null;
+    managerProfile: unknown | null;
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type UserCreated = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    email: string;
+    fullName: string;
+    phone: string;
+    gender: string;
+    dateOfBirth: unknown | null;
+    role: string;
+    isActive: boolean;
+    createdAt: string;
+    memberProfile: { id: string; trainingLevel: string };
+    coachProfile: unknown | null;
+    managerProfile: unknown | null;
+  };
+};
+export type UserOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    email: string;
+    fullName: string;
+    phone: string;
+    gender: string;
+    dateOfBirth: unknown | null;
+    role: string;
+    isActive: boolean;
+    memberProfile: { id: string };
+    coachProfile: unknown | null;
+    managerProfile: unknown | null;
+  };
+};
+export type MemberListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    fitnessGoal: string;
+    trainingLevel: string;
+    trainingPreference: string;
+    user: {
+      id: string;
+      email: string;
+      fullName: string;
+      phone: string;
+      role: string;
+      isActive: boolean;
+    };
+    subscriptions: Array<{
+      status: string;
+      endDate: string;
+      plan: { id: string; name: string; price: string; tier: string };
+    }>;
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type MemberOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    fitnessGoal: string;
+    trainingLevel: string;
+    user: {
+      id: string;
+      email: string;
+      fullName: string;
+      phone: string;
+      role: string;
+      isActive: boolean;
+    };
+    subscriptions: Array<{
+      status: string;
+      plan: { name: string; tier: string };
+    }>;
+  };
+};
+export type MembershipStatusOk = {
+  success: boolean;
+  message: string;
+  data: {
+    effectiveTier: string;
+    activeSubscription: {
+      status: string;
+      endDate: string;
+      plan: { name: string; tier: string };
+    };
+    daysRemaining: number;
+  };
+};
+export type CoachListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    email: string;
+    fullName: string;
+    phone: string;
+    role: string;
+    isActive: boolean;
+    coachProfile: { specialization: string; experienceYears: number };
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type CoachOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    email: string;
+    fullName: string;
+    phone: string;
+    role: string;
+    isActive: boolean;
+    coachProfile: {
+      specialization: string;
+      experienceYears: number;
+      bio: string;
+      classes: Array<{
+        isPrimary: boolean;
+        class: {
+          id: string;
+          name: string;
+          sport: { name: string };
+          schedules: Array<unknown>;
+        };
+      }>;
+    };
+  };
+};
+export type PlanListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    name: string;
+    description: string;
+    price: string;
+    durationDays: number;
+    tier: string;
+    isActive: boolean;
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type PlanCreated = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    name: string;
+    price: string;
+    durationDays: number;
+    tier: string;
+    isActive: boolean;
+  };
+};
+export type PlanOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    name: string;
+    price: string;
+    durationDays: number;
+    tier: string;
+    isActive: boolean;
+  };
+};
+export type SubscriptionCreated = {
+  success: boolean;
+  message: string;
+  data: {
+    subscription: {
+      id: string;
+      tier: string;
+      startDate: string;
+      endDate: string;
+      status: string;
+      plan: { name: string; tier: string };
+    };
+    payment: { id: string; amount: string; method: string; status: string };
+  };
+};
+export type SubscriptionListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    tier: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+    plan: { name: string; tier: string };
+    payments: Array<{ id: string; amount: string; status: string }>;
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type SubscriptionOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    tier: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+    plan: { name: string; tier: string };
+    member: { user: { fullName: string; email: string } };
+  };
+};
+export type SportListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    name: string;
+    description: string;
+    isActive: boolean;
+    _count: { classes: number };
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type SportCreated = {
+  success: boolean;
+  message: string;
+  data: { id: string; name: string; description: string; isActive: boolean };
+};
+export type SportOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    name: string;
+    isActive: boolean;
+    classes: Array<unknown>;
+  };
+};
+export type RoomListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    name: string;
+    capacity: number;
+    location: string;
+    isActive: boolean;
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type RoomCreated = {
+  success: boolean;
+  message: string;
+  data: { id: string; name: string; capacity: number; isActive: boolean };
+};
+export type RoomOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    name: string;
+    capacity: number;
+    location: string;
+    isActive: boolean;
+  };
+};
+export type ClassListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    name: string;
+    description: string;
+    sport: { name: string };
+    capacity: number;
+    classType: string;
+    isActive: boolean;
+    coaches: Array<{
+      isPrimary: boolean;
+      coach: { user: { fullName: string } };
+    }>;
+    _count: { enrollments: number; schedules: number };
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type ClassCreated = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    name: string;
+    sport: { name: string };
+    capacity: number;
+    classType: string;
+  };
+};
+export type ClassOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    name: string;
+    sport: { name: string };
+    capacity: number;
+    classType: string;
+    isActive: boolean;
+    coaches: Array<{
+      isPrimary: boolean;
+      coach: { user: { fullName: string } };
+    }>;
+    schedules: Array<unknown>;
+  };
+};
+export type ScheduleListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    startTime: string;
+    endTime: string;
+    status: string;
+    class: { name: string; sport: { name: string } };
+    room: { name: string };
+    _count: { enrollments: number };
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type ScheduleCreated = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    startTime: string;
+    endTime: string;
+    status: string;
+    class: { name: string };
+    room: { name: string };
+  };
+};
+export type ScheduleOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    startTime: string;
+    endTime: string;
+    status: string;
+    class: { name: string; sport: { name: string }; coaches: Array<unknown> };
+    room: { name: string };
+    _count: { enrollments: number };
+  };
+};
+export type EnrollmentCreated = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    status: string;
+    bookedAt: string;
+    schedule: {
+      startTime: string;
+      endTime: string;
+      class: { name: string; sport: { name: string } };
+      room: { name: string };
+    };
+  };
+};
+export type EnrollmentListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    status: string;
+    bookedAt: string;
+    member: { user: { fullName: string; email: string } };
+    schedule: { startTime: string; class: { name: string } };
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type EnrollmentOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    status: string;
+    bookedAt: string;
+    schedule: {
+      startTime: string;
+      endTime: string;
+      class: { name: string; sport: { name: string } };
+      room: { name: string };
+    };
+  };
+};
+export type PaymentCreated = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    amount: string;
+    method: string;
+    status: string;
+    paidAt: string;
+    member: { user: { fullName: string } };
+    invoice: { invoiceNumber: string };
+  };
+};
+export type PaymentListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    amount: string;
+    method: string;
+    status: string;
+    paidAt: string;
+    member: { user: { fullName: string; email: string } };
+    invoice: { invoiceNumber: string };
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type PaymentOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    amount: string;
+    method: string;
+    status: string;
+    member: { user: { fullName: string } };
+    subscription: { plan: { name: string; tier: string } };
+    invoice: { invoiceNumber: string };
+  };
+};
+export type InvoiceListOk = {
+  success: boolean;
+  message: string;
+  data: Array<{
+    id: string;
+    invoiceNumber: string;
+    subtotal: string;
+    discount: string;
+    total: string;
+    status: string;
+    issuedAt: string;
+    member: { user: { fullName: string } };
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+export type InvoiceOk = {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    invoiceNumber: string;
+    subtotal: string;
+    discount: string;
+    total: string;
+    status: string;
+    issuedAt: string;
+    member: { user: { fullName: string; email: string } };
+    payment: { amount: string; method: string; status: string };
+  };
+};
+export type RevenueReportOk = {
+  success: boolean;
+  message: string;
+  data: {
+    totalRevenue: number;
+    totalPayments: number;
+    successPayments: number;
+    failedPayments: number;
+    pendingPayments: number;
+    refundedPayments: number;
+    revenueByMethod: { CASH: number; BANK_TRANSFER: number };
+    recentPayments: Array<{
+      id: string;
+      amount: string;
+      status: string;
+      member: { user: { fullName: string } };
+      invoice: { invoiceNumber: string };
+    }>;
+  };
+};
+export type MemberReportOk = {
+  success: boolean;
+  message: string;
+  data: {
+    totalMembers: number;
+    newMembers: number;
+    activeMembers: number;
+    expiredMembers: number;
+    membersByTier: { FREE: number; MEMBERSHIP: number; PREMIUM: number };
+  };
+};
+export type EnrollmentReportOk = {
+  success: boolean;
+  message: string;
+  data: {
+    totalEnrollments: number;
+    cancelledEnrollments: number;
+    topClasses: Array<{ classId: string; className: string; count: number }>;
+    enrollmentsByClassType: { REGULAR: number; PREMIUM: number };
+  };
+};
+export type MembershipReportOk = {
+  success: boolean;
+  message: string;
+  data: {
+    totalSubscriptions: number;
+    newSubscriptions: number;
+    activeSubscriptions: number;
+    expiredSubscriptions: number;
+    cancelledSubscriptions: number;
+    suspendedSubscriptions: number;
+    subscriptionsByTier: { MEMBERSHIP: number; PREMIUM: number };
+    totalRevenue: number;
+  };
+};

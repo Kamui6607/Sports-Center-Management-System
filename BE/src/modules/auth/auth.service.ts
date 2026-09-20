@@ -7,6 +7,8 @@ import {
   verifyRefreshToken,
   getRefreshTokenExpiryDate,
 } from "../../utils/jwt.js";
+import { hashToken } from "../../utils/hashToken.js";
+import { createNotification } from "../notifications/notifications.service.js";
 import type { RegisterInput, UpdateProfileInput } from "./auth.schema.js";
 
 export async function register(data: RegisterInput) {
@@ -39,8 +41,17 @@ export async function register(data: RegisterInput) {
     },
   });
 
+  // Gửi thông báo chào mừng (fire-and-forget, không block response)
+  createNotification(
+    user.id,
+    "MEMBER_REGISTERED",
+    "Chào mừng đến với Trung tâm Thể thao!",
+    `Xin chào ${user.fullName}! Tài khoản của bạn đã được tạo thành công. Hãy khám phá các gói tập và lớp học phù hợp với bạn.`
+  ).catch(() => {}); // Không để lỗi notification phá vỡ response đăng ký
+
   return user;
 }
+
 
 export async function login(email: string, password: string) {
   const user = await prisma.user.findUnique({ where: { email } });
@@ -54,9 +65,10 @@ export async function login(email: string, password: string) {
   const accessToken = signAccessToken(payload);
   const refreshToken = signRefreshToken(payload);
 
+  // BR-27: Store hash of refresh token, not the raw token
   await prisma.refreshToken.create({
     data: {
-      token: refreshToken,
+      token: hashToken(refreshToken),
       userId: user.id,
       expiresAt: getRefreshTokenExpiryDate(),
     },
@@ -66,11 +78,12 @@ export async function login(email: string, password: string) {
 }
 
 export async function logout(token: string) {
-  const existing = await prisma.refreshToken.findUnique({ where: { token } });
+  const tokenHash = hashToken(token);
+  const existing = await prisma.refreshToken.findUnique({ where: { token: tokenHash } });
   if (!existing) throw new AppError("Refresh token not found", 404);
 
   await prisma.refreshToken.update({
-    where: { token },
+    where: { token: tokenHash },
     data: { revokedAt: new Date() },
   });
 }
@@ -83,7 +96,8 @@ export async function refreshAccessToken(token: string) {
     throw new AppError("Invalid or expired refresh token", 401);
   }
 
-  const stored = await prisma.refreshToken.findUnique({ where: { token } });
+  const tokenHash = hashToken(token);
+  const stored = await prisma.refreshToken.findUnique({ where: { token: tokenHash } });
   if (!stored) throw new AppError("Refresh token not found", 401);
   if (stored.revokedAt) throw new AppError("Refresh token has been revoked", 401);
   if (stored.expiresAt < new Date()) throw new AppError("Refresh token has expired", 401);

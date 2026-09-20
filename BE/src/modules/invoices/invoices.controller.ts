@@ -10,7 +10,7 @@ export async function listInvoices(req: Request, res: Response, next: NextFuncti
 }
 export async function getInvoiceById(req: Request, res: Response, next: NextFunction) {
   try {
-    const invoice = await invoicesService.getInvoiceById(req.params.id as string);
+    const invoice = await invoicesService.getInvoiceById(req.params.id as string, req.user);
     sendSuccess(res, invoice, "Invoice retrieved successfully");
   } catch (err) { next(err); }
 }
@@ -18,7 +18,8 @@ export async function getMemberInvoices(req: Request, res: Response, next: NextF
   try {
     const { invoices, pagination } = await invoicesService.getMemberInvoices(
       req.params.memberId as string,
-      req.query
+      req.query,
+      req.user
     );
     sendSuccess(res, invoices, "Member invoices retrieved successfully", 200, pagination);
   } catch (err) { next(err); }

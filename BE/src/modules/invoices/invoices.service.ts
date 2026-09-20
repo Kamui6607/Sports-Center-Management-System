@@ -39,21 +39,41 @@ export async function listInvoices(query: any) {
   return { invoices, pagination: buildPaginationMeta(total, page, limit) };
 }
 
-export async function getInvoiceById(id: string) {
+export async function getInvoiceById(id: string, currentUser: any) {
   const invoice = await prisma.invoice.findUnique({
     where: { id },
     include: invoiceInclude,
   });
   if (!invoice) throw new AppError("Invoice not found", 404);
+
+  // IDOR: MEMBER can only view their own invoice
+  if (currentUser.role === "MEMBER") {
+    const memberProfile = await prisma.memberProfile.findUnique({ where: { userId: currentUser.id } });
+    if (!memberProfile || invoice.memberId !== memberProfile.id) {
+      throw new AppError("Forbidden: You can only view your own invoices", 403);
+    }
+  }
+  if (currentUser.role === "COACH") {
+    throw new AppError("Forbidden: Coaches cannot view invoices", 403);
+  }
+
   return invoice;
 }
 
-export async function getMemberInvoices(memberId: string, query: any) {
+export async function getMemberInvoices(memberId: string, query: any, currentUser: any) {
   // Accept userId or profileId
   const memberProfile = await prisma.memberProfile.findFirst({
     where: { OR: [{ id: memberId }, { userId: memberId }] },
   });
   if (!memberProfile) throw new AppError("Member not found", 404);
+
+  // IDOR: MEMBER can only view their own invoices
+  if (currentUser.role === "MEMBER" && memberProfile.userId !== currentUser.id) {
+    throw new AppError("Forbidden: You can only view your own invoices", 403);
+  }
+  if (currentUser.role === "COACH") {
+    throw new AppError("Forbidden: Coaches cannot view invoices", 403);
+  }
 
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));

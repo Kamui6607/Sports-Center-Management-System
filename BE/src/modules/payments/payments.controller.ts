@@ -16,7 +16,7 @@ export async function listPayments(req: Request, res: Response, next: NextFuncti
 }
 export async function getPaymentById(req: Request, res: Response, next: NextFunction) {
   try {
-    const payment = await paymentsService.getPaymentById(req.params.id as string);
+    const payment = await paymentsService.getPaymentById(req.params.id as string, req.user);
     sendSuccess(res, payment, "Payment retrieved successfully");
   } catch (err) { next(err); }
 }

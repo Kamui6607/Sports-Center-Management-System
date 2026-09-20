@@ -47,7 +47,7 @@ export async function listMembers(query: MemberQueryInput) {
       include: {
         ...memberInclude,
         subscriptions: {
-          where: { status: "ACTIVE", endDate: { gte: new Date() } },
+          where: { status: "ACTIVE", startDate: { lte: new Date() }, endDate: { gte: new Date() } },
           orderBy: { endDate: "desc" },
           take: 1,
           include: { plan: true },
@@ -69,7 +69,7 @@ export async function getMemberById(id: string) {
     include: {
       ...memberInclude,
       subscriptions: {
-        where: { status: "ACTIVE", endDate: { gte: new Date() } },
+        where: { status: "ACTIVE", startDate: { lte: new Date() }, endDate: { gte: new Date() } },
         include: { plan: true },
         orderBy: { endDate: "desc" },
         take: 1,
@@ -119,6 +119,7 @@ export async function getMembershipStatus(memberId: string) {
     where: {
       memberId: memberProfile.id,
       status: "ACTIVE",
+      startDate: { lte: new Date() },
       endDate: { gte: new Date() },
     },
     include: { plan: true },

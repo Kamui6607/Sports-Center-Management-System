@@ -32,6 +32,13 @@ export async function getRoomById(id: string) {
 export async function updateRoom(id: string, data: any) {
   const room = await prisma.room.findUnique({ where: { id } });
   if (!room) throw new AppError("Room not found", 404);
+  if (data.isActive === false && room.isActive === true) {
+    const scheduled = await prisma.classSchedule.count({
+      where: { roomId: id, status: "SCHEDULED", startTime: { gte: new Date() } },
+    });
+    if (scheduled > 0) throw new AppError("Cannot deactivate room with upcoming schedules", 400);
+  }
+
   return prisma.room.update({ where: { id }, data });
 }
 

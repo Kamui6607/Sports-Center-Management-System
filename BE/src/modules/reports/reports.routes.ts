@@ -105,4 +105,32 @@ router.get("/enrollments", validate(DateRangeSchema, "query"), reportsController
  */
 router.get("/memberships", validate(DateRangeSchema, "query"), reportsController.getMembershipReport);
 
+/**
+ * @swagger
+ * /reports/subscription-logs:
+ *   get:
+ *     summary: Detailed log of subscription purchases
+ *     tags: [Reports]
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200: { $ref: "#/components/responses/SubscriptionLogListOk" }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       500: { $ref: "#/components/responses/ServerError" }
+ */
+router.get("/subscription-logs", reportsController.getSubscriptionLogs);
+
 export default router;

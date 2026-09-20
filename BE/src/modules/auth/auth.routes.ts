@@ -27,12 +27,12 @@ const router = Router();
  *             type: object
  *             required: [email, password, fullName]
  *             properties:
- *               email: { type: string, format: email }
+ *               email: { type: string, format: email, description: "Will be converted to lowercase" }
  *               password: { type: string, minLength: 6 }
- *               fullName: { type: string }
- *               phone: { type: string }
+ *               fullName: { type: string, maxLength: 100 }
+ *               phone: { type: string, pattern: "^[0-9+]{9,15}$", description: "Optional, 9-15 digits, can start with +" }
  *               gender: { type: string, enum: [MALE, FEMALE, OTHER] }
- *               dateOfBirth: { type: string }
+ *               dateOfBirth: { type: string, format: date, description: "Must be in the past" }
  *     responses:
  *       201: { $ref: "#/components/responses/RegisterCreated" }
  *       400: { $ref: "#/components/responses/BadRequest" }
@@ -141,10 +141,10 @@ router.get("/me", authenticate, authController.getMe);
  *           schema:
  *             type: object
  *             properties:
- *               fullName: { type: string }
- *               phone: { type: string }
+ *               fullName: { type: string, maxLength: 100 }
+ *               phone: { type: string, pattern: "^[0-9+]{9,15}$", description: "Optional, 9-15 digits, can start with +" }
  *               gender: { type: string, enum: [MALE, FEMALE, OTHER] }
- *               dateOfBirth: { type: string }
+ *               dateOfBirth: { type: string, format: date, description: "Must be in the past" }
  *               fitnessGoal: { type: string }
  *               trainingLevel: { type: string, enum: [BEGINNER, INTERMEDIATE, ADVANCED] }
  *               trainingPreference: { type: string }

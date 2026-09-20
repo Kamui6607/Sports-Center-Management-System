@@ -29,29 +29,45 @@ export async function createPayment(data: any, createdById: string) {
       where: { id: data.subscriptionId },
     });
     if (!sub) throw new AppError("Subscription not found", 404);
+    if (sub.memberId !== memberProfile.id) {
+      throw new AppError("Subscription belongs to a different member", 400);
+    }
   }
 
-  const payment = await prisma.payment.create({
-    data: {
-      memberId: memberProfile.id,
-      subscriptionId: data.subscriptionId,
-      amount: data.amount,
-      method: data.method,
-      status: data.status ?? "SUCCESS",
-      note: data.note,
-      transactionCode: data.transactionCode,
-      paidAt: data.status === "SUCCESS" ? new Date() : undefined,
-      createdById,
-    },
-    include: { member: { include: { user: { select: { fullName: true } } } } },
+  // Wrap in transaction for BR-05 (atomicity)
+  return prisma.$transaction(async (tx) => {
+    const payment = await tx.payment.create({
+      data: {
+        memberId: memberProfile.id,
+        subscriptionId: data.subscriptionId,
+        amount: data.amount,
+        method: data.method,
+        status: data.status ?? "SUCCESS",
+        note: data.note,
+        transactionCode: data.transactionCode,
+        paidAt: (data.status ?? "SUCCESS") === "SUCCESS" ? new Date() : undefined,
+        createdById,
+      },
+      include: { member: { include: { user: { select: { fullName: true } } } } },
+    });
+
+    let invoice = null;
+    if (payment.status === "SUCCESS") {
+      invoice = await tx.invoice.create({
+        data: {
+          invoiceNumber: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+          memberId: memberProfile.id,
+          paymentId: payment.id,
+          subtotal: data.amount,
+          discount: 0,
+          total: data.amount,
+          status: "ISSUED",
+          issuedAt: new Date(),
+        },
+      });
+    }
+    return { ...payment, invoice };
   });
-
-  let invoice = null;
-  if (payment.status === "SUCCESS") {
-    invoice = await createInvoice(memberProfile.id, payment.id, data.amount);
-  }
-
-  return { ...payment, invoice };
 }
 
 export async function listPayments(query: any) {
@@ -83,7 +99,7 @@ export async function listPayments(query: any) {
   return { payments, pagination: buildPaginationMeta(total, page, limit) };
 }
 
-export async function getPaymentById(id: string) {
+export async function getPaymentById(id: string, currentUser: any) {
   const payment = await prisma.payment.findUnique({
     where: { id },
     include: {
@@ -94,6 +110,18 @@ export async function getPaymentById(id: string) {
     },
   });
   if (!payment) throw new AppError("Payment not found", 404);
+
+  // IDOR: MEMBER can only view their own payment
+  if (currentUser.role === "MEMBER") {
+    const memberProfile = await prisma.memberProfile.findUnique({ where: { userId: currentUser.id } });
+    if (!memberProfile || payment.memberId !== memberProfile.id) {
+      throw new AppError("Forbidden: You can only view your own payments", 403);
+    }
+  }
+  if (currentUser.role === "COACH") {
+    throw new AppError("Forbidden: Coaches cannot view payment details", 403);
+  }
+
   return payment;
 }
 
@@ -101,23 +129,46 @@ export async function updatePaymentStatus(id: string, status: string) {
   const payment = await prisma.payment.findUnique({ where: { id }, include: { invoice: true } });
   if (!payment) throw new AppError("Payment not found", 404);
 
+  // BR-14: Strict state machine
+  if (payment.status === status) return payment;
+
+  if (payment.status === "SUCCESS" && status !== "REFUNDED") {
+    throw new AppError("A successful payment can only be refunded", 400);
+  }
+  if (payment.status === "FAILED" || payment.status === "REFUNDED") {
+    throw new AppError(`Cannot update payment from ${payment.status} to ${status}`, 400);
+  }
+
   const updateData: any = { status };
   if (status === "SUCCESS") updateData.paidAt = new Date();
 
-  const updated = await prisma.payment.update({ where: { id }, data: updateData });
+  await prisma.$transaction(async (tx) => {
+    await tx.payment.update({ where: { id }, data: updateData });
 
-  // Auto create invoice if SUCCESS and no invoice
-  if (status === "SUCCESS" && !payment.invoice) {
-    await createInvoice(payment.memberId, payment.id, Number(payment.amount));
-  }
+    // Auto create invoice if SUCCESS and no invoice
+    if (status === "SUCCESS" && !payment.invoice) {
+      await tx.invoice.create({
+        data: {
+          invoiceNumber: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+          memberId: payment.memberId,
+          paymentId: payment.id,
+          subtotal: Number(payment.amount),
+          discount: 0,
+          total: Number(payment.amount),
+          status: "ISSUED",
+          issuedAt: new Date(),
+        },
+      });
+    }
 
-  // Cancel invoice if REFUNDED or FAILED
-  if ((status === "REFUNDED" || status === "FAILED") && payment.invoice) {
-    await prisma.invoice.update({
-      where: { id: payment.invoice.id },
-      data: { status: "CANCELLED" },
-    });
-  }
+    // Cancel invoice if REFUNDED or FAILED
+    if ((status === "REFUNDED" || status === "FAILED") && payment.invoice) {
+      await tx.invoice.update({
+        where: { id: payment.invoice.id },
+        data: { status: "CANCELLED" },
+      });
+    }
+  });
 
-  return getPaymentById(id);
+  return getPaymentById(id, { role: "MANAGER" });
 }

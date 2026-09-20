@@ -68,7 +68,7 @@ export async function getCoachById(id: string) {
             include: {
               class: {
                 include: {
-                  sport: true,
+                  sports: true,
                   schedules: {
                     where: { status: "SCHEDULED" },
                     take: 5,

@@ -61,7 +61,7 @@ router.get(
  */
 router.get(
   "/member/:memberId",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate,
   invoicesController.getMemberInvoices
 );
 
@@ -86,7 +86,7 @@ router.get(
  */
 router.get(
   "/:id",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate,
   invoicesController.getInvoiceById
 );
 

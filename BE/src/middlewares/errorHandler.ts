@@ -39,7 +39,20 @@ export function errorHandler(
     return;
   }
 
-  // Malformed JSON request body (body-parser sets type="entity.parse.failed")
+  // Prisma foreign key constraint
+  if ((err as any).code === "P2003") {
+    const field = (err as any).meta?.field_name ?? "field";
+    sendError(res, `Foreign key constraint failed on: ${field}`, 400);
+    return;
+  }
+
+  // Prisma relation violation
+  if ((err as any).code === "P2014") {
+    sendError(res, "The change would violate a required relation", 400);
+    return;
+  }
+
+  // Malformed JSON request body
   if ((err as any).type === "entity.parse.failed") {
     sendError(res, "Invalid JSON request body", 400);
     return;

@@ -23,6 +23,11 @@ import enrollmentRoutes from "./modules/enrollments/enrollments.routes.js";
 import paymentRoutes from "./modules/payments/payments.routes.js";
 import invoiceRoutes from "./modules/invoices/invoices.routes.js";
 import reportRoutes from "./modules/reports/reports.routes.js";
+import chatRoutes from "./modules/chat/chat.routes.js";
+import attendanceRoutes from "./modules/attendance/attendance.routes.js";
+import trainingPlanRoutes from "./modules/training-plans/training-plans.routes.js";
+import notificationRoutes from "./modules/notifications/notifications.routes.js";
+import feedbackRoutes from "./modules/feedbacks/feedbacks.routes.js";
 
 const app = express();
 
@@ -67,6 +72,14 @@ app.use(`${v1}/enrollments`, enrollmentRoutes);
 app.use(`${v1}/payments`, paymentRoutes);
 app.use(`${v1}/invoices`, invoiceRoutes);
 app.use(`${v1}/reports`, reportRoutes);
+app.use(`${v1}/chat`, chatRoutes);
+app.use(`${v1}/attendance`, attendanceRoutes);
+app.use(`${v1}/training-plans`, trainingPlanRoutes);
+app.use(`${v1}/notifications`, notificationRoutes);
+app.use(`${v1}/feedbacks`, feedbackRoutes);
+
+// Static files for uploads
+app.use("/uploads", express.static("uploads"));
 
 // 404
 app.use((_req, res) => {
