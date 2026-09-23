@@ -38,3 +38,16 @@ export async function getSubscriptionLogs(req: Request, res: Response, next: Nex
     sendSuccess(res, report, "Subscription logs retrieved successfully");
   } catch (err) { next(err); }
 }
+
+export async function getAttendanceReport(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { rows, summary, pagination } = await reportsService.getAttendanceReport(req.query as any);
+    sendSuccess(
+      res,
+      { rows, summary },
+      "Attendance report retrieved successfully",
+      200,
+      pagination
+    );
+  } catch (err) { next(err); }
+}

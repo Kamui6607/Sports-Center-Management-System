@@ -9,6 +9,7 @@ import {
 } from "../../utils/jwt.js";
 import { hashToken } from "../../utils/hashToken.js";
 import { createNotification } from "../notifications/notifications.service.js";
+import { ensureActiveFreeSubscription } from "../subscriptions/free-subscription.service.js";
 import type { RegisterInput, UpdateProfileInput } from "./auth.schema.js";
 
 export async function register(data: RegisterInput) {
@@ -17,28 +18,39 @@ export async function register(data: RegisterInput) {
 
   const hashed = await hashPassword(data.password);
 
-  const user = await prisma.user.create({
-    data: {
-      email: data.email,
-      password: hashed,
-      fullName: data.fullName,
-      phone: data.phone,
-      gender: data.gender,
-      dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-      role: "MEMBER",
-      memberProfile: { create: {} },
-    },
-    select: {
-      id: true,
-      email: true,
-      fullName: true,
-      phone: true,
-      gender: true,
-      dateOfBirth: true,
-      role: true,
-      isActive: true,
-      memberProfile: true,
-    },
+  // Tạo user + MemberProfile + subscription FREE ACTIVE trong CÙNG transaction:
+  // mọi MEMBER mới luôn có gói ACTIVE (tier FREE, maxConcurrentClasses = 0), không rơi vào
+  // trạng thái "không có subscription". Idempotent: đã có ACTIVE subscription thì không tạo thêm.
+  const user = await prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({
+      data: {
+        email: data.email,
+        password: hashed,
+        fullName: data.fullName,
+        phone: data.phone,
+        gender: data.gender,
+        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+        role: "MEMBER",
+        memberProfile: { create: {} },
+      },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        phone: true,
+        gender: true,
+        dateOfBirth: true,
+        role: true,
+        isActive: true,
+        memberProfile: true,
+      },
+    });
+
+    if (created.memberProfile) {
+      await ensureActiveFreeSubscription(tx, created.memberProfile.id);
+    }
+
+    return created;
   });
 
   // Gửi thông báo chào mừng (fire-and-forget, không block response)

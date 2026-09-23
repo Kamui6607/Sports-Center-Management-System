@@ -28,6 +28,12 @@ const router = Router();
  *           type: string
  *         description: Search by name
  *       - in: query
+ *         name: areaType
+ *         schema:
+ *           type: string
+ *           enum: [POOL, INDOOR, OUTDOOR]
+ *         description: Filter sports supporting an area type
+ *       - in: query
  *         name: isActive
  *         schema:
  *           type: string
@@ -85,6 +91,7 @@ router.get("/:id", sportsController.getSportById);
  *             type: object
  *             required:
  *               - name
+ *               - areaTypes
  *             properties:
  *               name:
  *                 type: string
@@ -92,6 +99,14 @@ router.get("/:id", sportsController.getSportById);
  *               description:
  *                 type: string
  *                 example: "Yoga class improves flexibility"
+ *               areaTypes:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   enum: [POOL, INDOOR, OUTDOOR]
+ *                 minItems: 1
+ *                 example: ["INDOOR"]
+ *                 description: "Area types this sport supports (at least one)"
  *     responses:
  *       201: { $ref: "#/components/responses/SportCreated" }
  *       400: { $ref: "#/components/responses/BadRequest" }
@@ -131,6 +146,13 @@ router.post(
  *                 type: string
  *               description:
  *                 type: string
+ *               areaTypes:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   enum: [POOL, INDOOR, OUTDOOR]
+ *                 minItems: 1
+ *                 description: "Area types this sport supports. Cannot remove a type used by an active Class."
  *               isActive:
  *                 type: boolean
  *     responses:

@@ -1,3 +1,4 @@
+import { sportNames } from "../../shared/sports";
 import { formatMemberDate } from "../../shared/memberFormat";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -267,7 +268,7 @@ export function MyClassesPage() {
                         Phòng: <strong>{sch?.room?.name || "Sân tập"}</strong>
                       </span>
                       <span>
-                        Môn: <strong>{sch?.class?.sport?.name || "Thể thao"}</strong>
+                        Môn: <strong>{sportNames(sch?.class)}</strong>
                       </span>
                     </div>
                   </div>

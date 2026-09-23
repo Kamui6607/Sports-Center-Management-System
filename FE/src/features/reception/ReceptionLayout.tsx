@@ -8,12 +8,17 @@ import { MembersPage, CreateMemberPage } from "./members/MembersPage";
 import { MembershipPage } from "./membership/MembershipPage";
 import { ClassesPage } from "./classes/ClassesPage";
 import { PaymentsPage } from "./payments/PaymentsPage";
+import { resources } from "../manage/config";
+import { ResourcePage } from "../manage/ResourcePage";
 const items = [
   ["dashboard", "Tổng quan"],
   ["members", "Hội viên"],
   ["membership", "Gói thành viên"],
   ["classes", "Đăng ký lớp"],
-  ["checkin", "Điểm danh"],
+  ["catalogue", "Quản lý lớp học"],
+  ["schedules", "Lịch & điểm danh"],
+  ["sports", "Bộ môn"],
+  ["rooms", "Phòng tập"],
   ["payments", "Thanh toán & hóa đơn"],
   ["support", "Yêu cầu hỗ trợ"],
 ] as const;
@@ -30,6 +35,24 @@ export function ReceptionLayout(props: PortalProps) {
         <Route path="/receptionist/membership" element={<MembershipPage />} />
         <Route path="/receptionist/classes" element={<ClassesPage />} />
         <Route path="/receptionist/payments" element={<PaymentsPage />} />
+        {resources
+          .filter((r) =>
+            ["sports", "rooms", "classes", "schedules"].includes(r.slug),
+          )
+          .map((r) => (
+            <Route
+              key={r.slug}
+              path={`/receptionist/${r.slug === "classes" ? "catalogue" : r.slug}`}
+              element={
+                <ResourcePage
+                  key={r.slug}
+                  resource={r}
+                  role="STAFF"
+                  userId={props.user.id}
+                />
+              }
+            />
+          ))}
         <Route
           path="/receptionist/checkin"
           element={

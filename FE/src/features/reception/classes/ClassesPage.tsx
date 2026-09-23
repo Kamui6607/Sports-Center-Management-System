@@ -114,7 +114,11 @@ export function ClassesPage() {
                 actions={(row) => (
                   <button
                     className="button small"
-                    disabled={row.status !== "BOOKED" || !row.id}
+                    disabled={
+                      row.status !== "BOOKED" ||
+                      !row.id ||
+                      Date.parse(String(schedule.startTime)) <= Date.now()
+                    }
                     onClick={() => setAction({ cancelId: String(row.id) })}
                   >
                     Hủy đăng ký của {display(at(row, "member.user.fullName"))}

@@ -490,9 +490,11 @@
                         "class": {
                           "id": "class-yoga-001",
                           "name": "Morning Yoga",
-                          "sport": {
-                            "name": "Yoga"
-                          },
+                          "sports": [
+                            {
+                              "name": "Yoga"
+                            }
+                          ],
                           "schedules": []
                         }
                       }
@@ -628,6 +630,8 @@
                     "startDate": "2026-09-11T14:20:14.968Z",
                     "endDate": "2026-10-11T14:20:14.968Z",
                     "status": "ACTIVE",
+                    "suspendedAt": null,
+                    "remainingDays": null,
                     "plan": {
                       "name": "Membership Monthly",
                       "tier": "MEMBERSHIP"
@@ -666,7 +670,9 @@
                   "tier": "MEMBERSHIP",
                   "startDate": "2026-09-11T14:20:14.968Z",
                   "endDate": "2026-10-11T14:20:14.968Z",
-                  "status": "ACTIVE",
+                  "status": "SUSPENDED",
+                  "suspendedAt": "2026-09-20T14:20:14.968Z",
+                  "remainingDays": 21,
                   "plan": {
                     "name": "Membership Monthly",
                     "tier": "MEMBERSHIP"
@@ -838,9 +844,11 @@
                     "id": "class-yoga-001",
                     "name": "Morning Yoga",
                     "description": "Gentle yoga class",
-                    "sport": {
-                      "name": "Yoga"
-                    },
+                    "sports": [
+                      {
+                        "name": "Yoga"
+                      }
+                    ],
                     "capacity": 15,
                     "classType": "REGULAR",
                     "isActive": true,
@@ -883,9 +891,11 @@
                 "data": {
                   "id": "class-boxing-001",
                   "name": "Boxing Basics",
-                  "sport": {
-                    "name": "Boxing"
-                  },
+                  "sports": [
+                    {
+                      "name": "Boxing"
+                    }
+                  ],
                   "capacity": 12,
                   "classType": "REGULAR"
                 }
@@ -906,9 +916,11 @@
                 "data": {
                   "id": "class-yoga-001",
                   "name": "Morning Yoga",
-                  "sport": {
-                    "name": "Yoga"
-                  },
+                  "sports": [
+                    {
+                      "name": "Yoga"
+                    }
+                  ],
                   "capacity": 15,
                   "classType": "REGULAR",
                   "isActive": true,
@@ -946,9 +958,11 @@
                     "status": "SCHEDULED",
                     "class": {
                       "name": "Morning Yoga",
-                      "sport": {
-                        "name": "Yoga"
-                      }
+                      "sports": [
+                        {
+                          "name": "Yoga"
+                        }
+                      ]
                     },
                     "room": {
                       "name": "Yoga Room A"
@@ -1011,9 +1025,11 @@
                   "status": "SCHEDULED",
                   "class": {
                     "name": "Morning Yoga",
-                    "sport": {
-                      "name": "Yoga"
-                    },
+                    "sports": [
+                      {
+                        "name": "Yoga"
+                      }
+                    ],
                     "coaches": []
                   },
                   "room": {
@@ -1046,9 +1062,11 @@
                     "endTime": "2026-09-15T08:00:00.000Z",
                     "class": {
                       "name": "Morning Yoga",
-                      "sport": {
-                        "name": "Yoga"
-                      }
+                      "sports": [
+                        {
+                          "name": "Yoga"
+                        }
+                      ]
                     },
                     "room": {
                       "name": "Yoga Room A"
@@ -1117,9 +1135,11 @@
                     "endTime": "2026-09-15T08:00:00.000Z",
                     "class": {
                       "name": "Morning Yoga",
-                      "sport": {
-                        "name": "Yoga"
-                      }
+                      "sports": [
+                        {
+                          "name": "Yoga"
+                        }
+                      ]
                     },
                     "room": {
                       "name": "Yoga Room A"
@@ -1250,6 +1270,9 @@
                     "total": "300000",
                     "status": "ISSUED",
                     "issuedAt": "2026-09-12T08:00:00.000Z",
+                    "memberName": "John Doe",
+                    "planName": "Membership Monthly",
+                    "planTier": "MEMBERSHIP",
                     "member": {
                       "user": {
                         "fullName": "John Doe"
@@ -1285,6 +1308,9 @@
                   "total": "300000",
                   "status": "ISSUED",
                   "issuedAt": "2026-09-12T08:00:00.000Z",
+                  "memberName": "John Doe",
+                  "planName": "Membership Monthly",
+                  "planTier": "MEMBERSHIP",
                   "member": {
                     "user": {
                       "fullName": "John Doe",
@@ -1423,6 +1449,41 @@
             }
           }
         }
+      },
+      "SubscriptionLogListOk": {
+        "description": "Paginated list of subscription logs",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "example": {
+                "success": true,
+                "message": "Subscription logs retrieved successfully",
+                "data": [
+                  {
+                    "id": "9643ec65-bacb-4b1b-9442-239bb60bd8fa",
+                    "action": "Mua / Gia hạn gói",
+                    "username": "Nguyễn Văn A",
+                    "email": "nguyenvana@gmail.com",
+                    "planName": "Gói Hội viên 1 tháng",
+                    "planTier": "MEMBERSHIP",
+                    "price": 500000,
+                    "paymentStatus": "SUCCESS",
+                    "startDate": "2026-09-18T00:00:00.000Z",
+                    "endDate": "2026-10-18T00:00:00.000Z",
+                    "purchasedAt": "2026-09-18T08:05:00.123Z"
+                  }
+                ],
+                "pagination": {
+                  "page": 1,
+                  "limit": 20,
+                  "total": 1,
+                  "totalPages": 1
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -1487,6 +1548,26 @@
     {
       "name": "Reports",
       "description": "Analytics & reports"
+    },
+    {
+      "name": "Chat",
+      "description": "Real-time messaging (Manager & Staff)"
+    },
+    {
+      "name": "Attendance",
+      "description": "Class attendance tracking"
+    },
+    {
+      "name": "Training",
+      "description": "Personalized training plans and results"
+    },
+    {
+      "name": "Notifications",
+      "description": "Manage user notifications"
+    },
+    {
+      "name": "Feedbacks",
+      "description": "Member đánh giá HLV sau buổi học"
     }
   ],
   "paths": {
@@ -1693,6 +1774,47 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fullName": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "MALE",
+                      "FEMALE",
+                      "OTHER"
+                    ]
+                  },
+                  "dateOfBirth": {
+                    "type": "string"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "MEMBER",
+                      "COACH",
+                      "STAFF",
+                      "MANAGER"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "$ref": "#/components/responses/UserOk"
@@ -1747,6 +1869,94 @@
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/training-plans": {
+      "get": {
+        "tags": [
+          "Training"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "memberId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Training"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "memberId": {
+                    "type": "string"
+                  },
+                  "coachId": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "startDate": {
+                    "type": "string"
+                  },
+                  "endDate": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/training-plans/results": {
+      "post": {
+        "tags": [
+          "Training"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "planId": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
           }
         }
       }
@@ -1970,9 +2180,15 @@
     },
     "/subscriptions/{id}/status": {
       "patch": {
-        "summary": "Update subscription status",
+        "summary": "Cập nhật trạng thái gói (Manager only)",
+        "description": "**Khi đổi sang `CANCELLED` (Manager hủy gói):**\n- Tự động tính hoàn tiền theo tỷ lệ ngày còn lại *(Prorated)*:\n  `refundAmount = (giá_gốc / tổng_ngày) × ngày_còn_lại`\n- Nếu còn ngày sử dụng → Payment gốc chuyển sang `REFUNDED`, Member nhận Notification `PAYMENT_REFUNDED`.\n- Nếu gói đã hết hạn (0 ngày còn lại) → Không hoàn tiền, gửi `SUBSCRIPTION_CANCELLED`.\n- Toàn bộ lịch học tương lai (`BOOKED`) của member **tự động bị hủy**.\n\n**Khi đổi sang `SUSPENDED`:** Lưu số ngày còn lại để khôi phục sau.\n\n**Khi đổi từ `SUSPENDED` → `ACTIVE`:** Cộng lại số ngày còn dư vào ngày kết thúc mới.\n",
         "tags": [
           "Subscriptions"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "parameters": [
           {
@@ -1998,10 +2214,29 @@
                     "type": "string",
                     "enum": [
                       "ACTIVE",
-                      "EXPIRED",
                       "CANCELLED",
                       "SUSPENDED"
                     ]
+                  }
+                }
+              },
+              "examples": {
+                "cancel": {
+                  "summary": "Hủy gói (tự động tính hoàn tiền)",
+                  "value": {
+                    "status": "CANCELLED"
+                  }
+                },
+                "suspend": {
+                  "summary": "Tạm dừng gói",
+                  "value": {
+                    "status": "SUSPENDED"
+                  }
+                },
+                "resume": {
+                  "summary": "Kích hoạt lại từ tạm dừng",
+                  "value": {
+                    "status": "ACTIVE"
                   }
                 }
               }
@@ -2010,10 +2245,158 @@
         },
         "responses": {
           "200": {
-            "$ref": "#/components/responses/SubscriptionOk"
+            "description": "Cập nhật thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "examples": {
+                  "cancelled_with_refund": {
+                    "summary": "Hủy + hoàn tiền prorated",
+                    "value": {
+                      "success": true,
+                      "message": "Subscription status updated",
+                      "data": {
+                        "id": "sub-uuid",
+                        "status": "CANCELLED",
+                        "refundAmount": 200000,
+                        "willRefund": true,
+                        "daysLeft": 20
+                      }
+                    }
+                  },
+                  "cancelled_no_refund": {
+                    "summary": "Hủy gói đã hết hạn",
+                    "value": {
+                      "success": true,
+                      "message": "Subscription status updated",
+                      "data": {
+                        "id": "sub-uuid",
+                        "status": "CANCELLED",
+                        "refundAmount": 0,
+                        "willRefund": false,
+                        "daysLeft": 0
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/subscriptions/{id}/cancel": {
+      "patch": {
+        "summary": "Member tự hủy gói của mình",
+        "description": "**Chính sách hoàn tiền khi Member tự hủy gói:**\n- Gói còn **> 15 ngày** sử dụng → Hoàn **30%** giá trị gói gốc (qua nhân viên).\n- Gói còn **≤ 15 ngày** sử dụng → **Không hoàn tiền**.\n\n**Hiệu lực khi hủy:**\n- Subscription chuyển sang `CANCELLED`.\n- Toàn bộ lịch học đã đặt trong tương lai (`BOOKED`) sẽ tự động bị `CANCELLED`.\n- Payment gốc chuyển sang `REFUNDED` nếu đủ điều kiện.\n- Member nhận Notification ngay lập tức với thông tin hoàn tiền (nếu có).\n",
+        "tags": [
+          "Subscriptions"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Subscription ID (phải là gói của chính mình)"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Lý do hủy gói (không bắt buộc)",
+                    "example": "Tôi không có thời gian tập luyện nữa"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Hủy thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "examples": {
+                  "refund_eligible": {
+                    "summary": "Hoàn tiền 30% (còn > 15 ngày)",
+                    "value": {
+                      "success": true,
+                      "message": "Hủy thành công. Hoàn 150,000đ (30%) vì còn 20 ngày.",
+                      "data": {
+                        "subscriptionId": "sub-uuid",
+                        "status": "CANCELLED",
+                        "daysLeft": 20,
+                        "refundAmount": 150000,
+                        "willRefund": true
+                      }
+                    }
+                  },
+                  "no_refund": {
+                    "summary": "Không hoàn tiền (còn ≤ 15 ngày)",
+                    "value": {
+                      "success": true,
+                      "message": "Hủy thành công. Không hoàn tiền vì còn ≤ 15 ngày (còn 10 ngày).",
+                      "data": {
+                        "subscriptionId": "sub-uuid",
+                        "status": "CANCELLED",
+                        "daysLeft": 10,
+                        "refundAmount": 0,
+                        "willRefund": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Gói không ở trạng thái ACTIVE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "success": false,
+                  "message": "Không thể hủy gói đang ở trạng thái CANCELLED"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -2681,6 +3064,63 @@
         }
       }
     },
+    "/reports/subscription-logs": {
+      "get": {
+        "summary": "Detailed log of subscription purchases",
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "startDate",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endDate",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SubscriptionLogListOk"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/payments": {
       "post": {
         "summary": "Record a payment (auto-creates invoice on SUCCESS)",
@@ -2926,6 +3366,202 @@
         }
       }
     },
+    "/notifications": {
+      "get": {
+        "summary": "Get my notifications",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MEMBER_REGISTERED",
+                "CHAT_MESSAGE",
+                "SUBSCRIPTION_EXPIRING",
+                "SUBSCRIPTION_EXPIRED",
+                "SUBSCRIPTION_CANCELLED",
+                "UPCOMING_CLASS",
+                "SCHEDULE_CANCELLED",
+                "SCHEDULE_UPDATED",
+                "ENROLLMENT_CONFIRMED",
+                "ENROLLMENT_CANCELLED",
+                "TRAINING_PLAN_ASSIGNED",
+                "NEW_CLASS",
+                "COACH_CHANGED",
+                "PAYMENT_SUCCESS",
+                "PAYMENT_REFUNDED",
+                "PAYMENT_FAILED"
+              ]
+            },
+            "description": "Filter by notification type"
+          },
+          {
+            "in": "query",
+            "name": "isRead",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "description": "Filter by read status"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of notifications"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "summary": "Get count of unread notifications",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unread count retrieved successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/notifications/mark-all-read": {
+      "patch": {
+        "summary": "Mark all my notifications as read",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All notifications marked as read"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/notifications/{id}/read": {
+      "patch": {
+        "summary": "Mark a specific notification as read",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Notification ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification marked as read"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/notifications/trigger-upcoming-reminders": {
+      "post": {
+        "summary": "Manually trigger upcoming class reminders (within 24h)",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reminders triggered successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/membership-plans": {
       "get": {
         "summary": "List membership plans (public)",
@@ -3080,6 +3716,40 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number"
+                  },
+                  "durationDays": {
+                    "type": "integer"
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "MEMBERSHIP",
+                      "PREMIUM"
+                    ]
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "$ref": "#/components/responses/PlanOk"
@@ -3247,6 +3917,49 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fullName": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "MALE",
+                      "FEMALE",
+                      "OTHER"
+                    ]
+                  },
+                  "dateOfBirth": {
+                    "type": "string"
+                  },
+                  "fitnessGoal": {
+                    "type": "string"
+                  },
+                  "trainingLevel": {
+                    "type": "string",
+                    "enum": [
+                      "BEGINNER",
+                      "INTERMEDIATE",
+                      "ADVANCED"
+                    ]
+                  },
+                  "trainingPreference": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "$ref": "#/components/responses/MemberOk"
@@ -3439,11 +4152,399 @@
         }
       }
     },
+    "/feedbacks": {
+      "post": {
+        "summary": "Member gửi đánh giá cho HLV",
+        "description": "**Business Rules:**\n- Chỉ Member đã từng `BOOKED` hoặc `COMPLETED` ít nhất 1 buổi học cùng HLV mới được đánh giá.\n- Mỗi cặp (member + coach + class) chỉ có **1 feedback** — gửi lại sẽ cập nhật feedback cũ.\n- `isAnonymous: true` → tên member sẽ được ẩn khi hiển thị công khai.\n",
+        "tags": [
+          "Feedbacks"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "coachId",
+                  "rating"
+                ],
+                "properties": {
+                  "coachId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "CoachProfile ID"
+                  },
+                  "classId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Lớp học liên quan (tuỳ chọn)"
+                  },
+                  "rating": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "description": "Số sao đánh giá (1–5)",
+                    "example": 5
+                  },
+                  "comment": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "description": "Nhận xét chi tiết",
+                    "example": "HLV rất nhiệt tình, hướng dẫn chi tiết và dễ hiểu!"
+                  },
+                  "isAnonymous": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Ẩn tên khi hiển thị công khai"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Gửi đánh giá thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Cảm ơn bạn đã gửi đánh giá!",
+                  "data": {
+                    "id": "fb-uuid",
+                    "coachId": "coach-uuid",
+                    "rating": 5,
+                    "comment": "HLV rất nhiệt tình!",
+                    "isAnonymous": false,
+                    "coach": {
+                      "user": {
+                        "fullName": "Nguyễn Văn A"
+                      }
+                    },
+                    "class": {
+                      "name": "Morning Yoga"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Member chưa từng học với HLV này",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "success": false,
+                  "message": "Bạn chỉ có thể đánh giá HLV mà bạn đã hoặc đang học cùng."
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "get": {
+        "summary": "Xem danh sách đánh giá của một HLV (public)",
+        "description": "Trả về danh sách feedback và điểm trung bình (averageRating) của HLV.\nCác feedback có `isAnonymous: true` sẽ hiển thị tên là **\"Ẩn danh\"**.\n",
+        "tags": [
+          "Feedbacks"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "coachId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "CoachProfile ID cần xem đánh giá"
+          },
+          {
+            "in": "query",
+            "name": "classId",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Lọc theo lớp học cụ thể (tuỳ chọn)"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách feedbacks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "feedbacks": [
+                      {
+                        "id": "fb-uuid-1",
+                        "rating": 5,
+                        "comment": "Rất tuyệt vời!",
+                        "isAnonymous": false,
+                        "member": {
+                          "user": {
+                            "fullName": "Trần Thị B"
+                          }
+                        },
+                        "coach": {
+                          "user": {
+                            "fullName": "Nguyễn Văn A"
+                          }
+                        },
+                        "class": {
+                          "name": "Morning Yoga"
+                        }
+                      },
+                      {
+                        "id": "fb-uuid-2",
+                        "rating": 4,
+                        "comment": "Tốt",
+                        "isAnonymous": true,
+                        "member": {
+                          "user": {
+                            "fullName": "Ẩn danh"
+                          }
+                        }
+                      }
+                    ],
+                    "summary": {
+                      "averageRating": 4.5,
+                      "totalFeedbacks": 12
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/feedbacks/my": {
+      "get": {
+        "summary": "Member xem danh sách feedback mình đã gửi",
+        "tags": [
+          "Feedbacks"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách feedback của member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "id": "fb-uuid",
+                      "rating": 5,
+                      "comment": "HLV rất tốt!",
+                      "coach": {
+                        "user": {
+                          "fullName": "Nguyễn Văn A"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/feedbacks/{id}": {
+      "delete": {
+        "summary": "Member xóa feedback của mình",
+        "tags": [
+          "Feedbacks"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Feedback ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Xóa thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "message": "Feedback đã được xóa thành công."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/feedbacks/{id}/manager": {
+      "delete": {
+        "summary": "Manager xóa feedback vi phạm",
+        "tags": [
+          "Feedbacks"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Feedback ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Xóa thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "message": "Feedback đã được xóa bởi quản lý."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/enrollments": {
       "post": {
         "summary": "Book a class (Member books own class; Staff/Manager book for a member)",
+        "description": "**Business Rules (Chốt chặn nghiệp vụ):**\n- Membership must be ACTIVE at booking time.\n- Membership `endDate` must be ≥ `schedule.startTime` — cannot book a class that happens after your plan expires.\n- PREMIUM class requires PREMIUM tier.\n- No double-booking the same schedule.\n- No two schedules with overlapping time.\n- Class capacity must not be exceeded.\n",
         "tags": [
           "Enrollments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
         ],
         "requestBody": {
           "required": true,
@@ -3456,13 +4557,18 @@
                 ],
                 "properties": {
                   "scheduleId": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid"
                   },
                   "memberId": {
                     "type": "string",
+                    "format": "uuid",
                     "description": "Required when booked by Staff/Manager"
                   }
                 }
+              },
+              "example": {
+                "scheduleId": "a1b2c3d4-0000-0000-0000-000000000001"
               }
             }
           }
@@ -3478,7 +4584,37 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "$ref": "#/components/responses/Forbidden"
+            "description": "Forbidden — one of:\n- No active membership\n- Membership expires before class date\n- PREMIUM class requires PREMIUM plan\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "examples": {
+                  "no_membership": {
+                    "summary": "No active membership",
+                    "value": {
+                      "success": false,
+                      "message": "Bạn không có gói tập đang hoạt động. Vui lòng mua gói để đặt lịch."
+                    }
+                  },
+                  "plan_expires_before_class": {
+                    "summary": "Plan expires before class",
+                    "value": {
+                      "success": false,
+                      "message": "Gói tập của bạn sẽ hết hạn ngày 25/09/2026, trước khi lớp học diễn ra ngày 30/09/2026. Vui lòng gia hạn gói để đặt lịch."
+                    }
+                  },
+                  "premium_required": {
+                    "summary": "PREMIUM class requires PREMIUM plan",
+                    "value": {
+                      "success": false,
+                      "message": "Premium membership required to book this class."
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -3499,22 +4635,6 @@
           "Enrollments"
         ],
         "parameters": [
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "in": "query",
             "name": "status",
@@ -3752,6 +4872,23 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "fullName": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "MALE",
+                      "FEMALE",
+                      "OTHER"
+                    ]
+                  },
+                  "dateOfBirth": {
+                    "type": "string"
+                  },
                   "specialization": {
                     "type": "string"
                   },
@@ -3887,7 +5024,7 @@
                 "type": "object",
                 "required": [
                   "name",
-                  "sportId",
+                  "sportIds",
                   "capacity"
                 ],
                 "properties": {
@@ -3898,8 +5035,12 @@
                   "description": {
                     "type": "string"
                   },
-                  "sportId": {
-                    "type": "string"
+                  "sportIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
                   },
                   "capacity": {
                     "type": "integer",
@@ -4002,8 +5143,12 @@
                   "description": {
                     "type": "string"
                   },
-                  "sportId": {
-                    "type": "string"
+                  "sportIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
                   },
                   "capacity": {
                     "type": "integer"
@@ -4083,7 +5228,7 @@
     },
     "/classes/{id}/coaches": {
       "post": {
-        "summary": "Assign coach to class",
+        "summary": "Assign coach to class (Sends COACH_CHANGED notification to enrolled members)",
         "tags": [
           "Classes"
         ],
@@ -4146,7 +5291,7 @@
     },
     "/classes/{id}/coaches/{coachId}": {
       "delete": {
-        "summary": "Remove coach from class",
+        "summary": "Remove coach from class (Sends COACH_CHANGED notification to enrolled members)",
         "tags": [
           "Classes"
         ],
@@ -4492,6 +5637,212 @@
         }
       }
     },
+    "/class-schedules/{id}/complete": {
+      "patch": {
+        "summary": "Mark a schedule as COMPLETED (only after endTime)",
+        "tags": [
+          "Class Schedules"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ScheduleOk"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/chat/contacts": {
+      "get": {
+        "summary": "Get eligible chat contacts",
+        "description": "Retrieves a list of users the current user is allowed to chat with based on their role.",
+        "tags": [
+          "Chat"
+        ],
+        "responses": {
+          "200": {
+            "description": "Contacts retrieved successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/chat/conversations": {
+      "get": {
+        "summary": "Get list of conversations",
+        "description": "Retrieves a list of users the current user has chatted with, along with the latest message and unread count per user.",
+        "tags": [
+          "Chat"
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversations retrieved successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/chat/messages": {
+      "get": {
+        "summary": "Get chat messages",
+        "description": "Fetches message history with a specific target user, or the global chat room if targetId is omitted.",
+        "tags": [
+          "Chat"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "targetId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional ID of the user to get private messages with"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages retrieved successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "summary": "Send a message",
+        "description": "Send a text message, an image/file, or both. If sending a file, it must be sent as multipart/form-data.",
+        "tags": [
+          "Chat"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "receiverId": {
+                    "type": "string",
+                    "description": "ID of the receiver for 1-1 chat. If omitted, it sends to the global chat."
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "Text content of the message"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "File or image to upload"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message sent successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/chat/messages/read": {
+      "patch": {
+        "summary": "Mark messages as read",
+        "description": "Marks all unread messages from a specific sender as read in bulk.",
+        "tags": [
+          "Chat"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targetId": {
+                    "type": "string",
+                    "description": "ID of the sender whose messages are being read"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Messages marked as read successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/chat/messages/unread-count": {
+      "get": {
+        "summary": "Get global unread message count",
+        "description": "Returns the total number of unread messages across all conversations for the current user.",
+        "tags": [
+          "Chat"
+        ],
+        "responses": {
+          "200": {
+            "description": "Unread count retrieved successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/auth/register": {
       "post": {
         "summary": "Register a new member account",
@@ -4513,17 +5864,21 @@
                 "properties": {
                   "email": {
                     "type": "string",
-                    "format": "email"
+                    "format": "email",
+                    "description": "Will be converted to lowercase"
                   },
                   "password": {
                     "type": "string",
                     "minLength": 6
                   },
                   "fullName": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100
                   },
                   "phone": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[0-9+]{9,15}$",
+                    "description": "Optional, 9-15 digits, can start with +"
                   },
                   "gender": {
                     "type": "string",
@@ -4534,7 +5889,9 @@
                     ]
                   },
                   "dateOfBirth": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date",
+                    "description": "Must be in the past"
                   }
                 }
               }
@@ -4721,10 +6078,13 @@
                 "type": "object",
                 "properties": {
                   "fullName": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100
                   },
                   "phone": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[0-9+]{9,15}$",
+                    "description": "Optional, 9-15 digits, can start with +"
                   },
                   "gender": {
                     "type": "string",
@@ -4733,6 +6093,11 @@
                       "FEMALE",
                       "OTHER"
                     ]
+                  },
+                  "dateOfBirth": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Must be in the past"
                   },
                   "fitnessGoal": {
                     "type": "string"
@@ -4813,6 +6178,270 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance": {
+      "get": {
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "scheduleId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scheduleId": {
+                    "type": "string"
+                  },
+                  "memberId": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "PRESENT",
+                      "ABSENT",
+                      "LATE",
+                      "EXCUSED"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/attendance/{id}": {
+      "patch": {
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "PRESENT",
+                      "ABSENT",
+                      "LATE",
+                      "EXCUSED"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/attendance/generate-qr": {
+      "post": {
+        "summary": "Generate a short-lived QR token for attendance (Coach/Manager only)",
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "scheduleId"
+                ],
+                "properties": {
+                  "scheduleId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "QR token generated"
+          }
+        }
+      }
+    },
+    "/attendance/scan-qr": {
+      "post": {
+        "summary": "Scan a QR token to mark self as PRESENT (Member only)",
+        "description": "**Chốt chặn 2:** Tại thời điểm quét QR, hệ thống kiểm tra lại gói tập của member có còn hạn hay không.\nDù đã đặt lịch thành công trước đó, nếu gói hết hạn trước khi đi học → bị từ chối điểm danh.\n",
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "qrToken"
+                ],
+                "properties": {
+                  "qrToken": {
+                    "type": "string",
+                    "description": "JWT token from QR code shown by Coach"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Marked as PRESENT successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "att-uuid",
+                    "status": "PRESENT"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "QR expired or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "examples": {
+                  "qr_expired": {
+                    "summary": "QR expired",
+                    "value": {
+                      "success": false,
+                      "message": "Mã QR đã hết hạn. Yêu cầu HLV mở mã mới."
+                    }
+                  },
+                  "qr_invalid": {
+                    "summary": "QR invalid",
+                    "value": {
+                      "success": false,
+                      "message": "Mã QR không hợp lệ."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Not enrolled or subscription expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "examples": {
+                  "not_enrolled": {
+                    "summary": "Not enrolled",
+                    "value": {
+                      "success": false,
+                      "message": "Bạn chưa đặt chỗ cho lớp học này nên không thể điểm danh."
+                    }
+                  },
+                  "subscription_expired": {
+                    "summary": "Subscription expired at scan time",
+                    "value": {
+                      "success": false,
+                      "message": "Gói tập của bạn đã hết hạn. Vui lòng gia hạn để có thể vào lớp học."
+                    }
+                  }
+                }
+              }
+            }
           },
           "500": {
             "$ref": "#/components/responses/ServerError"

@@ -15,3 +15,8 @@ export const CreateTrainingResultSchema = z.object({
   metrics: z.record(z.any()).optional(),
   coachNote: z.string().optional()
 });
+
+// Đổi HLV của kế hoạch tập luyện (chỉ đụng TrainingPlan.coachId, không cần migration).
+export const UpdateTrainingPlanSchema = z.object({
+  coachId: z.string().uuid(),
+});

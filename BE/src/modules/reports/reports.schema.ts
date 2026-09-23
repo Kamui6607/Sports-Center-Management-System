@@ -7,3 +7,11 @@ export const DateRangeSchema = z.object({
   message: "endDate must be after or equal to startDate",
   path: ["endDate"],
 });
+
+export const AttendanceReportQuerySchema = z.object({
+  status: z.enum(["OK", "WARN", "RELEASE"]).optional(),
+  classId: z.string().optional(),
+  memberId: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});

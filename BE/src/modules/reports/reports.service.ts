@@ -1,4 +1,7 @@
 import { prisma } from "../../config/prisma.js";
+import { buildPaginationMeta } from "../../utils/pagination.js";
+import { computeAttendanceBuckets } from "../attendance/attendance-analytics.service.js";
+import { expireStalePenalties } from "../attendance/attendance-penalties.service.js";
 
 export async function getRevenueReport(startDate: string, endDate: string) {
   // BR-26: Parse as VN business day boundaries (start of startDate, end of endDate in +07:00)
@@ -268,4 +271,69 @@ export async function getSubscriptionLogs(startDate?: string, endDate?: string, 
       totalPages: Math.ceil(total / limit),
     }
   };
+}
+
+/**
+ * §6: Báo cáo chuyên cần theo (member × class) cho Manager review trước khi áp dụng hình phạt.
+ * Cửa sổ tính cố định: tối đa 10 buổi đã kết thúc gần nhất (không dùng date range).
+ * status: OK | WARN | RELEASE; kèm penalty đang hiệu lực (nếu có).
+ */
+export async function getAttendanceReport(query: {
+  status?: string;
+  classId?: string;
+  memberId?: string;
+  page?: string;
+  limit?: string;
+}) {
+  await expireStalePenalties();
+
+  const buckets = await computeAttendanceBuckets(prisma);
+  const penalties = await prisma.attendancePenalty.findMany({
+    where: { status: { in: ["PENDING", "APPLIED"] } },
+    select: {
+      id: true,
+      memberId: true,
+      classId: true,
+      status: true,
+      blockedUntil: true,
+      releasedCount: true,
+    },
+  });
+  const penaltyMap = new Map(penalties.map((p) => [`${p.memberId}|${p.classId}`, p]));
+
+  let rows = buckets.map((bucket) => {
+    const penalty = penaltyMap.get(`${bucket.memberId}|${bucket.classId}`);
+    return {
+      ...bucket,
+      activePenalty: penalty
+        ? {
+            id: penalty.id,
+            status: penalty.status,
+            blockedUntil: penalty.blockedUntil,
+            releasedCount: penalty.releasedCount,
+          }
+        : null,
+    };
+  });
+
+  const summary = {
+    total: rows.length,
+    ok: rows.filter((r) => r.status === "OK").length,
+    warn: rows.filter((r) => r.status === "WARN").length,
+    release: rows.filter((r) => r.status === "RELEASE").length,
+  };
+
+  if (query.status) rows = rows.filter((r) => r.status === query.status);
+  if (query.classId) rows = rows.filter((r) => r.classId === query.classId);
+  if (query.memberId) rows = rows.filter((r) => r.memberId === query.memberId);
+
+  // Ưu tiên rủi ro cao trước: rate thấp nhất, rồi tới mẫu lớn hơn.
+  rows.sort((a, b) => a.attendanceRate - b.attendanceRate || b.sampleSize - a.sampleSize);
+
+  const page = Math.max(1, parseInt(query.page ?? "1") || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "20") || 20));
+  const total = rows.length;
+  const paged = rows.slice((page - 1) * limit, page * limit);
+
+  return { rows: paged, summary, pagination: buildPaginationMeta(total, page, limit) };
 }

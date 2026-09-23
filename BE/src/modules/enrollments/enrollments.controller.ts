@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as enrollmentsService from "./enrollments.service.js";
+import * as quotaService from "./enrollment-quota.service.js";
 import { sendSuccess, sendCreated, sendError } from "../../utils/response.js";
 import { prisma } from "../../config/prisma.js";
 
@@ -57,6 +58,18 @@ export async function cancelEnrollment(req: Request, res: Response, next: NextFu
   } catch (err) { next(err); }
 }
 
+export async function transferEnrollment(req: Request, res: Response, next: NextFunction) {
+  try {
+    const enrollment = await enrollmentsService.transferEnrollment(
+      req.params.id as string,
+      req.body.targetScheduleId,
+      req.user!.id,
+      req.user!.role
+    );
+    sendSuccess(res, enrollment, "Enrollment transferred successfully");
+  } catch (err) { next(err); }
+}
+
 export async function getMyEnrollments(req: Request, res: Response, next: NextFunction) {
   try {
     const { enrollments, pagination } = await enrollmentsService.getMyEnrollments(
@@ -74,5 +87,16 @@ export async function getScheduleEnrollments(req: Request, res: Response, next: 
       req.query
     );
     sendSuccess(res, enrollments, "Schedule enrollments retrieved successfully", 200, pagination);
+  } catch (err) { next(err); }
+}
+
+/**
+ * Quota lớp học song song của CHÍNH member đang đăng nhập (không nhận memberId từ ngoài),
+ * nên không thể xem quota của member khác.
+ */
+export async function getMyQuota(req: Request, res: Response, next: NextFunction) {
+  try {
+    const quota = await quotaService.getMyConcurrentClassQuota(req.user!.id);
+    sendSuccess(res, quota, "Concurrent class quota retrieved successfully");
   } catch (err) { next(err); }
 }

@@ -109,12 +109,18 @@ router.patch(
  * /members/{id}/membership-status:
  *   get:
  *     summary: Get member effective tier and active subscription
+ *     description: |
+ *       `effectiveTier` = tier của MembershipSubscription ACTIVE (FREE | MEMBERSHIP | PREMIUM).
+ *       Khi member KHÔNG có subscription ACTIVE → `effectiveTier = null`, `activeSubscription = null`,
+ *       `daysRemaining = null` (KHÔNG dùng "FREE" để đại diện cho "không có gói") — nhất quán với
+ *       `GET /enrollments/my/quota`. Authorization không đổi: MANAGER / STAFF.
  *     tags: [Members]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema: { type: string }
+ *         description: memberProfile.id hoặc userId
  *     responses:
  *       200: { $ref: "#/components/responses/MembershipStatusOk" }
  *       401: { $ref: "#/components/responses/Unauthorized" }

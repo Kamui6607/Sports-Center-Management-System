@@ -6,6 +6,7 @@ import {
   CreateClassSchema,
   UpdateClassSchema,
   AssignCoachSchema,
+  AssignSupportCoachSchema,
   ClassQuerySchema,
 } from "./classes.schema.js";
 import * as classesController from "./classes.controller.js";
@@ -41,7 +42,13 @@ const router = Router();
  *         schema:
  *           type: string
  *           enum: [REGULAR, PREMIUM]
- *         description: Filter by class type
+ *         description: Filter by class tier (REGULAR | PREMIUM)
+ *       - in: query
+ *         name: areaType
+ *         schema:
+ *           type: string
+ *           enum: [POOL, INDOOR, OUTDOOR]
+ *         description: Filter by area type (POOL | INDOOR | OUTDOOR)
  *       - in: query
  *         name: coachId
  *         schema:
@@ -112,6 +119,7 @@ router.get("/:id", authenticate, classesController.getClassById);
  *               - name
  *               - sportIds
  *               - capacity
+ *               - areaType
  *             properties:
  *               name:
  *                 type: string
@@ -130,6 +138,12 @@ router.get("/:id", authenticate, classesController.getClassById);
  *                 type: string
  *                 enum: [REGULAR, PREMIUM]
  *                 default: REGULAR
+ *                 description: "Class tier (REGULAR | PREMIUM). Different from areaType."
+ *               areaType:
+ *                 type: string
+ *                 enum: [POOL, INDOOR, OUTDOOR]
+ *                 example: "INDOOR"
+ *                 description: "Area type required by this class. Every selected sport must support it."
  *     responses:
  *       201: { $ref: "#/components/responses/ClassCreated" }
  *       400: { $ref: "#/components/responses/BadRequest" }
@@ -179,6 +193,10 @@ router.post(
  *               classType:
  *                 type: string
  *                 enum: [REGULAR, PREMIUM]
+ *               areaType:
+ *                 type: string
+ *                 enum: [POOL, INDOOR, OUTDOOR]
+ *                 description: "New area type. All sports of this class must support it, and upcoming schedules must use a matching Room."
  *               isActive:
  *                 type: boolean
  *     responses:
@@ -267,6 +285,53 @@ router.post(
   authorize("MANAGER", "STAFF"),
   validate(AssignCoachSchema),
   classesController.assignCoach
+);
+
+/**
+ * @swagger
+ * /classes/{id}/coaches/support:
+ *   post:
+ *     summary: Assign a support coach to class (Sends COACH_CHANGED notification to enrolled members)
+ *     description: >
+ *       Gán HLV hỗ trợ cho Class. Mỗi Class chỉ có duy nhất 1 HLV chính (isPrimary = true),
+ *       HLV hỗ trợ luôn được lưu với isPrimary = false nên endpoint này không nhận isPrimary.
+ *       Idempotent khi HLV đã là HLV hỗ trợ của Class (không gửi lại thông báo).
+ *       Trả 409 nếu HLV đang là HLV chính của Class hoặc trùng lịch với buổi SCHEDULED sắp tới.
+ *     tags: [Classes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Class ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - coachId
+ *             properties:
+ *               coachId:
+ *                 type: string
+ *                 description: CoachProfile ID
+ *     responses:
+ *       200: { $ref: "#/components/responses/ClassOk" }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *       409: { $ref: "#/components/responses/Conflict" }
+ *       500: { $ref: "#/components/responses/ServerError" }
+ */
+router.post(
+  "/:id/coaches/support",
+  authenticate,
+  authorize("MANAGER", "STAFF"),
+  validate(AssignSupportCoachSchema),
+  classesController.assignSupportCoach
 );
 
 /**

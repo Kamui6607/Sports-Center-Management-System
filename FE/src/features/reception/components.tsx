@@ -19,7 +19,7 @@ export function Heading({
   return (
     <div className="page-heading">
       <div>
-        <div className="eyebrow">KHÔNG GIAN LỄ TÂN</div>
+        <div className="eyebrow">VẬN HÀNH TRUNG TÂM</div>
         <h1>{title}</h1>
       </div>
       {children}
@@ -163,7 +163,7 @@ export function ActionForm({
   const [busy, setBusy] = useState(false);
   const done = () => {
     setSuccess(true);
-    void cache.invalidateQueries({ queryKey: ["reception"] });
+    void cache.invalidateQueries();
   };
   return (
     <Modal title={title} onClose={onClose} dismissible={!busy}>

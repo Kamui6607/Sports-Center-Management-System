@@ -1,5 +1,6 @@
 import operations from "./operations.json";
 import { localizeApiError } from "./apiErrors";
+import { terminalSessionError } from "./businessRules";
 import type { LoginOk, ProfileOk, PostAuthLoginRequest } from "./generated";
 export type RecordData = { [key: string]: unknown };
 export interface Envelope<T> {
@@ -64,6 +65,7 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public errors: Envelope<unknown>["errors"] = [],
+    public terminalSession = false,
   ) {
     super(message);
   }
@@ -80,10 +82,14 @@ async function transport(
       method,
       headers: {
         Accept: "application/json",
-        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(body !== undefined && !(body instanceof FormData)
+          ? { "Content-Type": "application/json" }
+          : {}),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      ...(body !== undefined
+        ? { body: body instanceof FormData ? body : JSON.stringify(body) }
+        : {}),
       signal: signal
         ? AbortSignal.any([signal, AbortSignal.timeout(60000)])
         : AbortSignal.timeout(60000),
@@ -113,7 +119,12 @@ async function transport(
       payload.errors,
       res.status,
     );
-    throw new ApiError(localized.message, res.status, localized.errors);
+    throw new ApiError(
+      localized.message,
+      res.status,
+      localized.errors,
+      terminalSessionError(String(payload.message || "")),
+    );
   }
   return payload;
 }
@@ -179,6 +190,18 @@ export async function api<T = RecordData>(
       options.signal,
     )) as Envelope<T>;
   } catch (e) {
+    if (
+      e instanceof ApiError &&
+      e.status === 401 &&
+      e.terminalSession &&
+      op.security.length
+    ) {
+      clearSession();
+      window.dispatchEvent(
+        new CustomEvent("session-expired", { detail: e.message }),
+      );
+      throw e;
+    }
     if (
       e instanceof ApiError &&
       e.status === 401 &&

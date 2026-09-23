@@ -1,22 +1,23 @@
+import { sportNames } from "../../shared/sports";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { classesApi } from "../../api/classes.api";
+import { Search, Volleyball, Users, Sparkles, ArrowRight } from "lucide-react";
 import {
-  Search,
-  Volleyball,
-  Users,
-  Sparkles,
-  ArrowRight,
-} from "lucide-react";
-import { LoadingSpinner, EmptyState, StatusBadge } from "../../components/common";
+  LoadingSpinner,
+  EmptyState,
+  StatusBadge,
+} from "../../components/common";
 
 export function BrowseClassesPage() {
   const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
   const [selectedSport, setSelectedSport] = useState<string>("");
-  const [selectedType, setSelectedType] = useState<"REGULAR" | "PREMIUM" | "">("");
+  const [selectedType, setSelectedType] = useState<"REGULAR" | "PREMIUM" | "">(
+    "",
+  );
   const [page, setPage] = useState(1);
 
   // Fetch sports for filtering
@@ -26,7 +27,11 @@ export function BrowseClassesPage() {
   });
 
   // Fetch classes
-  const { data: classData, isLoading, error } = useQuery({
+  const {
+    data: classData,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["classes", search, selectedSport, selectedType, page],
     queryFn: () =>
       classesApi.getClasses({
@@ -59,11 +64,19 @@ export function BrowseClassesPage() {
         }}
       >
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#203d31", margin: "0 0 6px" }}>
+          <h1
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              color: "#203d31",
+              margin: "0 0 6px",
+            }}
+          >
             Khám phá Lớp học Thể thao
           </h1>
           <p style={{ margin: 0, color: "#58695f", fontSize: 13 }}>
-            Lựa chọn môn thể thao yêu thích, xem lịch học và đặt chỗ trực tuyến nhanh chóng
+            Lựa chọn môn thể thao yêu thích, xem lịch học và đặt chỗ trực tuyến
+            nhanh chóng
           </p>
         </div>
       </div>
@@ -86,7 +99,12 @@ export function BrowseClassesPage() {
           <Search
             size={17}
             color="#58695f"
-            style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
+            style={{
+              position: "absolute",
+              left: 12,
+              top: "50%",
+              transform: "translateY(-50%)",
+            }}
           />
           <input
             type="text"
@@ -201,7 +219,14 @@ export function BrowseClassesPage() {
                 }}
               >
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginBottom: 12,
+                    }}
+                  >
                     <span
                       style={{
                         fontSize: 12,
@@ -213,7 +238,7 @@ export function BrowseClassesPage() {
                         border: "1px solid #d4ebbf",
                       }}
                     >
-                      {c.sport?.name || "Thể thao"}
+                      {sportNames(c)}
                     </span>
                     <StatusBadge status={c.classType} />
                   </div>
@@ -242,25 +267,52 @@ export function BrowseClassesPage() {
                       overflow: "hidden",
                     }}
                   >
-                    {c.description || "Lớp học tiêu chuẩn rèn luyện thể chất với giáo trình bài bản và chuyên nghiệp."}
+                    {c.description ||
+                      "Lớp học tiêu chuẩn rèn luyện thể chất với giáo trình bài bản và chuyên nghiệp."}
                   </p>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12, color: "#475467" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      fontSize: 12,
+                      color: "#475467",
+                    }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 6 }}
+                    >
                       <Users size={14} color="#58695f" />
-                      <span>Sức chứa: <strong>{c.capacity} học viên</strong></span>
+                      <span>
+                        Sức chứa: <strong>{c.capacity} học viên</strong>
+                      </span>
                     </div>
 
                     {primaryCoach && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
                         <Sparkles size={14} color="#58695f" />
-                        <span>HLV chính: <strong>{primaryCoach}</strong></span>
+                        <span>
+                          HLV chính: <strong>{primaryCoach}</strong>
+                        </span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #f2f5f3" }}>
+                <div
+                  style={{
+                    marginTop: 20,
+                    paddingTop: 16,
+                    borderTop: "1px solid #f2f5f3",
+                  }}
+                >
                   <button
                     onClick={() => navigate(`/member/classes/${c.id}`)}
                     style={{
@@ -288,6 +340,27 @@ export function BrowseClassesPage() {
           })}
         </div>
       )}
+      <div className="pagination">
+        <button
+          className="button"
+          disabled={page === 1 || isLoading}
+          onClick={() => setPage((p) => p - 1)}
+        >
+          Trang trước
+        </button>
+        <span>Trang {page}</span>
+        <button
+          className="button"
+          disabled={
+            isLoading ||
+            !classData?.pagination ||
+            page >= classData.pagination.totalPages
+          }
+          onClick={() => setPage((p) => p + 1)}
+        >
+          Trang sau
+        </button>
+      </div>
     </div>
   );
 }

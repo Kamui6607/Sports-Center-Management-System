@@ -1,3 +1,4 @@
+import { allPages } from "../shared/pagedApi";
 import { apiClient } from "./client";
 import type { Enrollment } from "../types/member";
 
@@ -15,6 +16,14 @@ export const enrollmentsApi = {
   async getMyEnrollments(
     query: EnrollmentQuery = {},
   ): Promise<{ enrollments: Enrollment[]; pagination?: unknown }> {
+    if (!query.page)
+      return {
+        enrollments: (
+          await allPages<Enrollment>("GET /enrollments/my", {
+            query: query.status ? { status: query.status } : {},
+          })
+        ).data,
+      };
     const params = new URLSearchParams();
     if (query.status) params.append("status", query.status);
     if (query.page) params.append("page", String(query.page));

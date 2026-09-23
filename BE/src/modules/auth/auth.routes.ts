@@ -17,6 +17,11 @@ const router = Router();
  * /auth/register:
  *   post:
  *     summary: Register a new member account
+ *     description: |
+ *       Tạo tài khoản MEMBER + MemberProfile. **Backend tự động cấp kèm một MembershipSubscription ACTIVE
+ *       với gói FREE** (`MembershipPlan.tier = FREE`, `maxConcurrentClasses = 0`) — idempotent, không tạo trùng
+ *       nếu member đã có subscription ACTIVE. Vì vậy ngay sau khi đăng ký, `GET /enrollments/my/quota` trả
+ *       `hasActiveSubscription = true`, `tier = "FREE"`, `limit = 0`, `used = 0`, `remaining = 0`.
  *     tags: [Auth]
  *     security: []
  *     requestBody:

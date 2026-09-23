@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
+import { resolveMaxConcurrentClasses } from "../../config/membership.js";
 import type { CreatePlanInput, UpdatePlanInput } from "./membership-plans.schema.js";
 
 export async function listPlans(query: any) {
@@ -29,7 +30,13 @@ export async function createPlan(data: CreatePlanInput) {
   const existing = await prisma.membershipPlan.findFirst({ where: { name: data.name } });
   if (existing) throw new AppError("A plan with this name already exists", 409);
 
-  return prisma.membershipPlan.create({ data });
+  return prisma.membershipPlan.create({
+    data: {
+      ...data,
+      // Manager có thể nhập quota; bỏ trống thì lấy mặc định theo tier (FREE 0 / MEMBERSHIP 3 / PREMIUM 6).
+      maxConcurrentClasses: resolveMaxConcurrentClasses(data.tier, data.maxConcurrentClasses),
+    },
+  });
 }
 
 export async function getPlanById(id: string) {

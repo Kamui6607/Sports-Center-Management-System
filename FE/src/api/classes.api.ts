@@ -1,3 +1,4 @@
+import { allPages } from "../shared/pagedApi";
 import { apiClient } from "./client";
 import type { ClassItem, ClassSchedule, Sport } from "../types/member";
 
@@ -21,20 +22,27 @@ export interface ScheduleQuery {
 }
 
 export const classesApi = {
-  async getClasses(query: ClassQuery = {}): Promise<{ classes: ClassItem[]; pagination?: unknown }> {
+  async getClasses(
+    query: ClassQuery = {},
+  ): Promise<{
+    classes: ClassItem[];
+    pagination?: { page: number; totalPages: number; total: number };
+  }> {
     const params = new URLSearchParams();
     if (query.search) params.append("search", query.search);
     if (query.sportId) params.append("sportId", query.sportId);
     if (query.classType) params.append("classType", query.classType);
-    if (query.isActive !== undefined) params.append("isActive", String(query.isActive));
+    if (query.isActive !== undefined)
+      params.append("isActive", String(query.isActive));
     if (query.coachId) params.append("coachId", query.coachId);
     if (query.page) params.append("page", String(query.page));
     if (query.limit) params.append("limit", String(query.limit));
 
     const qs = params.toString();
-    return apiClient.get<{ classes: ClassItem[]; pagination?: unknown }>(
-      `/classes${qs ? `?${qs}` : ""}`
-    );
+    return apiClient.get<{
+      classes: ClassItem[];
+      pagination?: { page: number; totalPages: number; total: number };
+    }>(`/classes${qs ? `?${qs}` : ""}`);
   },
 
   async getClassById(id: string): Promise<ClassItem> {
@@ -42,10 +50,19 @@ export const classesApi = {
   },
 
   async getSports(): Promise<{ sports: Sport[] }> {
-    return apiClient.get<{ sports: Sport[] }>("/sports?isActive=true");
+    return {
+      sports: (
+        await allPages<Sport>("GET /sports", { query: { isActive: "true" } })
+      ).data,
+    };
   },
 
-  async getSchedules(query: ScheduleQuery = {}): Promise<{ schedules: ClassSchedule[]; pagination?: unknown }> {
+  async getSchedules(
+    query: ScheduleQuery = {},
+  ): Promise<{
+    schedules: ClassSchedule[];
+    pagination?: { page: number; totalPages: number; total: number };
+  }> {
     const params = new URLSearchParams();
     if (query.classId) params.append("classId", query.classId);
     if (query.roomId) params.append("roomId", query.roomId);
@@ -54,10 +71,13 @@ export const classesApi = {
     if (query.startAfter) params.append("startAfter", query.startAfter);
     if (query.startBefore) params.append("startBefore", query.startBefore);
 
-    const qs = params.toString();
-    return apiClient.get<{ schedules: ClassSchedule[]; pagination?: unknown }>(
-      `/class-schedules${qs ? `?${qs}` : ""}`
-    );
+    return {
+      schedules: (
+        await allPages<ClassSchedule>("GET /class-schedules", {
+          query: Object.fromEntries(params),
+        })
+      ).data,
+    };
   },
 
   async getScheduleById(id: string): Promise<ClassSchedule> {

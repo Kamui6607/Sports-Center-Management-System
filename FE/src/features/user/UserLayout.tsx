@@ -6,6 +6,7 @@ import { Placeholder } from "../../shared/Placeholder";
 import { Loading } from "../../shared/feedback";
 import { MemberSessionProvider } from "../../context/AuthContext";
 import type { User } from "../../types/member";
+import { MemberPaymentsPage } from "../../pages/member/PaymentsPage";
 const Dashboard = lazy(() =>
   import("../../pages/member/DashboardPage").then((m) => ({
     default: m.DashboardPage,
@@ -59,6 +60,7 @@ const Notifications = lazy(() =>
 const items = [
   ["dashboard", "Tổng quan hội viên"],
   ["membership", "Gói thành viên"],
+  ["payments", "Thanh toán & hóa đơn"],
   ["classes", "Khám phá lớp học"],
   ["my-classes", "Lớp của tôi"],
   ["schedule", "Lịch tập"],
@@ -87,6 +89,7 @@ export function UserLayout(props: PortalProps) {
                 }
               />
               <Route path="/member/membership" element={<Membership />} />
+              <Route path="/member/payments" element={<MemberPaymentsPage />} />
               <Route path="/member/classes" element={<Classes />} />
               <Route path="/member/classes/:id" element={<ClassDetail />} />
               <Route path="/member/my-classes" element={<MyClasses />} />

@@ -1,0 +1,88 @@
+.workflow-page {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.workflow-card {
+  padding: 24px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.workflow-card h2 {
+  font-size: 18px;
+}
+.workflow-card p,
+.workflow-message p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.workflow-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.workflow-actions h2 {
+  flex: 1;
+  min-width: 0;
+}
+.workflow-actions input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  accent-color: #203d31;
+}
+.workflow-actions label:has(input[type="checkbox"]) { display:flex; align-items:center; gap:8px; }
+.workflow-notification-preview { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:5; overflow:hidden; }
+.workflow-page label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.workflow-page select,
+.workflow-page input,
+.workflow-page textarea {
+  max-width: 100%;
+  min-width: 0;
+}
+.workflow-page fieldset {
+  border: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.workflow-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 50vh;
+  overflow: auto;
+  margin: 20px 0;
+}
+.workflow-message {
+  border: 1px solid var(--border, #e7ece9);
+  padding: 14px;
+  border-radius: 12px;
+  width: 85%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.workflow-message.own {
+  align-self: flex-end;
+  background: #f0f5ec;
+}
+.workflow-message small {
+  display: block;
+  margin-top: 10px;
+}
+@media (max-width: 600px) {
+  .workflow-card {
+    padding: 16px;
+  }
+  .workflow-actions > button {
+    max-width: 100%;
+    white-space: normal;
+  }
+}

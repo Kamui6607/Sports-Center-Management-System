@@ -32,3 +32,15 @@ export async function deleteRoom(req: Request, res: Response, next: NextFunction
     sendSuccess(res, room, "Room deactivated successfully");
   } catch (err) { next(err); }
 }
+export async function previewTransferSchedules(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await roomsService.previewTransferSchedules(req.params.roomId as string, req.body);
+    sendSuccess(res, result, "Transfer preview retrieved successfully");
+  } catch (err) { next(err); }
+}
+export async function transferSchedules(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await roomsService.transferSchedules(req.params.roomId as string, req.body, req.user!);
+    sendSuccess(res, result, "Schedules transferred successfully");
+  } catch (err) { next(err); }
+}

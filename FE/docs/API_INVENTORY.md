@@ -2,7 +2,7 @@
 
 Source: https://sports-center-management-system.onrender.com/api/v1/docs/swagger-ui-init.js
 
-Snapshot: 2026-09-12. Production base: https://sports-center-management-system.onrender.com/api/v1
+Snapshot: 2026-09-20. Production base: https://sports-center-management-system.onrender.com/api/v1
 
 Response examples are documentation only, never application data. Coaches use undefined bearerAuth capitalization; client sends the documented HTTP Bearer token.
 
@@ -11,7 +11,7 @@ List all users
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -174,7 +174,7 @@ Create staff, coach, manager or member account (MEMBER creates the member profil
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -345,7 +345,7 @@ Get user by ID
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -478,7 +478,7 @@ Update user
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -493,7 +493,40 @@ Parameters:
 ```
 Request body:
 ```json
-null
+{
+  "type": "object",
+  "properties": {
+    "fullName": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "gender": {
+      "type": "string",
+      "enum": [
+        "MALE",
+        "FEMALE",
+        "OTHER"
+      ]
+    },
+    "dateOfBirth": {
+      "type": "string"
+    },
+    "isActive": {
+      "type": "boolean"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "MEMBER",
+        "COACH",
+        "STAFF",
+        "MANAGER"
+      ]
+    }
+  }
+}
 ```
 Responses/status codes:
 ```json
@@ -611,7 +644,7 @@ Deactivate user (soft delete)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -739,12 +772,115 @@ Responses/status codes:
 }
 ```
 
+## GET /training-plans
+undefined
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "query",
+    "name": "memberId",
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Success"
+  }
+}
+```
+
+## POST /training-plans
+undefined
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "properties": {
+    "memberId": {
+      "type": "string"
+    },
+    "coachId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "startDate": {
+      "type": "string"
+    },
+    "endDate": {
+      "type": "string"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "201": {
+    "description": "Success"
+  }
+}
+```
+
+## POST /training-plans/results
+undefined
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "properties": {
+    "planId": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "201": {
+    "description": "Success"
+  }
+}
+```
+
 ## POST /subscriptions
 Register member to a membership plan
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -900,7 +1036,7 @@ Renew a membership subscription
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -1058,7 +1194,7 @@ Get all subscriptions for a member
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -1107,6 +1243,8 @@ Responses/status codes:
                 "startDate": "2026-09-11T14:20:14.968Z",
                 "endDate": "2026-10-11T14:20:14.968Z",
                 "status": "ACTIVE",
+                "suspendedAt": null,
+                "remainingDays": null,
                 "plan": {
                   "name": "Membership Monthly",
                   "tier": "MEMBERSHIP"
@@ -1201,7 +1339,7 @@ Get subscription by ID
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -1235,7 +1373,9 @@ Responses/status codes:
               "tier": "MEMBERSHIP",
               "startDate": "2026-09-11T14:20:14.968Z",
               "endDate": "2026-10-11T14:20:14.968Z",
-              "status": "ACTIVE",
+              "status": "SUSPENDED",
+              "suspendedAt": "2026-09-20T14:20:14.968Z",
+              "remainingDays": 21,
               "plan": {
                 "name": "Membership Monthly",
                 "tier": "MEMBERSHIP"
@@ -1332,11 +1472,11 @@ Responses/status codes:
 ```
 
 ## PATCH /subscriptions/{id}/status
-Update subscription status
+Cập nhật trạng thái gói (Manager only)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -1361,7 +1501,6 @@ Request body:
       "type": "string",
       "enum": [
         "ACTIVE",
-        "EXPIRED",
         "CANCELLED",
         "SUSPENDED"
       ]
@@ -1373,29 +1512,38 @@ Responses/status codes:
 ```json
 {
   "200": {
-    "description": "Single subscription",
+    "description": "Cập nhật thành công",
     "content": {
       "application/json": {
         "schema": {
-          "type": "object",
-          "example": {
-            "success": true,
-            "message": "Subscription retrieved successfully",
-            "data": {
-              "id": "9643ec65-bacb-4b1b-9442-239bb60bd8fa",
-              "tier": "MEMBERSHIP",
-              "startDate": "2026-09-11T14:20:14.968Z",
-              "endDate": "2026-10-11T14:20:14.968Z",
-              "status": "ACTIVE",
-              "plan": {
-                "name": "Membership Monthly",
-                "tier": "MEMBERSHIP"
-              },
-              "member": {
-                "user": {
-                  "fullName": "John Doe",
-                  "email": "member1@example.com"
-                }
+          "type": "object"
+        },
+        "examples": {
+          "cancelled_with_refund": {
+            "summary": "Hủy + hoàn tiền prorated",
+            "value": {
+              "success": true,
+              "message": "Subscription status updated",
+              "data": {
+                "id": "sub-uuid",
+                "status": "CANCELLED",
+                "refundAmount": 200000,
+                "willRefund": true,
+                "daysLeft": 20
+              }
+            }
+          },
+          "cancelled_no_refund": {
+            "summary": "Hủy gói đã hết hạn",
+            "value": {
+              "success": true,
+              "message": "Subscription status updated",
+              "data": {
+                "id": "sub-uuid",
+                "status": "CANCELLED",
+                "refundAmount": 0,
+                "willRefund": false,
+                "daysLeft": 0
               }
             }
           }
@@ -1482,12 +1630,162 @@ Responses/status codes:
 }
 ```
 
+## PATCH /subscriptions/{id}/cancel
+Member tự hủy gói của mình
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "description": "Subscription ID (phải là gói của chính mình)"
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "properties": {
+    "reason": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Lý do hủy gói (không bắt buộc)",
+      "example": "Tôi không có thời gian tập luyện nữa"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Hủy thành công",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object"
+        },
+        "examples": {
+          "refund_eligible": {
+            "summary": "Hoàn tiền 30% (còn > 15 ngày)",
+            "value": {
+              "success": true,
+              "message": "Hủy thành công. Hoàn 150,000đ (30%) vì còn 20 ngày.",
+              "data": {
+                "subscriptionId": "sub-uuid",
+                "status": "CANCELLED",
+                "daysLeft": 20,
+                "refundAmount": 150000,
+                "willRefund": true
+              }
+            }
+          },
+          "no_refund": {
+            "summary": "Không hoàn tiền (còn ≤ 15 ngày)",
+            "value": {
+              "success": true,
+              "message": "Hủy thành công. Không hoàn tiền vì còn ≤ 15 ngày (còn 10 ngày).",
+              "data": {
+                "subscriptionId": "sub-uuid",
+                "status": "CANCELLED",
+                "daysLeft": 10,
+                "refundAmount": 0,
+                "willRefund": false
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "400": {
+    "description": "Gói không ở trạng thái ACTIVE",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object"
+        },
+        "example": {
+          "success": false,
+          "message": "Không thể hủy gói đang ở trạng thái CANCELLED"
+        }
+      }
+    }
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## GET /sports
 Get list of sports
 
 Authentication: []
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -1608,7 +1906,7 @@ Create a new sport
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -1738,7 +2036,7 @@ View sport details
 
 Authentication: []
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -1834,7 +2132,7 @@ Update sport
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -1971,7 +2269,7 @@ Deactivate sport (soft delete)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -2095,7 +2393,7 @@ Get list of rooms
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -2227,7 +2525,7 @@ Create a new room
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -2362,7 +2660,7 @@ View room details
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -2473,7 +2771,7 @@ Update room info
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -2614,7 +2912,7 @@ Deactivate room (soft delete)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -2739,7 +3037,7 @@ Revenue report (total, by method, recent payments)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -2880,7 +3178,7 @@ Member report (total, new, active, by tier)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -3003,7 +3301,7 @@ Enrollment report (top classes, by type)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -3130,7 +3428,7 @@ Membership subscription report (by status, tier, revenue)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -3250,12 +3548,159 @@ Responses/status codes:
 }
 ```
 
+## GET /reports/subscription-logs
+Detailed log of subscription purchases
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "query",
+    "name": "startDate",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "in": "query",
+    "name": "endDate",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "in": "query",
+    "name": "page",
+    "schema": {
+      "type": "integer",
+      "default": 1
+    }
+  },
+  {
+    "in": "query",
+    "name": "limit",
+    "schema": {
+      "type": "integer",
+      "default": 20
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Paginated list of subscription logs",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": true,
+            "message": "Subscription logs retrieved successfully",
+            "data": [
+              {
+                "id": "9643ec65-bacb-4b1b-9442-239bb60bd8fa",
+                "action": "Mua / Gia hạn gói",
+                "username": "Nguyễn Văn A",
+                "email": "nguyenvana@gmail.com",
+                "planName": "Gói Hội viên 1 tháng",
+                "planTier": "MEMBERSHIP",
+                "price": 500000,
+                "paymentStatus": "SUCCESS",
+                "startDate": "2026-09-18T00:00:00.000Z",
+                "endDate": "2026-10-18T00:00:00.000Z",
+                "purchasedAt": "2026-09-18T08:05:00.123Z"
+              }
+            ],
+            "pagination": {
+              "page": 1,
+              "limit": 20,
+              "total": 1,
+              "totalPages": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "400": {
+    "description": "Bad request (validation or malformed body)",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Validation failed",
+            "errors": [
+              {
+                "field": "email",
+                "message": "Invalid email address"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## POST /payments
 Record a payment (auto-creates invoice on SUCCESS)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -3418,7 +3863,7 @@ List payments with filters
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -3583,7 +4028,7 @@ Get payment by ID
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -3721,7 +4166,7 @@ Update payment status
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -3870,12 +4315,369 @@ Responses/status codes:
 }
 ```
 
+## GET /notifications
+Get my notifications
+
+Authentication: [{"bearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "query",
+    "name": "type",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "MEMBER_REGISTERED",
+        "CHAT_MESSAGE",
+        "SUBSCRIPTION_EXPIRING",
+        "SUBSCRIPTION_EXPIRED",
+        "SUBSCRIPTION_CANCELLED",
+        "UPCOMING_CLASS",
+        "SCHEDULE_CANCELLED",
+        "SCHEDULE_UPDATED",
+        "ENROLLMENT_CONFIRMED",
+        "ENROLLMENT_CANCELLED",
+        "TRAINING_PLAN_ASSIGNED",
+        "NEW_CLASS",
+        "COACH_CHANGED",
+        "PAYMENT_SUCCESS",
+        "PAYMENT_REFUNDED",
+        "PAYMENT_FAILED"
+      ]
+    },
+    "description": "Filter by notification type"
+  },
+  {
+    "in": "query",
+    "name": "isRead",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "true",
+        "false"
+      ]
+    },
+    "description": "Filter by read status"
+  },
+  {
+    "in": "query",
+    "name": "page",
+    "schema": {
+      "type": "integer",
+      "default": 1
+    }
+  },
+  {
+    "in": "query",
+    "name": "limit",
+    "schema": {
+      "type": "integer",
+      "default": 20
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "A list of notifications"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /notifications/unread-count
+Get count of unread notifications
+
+Authentication: [{"bearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Unread count retrieved successfully"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## PATCH /notifications/mark-all-read
+Mark all my notifications as read
+
+Authentication: [{"bearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "All notifications marked as read"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## PATCH /notifications/{id}/read
+Mark a specific notification as read
+
+Authentication: [{"bearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    },
+    "description": "Notification ID"
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Notification marked as read"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## POST /notifications/trigger-upcoming-reminders
+Manually trigger upcoming class reminders (within 24h)
+
+Authentication: [{"bearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Reminders triggered successfully"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## GET /membership-plans
 List membership plans (public)
 
 Authentication: []
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -3982,7 +4784,7 @@ Create membership plan
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -4128,7 +4930,7 @@ Get plan details (public)
 
 Authentication: []
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -4226,7 +5028,7 @@ Update membership plan
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -4241,7 +5043,33 @@ Parameters:
 ```
 Request body:
 ```json
-null
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "price": {
+      "type": "number"
+    },
+    "durationDays": {
+      "type": "integer"
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "MEMBERSHIP",
+        "PREMIUM"
+      ]
+    },
+    "isActive": {
+      "type": "boolean"
+    }
+  }
+}
 ```
 Responses/status codes:
 ```json
@@ -4352,7 +5180,7 @@ Deactivate membership plan
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -4478,7 +5306,7 @@ List all members
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -4641,7 +5469,7 @@ Get member by ID (userId or profileId)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -4761,7 +5589,7 @@ Update member info
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -4776,7 +5604,42 @@ Parameters:
 ```
 Request body:
 ```json
-null
+{
+  "type": "object",
+  "properties": {
+    "fullName": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "gender": {
+      "type": "string",
+      "enum": [
+        "MALE",
+        "FEMALE",
+        "OTHER"
+      ]
+    },
+    "dateOfBirth": {
+      "type": "string"
+    },
+    "fitnessGoal": {
+      "type": "string"
+    },
+    "trainingLevel": {
+      "type": "string",
+      "enum": [
+        "BEGINNER",
+        "INTERMEDIATE",
+        "ADVANCED"
+      ]
+    },
+    "trainingPreference": {
+      "type": "string"
+    }
+  }
+}
 ```
 Responses/status codes:
 ```json
@@ -4901,7 +5764,7 @@ Get member effective tier and active subscription
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -5011,7 +5874,7 @@ List all invoices
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -5073,6 +5936,9 @@ Responses/status codes:
                 "total": "300000",
                 "status": "ISSUED",
                 "issuedAt": "2026-09-12T08:00:00.000Z",
+                "memberName": "John Doe",
+                "planName": "Membership Monthly",
+                "planTier": "MEMBERSHIP",
                 "member": {
                   "user": {
                     "fullName": "John Doe"
@@ -5161,7 +6027,7 @@ Get invoices for a specific member
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -5199,6 +6065,9 @@ Responses/status codes:
                 "total": "300000",
                 "status": "ISSUED",
                 "issuedAt": "2026-09-12T08:00:00.000Z",
+                "memberName": "John Doe",
+                "planName": "Membership Monthly",
+                "planTier": "MEMBERSHIP",
                 "member": {
                   "user": {
                     "fullName": "John Doe"
@@ -5301,7 +6170,7 @@ Get invoice by ID
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -5338,6 +6207,9 @@ Responses/status codes:
               "total": "300000",
               "status": "ISSUED",
               "issuedAt": "2026-09-12T08:00:00.000Z",
+              "memberName": "John Doe",
+              "planName": "Membership Monthly",
+              "planTier": "MEMBERSHIP",
               "member": {
                 "user": {
                   "fullName": "John Doe",
@@ -5434,12 +6306,596 @@ Responses/status codes:
 }
 ```
 
+## POST /feedbacks
+Member gửi đánh giá cho HLV
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "coachId",
+    "rating"
+  ],
+  "properties": {
+    "coachId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "CoachProfile ID"
+    },
+    "classId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Lớp học liên quan (tuỳ chọn)"
+    },
+    "rating": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Số sao đánh giá (1–5)",
+      "example": 5
+    },
+    "comment": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Nhận xét chi tiết",
+      "example": "HLV rất nhiệt tình, hướng dẫn chi tiết và dễ hiểu!"
+    },
+    "isAnonymous": {
+      "type": "boolean",
+      "default": false,
+      "description": "Ẩn tên khi hiển thị công khai"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "201": {
+    "description": "Gửi đánh giá thành công",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object"
+        },
+        "example": {
+          "success": true,
+          "message": "Cảm ơn bạn đã gửi đánh giá!",
+          "data": {
+            "id": "fb-uuid",
+            "coachId": "coach-uuid",
+            "rating": 5,
+            "comment": "HLV rất nhiệt tình!",
+            "isAnonymous": false,
+            "coach": {
+              "user": {
+                "fullName": "Nguyễn Văn A"
+              }
+            },
+            "class": {
+              "name": "Morning Yoga"
+            }
+          }
+        }
+      }
+    }
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Member chưa từng học với HLV này",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object"
+        },
+        "example": {
+          "success": false,
+          "message": "Bạn chỉ có thể đánh giá HLV mà bạn đã hoặc đang học cùng."
+        }
+      }
+    }
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /feedbacks
+Xem danh sách đánh giá của một HLV (public)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "query",
+    "name": "coachId",
+    "required": true,
+    "schema": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "description": "CoachProfile ID cần xem đánh giá"
+  },
+  {
+    "in": "query",
+    "name": "classId",
+    "schema": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "description": "Lọc theo lớp học cụ thể (tuỳ chọn)"
+  },
+  {
+    "in": "query",
+    "name": "page",
+    "schema": {
+      "type": "integer",
+      "default": 1
+    }
+  },
+  {
+    "in": "query",
+    "name": "limit",
+    "schema": {
+      "type": "integer",
+      "default": 10
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Danh sách feedbacks",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object"
+        },
+        "example": {
+          "success": true,
+          "data": {
+            "feedbacks": [
+              {
+                "id": "fb-uuid-1",
+                "rating": 5,
+                "comment": "Rất tuyệt vời!",
+                "isAnonymous": false,
+                "member": {
+                  "user": {
+                    "fullName": "Trần Thị B"
+                  }
+                },
+                "coach": {
+                  "user": {
+                    "fullName": "Nguyễn Văn A"
+                  }
+                },
+                "class": {
+                  "name": "Morning Yoga"
+                }
+              },
+              {
+                "id": "fb-uuid-2",
+                "rating": 4,
+                "comment": "Tốt",
+                "isAnonymous": true,
+                "member": {
+                  "user": {
+                    "fullName": "Ẩn danh"
+                  }
+                }
+              }
+            ],
+            "summary": {
+              "averageRating": 4.5,
+              "totalFeedbacks": 12
+            }
+          }
+        }
+      }
+    }
+  },
+  "400": {
+    "description": "Bad request (validation or malformed body)",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Validation failed",
+            "errors": [
+              {
+                "field": "email",
+                "message": "Invalid email address"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /feedbacks/my
+Member xem danh sách feedback mình đã gửi
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Danh sách feedback của member",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object"
+        },
+        "example": {
+          "success": true,
+          "data": [
+            {
+              "id": "fb-uuid",
+              "rating": 5,
+              "comment": "HLV rất tốt!",
+              "coach": {
+                "user": {
+                  "fullName": "Nguyễn Văn A"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## DELETE /feedbacks/{id}
+Member xóa feedback của mình
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "description": "Feedback ID"
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Xóa thành công",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object"
+        },
+        "example": {
+          "success": true,
+          "data": {
+            "message": "Feedback đã được xóa thành công."
+          }
+        }
+      }
+    }
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## DELETE /feedbacks/{id}/manager
+Manager xóa feedback vi phạm
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "description": "Feedback ID"
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Xóa thành công",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object"
+        },
+        "example": {
+          "success": true,
+          "data": {
+            "message": "Feedback đã được xóa bởi quản lý."
+          }
+        }
+      }
+    }
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## POST /enrollments
 Book a class (Member books own class; Staff/Manager book for a member)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -5452,10 +6908,12 @@ Request body:
   ],
   "properties": {
     "scheduleId": {
-      "type": "string"
+      "type": "string",
+      "format": "uuid"
     },
     "memberId": {
       "type": "string",
+      "format": "uuid",
       "description": "Required when booked by Staff/Manager"
     }
   }
@@ -5482,9 +6940,11 @@ Responses/status codes:
                 "endTime": "2026-09-15T08:00:00.000Z",
                 "class": {
                   "name": "Morning Yoga",
-                  "sport": {
-                    "name": "Yoga"
-                  }
+                  "sports": [
+                    {
+                      "name": "Yoga"
+                    }
+                  ]
                 },
                 "room": {
                   "name": "Yoga Room A"
@@ -5531,14 +6991,33 @@ Responses/status codes:
     }
   },
   "403": {
-    "description": "Insufficient role permissions",
+    "description": "Forbidden — one of:\n- No active membership\n- Membership expires before class date\n- PREMIUM class requires PREMIUM plan\n",
     "content": {
       "application/json": {
         "schema": {
-          "type": "object",
-          "example": {
-            "success": false,
-            "message": "Forbidden: insufficient permissions"
+          "type": "object"
+        },
+        "examples": {
+          "no_membership": {
+            "summary": "No active membership",
+            "value": {
+              "success": false,
+              "message": "Bạn không có gói tập đang hoạt động. Vui lòng mua gói để đặt lịch."
+            }
+          },
+          "plan_expires_before_class": {
+            "summary": "Plan expires before class",
+            "value": {
+              "success": false,
+              "message": "Gói tập của bạn sẽ hết hạn ngày 25/09/2026, trước khi lớp học diễn ra ngày 30/09/2026. Vui lòng gia hạn gói để đặt lịch."
+            }
+          },
+          "premium_required": {
+            "summary": "PREMIUM class requires PREMIUM plan",
+            "value": {
+              "success": false,
+              "message": "Premium membership required to book this class."
+            }
           }
         }
       }
@@ -5594,7 +7073,7 @@ Get current member's enrollments
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -5727,7 +7206,7 @@ Get all enrollments for a schedule
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -5856,7 +7335,7 @@ Cancel an enrollment
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -5894,9 +7373,11 @@ Responses/status codes:
                 "endTime": "2026-09-15T08:00:00.000Z",
                 "class": {
                   "name": "Morning Yoga",
-                  "sport": {
-                    "name": "Yoga"
-                  }
+                  "sports": [
+                    {
+                      "name": "Yoga"
+                    }
+                  ]
                 },
                 "room": {
                   "name": "Yoga Room A"
@@ -5992,7 +7473,7 @@ List all coaches
 
 Authentication: [{"bearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -6140,7 +7621,7 @@ Get coach by ID
 
 Authentication: [{"bearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -6187,9 +7668,11 @@ Responses/status codes:
                     "class": {
                       "id": "class-yoga-001",
                       "name": "Morning Yoga",
-                      "sport": {
-                        "name": "Yoga"
-                      },
+                      "sports": [
+                        {
+                          "name": "Yoga"
+                        }
+                      ],
                       "schedules": []
                     }
                   }
@@ -6271,7 +7754,7 @@ Update coach profile
 
 Authentication: [{"bearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -6290,6 +7773,23 @@ Request body:
 {
   "type": "object",
   "properties": {
+    "fullName": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "gender": {
+      "type": "string",
+      "enum": [
+        "MALE",
+        "FEMALE",
+        "OTHER"
+      ]
+    },
+    "dateOfBirth": {
+      "type": "string"
+    },
     "specialization": {
       "type": "string"
     },
@@ -6331,9 +7831,11 @@ Responses/status codes:
                     "class": {
                       "id": "class-yoga-001",
                       "name": "Morning Yoga",
-                      "sport": {
-                        "name": "Yoga"
-                      },
+                      "sports": [
+                        {
+                          "name": "Yoga"
+                        }
+                      ],
                       "schedules": []
                     }
                   }
@@ -6429,7 +7931,7 @@ Get list of classes
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -6518,9 +8020,11 @@ Responses/status codes:
                 "id": "class-yoga-001",
                 "name": "Morning Yoga",
                 "description": "Gentle yoga class",
-                "sport": {
-                  "name": "Yoga"
-                },
+                "sports": [
+                  {
+                    "name": "Yoga"
+                  }
+                ],
                 "capacity": 15,
                 "classType": "REGULAR",
                 "isActive": true,
@@ -6607,7 +8111,7 @@ Create a new class
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -6617,7 +8121,7 @@ Request body:
   "type": "object",
   "required": [
     "name",
-    "sportId",
+    "sportIds",
     "capacity"
   ],
   "properties": {
@@ -6628,8 +8132,12 @@ Request body:
     "description": {
       "type": "string"
     },
-    "sportId": {
-      "type": "string"
+    "sportIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
     },
     "capacity": {
       "type": "integer",
@@ -6661,9 +8169,11 @@ Responses/status codes:
             "data": {
               "id": "class-boxing-001",
               "name": "Boxing Basics",
-              "sport": {
-                "name": "Boxing"
-              },
+              "sports": [
+                {
+                  "name": "Boxing"
+                }
+              ],
               "capacity": 12,
               "classType": "REGULAR"
             }
@@ -6756,7 +8266,7 @@ View class details (includes coaches and upcoming schedules)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -6788,9 +8298,11 @@ Responses/status codes:
             "data": {
               "id": "class-yoga-001",
               "name": "Morning Yoga",
-              "sport": {
-                "name": "Yoga"
-              },
+              "sports": [
+                {
+                  "name": "Yoga"
+                }
+              ],
               "capacity": 15,
               "classType": "REGULAR",
               "isActive": true,
@@ -6881,7 +8393,7 @@ Update class
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -6905,8 +8417,12 @@ Request body:
     "description": {
       "type": "string"
     },
-    "sportId": {
-      "type": "string"
+    "sportIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
     },
     "capacity": {
       "type": "integer"
@@ -6939,9 +8455,11 @@ Responses/status codes:
             "data": {
               "id": "class-yoga-001",
               "name": "Morning Yoga",
-              "sport": {
-                "name": "Yoga"
-              },
+              "sports": [
+                {
+                  "name": "Yoga"
+                }
+              ],
               "capacity": 15,
               "classType": "REGULAR",
               "isActive": true,
@@ -7046,7 +8564,7 @@ Deactivate class (soft delete)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -7078,9 +8596,11 @@ Responses/status codes:
             "data": {
               "id": "class-yoga-001",
               "name": "Morning Yoga",
-              "sport": {
-                "name": "Yoga"
-              },
+              "sports": [
+                {
+                  "name": "Yoga"
+                }
+              ],
               "capacity": 15,
               "classType": "REGULAR",
               "isActive": true,
@@ -7181,11 +8701,11 @@ Responses/status codes:
 ```
 
 ## POST /classes/{id}/coaches
-Assign coach to class
+Assign coach to class (Sends COACH_CHANGED notification to enrolled members)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -7234,9 +8754,11 @@ Responses/status codes:
             "data": {
               "id": "class-yoga-001",
               "name": "Morning Yoga",
-              "sport": {
-                "name": "Yoga"
-              },
+              "sports": [
+                {
+                  "name": "Yoga"
+                }
+              ],
               "capacity": 15,
               "classType": "REGULAR",
               "isActive": true,
@@ -7337,11 +8859,11 @@ Responses/status codes:
 ```
 
 ## DELETE /classes/{id}/coaches/{coachId}
-Remove coach from class
+Remove coach from class (Sends COACH_CHANGED notification to enrolled members)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -7383,9 +8905,11 @@ Responses/status codes:
             "data": {
               "id": "class-yoga-001",
               "name": "Morning Yoga",
-              "sport": {
-                "name": "Yoga"
-              },
+              "sports": [
+                {
+                  "name": "Yoga"
+                }
+              ],
               "capacity": 15,
               "classType": "REGULAR",
               "isActive": true,
@@ -7490,7 +9014,7 @@ Get list of schedules
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -7590,9 +9114,11 @@ Responses/status codes:
                 "status": "SCHEDULED",
                 "class": {
                   "name": "Morning Yoga",
-                  "sport": {
-                    "name": "Yoga"
-                  }
+                  "sports": [
+                    {
+                      "name": "Yoga"
+                    }
+                  ]
                 },
                 "room": {
                   "name": "Yoga Room A"
@@ -7669,7 +9195,7 @@ Create a new schedule (checks room & coach conflicts)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -7830,7 +9356,7 @@ View schedule details (including enrolled count)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -7866,9 +9392,11 @@ Responses/status codes:
               "status": "SCHEDULED",
               "class": {
                 "name": "Morning Yoga",
-                "sport": {
-                  "name": "Yoga"
-                },
+                "sports": [
+                  {
+                    "name": "Yoga"
+                  }
+                ],
                 "coaches": []
               },
               "room": {
@@ -7953,7 +9481,7 @@ Update schedule (re-checks conflicts if room/time changed)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -8013,9 +9541,11 @@ Responses/status codes:
               "status": "SCHEDULED",
               "class": {
                 "name": "Morning Yoga",
-                "sport": {
-                  "name": "Yoga"
-                },
+                "sports": [
+                  {
+                    "name": "Yoga"
+                  }
+                ],
                 "coaches": []
               },
               "room": {
@@ -8128,7 +9658,7 @@ Cancel schedule (automatically cancels all BOOKED enrollments)
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 [
   {
@@ -8164,9 +9694,11 @@ Responses/status codes:
               "status": "SCHEDULED",
               "class": {
                 "name": "Morning Yoga",
-                "sport": {
-                  "name": "Yoga"
-                },
+                "sports": [
+                  {
+                    "name": "Yoga"
+                  }
+                ],
                 "coaches": []
               },
               "room": {
@@ -8260,12 +9792,474 @@ Responses/status codes:
 }
 ```
 
+## PATCH /class-schedules/{id}/complete
+Mark a schedule as COMPLETED (only after endTime)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Single schedule with class/room and enrolled count",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": true,
+            "message": "Schedule retrieved successfully",
+            "data": {
+              "id": "sch-yoga-001",
+              "startTime": "2026-09-15T07:00:00.000Z",
+              "endTime": "2026-09-15T08:00:00.000Z",
+              "status": "SCHEDULED",
+              "class": {
+                "name": "Morning Yoga",
+                "sports": [
+                  {
+                    "name": "Yoga"
+                  }
+                ],
+                "coaches": []
+              },
+              "room": {
+                "name": "Yoga Room A"
+              },
+              "_count": {
+                "enrollments": 2
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "400": {
+    "description": "Bad request (validation or malformed body)",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Validation failed",
+            "errors": [
+              {
+                "field": "email",
+                "message": "Invalid email address"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /chat/contacts
+Get eligible chat contacts
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Contacts retrieved successfully"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /chat/conversations
+Get list of conversations
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Conversations retrieved successfully"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /chat/messages
+Get chat messages
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "query",
+    "name": "targetId",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Optional ID of the user to get private messages with"
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Messages retrieved successfully"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## POST /chat/messages
+Send a message
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "201": {
+    "description": "Message sent successfully"
+  },
+  "400": {
+    "description": "Bad request (validation or malformed body)",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Validation failed",
+            "errors": [
+              {
+                "field": "email",
+                "message": "Invalid email address"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## PATCH /chat/messages/read
+Mark messages as read
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "properties": {
+    "targetId": {
+      "type": "string",
+      "description": "ID of the sender whose messages are being read"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Messages marked as read successfully"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /chat/messages/unread-count
+Get global unread message count
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Unread count retrieved successfully"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## POST /auth/register
 Register a new member account
 
 Authentication: []
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -8281,17 +10275,21 @@ Request body:
   "properties": {
     "email": {
       "type": "string",
-      "format": "email"
+      "format": "email",
+      "description": "Will be converted to lowercase"
     },
     "password": {
       "type": "string",
       "minLength": 6
     },
     "fullName": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 100
     },
     "phone": {
-      "type": "string"
+      "type": "string",
+      "pattern": "^[0-9+]{9,15}$",
+      "description": "Optional, 9-15 digits, can start with +"
     },
     "gender": {
       "type": "string",
@@ -8302,7 +10300,9 @@ Request body:
       ]
     },
     "dateOfBirth": {
-      "type": "string"
+      "type": "string",
+      "format": "date",
+      "description": "Must be in the past"
     }
   }
 }
@@ -8394,7 +10394,7 @@ Login and receive access + refresh tokens
 
 Authentication: []
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -8494,7 +10494,7 @@ Logout and revoke refresh token
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -8600,7 +10600,7 @@ Get a new access token using a refresh token
 
 Authentication: []
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -8694,7 +10694,7 @@ Get current user profile
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -8787,7 +10787,7 @@ Update current user profile
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -8797,10 +10797,13 @@ Request body:
   "type": "object",
   "properties": {
     "fullName": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 100
     },
     "phone": {
-      "type": "string"
+      "type": "string",
+      "pattern": "^[0-9+]{9,15}$",
+      "description": "Optional, 9-15 digits, can start with +"
     },
     "gender": {
       "type": "string",
@@ -8809,6 +10812,11 @@ Request body:
         "FEMALE",
         "OTHER"
       ]
+    },
+    "dateOfBirth": {
+      "type": "string",
+      "format": "date",
+      "description": "Must be in the past"
     },
     "fitnessGoal": {
       "type": "string"
@@ -8932,7 +10940,7 @@ Change current user password
 
 Authentication: [{"BearerAuth":[]}]
 
-Parameters: 
+Parameters:
 ```json
 []
 ```
@@ -9037,3 +11045,282 @@ Responses/status codes:
   }
 }
 ```
+
+## GET /attendance
+undefined
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "query",
+    "name": "scheduleId",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Success"
+  }
+}
+```
+
+## POST /attendance
+undefined
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "properties": {
+    "scheduleId": {
+      "type": "string"
+    },
+    "memberId": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PRESENT",
+        "ABSENT",
+        "LATE",
+        "EXCUSED"
+      ]
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "201": {
+    "description": "Success"
+  }
+}
+```
+
+## PATCH /attendance/{id}
+undefined
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "PRESENT",
+        "ABSENT",
+        "LATE",
+        "EXCUSED"
+      ]
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Success"
+  }
+}
+```
+
+## POST /attendance/generate-qr
+Generate a short-lived QR token for attendance (Coach/Manager only)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "scheduleId"
+  ],
+  "properties": {
+    "scheduleId": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "QR token generated"
+  }
+}
+```
+
+## POST /attendance/scan-qr
+Scan a QR token to mark self as PRESENT (Member only)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "qrToken"
+  ],
+  "properties": {
+    "qrToken": {
+      "type": "string",
+      "description": "JWT token from QR code shown by Coach"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Marked as PRESENT successfully",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object"
+        },
+        "example": {
+          "success": true,
+          "data": {
+            "id": "att-uuid",
+            "status": "PRESENT"
+          }
+        }
+      }
+    }
+  },
+  "400": {
+    "description": "QR expired or invalid",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object"
+        },
+        "examples": {
+          "qr_expired": {
+            "summary": "QR expired",
+            "value": {
+              "success": false,
+              "message": "Mã QR đã hết hạn. Yêu cầu HLV mở mã mới."
+            }
+          },
+          "qr_invalid": {
+            "summary": "QR invalid",
+            "value": {
+              "success": false,
+              "message": "Mã QR không hợp lệ."
+            }
+          }
+        }
+      }
+    }
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Not enrolled or subscription expired",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object"
+        },
+        "examples": {
+          "not_enrolled": {
+            "summary": "Not enrolled",
+            "value": {
+              "success": false,
+              "message": "Bạn chưa đặt chỗ cho lớp học này nên không thể điểm danh."
+            }
+          },
+          "subscription_expired": {
+            "summary": "Subscription expired at scan time",
+            "value": {
+              "success": false,
+              "message": "Gói tập của bạn đã hết hạn. Vui lòng gia hạn để có thể vào lớp học."
+            }
+          }
+        }
+      }
+    }
+  },
+  "500": {
+    "description": "Unexpected internal server error",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Verified workflow contracts
+Additional operations and missing bodies/parameters are preserved in workflow-contract-overrides.json, checked against backend commit 9d4af0efb8c3e910af233eb3e30b4e7b04dae238. See WORKFLOW_ALIGNMENT.md.

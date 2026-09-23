@@ -6,6 +6,8 @@ import type { LucideIcon } from "lucide-react";
 import { useSidebar } from "./useSidebar";
 import { Brand } from "./Brand";
 import type { ProfileOk } from "./generated";
+import { Chat, Notifications } from "./Communication";
+import { Policies } from "./Policies";
 export type NavigationItem = readonly [
   path: string,
   name: string,
@@ -36,7 +38,22 @@ export function PortalLayout({
   const sidebarId = useId();
   const [busy, setBusy] = useState(false);
   const location = useLocation();
-  const navigation = groups || [{ title: "KHÔNG GIAN LÀM VIỆC", items }];
+  const navigation = [
+    ...(groups || [
+      {
+        title: "KHÔNG GIAN LÀM VIỆC",
+        items: items.filter((i) => !["notifications", "chat"].includes(i[0])),
+      },
+    ]),
+    {
+      title: "KẾT NỐI",
+      items: [
+        ["notifications", "Thông báo"],
+        ["chat", "Tin nhắn"],
+        ["policies", "Chính sách sử dụng"],
+      ] as NavigationItem[],
+    },
+  ];
   const pageTitle =
     navigation
       .flatMap((g) => g.items)
@@ -141,7 +158,15 @@ export function PortalLayout({
           </Link>
         </header>
         <main id="main-content" tabIndex={-1}>
-          {children}
+          {location.pathname === `${base}/notifications` ? (
+            <Notifications role={user.role} />
+          ) : location.pathname === `${base}/chat` ? (
+            <Chat userId={user.id} />
+          ) : location.pathname === `${base}/policies` ? (
+            <Policies role={user.role} />
+          ) : (
+            children
+          )}
         </main>
         <footer className="main-footer">
           © {new Date().getFullYear()} Pulse Sports Center

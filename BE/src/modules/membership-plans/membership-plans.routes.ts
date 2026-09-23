@@ -53,6 +53,10 @@ router.get("/:id", plansController.getPlanById);
  * /membership-plans:
  *   post:
  *     summary: Create membership plan
+ *     description: |
+ *       MANAGER tạo gói tập. `maxConcurrentClasses` = quota lớp học song song: số Class KHÁC NHAU
+ *       tối đa hội viên được giữ đồng thời (>= 0). Bỏ trống => mặc định theo tier (MEMBERSHIP 3 / PREMIUM 6).
+ *       MEMBER không có quyền gọi API này.
  *     tags: [Membership Plans]
  *     requestBody:
  *       required: true
@@ -67,6 +71,16 @@ router.get("/:id", plansController.getPlanById);
  *               price: { type: number }
  *               durationDays: { type: integer }
  *               tier: { type: string, enum: [MEMBERSHIP, PREMIUM] }
+ *               maxConcurrentClasses:
+ *                 type: integer
+ *                 minimum: 0
+ *                 description: "Quota số Class KHÁC NHAU được giữ đồng thời; bỏ trống = mặc định theo tier"
+ *           example:
+ *             name: "Membership Monthly"
+ *             price: 300000
+ *             durationDays: 30
+ *             tier: "MEMBERSHIP"
+ *             maxConcurrentClasses: 3
  *     responses:
  *       201: { $ref: "#/components/responses/PlanCreated" }
  *       400: { $ref: "#/components/responses/BadRequest" }
@@ -87,6 +101,17 @@ router.post(
  * /membership-plans/{id}:
  *   patch:
  *     summary: Update membership plan
+ *     description: |
+ *       MANAGER cập nhật gói tập (kể cả `maxConcurrentClasses` — quota lớp học song song, >= 0; integer).
+ *
+ *       **`maxConcurrentClasses` là config của TỪNG plan, không phải field derived của `tier`**:
+ *       - `PATCH { "tier": "PREMIUM" }` → chỉ đổi tier, **GIỮ NGUYÊN** quota hiện tại (không tự đổi 3 → 6).
+ *       - `PATCH { "tier": "PREMIUM", "maxConcurrentClasses": 6 }` → đổi cả hai.
+ *       - `POST /membership-plans` không truyền quota mới áp default theo tier (FREE 0 / MEMBERSHIP 3 / PREMIUM 6);
+ *         giá trị explicit luôn được ưu tiên.
+ *
+ *       Quota mới áp dụng cho lần đặt lớp TIẾP THEO; KHÔNG tự hủy các lớp hội viên đang giữ
+ *       (grandfathering: có thể `used > limit` nhưng `remaining = 0`).
  *     tags: [Membership Plans]
  *     parameters:
  *       - in: path
@@ -105,7 +130,10 @@ router.post(
  *               price: { type: number }
  *               durationDays: { type: integer }
  *               tier: { type: string, enum: [MEMBERSHIP, PREMIUM] }
+ *               maxConcurrentClasses: { type: integer, minimum: 0, description: "Quota số Class KHÁC NHAU được giữ đồng thời" }
  *               isActive: { type: boolean }
+ *           example:
+ *             maxConcurrentClasses: 6
  *     responses:
  *       200: { $ref: "#/components/responses/PlanOk" }
  *       400: { $ref: "#/components/responses/BadRequest" }

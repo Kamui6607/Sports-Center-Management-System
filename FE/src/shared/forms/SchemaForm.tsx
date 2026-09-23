@@ -1,3 +1,4 @@
+import { classSports } from "../sports";
 import { useId, useState } from "react";
 import type { FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -6,8 +7,10 @@ import { api, ApiError, contract } from "../api";
 import type { RecordData, Schema } from "../api";
 import { at, label } from "../config";
 import { ErrorState, Loading } from "../feedback";
+import { allPages } from "../pagedApi";
 const lookupPaths: Record<string, string> = {
   sportId: "/sports",
+  sportIds: "/sports",
   roomId: "/rooms",
   classId: "/classes",
   coachId: "/coaches",
@@ -19,26 +22,15 @@ function Lookup({
   required,
 }: {
   name: string;
-  value: string;
-  onChange: (v: string) => void;
+  value: string | string[];
+  onChange: (v: string | string[]) => void;
   required: boolean;
 }) {
   const path = lookupPaths[name];
   const q = useQuery({
     queryKey: ["lookup", path],
     queryFn: async ({ signal }) => {
-      const records: RecordData[] = [];
-      let page = 1;
-      while (true) {
-        const res = await api<RecordData[]>("GET " + path, {
-          query: { page: String(page), limit: "100" },
-          signal,
-        });
-        records.push(...res.data);
-        if (!res.pagination || page >= res.pagination.totalPages) break;
-        page++;
-      }
-      return records;
+      return (await allPages<RecordData>("GET " + path, { signal })).data;
     },
   });
   return (
@@ -47,17 +39,31 @@ function Lookup({
       <select
         hidden={q.isPending}
         required={required}
+        multiple={name === "sportIds"}
+        size={name === "sportIds" ? 4 : undefined}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) =>
+          onChange(
+            name === "sportIds"
+              ? Array.from(e.target.selectedOptions, (o) => o.value)
+              : e.target.value,
+          )
+        }
         disabled={q.isPending || q.isError}
       >
-        <option value="">
-          {q.isPending ? "Đang tải…" : "Chọn " + label(name).toLowerCase()}
-        </option>
+        {name !== "sportIds" && (
+          <option value="">
+            {q.isPending ? "Đang tải…" : "Chọn " + label(name).toLowerCase()}
+          </option>
+        )}
         {q.data?.map((row) => {
           const id = name === "coachId" ? at(row, "coachProfile.id") : row.id;
           return id ? (
-            <option key={String(id)} value={String(id)}>
+            <option
+              key={String(id)}
+              value={String(id)}
+              disabled={row.isActive === false && String(id) !== value}
+            >
               {String(row.name || row.fullName)}
               {row.isActive === false ? " (ngừng hoạt động)" : ""}
             </option>
@@ -99,7 +105,10 @@ export function SchemaForm({
     ...Object.fromEntries(
       Object.entries(schema?.properties || {}).map(([k, s]) => [
         k,
-        initial[k] ?? s.default ?? "",
+        initial[k] ??
+          (k === "sportIds"
+            ? classSports(initial).map((s) => s.id)
+            : (s.default ?? "")),
       ]),
     ),
     ...fixed,
@@ -125,12 +134,21 @@ export function SchemaForm({
       let v = values[k];
       if (v === "" || v === undefined || v === null) continue;
       if (s.type === "number" || s.type === "integer") v = Number(v);
-      if (s.format === "date-time") v = new Date(String(v)).toISOString();
+      if (s.format === "date-time") {
+        if (!Number.isFinite(Date.parse(String(v)))) {
+          setError(new Error("Ngày giờ không hợp lệ."));
+          return;
+        }
+        v = new Date(String(v)).toISOString();
+      }
       body[k] = typeof v === "string" && !/password/i.test(k) ? v.trim() : v;
     }
     const missing =
       schema!.required?.filter(
-        (k) => body[k] === undefined || body[k] === "",
+        (k) =>
+          body[k] === undefined ||
+          body[k] === "" ||
+          (Array.isArray(body[k]) && !body[k].length),
       ) || [];
     if (missing.length) {
       setError(
@@ -141,6 +159,75 @@ export function SchemaForm({
         ),
       );
       return;
+    }
+    for (const [k, s] of Object.entries(schema!.properties || {})) {
+      const v = body[k];
+      if (v === undefined) continue;
+      if (k === "sportIds" && (!Array.isArray(v) || v.length === 0)) {
+        setError(new Error("Vui lòng chọn ít nhất một bộ môn cho lớp học."));
+        return;
+      }
+      if (
+        (s.minLength && String(v).length < s.minLength) ||
+        (s.enum && !s.enum.includes(String(v)))
+      ) {
+        setError(new Error(`${label(k)} chưa hợp lệ.`));
+        return;
+      }
+      if (
+        ["number", "integer"].includes(s.type) &&
+        (!Number.isFinite(v) ||
+          (s.type === "integer" && !Number.isInteger(v)) ||
+          (["price", "amount", "capacity", "durationDays"].includes(k) &&
+            Number(v) <= 0) ||
+          (k === "experienceYears" && Number(v) < 0))
+      ) {
+        setError(
+          new Error(
+            `${label(k)} phải là số hợp lệ và lớn hơn 0 (kinh nghiệm có thể bằng 0).`,
+          ),
+        );
+        return;
+      }
+      if (
+        k === "dateOfBirth" &&
+        (!Number.isFinite(Date.parse(String(v))) ||
+          Date.parse(String(v)) > Date.now())
+      ) {
+        setError(new Error("Ngày sinh phải hợp lệ và không ở tương lai."));
+        return;
+      }
+      if (k === "phone" && !/^[0-9+\-() ]+$/.test(String(v))) {
+        setError(
+          new Error(
+            "Số điện thoại chỉ được chứa số và dấu +, -, ngoặc hoặc khoảng trắng.",
+          ),
+        );
+        return;
+      }
+      if (
+        k === "capacity" &&
+        / \/classes(?:\/|$)/.test(operation) &&
+        Number(v) > 200
+      ) {
+        setError(new Error("Sĩ số lớp tối đa 200 học viên."));
+        return;
+      }
+    }
+    if (
+      operation === "POST /training-plans" &&
+      Date.parse(String(body.endDate)) <= Date.parse(String(body.startDate))
+    ) {
+      setError(new Error("Ngày kết thúc phải sau ngày bắt đầu kế hoạch."));
+      return;
+    }
+    if (operation === "PATCH /class-schedules/{id}") {
+      // Lifecycle actions must use their dedicated endpoints and confirmations.
+      delete body.status;
+      if (initial.status !== "SCHEDULED") {
+        setError(new Error("Chỉ chỉnh sửa lịch đang mở."));
+        return;
+      }
     }
     if (
       body.startTime &&
@@ -164,8 +251,25 @@ export function SchemaForm({
   }
   return (
     <form onSubmit={submit} aria-busy={busy}>
+      {/POST \/subscriptions/.test(operation) && (
+        <p className="confirm-copy">
+          Chỉ lưu sau khi đã nhận đủ tiền. Hệ thống sẽ ghi nhận thanh toán thành
+          công và xuất hóa đơn ngay. Đăng ký gói mới tạm dừng các gói đang hoạt
+          động và cộng ngày dư vào gói mới; gia hạn tạo thêm một kỳ gói.
+        </p>
+      )}
+      {operation === "POST /payments" && (
+        <p className="confirm-copy">
+          Đối chiếu khoản đã thu trước khi ghi nhận. Đăng ký và gia hạn gói đã
+          tự tạo thanh toán; không ghi trùng khoản này.
+        </p>
+      )}
       <fieldset className="form-grid" disabled={busy}>
         {Object.entries(schema.properties || {})
+          .filter(
+            ([k]) =>
+              !(operation === "PATCH /class-schedules/{id}" && k === "status"),
+          )
           .filter(([k]) => !(k in fixed))
           .filter(
             ([k]) =>
@@ -208,7 +312,13 @@ export function SchemaForm({
                   <Lookup
                     name={k}
                     required={required}
-                    value={String(value || "")}
+                    value={
+                      k === "sportIds"
+                        ? Array.isArray(value)
+                          ? value.map(String)
+                          : []
+                        : String(value || "")
+                    }
                     onChange={(v) => change(k, v)}
                   />
                 ) : s.type === "boolean" ? (
@@ -296,9 +406,11 @@ export function SchemaForm({
                     min={
                       ["capacity", "durationDays"].includes(k)
                         ? 1
-                        : ["price", "experienceYears", "amount"].includes(k)
-                          ? 0
-                          : undefined
+                        : ["price", "amount"].includes(k)
+                          ? 0.01
+                          : ["experienceYears"].includes(k)
+                            ? 0
+                            : undefined
                     }
                     step={
                       s.type === "integer"
@@ -377,7 +489,7 @@ export function FilterField({
           name={name}
           required={false}
           value={value}
-          onChange={onChange}
+          onChange={(v) => onChange(String(v))}
         />
       ) : (
         <input

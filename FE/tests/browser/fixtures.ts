@@ -21,11 +21,32 @@ export async function setup(page: Page, role = "STAFF", longText = false) {
     const response: any = Object.entries(operation.responses).find(([code]) =>
       code.startsWith("2"),
     )?.[1];
-    const payload = structuredClone(
-      doc.components.responses[response.$ref.split("/").pop()].content[
-        "application/json"
-      ].schema.example,
-    );
+    const resolved = response.$ref
+      ? doc.components.responses[response.$ref.split("/").pop()]
+      : response;
+    const content = resolved.content?.["application/json"];
+    // Current Swagger also uses inline responses and omits examples for these
+    // collections. Keep explicit empty fixtures instead of dereferencing $ref.
+    const emptyLists = [
+      "/training-plans",
+      "/notifications",
+      "/attendance",
+      "/chat/contacts",
+      "/chat/conversations",
+      "/chat/messages",
+    ];
+    const fallback = path.endsWith("/unread-count")
+      ? { success: true, data: { unreadCount: 0 } }
+      : emptyLists.includes(path)
+        ? { success: true, data: [] }
+        : undefined;
+    const example = content?.schema?.example || content?.example || fallback;
+    if (!example)
+      return route.fulfill({
+        status: 501,
+        json: { success: false, message: "Missing response fixture " + path },
+      });
+    const payload = structuredClone(example);
     if (path === "/auth/me") payload.data.role = role;
     if (path === "/class-schedules")
       payload.data.forEach((r: any) => {

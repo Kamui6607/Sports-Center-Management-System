@@ -9,6 +9,7 @@ export async function listSports(query: any) {
   const where: any = {};
   if (query.isActive !== undefined) where.isActive = query.isActive === "true";
   if (query.search) where.name = { contains: query.search, mode: "insensitive" };
+  if (query.areaType) where.areaTypes = { has: query.areaType };
 
   const [total, sports] = await Promise.all([
     prisma.sport.count({ where }),
@@ -43,6 +44,27 @@ export async function updateSport(id: string, data: any) {
   if (data.isActive === false && sport.isActive === true) {
     const activeClasses = await prisma.class.count({ where: { sports: { some: { id } }, isActive: true } });
     if (activeClasses > 0) throw new AppError("Cannot deactivate sport with active classes", 400);
+  }
+
+  // Không được thu hẹp areaTypes nếu đang làm một Class active trở nên invalid.
+  if (data.areaTypes) {
+    const removed = (sport.areaTypes as string[]).filter((t) => !(data.areaTypes as string[]).includes(t));
+    if (removed.length > 0) {
+      const affected = await prisma.class.findFirst({
+        where: {
+          sports: { some: { id } },
+          isActive: true,
+          areaType: { in: removed as any },
+        },
+        select: { id: true, name: true, areaType: true },
+      });
+      if (affected) {
+        throw new AppError(
+          `Cannot remove area type "${affected.areaType}" from Sport "${sport.name}" because it is used by Class "${affected.name}"`,
+          400
+        );
+      }
+    }
   }
 
   return prisma.sport.update({ where: { id }, data });

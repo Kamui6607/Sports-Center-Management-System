@@ -195,9 +195,11 @@ test("reception mobile navigation and unavailable features never call invented e
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/receptionist/dashboard");
   await page.getByRole("button", { name: "Mở menu" }).click();
-  await page.getByRole("link", { name: "Điểm danh", exact: true }).click();
+  await page
+    .getByRole("link", { name: "Lịch & điểm danh", exact: true })
+    .click();
   await expect(
-    page.getByRole("heading", { name: "Điểm danh hội viên" }),
+    page.getByRole("heading", { name: "Lịch hoạt động", exact: true }),
   ).toBeVisible();
   await page.goto("/receptionist/support");
   await expect(

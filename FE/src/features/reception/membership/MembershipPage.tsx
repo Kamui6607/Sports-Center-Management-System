@@ -1,9 +1,13 @@
+import { CancelSubscription } from "../../../shared/CancelSubscription";
+import { downgradeReason } from "../../../shared/businessRules";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { RecordData } from "../../../shared/api";
 import { display, money } from "../../../shared/config";
 import { Details, ErrorState, Loading } from "../../../shared/ui";
 import { useReceptionDetail, useReceptionList } from "../api";
+import { subscriptionTransitions } from "../../../shared/businessRules";
+import { StatusAction } from "../../../shared/StatusAction";
 import {
   ActionForm,
   Heading,
@@ -11,7 +15,7 @@ import {
   MemberPicker,
   Table,
 } from "../components";
-export function MembershipPage() {
+export function MembershipPage({ role = "STAFF" }: { role?: string }) {
   const [search, setSearch] = useSearchParams();
   const linkedId = search.get("memberId") || "";
   const linked = useReceptionDetail(
@@ -35,8 +39,21 @@ export function MembershipPage() {
     Boolean(id),
   );
   const plans = useReceptionList("GET /membership-plans", { isActive: "true" });
+  const hasPlans = (plans.data?.data || []).some(
+    (p) => p.id && p.isActive !== false,
+  );
+  const current = subscriptions.data?.data.find((s) => s.status === "ACTIVE");
   const choices = (plans.data?.data || [])
     .filter((p) => p.id && p.isActive !== false)
+    .filter(
+      (p) =>
+        action?.id ||
+        !downgradeReason(
+          current as
+            { tier: unknown; plan?: { durationDays?: unknown } } | undefined,
+          { tier: p.tier, durationDays: p.durationDays },
+        ),
+    )
     .map((p) => ({
       value: String(p.id),
       label: `${display(p.name)} · ${money(p.price)} · ${display(p.durationDays)} ngày`,
@@ -73,18 +90,28 @@ export function MembershipPage() {
               <ErrorState error={plans.error} retry={() => plans.refetch()} />
             )}
             <p>
-              Chọn gói để đăng ký hoặc gia hạn cho hội viên. Kiểm tra lịch sử
-              thanh toán sau khi hoàn tất.
+              Đăng ký hoặc gia hạn sẽ ghi nhận đã thu tiền và phát hành hóa đơn
+              ngay. Chỉ xác nhận sau khi đã nhận đủ tiền. Đăng ký gói mới sẽ tạm
+              dừng gói ACTIVE và cộng ngày dư vào gói mới, không cho phép hạ
+              hạng hoặc giảm thời hạn cùng hạng. Gia hạn tạo một kỳ gói mới.
             </p>
             <button
               className="button primary"
-              disabled={!choices.length}
+              disabled={
+                !choices.length ||
+                subscriptions.isPending ||
+                subscriptions.isError
+              }
               onClick={() => setAction({})}
             >
               Đăng ký gói
             </button>
             {!plans.isPending && !plans.isError && !choices.length && (
-              <p>Chưa có gói đang hoạt động.</p>
+              <p>
+                {hasPlans
+                  ? "Không có gói phù hợp để mua mới. Gói mới cần cùng hạng với thời hạn không ngắn hơn, hoặc có hạng cao hơn."
+                  : "Chưa có gói đang hoạt động."}
+              </p>
             )}
             <ListState result={subscriptions}>
               {(rows) => (
@@ -97,13 +124,42 @@ export function MembershipPage() {
                     ["status", "Trạng thái"],
                   ]}
                   actions={(row) => (
-                    <button
-                      className="button small"
-                      disabled={!choices.length || !row.id}
-                      onClick={() => setAction({ id: String(row.id) })}
-                    >
-                      Gia hạn
-                    </button>
+                    <>
+                      <button
+                        className="button small"
+                        disabled={!hasPlans || !row.id}
+                        onClick={() => setAction({ id: String(row.id) })}
+                      >
+                        Gia hạn
+                      </button>
+                      {role === "MANAGER" && row.status === "ACTIVE" && (
+                        <CancelSubscription
+                          role="MANAGER"
+                          subscription={
+                            row as unknown as {
+                              id: string;
+                              endDate: string;
+                              status: string;
+                              plan: { price: number; durationDays: number };
+                            }
+                          }
+                        />
+                      )}
+                      <StatusAction
+                        operation="PATCH /subscriptions/{id}/status"
+                        id={String(row.id)}
+                        statuses={subscriptionTransitions(
+                          {
+                            status: row.status,
+                            remainingDays: row.remainingDays,
+                          },
+                          role,
+                        ).filter(
+                          (s) => s !== "CANCELLED" || row.status !== "ACTIVE",
+                        )}
+                        explanation="Tạm dừng sẽ lưu số ngày còn lại. Tiếp tục sẽ khôi phục thời hạn được bảo lưu. Hủy gói tạm dừng sẽ chấm dứt quyền lợi; backend hiện chưa áp dụng hoàn tiền và hủy lịch tự động cho gói tạm dừng."
+                      />
+                    </>
                   )}
                 />
               )}

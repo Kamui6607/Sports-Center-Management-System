@@ -6,6 +6,7 @@ import {
   CreateScheduleSchema,
   UpdateScheduleSchema,
   ScheduleQuerySchema,
+  ScheduleIdSchema,
 } from "./class-schedules.schema.js";
 import * as schedulesController from "./class-schedules.controller.js";
 
@@ -23,6 +24,7 @@ const router = Router();
  * /class-schedules:
  *   get:
  *     summary: Get list of schedules
+ *     description: "date/startAfter/startBefore use legacy start-time filtering. from/to use overlap-range filtering (schedule.startTime < to AND schedule.endTime > from). weekday/weekdays filter by Thứ 2..CN on startTime in Asia/Ho_Chi_Minh (ISO 1=Mon..7=Sun after normalization)."
  *     tags: [Class Schedules]
  *     parameters:
  *       - in: query
@@ -41,6 +43,22 @@ const router = Router();
  *           type: string
  *           enum: [SCHEDULED, CANCELLED, COMPLETED]
  *       - in: query
+ *         name: weekday
+ *         schema:
+ *           type: array
+ *           items:
+ *             type: string
+ *         style: form
+ *         explode: true
+ *         description: "Lọc 1 thứ: 2=T2..7=T7, 8=CN (alias: T2..T7, MON..SUN, Thứ 2..Chủ nhật). Lặp lại param để chọn nhiều thứ. VD: ?weekday=2&weekday=CN"
+ *         example: "2"
+ *       - in: query
+ *         name: weekdays
+ *         schema:
+ *           type: string
+ *         description: "Lọc nhiều thứ, phân tách dấu phẩy. VD: ?weekdays=2,4,8 hoặc ?weekdays=T2,T4,CN. Hợp nhất với weekday."
+ *         example: "2,4,8"
+ *       - in: query
  *         name: date
  *         schema:
  *           type: string
@@ -57,7 +75,19 @@ const router = Router();
  *         schema:
  *           type: string
  *           format: date-time
- *         description: Schedules starting before this time
+ *         description: Schedules starting before this time (legacy start-time filtering)
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Overlap-range filter start (schedule.endTime > from)
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Overlap-range filter end (schedule.startTime < to)
  *       - in: query
  *         name: page
  *         schema:
@@ -100,13 +130,19 @@ router.get(
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.get("/:id", authenticate, schedulesController.getScheduleById);
+router.get(
+  "/:id",
+  authenticate,
+  validate(ScheduleIdSchema, "params"),
+  schedulesController.getScheduleById
+);
 
 /**
  * @swagger
  * /class-schedules:
  *   post:
- *     summary: Create a new schedule (checks room & coach conflicts)
+ *     summary: Create a new schedule (checks area type, room & coach conflicts)
+ *     description: "Business rule: Class.areaType must equal Room.areaType. Checked before capacity and conflict checks."
  *     tags: [Class Schedules]
  *     requestBody:
  *       required: true
@@ -154,6 +190,7 @@ router.post(
  * /class-schedules/{id}:
  *   patch:
  *     summary: Update schedule (re-checks conflicts if room/time changed)
+ *     description: "Closed schedules (CANCELLED/COMPLETED) are immutable. status=COMPLETED is rejected here — use PATCH /class-schedules/{id}/complete."
  *     tags: [Class Schedules]
  *     parameters:
  *       - in: path
@@ -178,8 +215,12 @@ router.post(
  *                 format: date-time
  *               status:
  *                 type: string
- *                 enum: [SCHEDULED, CANCELLED, COMPLETED]
- *                 description: "If set to CANCELLED, all BOOKED enrollments are cancelled automatically"
+ *                 enum: [SCHEDULED, CANCELLED]
+ *                 description: "If set to CANCELLED, all BOOKED enrollments are cancelled automatically. COMPLETED must use /complete."
+ *               reason:
+ *                 type: string
+ *                 maxLength: 500
+ *                 description: "Cancellation reason (used in SCHEDULE_CANCELLED notification)"
  *     responses:
  *       200: { $ref: "#/components/responses/ScheduleOk" }
  *       400: { $ref: "#/components/responses/BadRequest" }
@@ -193,6 +234,7 @@ router.patch(
   "/:id",
   authenticate,
   authorize("MANAGER", "STAFF"),
+  validate(ScheduleIdSchema, "params"),
   validate(UpdateScheduleSchema),
   schedulesController.updateSchedule
 );
@@ -202,6 +244,7 @@ router.patch(
  * /class-schedules/{id}:
  *   delete:
  *     summary: Cancel schedule (automatically cancels all BOOKED enrollments)
+ *     description: "Idempotent for already-CANCELLED schedules (no duplicate notification). Rejects COMPLETED schedules."
  *     tags: [Class Schedules]
  *     parameters:
  *       - in: path
@@ -221,6 +264,7 @@ router.delete(
   "/:id",
   authenticate,
   authorize("MANAGER", "STAFF"),
+  validate(ScheduleIdSchema, "params"),
   schedulesController.deleteSchedule
 );
 
@@ -247,6 +291,7 @@ router.patch(
   "/:id/complete",
   authenticate,
   authorize("MANAGER", "STAFF"),
+  validate(ScheduleIdSchema, "params"),
   schedulesController.completeSchedule
 );
 

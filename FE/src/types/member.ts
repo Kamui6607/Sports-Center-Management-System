@@ -70,8 +70,9 @@ export interface ClassItem {
   id: string;
   name: string;
   description?: string | null;
-  sportId: string;
-  sport: Sport;
+  sportId?: string;
+  sport?: Sport;
+  sports?: (Sport | { sport: Sport; sportId?: string })[];
   capacity: number;
   classType: ClassType;
   isActive: boolean;

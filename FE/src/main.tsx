@@ -6,3 +6,4 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>,
 );
+import "./shared/detail.css";

@@ -10,9 +10,13 @@
     "start": "node dist/server.js",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "db:backfill:free-subscription": "tsx prisma/backfill-free-subscription.ts",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "test:e2e": "tsx tests/enrollment-quota.e2e.ts",
+    "test:e2e:attendance": "tsx tests/attendance-manual-code.e2e.ts",
+    "test:e2e:all": "npm run test:e2e && npm run test:e2e:attendance"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

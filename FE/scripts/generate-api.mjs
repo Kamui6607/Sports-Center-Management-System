@@ -37,7 +37,7 @@ let ts =
   "// Generated from Swagger. Response types describe documented examples, not exhaustive schemas.\n";
 const ops = {};
 let md =
-  "# OpenAPI endpoint inventory\n\nSource: https://sports-center-management-system.onrender.com/api/v1/docs/swagger-ui-init.js\n\nSnapshot: 2026-09-12. Production base: https://sports-center-management-system.onrender.com/api/v1\n\nResponse examples are documentation only, never application data. Coaches use undefined bearerAuth capitalization; client sends the documented HTTP Bearer token.\n";
+  "# OpenAPI endpoint inventory\n\nSource: https://sports-center-management-system.onrender.com/api/v1/docs/swagger-ui-init.js\n\nSnapshot: 2026-09-20. Production base: https://sports-center-management-system.onrender.com/api/v1\n\nResponse examples are documentation only, never application data. Coaches use undefined bearerAuth capitalization; client sends the documented HTTP Bearer token.\n";
 for (const [p, methods] of Object.entries(doc.paths))
   for (const [m, o] of Object.entries(methods)) {
     const key = m.toUpperCase() + " " + p;
@@ -63,11 +63,22 @@ for (const [p, methods] of Object.entries(doc.paths))
       statusCodes: Object.keys(responses),
     };
     if (body) ts += `export type ${name}Request = ${schemaType(body)};\n`;
-    md += `\n## ${key}\n${o.summary}\n\nAuthentication: ${JSON.stringify(o.security ?? doc.security)}\n\nParameters: \n\`\`\`json\n${JSON.stringify(o.parameters || [], null, 2)}\n\`\`\`\nRequest body:\n\`\`\`json\n${JSON.stringify(body || null, null, 2)}\n\`\`\`\nResponses/status codes:\n\`\`\`json\n${JSON.stringify(responses, null, 2)}\n\`\`\`\n`;
+    md += `\n## ${key}\n${o.summary}\n\nAuthentication: ${JSON.stringify(o.security ?? doc.security)}\n\nParameters:\n\`\`\`json\n${JSON.stringify(o.parameters || [], null, 2)}\n\`\`\`\nRequest body:\n\`\`\`json\n${JSON.stringify(body || null, null, 2)}\n\`\`\`\nResponses/status codes:\n\`\`\`json\n${JSON.stringify(responses, null, 2)}\n\`\`\`\n`;
   }
 for (const [k, r] of Object.entries(doc.components.responses)) {
   const ex = r.content?.["application/json"]?.schema?.example;
   if (ex) ts += `export type ${k} = ${exampleType(ex)};\n`;
+}
+// Swagger omits request bodies and pagination supported by the checked backend.
+// Keep these audited contracts reproducible until the backend publishes them.
+const overrideUrl = new URL(
+  "../docs/workflow-contract-overrides.json",
+  import.meta.url,
+);
+if (fs.existsSync(overrideUrl)) {
+  Object.assign(ops, JSON.parse(fs.readFileSync(overrideUrl, "utf8")));
+  md +=
+    "\n## Verified workflow contracts\nAdditional operations and missing bodies/parameters are preserved in workflow-contract-overrides.json, checked against backend commit 9d4af0efb8c3e910af233eb3e30b4e7b04dae238. See WORKFLOW_ALIGNMENT.md.\n";
 }
 fs.writeFileSync(new URL("../src/shared/generated.ts", import.meta.url), ts);
 fs.writeFileSync(

@@ -1,3 +1,4 @@
+import { CoachFeedback } from "../../shared/CoachFeedback";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -11,6 +12,10 @@ import {
   UserPlus,
 } from "lucide-react";
 import { api, contract } from "../../shared/api";
+import { canCompleteSchedule } from "../../shared/businessRules";
+import { Attendance } from "../../shared/Attendance";
+import { allPages } from "../../shared/pagedApi";
+import { TrainingPlans } from "../../shared/TrainingPlans";
 import type { RecordData } from "../../shared/api";
 import type { Resource } from "./config";
 import { at, display, money } from "../../shared/config";
@@ -24,7 +29,15 @@ import {
   Modal,
   SchemaForm,
 } from "../../shared/ui";
-export function ResourcePage({ resource: r }: { resource: Resource }) {
+export function ResourcePage({
+  resource: r,
+  role = "MANAGER",
+  userId,
+}: {
+  resource: Resource;
+  role?: string;
+  userId?: string;
+}) {
   const client = useQueryClient();
   const [query, setQuery] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
@@ -32,6 +45,7 @@ export function ResourcePage({ resource: r }: { resource: Resource }) {
   const [modal, setModal] = useState<{ kind: string; row?: RecordData } | null>(
     null,
   );
+  const [detailTab, setDetailTab] = useState("overview");
   const [notice, setNotice] = useState("");
   const [bError, setBError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
@@ -72,7 +86,12 @@ export function ResourcePage({ resource: r }: { resource: Resource }) {
     setBusy(true);
     setBError(undefined);
     try {
-      await api(remove, { params: { id: String(modal!.row!.id) } });
+      await api(
+        modal?.kind === "complete"
+          ? "PATCH /class-schedules/{id}/complete"
+          : remove,
+        { params: { id: String(modal!.row!.id) } },
+      );
       done();
     } catch (e) {
       setBError(e);
@@ -215,12 +234,19 @@ export function ResourcePage({ resource: r }: { resource: Resource }) {
                           title="Xem chi tiết"
                           aria-label="Xem chi tiết"
                           className="icon-button"
-                          onClick={() => setModal({ kind: "detail", row })}
+                          onClick={() => {
+                            setDetailTab("overview");
+                            setModal({ kind: "detail", row });
+                          }}
                         >
                           <Eye size={17} />
                         </button>
                         {contract[update]?.body && (
                           <button
+                            disabled={
+                              r.slug === "schedules" &&
+                              row.status !== "SCHEDULED"
+                            }
                             aria-label="Chỉnh sửa"
                             title="Chỉnh sửa"
                             className="icon-button"
@@ -239,6 +265,18 @@ export function ResourcePage({ resource: r }: { resource: Resource }) {
                             <UserPlus size={17} />
                           </button>
                         )}
+                        {r.slug === "schedules" && (
+                          <button
+                            className="button small"
+                            disabled={!canCompleteSchedule(row)}
+                            onClick={() => {
+                              setBError(undefined);
+                              setModal({ kind: "complete", row });
+                            }}
+                          >
+                            Hoàn tất
+                          </button>
+                        )}
                         {contract[remove] && (
                           <button
                             aria-label={
@@ -254,7 +292,9 @@ export function ResourcePage({ resource: r }: { resource: Resource }) {
                             className="icon-button danger-text"
                             disabled={
                               row.isActive === false ||
-                              row.status === "CANCELLED"
+                              row.status === "CANCELLED" ||
+                              row.status === "COMPLETED" ||
+                              (r.path === "/users" && row.id === userId)
                             }
                             onClick={() => {
                               setBError(undefined);
@@ -310,27 +350,30 @@ export function ResourcePage({ resource: r }: { resource: Resource }) {
           cho danh sách này.
         </p>
       )}
-      {["users", "members", "staff", "membership-plans"].includes(r.slug) && (
-        <p className="footnote">
-          Chỉnh sửa {r.title.toLowerCase()} sẽ được mở khi backend bổ sung hợp
-          đồng cập nhật.
-        </p>
-      )}
+      {["users", "members", "staff", "membership-plans"].includes(r.slug) &&
+        !contract[update]?.body && (
+          <p className="footnote">
+            Chỉnh sửa {r.title.toLowerCase()} sẽ được mở khi backend bổ sung hợp
+            đồng cập nhật.
+          </p>
+        )}
       {modal && (
         <Modal
           dismissible={!busy}
           title={
-            modal.kind === "create"
-              ? "Thêm " + r.title.toLowerCase()
-              : modal.kind === "assign"
-                ? "Phân công huấn luyện viên"
-                : modal.kind === "edit"
-                  ? "Chỉnh sửa thông tin"
-                  : modal.kind === "delete"
-                    ? r.slug === "schedules"
-                      ? "Hủy lịch hoạt động"
-                      : "Ngừng hoạt động"
-                    : "Chi tiết " + r.title.toLowerCase()
+            modal.kind === "complete"
+              ? "Hoàn tất buổi học"
+              : modal.kind === "create"
+                ? "Thêm " + r.title.toLowerCase()
+                : modal.kind === "assign"
+                  ? "Phân công huấn luyện viên"
+                  : modal.kind === "edit"
+                    ? "Chỉnh sửa thông tin"
+                    : modal.kind === "delete"
+                      ? r.slug === "schedules"
+                        ? "Hủy lịch hoạt động"
+                        : "Ngừng hoạt động"
+                      : "Chi tiết " + r.title.toLowerCase()
           }
           onClose={() => {
             if (!busy) setModal(null);
@@ -350,20 +393,32 @@ export function ResourcePage({ resource: r }: { resource: Resource }) {
                 modal.kind === "edit"
                   ? r.slug === "coaches"
                     ? (modal.row?.coachProfile as RecordData)
-                    : modal.row
+                    : r.slug === "members"
+                      ? { ...modal.row, ...(modal.row?.user as RecordData) }
+                      : modal.row
                   : {}
               }
-              fixed={modal.kind === "create" && r.role ? { role: r.role } : {}}
+              fixed={
+                modal.kind === "create" && r.role
+                  ? { role: r.role }
+                  : modal.kind === "edit" &&
+                      r.path === "/users" &&
+                      modal.row?.id === userId
+                    ? { role: modal.row?.role, isActive: true }
+                    : {}
+              }
               onSuccess={done}
               onBusyChange={setBusy}
               onCancel={() => setModal(null)}
             />
-          ) : modal.kind === "delete" ? (
+          ) : ["delete", "complete"].includes(modal.kind) ? (
             <>
               <p className="confirm-copy">
-                {r.slug === "schedules"
-                  ? "Hủy lịch này sẽ tự động hủy tất cả lượt đăng ký BOOKED."
-                  : "Bản ghi sẽ được ngừng hoạt động và được lưu lại trong hệ thống."}{" "}
+                {modal.kind === "complete"
+                  ? "Chỉ hoàn tất khi buổi học đã kết thúc. Các đăng ký BOOKED sẽ chuyển thành COMPLETED; kết quả điểm danh được lưu riêng."
+                  : r.slug === "schedules"
+                    ? "Hủy lịch này sẽ tự động hủy tất cả lượt đăng ký BOOKED."
+                    : "Bản ghi sẽ được ngừng hoạt động và được lưu lại trong hệ thống."}{" "}
                 Bạn có muốn tiếp tục?
               </p>
               {bError != null && <ErrorState error={bError} />}
@@ -390,14 +445,66 @@ export function ResourcePage({ resource: r }: { resource: Resource }) {
             <ErrorState error={detail.error} retry={() => detail.refetch()} />
           ) : (
             <>
-              <Details value={detail.data.data} />
-              {r.slug === "members" && (
-                <MemberStatus id={String(modal.row?.id)} />
+              {["members", "schedules", "classes", "coaches"].includes(
+                r.slug,
+              ) && (
+                <div
+                  className="detail-tabs"
+                  role="group"
+                  aria-label="Nội dung chi tiết"
+                >
+                  <button
+                    className="button small"
+                    aria-pressed={detailTab === "overview"}
+                    onClick={() => setDetailTab("overview")}
+                  >
+                    Tổng quan
+                  </button>
+                  <button
+                    className="button small"
+                    aria-pressed={detailTab === "related"}
+                    onClick={() => setDetailTab("related")}
+                  >
+                    {r.slug === "members"
+                      ? "Gói & tập luyện"
+                      : r.slug === "schedules"
+                        ? "Học viên & điểm danh"
+                        : r.slug === "coaches"
+                          ? "Đánh giá"
+                          : "Phân công HLV"}
+                  </button>
+                </div>
               )}
-              {r.slug === "schedules" && (
-                <Enrollments id={String(modal.row?.id)} />
+              {detailTab === "overview" && <Details value={detail.data.data} />}
+              {detailTab === "related" &&
+                r.slug === "coaches" &&
+                Boolean(at(detail.data.data, "coachProfile.id")) && (
+                  <div className="workflow-card">
+                    <CoachFeedback
+                      coachId={String(at(detail.data.data, "coachProfile.id"))}
+                      role={role}
+                    />
+                  </div>
+                )}
+              {detailTab === "related" && r.slug === "members" && (
+                <>
+                  <MemberStatus id={String(modal.row?.id)} />
+                  <div className="workflow-card">
+                    <TrainingPlans
+                      memberId={String(modal.row?.id)}
+                      role={role}
+                    />
+                  </div>
+                </>
               )}
-              {r.slug === "classes" && (
+              {detailTab === "related" && r.slug === "schedules" && (
+                <Enrollments
+                  id={String(modal.row?.id)}
+                  schedule={detail.data.data}
+                  role={role}
+                />
+              )}
+              {detailTab === "related" && r.slug === "classes" && (
                 <CoachAssignments
                   id={String(modal.row?.id)}
                   data={detail.data.data}
@@ -433,11 +540,19 @@ function MemberStatus({ id }: { id: string }) {
     </section>
   );
 }
-function Enrollments({ id }: { id: string }) {
+function Enrollments({
+  id,
+  schedule,
+  role,
+}: {
+  id: string;
+  schedule: RecordData;
+  role: string;
+}) {
   const q = useQuery({
     queryKey: ["enrollments", id],
     queryFn: ({ signal }) =>
-      api<RecordData[]>("GET /enrollments/schedule/{scheduleId}", {
+      allPages<RecordData>("GET /enrollments/schedule/{scheduleId}", {
         params: { scheduleId: id },
         signal,
       }),
@@ -450,7 +565,7 @@ function Enrollments({ id }: { id: string }) {
       ) : q.isError ? (
         <ErrorState error={q.error} retry={() => q.refetch()} />
       ) : q.data.data.length ? (
-        <Details value={q.data.data} />
+        <Attendance schedule={schedule} roster={q.data.data} role={role} />
       ) : (
         <Empty text="Chưa có hội viên đăng ký" />
       )}
@@ -489,6 +604,10 @@ function CoachAssignments({
   return (
     <section className="detail-section">
       <h3>Điều chỉnh phân công</h3>
+      <p className="field-note">
+        Hội viên đã đặt các buổi học sắp tới sẽ nhận thông báo khi thay đổi huấn
+        luyện viên.
+      </p>
       {coaches.map((c, i) => {
         const coachId = String(at(c, "coach.id") || "");
         return (

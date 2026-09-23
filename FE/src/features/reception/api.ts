@@ -1,3 +1,4 @@
+import { allPages } from "../../shared/pagedApi";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../shared/api";
 import type { RecordData } from "../../shared/api";
@@ -10,7 +11,9 @@ export function useReceptionList(
   return useQuery({
     queryKey: ["reception", operation, query, params],
     queryFn: ({ signal }) =>
-      api<RecordData[]>(operation, { query, params, signal }),
+      query.page
+        ? api<RecordData[]>(operation, { query, params, signal })
+        : allPages<RecordData>(operation, { query, params, signal }),
     enabled,
   });
 }

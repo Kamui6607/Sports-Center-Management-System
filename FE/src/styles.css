@@ -2774,3 +2774,5 @@ textarea[aria-invalid="true"] {
 }
 .member-hero-actions { flex-wrap: wrap; }
 .member-hero-actions button { flex: 1 1 160px; justify-content: center; }
+
+/* Compact detail design is shared by every portal. */

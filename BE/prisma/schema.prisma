@@ -48,6 +48,12 @@ enum ClassType {
   PREMIUM
 }
 
+enum AreaType {
+  POOL
+  INDOOR
+  OUTDOOR
+}
+
 enum ScheduleStatus {
   SCHEDULED
   CANCELLED
@@ -94,14 +100,16 @@ model User {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  memberProfile  MemberProfile?
-  coachProfile   CoachProfile?
-  managerProfile ManagerProfile?
-  refreshTokens  RefreshToken[]
-  createdPayments Payment[]      @relation("PaymentCreatedBy")
-  sentMessages    ChatMessage[]  @relation("SentMessages")
-  receivedMessages ChatMessage[] @relation("ReceivedMessages")
-  notifications  Notification[]
+  memberProfile              MemberProfile?
+  coachProfile               CoachProfile?
+  managerProfile             ManagerProfile?
+  refreshTokens              RefreshToken[]
+  createdPayments            Payment[]              @relation("PaymentCreatedBy")
+  sentMessages               ChatMessage[]          @relation("SentMessages")
+  receivedMessages           ChatMessage[]          @relation("ReceivedMessages")
+  notifications              Notification[]
+  decidedAttendancePenalties AttendancePenalty[]    @relation("AttendancePenaltyDecidedBy")
+  createdManualCodes         AttendanceManualCode[] @relation("AttendanceManualCodeCreatedBy")
 }
 
 model RefreshToken {
@@ -121,37 +129,39 @@ model RefreshToken {
 // ─────────────────────────────────────────
 
 model MemberProfile {
-  id                 String        @id @default(uuid())
-  userId             String        @unique
-  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String         @id @default(uuid())
+  userId             String         @unique
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   fitnessGoal        String?
   trainingLevel      TrainingLevel?
   trainingPreference String?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
-  subscriptions MembershipSubscription[]
-  enrollments   Enrollment[]
-  payments      Payment[]
-  invoices      Invoice[]
-  attendances   Attendance[]
-  trainingPlans TrainingPlan[]
-  feedbacks     CoachFeedback[]
+  subscriptions      MembershipSubscription[]
+  enrollments        Enrollment[]
+  payments           Payment[]
+  invoices           Invoice[]
+  attendances        Attendance[]
+  trainingPlans      TrainingPlan[]
+  feedbacks          CoachFeedback[]
+  penalties          AttendancePenalty[]
+  manualCodeAttempts AttendanceManualCodeAttempt[]
 }
 
 model CoachProfile {
-  id              String  @id @default(uuid())
-  userId          String  @unique
-  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   specialization  String?
   experienceYears Int?
   bio             String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  classes ClassMember[]
+  classes       ClassMember[]
   trainingPlans TrainingPlan[]
-  feedbacks CoachFeedback[]
+  feedbacks     CoachFeedback[]
 }
 
 model ManagerProfile {
@@ -167,34 +177,38 @@ model ManagerProfile {
 // ─────────────────────────────────────────
 
 model MembershipPlan {
-  id           String     @id @default(uuid())
-  name         String
-  description  String?
-  price        Decimal    @db.Decimal(12, 2)
-  durationDays Int
-  tier         MemberTier // MEMBERSHIP or PREMIUM
-  isActive     Boolean    @default(true)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                   String     @id @default(uuid())
+  name                 String
+  description          String?
+  price                Decimal    @db.Decimal(12, 2)
+  durationDays         Int
+  tier                 MemberTier // MEMBERSHIP or PREMIUM
+  /// Quota lớp học song song: số Class KHÁC NHAU tối đa mà hội viên được giữ đồng thời (>= 0).
+  /// Một Class = 1 quota dù hội viên có nhiều buổi BOOKED. Hệ thống đếm DISTINCT Class có
+  /// Enrollment BOOKED ở ClassSchedule SCHEDULED chưa bắt đầu. Do Manager cấu hình qua API.
+  maxConcurrentClasses Int
+  isActive             Boolean    @default(true)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
 
   subscriptions MembershipSubscription[]
 }
 
 model MembershipSubscription {
-  id             String           @id @default(uuid())
-  memberId       String
-  member         MemberProfile    @relation(fields: [memberId], references: [id])
-  planId         String
-  plan           MembershipPlan   @relation(fields: [planId], references: [id])
-  tier           MemberTier       // copied from plan at time of subscription
-  startDate      DateTime
-  endDate        DateTime
-  status         MembershipStatus @default(ACTIVE)
+  id            String           @id @default(uuid())
+  memberId      String
+  member        MemberProfile    @relation(fields: [memberId], references: [id])
+  planId        String
+  plan          MembershipPlan   @relation(fields: [planId], references: [id])
+  tier          MemberTier // copied from plan at time of subscription
+  startDate     DateTime
+  endDate       DateTime
+  status        MembershipStatus @default(ACTIVE)
   // BR-15: Suspension tracking
-  suspendedAt    DateTime?        // When suspension started
-  remainingDays  Int?             // Days remaining when suspended (for resume logic)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  suspendedAt   DateTime? // When suspension started
+  remainingDays Int? // Days remaining when suspended (for resume logic)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   payments Payment[]
 
@@ -209,12 +223,13 @@ model MembershipSubscription {
 // ─────────────────────────────────────────
 
 model Sport {
-  id          String   @id @default(uuid())
-  name        String   @unique
+  id          String     @id @default(uuid())
+  name        String     @unique
   description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  areaTypes   AreaType[]
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   classes Class[]
 }
@@ -224,6 +239,7 @@ model Room {
   name      String   @unique
   capacity  Int
   location  String?
+  areaType  AreaType
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -236,23 +252,27 @@ model Room {
 // ─────────────────────────────────────────
 
 model Class {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
   description String?
-  
-  // Many-to-Many with Sport
-  sports      Sport[]
 
-  capacity    Int
-  classType   ClassType @default(REGULAR)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  // Many-to-Many with Sport
+  sports Sport[]
+
+  capacity  Int
+  classType ClassType @default(REGULAR)
+  // Khu vực mà lớp học yêu cầu (POOL | INDOOR | OUTDOOR).
+  // Khác với classType (REGULAR | PREMIUM là hạng lớp).
+  areaType  AreaType
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   coaches     ClassMember[]
   schedules   ClassSchedule[]
   enrollments Enrollment[]
   feedbacks   CoachFeedback[]
+  penalties   AttendancePenalty[]
 }
 
 // Coach assignment to class (many-to-many)
@@ -284,6 +304,7 @@ model ClassSchedule {
 
   enrollments Enrollment[]
   attendances Attendance[]
+  manualCodes AttendanceManualCode[]
 
   @@index([classId])
   @@index([roomId])
@@ -351,14 +372,14 @@ model Invoice {
   paymentId     String        @unique
   payment       Payment       @relation(fields: [paymentId], references: [id])
   subtotal      Decimal       @db.Decimal(12, 2)
-  discount      Decimal       @db.Decimal(12, 2) @default(0)
+  discount      Decimal       @default(0) @db.Decimal(12, 2)
   total         Decimal       @db.Decimal(12, 2)
   status        InvoiceStatus @default(ISSUED)
   issuedAt      DateTime      @default(now())
   // BR-25: Snapshot fields — immutable record of who paid for what
-  memberName    String?       // Copied from user.fullName at time of issue
-  planName      String?       // Copied from plan.name at time of issue
-  planTier      String?       // Copied from plan.tier at time of issue
+  memberName    String? // Copied from user.fullName at time of issue
+  planName      String? // Copied from plan.name at time of issue
+  planTier      String? // Copied from plan.tier at time of issue
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -399,50 +420,124 @@ enum AttendanceStatus {
 }
 
 model Attendance {
-  id          String           @id @default(uuid())
-  scheduleId  String
-  schedule    ClassSchedule    @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  memberId    String
-  member      MemberProfile    @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  status      AttendanceStatus @default(PRESENT)
-  note        String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id         String           @id @default(uuid())
+  scheduleId String
+  schedule   ClassSchedule    @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  memberId   String
+  member     MemberProfile    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  status     AttendanceStatus @default(PRESENT)
+  note       String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   @@unique([scheduleId, memberId])
   @@index([scheduleId])
   @@index([memberId])
 }
 
+/// Mã dự phòng nhập tay cho Member không quét được QR (camera/điện thoại lỗi).
+/// Sinh cùng lượt với QR ở POST /attendance/generate-qr; TTL ngắn (90s) và mã cũ của cùng
+/// buổi học bị thu hồi khi mã mới được cấp (mỗi thời điểm chỉ có 1 mã hợp lệ / schedule).
+/// `attempts` đếm số lần nhập SAI vào chính mã này; vượt ngưỡng → mã bị vô hiệu (revokedAt).
+model AttendanceManualCode {
+  id         String        @id @default(uuid())
+  code       String        @unique
+  scheduleId String
+  schedule   ClassSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  /// userId (COACH/MANAGER) đã cấp mã — audit.
+  createdBy  String
+  creator    User          @relation("AttendanceManualCodeCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  attempts   Int           @default(0)
+  revokedAt  DateTime?
+  createdAt  DateTime      @default(now())
+
+  attemptLogs AttendanceManualCodeAttempt[]
+
+  @@index([scheduleId, expiresAt])
+  @@index([createdBy])
+}
+
+/// Log mọi lần thử nhập mã dự phòng (kể cả sai/hết hạn) — dùng cho rate-limit theo member + audit.
+model AttendanceManualCodeAttempt {
+  id        String                @id @default(uuid())
+  memberId  String
+  member    MemberProfile         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  codeId    String?
+  code      AttendanceManualCode? @relation(fields: [codeId], references: [id], onDelete: SetNull)
+  success   Boolean
+  createdAt DateTime              @default(now())
+
+  @@index([memberId, createdAt])
+}
+
+enum AttendancePenaltyStatus {
+  /// Reserved: hiện KHÔNG có flow nào persist PENDING (preview là read-only, apply tạo thẳng APPLIED).
+  /// Giữ lại cho luồng "đề xuất chờ duyệt" trong tương lai; không tạo record PENDING giả.
+  PENDING
+  APPLIED
+  REVOKED
+  EXPIRED
+}
+
+/// Lịch sử hình phạt chuyên cần theo (member × class): thu hồi slot tương lai + chặn đặt lại.
+model AttendancePenalty {
+  id                    String                  @id @default(uuid())
+  memberId              String
+  member                MemberProfile           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  classId               String
+  class                 Class                   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  reason                String
+  attendanceRate        Float
+  sampleSize            Int
+  releasedCount         Int                     @default(0)
+  releasedEnrollmentIds Json?
+  blockedUntil          DateTime?
+  status                AttendancePenaltyStatus @default(PENDING)
+  decidedBy             String?
+  decider               User?                   @relation("AttendancePenaltyDecidedBy", fields: [decidedBy], references: [id], onDelete: SetNull)
+  decidedAt             DateTime?
+  appealReason          String?
+  appealedAt            DateTime?
+  revokedBy             String?
+  revokedAt             DateTime?
+  revokedReason         String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  @@index([memberId, classId])
+  @@index([status, blockedUntil])
+}
+
 model TrainingPlan {
-  id          String           @id @default(uuid())
+  id          String        @id @default(uuid())
   memberId    String
-  member      MemberProfile    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  member      MemberProfile @relation(fields: [memberId], references: [id], onDelete: Cascade)
   coachId     String
-  coach       CoachProfile     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  coach       CoachProfile  @relation(fields: [coachId], references: [id], onDelete: Cascade)
   name        String
   description String?
   startDate   DateTime
   endDate     DateTime
-  isActive    Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
-  results     TrainingResult[]
+  results TrainingResult[]
 
   @@index([memberId])
   @@index([coachId])
 }
 
 model TrainingResult {
-  id          String        @id @default(uuid())
-  planId      String
-  plan        TrainingPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
-  date        DateTime
-  metrics     Json?         // Custom metrics like weight, body fat
-  coachNote   String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id        String       @id @default(uuid())
+  planId    String
+  plan      TrainingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  date      DateTime
+  metrics   Json? // Custom metrics like weight, body fat
+  coachNote String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   @@index([planId])
 }
@@ -452,18 +547,18 @@ model TrainingResult {
 // ─────────────────────────────────────────
 
 model CoachFeedback {
-  id         String        @id @default(uuid())
-  coachId    String
-  coach      CoachProfile  @relation(fields: [coachId], references: [id], onDelete: Cascade)
-  memberId   String
-  member     MemberProfile @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  classId    String?
-  class      Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
-  rating     Int           // 1-5 sao
-  comment    String?
-  isAnonymous Boolean      @default(false)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  id          String        @id @default(uuid())
+  coachId     String
+  coach       CoachProfile  @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  memberId    String
+  member      MemberProfile @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  classId     String?
+  class       Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
+  rating      Int // 1-5 sao
+  comment     String?
+  isAnonymous Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   @@unique([coachId, memberId, classId])
   @@index([coachId])
@@ -476,47 +571,51 @@ model CoachFeedback {
 
 enum NotificationType {
   // ── Tài khoản ──
-  MEMBER_REGISTERED       // Chào mừng hội viên mới đăng ký
+  MEMBER_REGISTERED // Chào mừng hội viên mới đăng ký
   // ── Chat ──
-  CHAT_MESSAGE            // Nhận tin nhắn mới
+  CHAT_MESSAGE // Nhận tin nhắn mới
   // ── Gói tập ──
-  SUBSCRIPTION_EXPIRING   // Gói sắp hết hạn (5 ngày trước)
-  SUBSCRIPTION_EXPIRED    // Gói đã hết hạn
-  SUBSCRIPTION_CANCELLED  // Gói bị hủy (kèm lý do)
+  SUBSCRIPTION_EXPIRING // Gói sắp hết hạn (5 ngày trước)
+  SUBSCRIPTION_EXPIRED // Gói đã hết hạn
+  SUBSCRIPTION_CANCELLED // Gói bị hủy (kèm lý do)
   // ── Lịch học ──
-  UPCOMING_CLASS          // Nhắc lớp sắp học (24h trước)
-  SCHEDULE_CANCELLED      // Lịch học bị hủy
-  SCHEDULE_UPDATED        // Lịch học được dời giờ
+  UPCOMING_CLASS // Nhắc lớp sắp học (24h trước)
+  SCHEDULE_CANCELLED // Lịch học bị hủy
+  SCHEDULE_UPDATED // Lịch học được dời giờ
   // ── Đặt lớp ──
-  ENROLLMENT_CONFIRMED    // Đặt lớp thành công
-  ENROLLMENT_CANCELLED    // Hủy đặt lớp
+  ENROLLMENT_CONFIRMED // Đặt lớp thành công
+  ENROLLMENT_CANCELLED // Hủy đặt lớp
   // ── Kế hoạch tập luyện ──
-  TRAINING_PLAN_ASSIGNED  // HLV giao kế hoạch tập mới
+  TRAINING_PLAN_ASSIGNED // HLV giao kế hoạch tập mới
   // ── Lớp học ──
-  NEW_CLASS               // Lớp học mới được mở
-  COACH_CHANGED           // Đổi HLV cho lớp
+  NEW_CLASS // Lớp học mới được mở
+  COACH_CHANGED // Đổi HLV cho lớp
+  // ── Chuyên cần (Attendance) ──
+  ATTENDANCE_WARNING // Cảnh báo chuyên cần dưới 80%
+  ATTENDANCE_PENALTY // Hình phạt chuyên cần: thu hồi slot + chặn đặt lại
+  ATTENDANCE_PENALTY_REVOKED // Hình phạt chuyên cần được gỡ
+  SCHEDULE_ROOM_CHANGED // Lịch học đổi phòng (bulk transfer Room hư)
   // ── Thanh toán ──
-  PAYMENT_SUCCESS         // Thanh toán thành công
-  PAYMENT_REFUNDED        // Hoàn tiền
+  PAYMENT_SUCCESS // Thanh toán thành công
+  PAYMENT_REFUNDED // Hoàn tiền
   // ── Chung ──
   GENERAL
 }
 
 model Notification {
-  id         String           @id @default(uuid())
-  userId     String
-  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type       NotificationType
-  title      String
-  body       String
-  reason     String?          // Lý do (dùng cho hủy gói, hủy lịch…)
-  isRead     Boolean          @default(false)
-  readAt     DateTime?
-  metadata   Json?            // e.g. { scheduleId, classId, subscriptionId, senderId }
-  createdAt  DateTime         @default(now())
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  reason    String? // Lý do (dùng cho hủy gói, hủy lịch…)
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  metadata  Json? // e.g. { scheduleId, classId, subscriptionId, senderId }
+  createdAt DateTime         @default(now())
 
   @@index([userId])
   @@index([isRead])
   @@index([createdAt])
 }
-

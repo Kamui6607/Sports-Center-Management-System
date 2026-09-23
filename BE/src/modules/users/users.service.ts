@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { hashPassword } from "../../utils/bcrypt.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
+import { ensureActiveFreeSubscription } from "../subscriptions/free-subscription.service.js";
 import type { CreateUserInput, UpdateUserInput, UserQueryInput } from "./users.schema.js";
 
 const userSelect = {
@@ -71,18 +72,28 @@ export async function createUser(data: CreateUserInput) {
         }
       : {};
 
-  return prisma.user.create({
-    data: {
-      email: data.email,
-      password: hashed,
-      fullName: data.fullName,
-      phone: data.phone,
-      gender: data.gender,
-      dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-      role: data.role,
-      ...profileCreate,
-    },
-    select: userSelect,
+  // Tạo user + (MEMBER) MemberProfile + subscription FREE ACTIVE trong cùng transaction.
+  // COACH/STAFF/MANAGER KHÔNG được auto-provision subscription (không có memberProfile).
+  return prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({
+      data: {
+        email: data.email,
+        password: hashed,
+        fullName: data.fullName,
+        phone: data.phone,
+        gender: data.gender,
+        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+        role: data.role,
+        ...profileCreate,
+      },
+      select: userSelect,
+    });
+
+    if (created.memberProfile) {
+      await ensureActiveFreeSubscription(tx, created.memberProfile.id);
+    }
+
+    return created;
   });
 }
 

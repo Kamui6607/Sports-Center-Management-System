@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as service from "./training-plans.service.js";
+import { sendSuccess } from "../../utils/response.js";
 
 export const createPlan = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -19,5 +20,16 @@ export const createResult = async (req: Request, res: Response, next: NextFuncti
   try {
     const result = await service.createResult(req.body as any, req.user);
     res.status(201).json({ success: true, data: result });
+  } catch (error) { next(error); }
+};
+
+export const updatePlanCoach = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const plan = await service.updatePlanCoach(
+      req.params.id as string,
+      req.body.coachId,
+      req.user
+    );
+    sendSuccess(res, plan, "Training plan coach updated successfully");
   } catch (error) { next(error); }
 };

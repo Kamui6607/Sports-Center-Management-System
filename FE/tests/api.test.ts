@@ -20,6 +20,67 @@ beforeEach(() => {
   vi.stubGlobal("window", { dispatchEvent: vi.fn() });
 });
 describe("API client contract and authentication", () => {
+  it("does not refresh a session revoked by Dynamic Auth", async () => {
+    sessionStorage.setItem("pulse.access", "old");
+    sessionStorage.setItem("pulse.refresh", "refresh");
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: false,
+            message: "Unauthorized: account is locked",
+          }),
+          { status: 401 },
+        ),
+      );
+    vi.stubGlobal("fetch", fetch);
+    const { api, hasSession } = await import("../src/shared/api");
+    await expect(api("GET /auth/me")).rejects.toThrow("Tài khoản đã bị khóa");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(hasSession()).toBe(false);
+  });
+  it("keeps browser multipart boundaries for chat uploads", async () => {
+    const fetch = vi.fn().mockResolvedValue(envelope({ id: "m1" }));
+    vi.stubGlobal("fetch", fetch);
+    const { api } = await import("../src/shared/api");
+    const body = new FormData();
+    body.set("content", "Hello");
+    await api("POST /chat/messages", { body });
+    expect(fetch.mock.calls[0][1].body).toBe(body);
+    expect(fetch.mock.calls[0][1].headers["Content-Type"]).toBeUndefined();
+  });
+  it("loads all verified pages and fails on a repeated page instead of hiding records", async () => {
+    const fetch = vi.fn(async (url: string) => {
+      const page = Number(new URL(url).searchParams.get("page"));
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: [{ id: String(page) }],
+          pagination: { page, totalPages: 2, total: 2, limit: 1 },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetch);
+    const { allPages } = await import("../src/shared/pagedApi");
+    expect((await allPages("GET /membership-plans")).data).toEqual([
+      { id: "1" },
+      { id: "2" },
+    ]);
+    fetch.mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: [],
+            pagination: { page: 1, totalPages: 2 },
+          }),
+        ),
+    );
+    await expect(allPages("GET /membership-plans")).rejects.toThrow(
+      "sai trang",
+    );
+  });
   it("rejects an undocumented endpoint before network access", async () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
@@ -34,7 +95,7 @@ describe("API client contract and authentication", () => {
     vi.stubGlobal("fetch", fetch);
     const { api } = await import("../src/shared/api");
     await expect(
-      api("GET /membership-plans", { query: { page: "2" } }),
+      api("GET /membership-plans", { query: { invented: "2" } }),
     ).rejects.toThrow("Undocumented query");
     await api("GET /users/{id}", { params: { id: "a/b?c" } });
     expect(fetch.mock.calls[0][0]).toMatch(/\/users\/a%2Fb%3Fc$/);
@@ -114,18 +175,16 @@ describe("member API uses the shared session transport", () => {
   it("adapts list envelopes without dropping pagination", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              success: true,
-              data: [{ id: "class-1", name: "Yoga" }],
-              pagination: { page: 2, totalPages: 3 },
-            }),
-            { status: 200 },
-          ),
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: [{ id: "class-1", name: "Yoga" }],
+            pagination: { page: 2, totalPages: 3 },
+          }),
+          { status: 200 },
         ),
+      ),
     );
     const { classesApi } = await import("../src/api/classes.api");
     await expect(classesApi.getClasses({ page: 2 })).resolves.toEqual({
@@ -139,21 +198,19 @@ describe("member API uses the shared session transport", () => {
     const { enrollmentsApi } = await import("../src/api/enrollments.api");
     await enrollmentsApi.getMyEnrollments({ status: "BOOKED", limit: 5 });
     expect(fetch.mock.calls[0][0]).toContain(
-      "/enrollments/my?status=BOOKED&limit=5",
+      "/enrollments/my?status=BOOKED&page=1&limit=100",
     );
   });
   it("shares token changes with the existing API and localizes member errors", async () => {
-    const fetch = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            success: false,
-            message: "Duplicate value for: phone",
-          }),
-          { status: 409 },
-        ),
-      );
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: false,
+          message: "Duplicate value for: phone",
+        }),
+        { status: 409 },
+      ),
+    );
     vi.stubGlobal("fetch", fetch);
     const { api } = await import("../src/shared/api");
     const { setTokens } = await import("../src/api/client");

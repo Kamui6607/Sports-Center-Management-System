@@ -2,10 +2,19 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import type { RecordData } from "../../../shared/api";
-import { Details, ErrorState, Loading, SchemaForm } from "../../../shared/ui";
+import {
+  Details,
+  ErrorState,
+  Loading,
+  Modal,
+  SchemaForm,
+} from "../../../shared/ui";
 import { Heading, MemberPicker } from "../components";
 import { useReceptionDetail } from "../api";
 export function MembersPage() {
+  const [edit, setEdit] = useState(false),
+    [busy, setBusy] = useState(false);
+  const cache = useQueryClient();
   const [member, setMember] = useState<RecordData | null>(null);
   const detail = useReceptionDetail(
     "GET /members/{id}",
@@ -28,7 +37,12 @@ export function MembersPage() {
           ) : detail.isError ? (
             <ErrorState error={detail.error} retry={() => detail.refetch()} />
           ) : (
-            <Details value={detail.data.data} />
+            <>
+              <Details value={detail.data.data} />
+              <button className="button" onClick={() => setEdit(true)}>
+                Chỉnh sửa hội viên
+              </button>
+            </>
           )}
           <Link
             className="button"
@@ -40,6 +54,28 @@ export function MembersPage() {
             Kiểm tra / đăng ký gói
           </Link>
         </section>
+      )}
+      {edit && member && detail.data && (
+        <Modal
+          title="Chỉnh sửa hội viên"
+          onClose={() => setEdit(false)}
+          dismissible={!busy}
+        >
+          <SchemaForm
+            operation="PATCH /members/{id}"
+            params={{ id: String(member.id) }}
+            initial={{
+              ...detail.data.data,
+              ...(detail.data.data.user as RecordData),
+            }}
+            onBusyChange={setBusy}
+            onCancel={() => setEdit(false)}
+            onSuccess={() => {
+              setEdit(false);
+              void cache.invalidateQueries();
+            }}
+          />
+        </Modal>
       )}
     </>
   );

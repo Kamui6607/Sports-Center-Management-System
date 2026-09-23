@@ -1,4 +1,14 @@
+import { sportNames } from "./sports";
 export const labels: Record<string, string> = {
+  PRESENT: "Có mặt",
+  ABSENT: "Vắng mặt",
+  LATE: "Đi muộn",
+  EXCUSED: "Vắng có phép",
+  remainingDays: "Số ngày còn lại",
+  suspendedAt: "Ngày tạm dừng",
+  memberName: "Tên hội viên tại thời điểm xuất hóa đơn",
+  planName: "Tên gói tại thời điểm xuất hóa đơn",
+  planTier: "Hạng gói tại thời điểm xuất hóa đơn",
   memberId: "Hội viên",
   paymentMethod: "Phương thức thanh toán",
   planId: "Gói tập",
@@ -33,6 +43,14 @@ export const labels: Record<string, string> = {
   experienceYears: "Số năm kinh nghiệm",
   bio: "Giới thiệu",
   sportId: "Bộ môn",
+  sportIds: "Các bộ môn",
+  sports: "Các bộ môn",
+  refundAmount: "Số tiền hoàn",
+  daysLeft: "Ngày còn lại",
+  willRefund: "Được hoàn tiền",
+  reason: "Lý do",
+  rating: "Đánh giá",
+  comment: "Nhận xét",
   classId: "Lớp học",
   roomId: "Phòng tập",
   coachId: "Huấn luyện viên",
@@ -132,6 +150,7 @@ export const money = (v: unknown) =>
         currency: "VND",
       }).format(Number(v));
 export function at(row: unknown, path: string): unknown {
+  if (path === "sportsLabel") return sportNames(row);
   return path
     .split(".")
     .reduce<unknown>(

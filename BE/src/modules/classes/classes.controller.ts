@@ -32,6 +32,12 @@ export async function assignCoach(req: Request, res: Response, next: NextFunctio
     sendSuccess(res, cls, "Coach assigned successfully");
   } catch (err) { next(err); }
 }
+export async function assignSupportCoach(req: Request, res: Response, next: NextFunction) {
+  try {
+    const cls = await classesService.assignSupportCoach(req.params.id as string, req.body.coachId);
+    sendSuccess(res, cls, "Support coach assigned successfully");
+  } catch (err) { next(err); }
+}
 export async function removeCoach(req: Request, res: Response, next: NextFunction) {
   try {
     const cls = await classesService.removeCoach(req.params.id as string, req.params.coachId as string);

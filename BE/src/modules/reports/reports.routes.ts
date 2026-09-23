@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticate } from "../../middlewares/authenticate.js";
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
-import { DateRangeSchema } from "./reports.schema.js";
+import { DateRangeSchema, AttendanceReportQuerySchema } from "./reports.schema.js";
 import * as reportsController from "./reports.controller.js";
 
 const router = Router();
@@ -131,6 +131,69 @@ router.get("/memberships", validate(DateRangeSchema, "query"), reportsController
  *       403: { $ref: "#/components/responses/Forbidden" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
+/**
+ * @swagger
+ * /reports/attendance:
+ *   get:
+ *     summary: Attendance report per (member × class) with OK/WARN/RELEASE status
+ *     description: |
+ *       Cửa sổ cố định: tối đa 10 buổi ĐÃ KẾT THÚC gần nhất của (member × class) — KHÔNG theo schedule,
+ *       nên đổi buổi trong cùng lớp không reset lịch sử.
+ *       `rate = (PRESENT + LATE) / (PRESENT + LATE + ABSENT + NO_SHOW)`; EXCUSED không vào tử/mẫu.
+ *       sampleSize < 5 -> OK; rate >= 80% -> OK; 70% <= rate < 80% -> WARN; rate < 70% -> RELEASE.
+ *     tags: [Reports]
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [OK, WARN, RELEASE] }
+ *       - in: query
+ *         name: classId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: memberId
+ *         schema: { type: string, description: MemberProfile.id }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200:
+ *         description: Attendance report
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: Attendance report retrieved successfully
+ *               data:
+ *                 summary: { total: 12, ok: 9, warn: 2, release: 1 }
+ *                 rows:
+ *                   - memberId: "member-uuid"
+ *                     memberName: "Nguyễn Văn A"
+ *                     classId: "class-uuid"
+ *                     className: "Yoga cơ bản"
+ *                     sampleSize: 8
+ *                     presentCount: 5
+ *                     lateCount: 0
+ *                     absentCount: 2
+ *                     noShowCount: 1
+ *                     excusedCount: 1
+ *                     attendanceRate: 62.5
+ *                     status: RELEASE
+ *                     activePenalty: null
+ *               pagination: { page: 1, limit: 20, total: 12, totalPages: 1 }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       500: { $ref: "#/components/responses/ServerError" }
+ */
+router.get(
+  "/attendance",
+  validate(AttendanceReportQuerySchema, "query"),
+  reportsController.getAttendanceReport
+);
+
 router.get("/subscription-logs", reportsController.getSubscriptionLogs);
 
 export default router;

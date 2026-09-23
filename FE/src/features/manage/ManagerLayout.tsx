@@ -22,6 +22,9 @@ import { resources } from "./config";
 import { Dashboard } from "./Dashboard";
 import { ResourcePage } from "./ResourcePage";
 import { Profile } from "../../shared/Profile";
+import { MembershipPage } from "../reception/membership/MembershipPage";
+import { PaymentsPage } from "../reception/payments/PaymentsPage";
+import { ClassesPage } from "../reception/classes/ClassesPage";
 const navGroups: NavigationGroup[] = [
   { title: "TỔNG QUAN", items: [["dashboard", "Tổng quan", LayoutDashboard]] },
   {
@@ -41,6 +44,9 @@ const navGroups: NavigationGroup[] = [
       ["rooms", "Phòng tập", Warehouse],
       ["classes", "Lớp học", Trophy],
       ["schedules", "Lịch hoạt động", CalendarDays],
+      ["membership", "Đăng ký & gia hạn gói", CreditCard],
+      ["payments", "Thanh toán & hóa đơn", CreditCard],
+      ["bookings", "Đăng ký lớp", CalendarDays],
     ],
   },
   {
@@ -72,11 +78,22 @@ export function ManagerLayout({
       <Routes>
         <Route path="/manager/dashboard" element={<Dashboard />} />
         <Route path="/manager/reports" element={<Dashboard reports />} />
+        <Route
+          path="/manager/membership"
+          element={<MembershipPage role="MANAGER" />}
+        />
+        <Route
+          path="/manager/payments"
+          element={<PaymentsPage role="MANAGER" />}
+        />
+        <Route path="/manager/bookings" element={<ClassesPage />} />
         {resources.map((r) => (
           <Route
             key={r.slug}
             path={"/manager/" + r.slug}
-            element={<ResourcePage key={r.slug} resource={r} />}
+            element={
+              <ResourcePage key={r.slug} resource={r} userId={user.id} />
+            }
           />
         ))}
         <Route path="/manager/profile" element={<Profile user={user} />} />

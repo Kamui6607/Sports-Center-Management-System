@@ -105,7 +105,7 @@ export const resources: Resource[] = [
     path: "/classes",
     columns: [
       ["name", "Lớp học"],
-      ["sport.name", "Bộ môn"],
+      ["sportsLabel", "Bộ môn"],
       ["classType", "Loại lớp"],
       ["capacity", "Sức chứa"],
       ["isActive", "Trạng thái"],

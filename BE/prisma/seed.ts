@@ -1,6 +1,8 @@
 import "dotenv/config";
-import { PrismaClient, UserRole, MemberTier, ClassType, PaymentMethod, PaymentStatus } from "@prisma/client";
+import { PrismaClient, UserRole, MemberTier, ClassType, AreaType, PaymentMethod, PaymentStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { FREE_PLAN } from "../src/config/membership.js";
+import { ensureActiveFreeSubscription } from "../src/modules/subscriptions/free-subscription.service.js";
 
 const prisma = new PrismaClient();
 
@@ -168,6 +170,7 @@ async function main() {
       price: 300000,
       durationDays: 30,
       tier: MemberTier.MEMBERSHIP,
+      maxConcurrentClasses: 3,
       isActive: true,
     },
   });
@@ -182,6 +185,7 @@ async function main() {
       price: 800000,
       durationDays: 90,
       tier: MemberTier.MEMBERSHIP,
+      maxConcurrentClasses: 3,
       isActive: true,
     },
   });
@@ -196,6 +200,24 @@ async function main() {
       price: 600000,
       durationDays: 30,
       tier: MemberTier.PREMIUM,
+      maxConcurrentClasses: 6,
+      isActive: true,
+    },
+  });
+
+  // Gói FREE hệ thống — Member mới được auto-provision subscription ACTIVE với plan này (quota 0).
+  // Chỉ MỘT plan FREE duy nhất: upsert theo id cố định, provisioning runtime cũng reuse plan FREE active.
+  await prisma.membershipPlan.upsert({
+    where: { id: "plan-free-001" },
+    update: {},
+    create: {
+      id: "plan-free-001",
+      name: FREE_PLAN.name,
+      description: FREE_PLAN.description,
+      price: FREE_PLAN.price,
+      durationDays: FREE_PLAN.durationDays,
+      tier: MemberTier.FREE,
+      maxConcurrentClasses: 0,
       isActive: true,
     },
   });
@@ -204,30 +226,33 @@ async function main() {
   // ─── SPORTS ──────────────────────────────────────────
   const yoga = await prisma.sport.upsert({
     where: { name: "Yoga" },
-    update: {},
+    update: { areaTypes: [AreaType.INDOOR] },
     create: {
       name: "Yoga",
       description: "Lớp Yoga cải thiện sự linh hoạt, cân bằng và tâm trí.",
+      areaTypes: [AreaType.INDOOR],
       isActive: true,
     },
   });
 
   const hiit = await prisma.sport.upsert({
     where: { name: "HIIT" },
-    update: {},
+    update: { areaTypes: [AreaType.INDOOR] },
     create: {
       name: "HIIT",
       description: "High Intensity Interval Training – đốt cháy calo hiệu quả.",
+      areaTypes: [AreaType.INDOOR],
       isActive: true,
     },
   });
 
   const swimming = await prisma.sport.upsert({
     where: { name: "Swimming" },
-    update: {},
+    update: { areaTypes: [AreaType.POOL] },
     create: {
       name: "Swimming",
       description: "Lớp bơi lội cho mọi trình độ.",
+      areaTypes: [AreaType.POOL],
       isActive: true,
     },
   });
@@ -236,33 +261,36 @@ async function main() {
   // ─── ROOMS ───────────────────────────────────────────
   const room1 = await prisma.room.upsert({
     where: { name: "Phòng Yoga A" },
-    update: {},
+    update: { areaType: AreaType.INDOOR },
     create: {
       name: "Phòng Yoga A",
       capacity: 20,
       location: "Tầng 1",
+      areaType: AreaType.INDOOR,
       isActive: true,
     },
   });
 
   const room2 = await prisma.room.upsert({
     where: { name: "Phòng HIIT B" },
-    update: {},
+    update: { areaType: AreaType.INDOOR },
     create: {
       name: "Phòng HIIT B",
       capacity: 15,
       location: "Tầng 2",
+      areaType: AreaType.INDOOR,
       isActive: true,
     },
   });
 
   const room3 = await prisma.room.upsert({
     where: { name: "Hồ Bơi" },
-    update: {},
+    update: { areaType: AreaType.POOL },
     create: {
       name: "Hồ Bơi",
       capacity: 25,
       location: "Tầng Trệt",
+      areaType: AreaType.POOL,
       isActive: true,
     },
   });
@@ -274,42 +302,47 @@ async function main() {
 
   const yogaClass = await prisma.class.upsert({
     where: { id: "class-yoga-001" },
-    update: {},
+    update: { sports: { set: [{ id: yoga.id }] }, areaType: AreaType.INDOOR },
     create: {
+      // Seed dùng ID custom ổn định (không phải UUID) để test/dev dễ tham chiếu.
+      // API giữ string.min(1), KHÔNG ép uuid để tương thích các ID này.
       id: "class-yoga-001",
       name: "Yoga Buổi Sáng",
       description: "Lớp Yoga nhẹ nhàng buổi sáng, phù hợp mọi trình độ.",
-      sportId: yoga.id,
+      sports: { connect: [{ id: yoga.id }] },
       capacity: 15,
       classType: ClassType.REGULAR,
+      areaType: AreaType.INDOOR,
       isActive: true,
     },
   });
 
   const hiitClass = await prisma.class.upsert({
     where: { id: "class-hiit-001" },
-    update: {},
+    update: { sports: { set: [{ id: hiit.id }] }, areaType: AreaType.INDOOR },
     create: {
       id: "class-hiit-001",
       name: "HIIT Cardio",
       description: "Lớp HIIT cường độ cao, đốt cháy calo tối đa.",
-      sportId: hiit.id,
+      sports: { connect: [{ id: hiit.id }] },
       capacity: 12,
       classType: ClassType.REGULAR,
+      areaType: AreaType.INDOOR,
       isActive: true,
     },
   });
 
   const premiumYoga = await prisma.class.upsert({
     where: { id: "class-yoga-premium-001" },
-    update: {},
+    update: { sports: { set: [{ id: yoga.id }] }, areaType: AreaType.INDOOR },
     create: {
       id: "class-yoga-premium-001",
       name: "Premium Yoga & Meditation",
       description: "Lớp Yoga Premium với coach 1-1 và thiền định chuyên sâu.",
-      sportId: yoga.id,
+      sports: { connect: [{ id: yoga.id }] },
       capacity: 8,
       classType: ClassType.PREMIUM,
+      areaType: AreaType.INDOOR,
       isActive: true,
     },
   });
@@ -397,7 +430,13 @@ async function main() {
   const member1Profile = member1.memberProfile;
   const member2Profile = member2.memberProfile;
 
-  if (member1Profile) {
+  // Seed chạy lại KHÔNG được tạo subscription trùng: chỉ seed gói trả phí khi member chưa có gói ACTIVE.
+  const hasActiveSubscription = async (memberProfileId: string) =>
+    (await prisma.membershipSubscription.count({
+      where: { memberId: memberProfileId, status: "ACTIVE" },
+    })) > 0;
+
+  if (member1Profile && !(await hasActiveSubscription(member1Profile.id))) {
     const subStartDate = new Date();
     const subEndDate = new Date();
     subEndDate.setDate(subEndDate.getDate() + planBasic.durationDays);
@@ -443,7 +482,7 @@ async function main() {
     console.log("Subscription for member1 created");
   }
 
-  if (member2Profile) {
+  if (member2Profile && !(await hasActiveSubscription(member2Profile.id))) {
     const subStartDate = new Date();
     const subEndDate = new Date();
     subEndDate.setDate(subEndDate.getDate() + planPremium.durationDays);
@@ -486,6 +525,20 @@ async function main() {
     });
 
     console.log("Subscription for member2 created");
+  }
+
+  // ─── AUTO FREE SUBSCRIPTION cho MEMBER chưa có gói ACTIVE ────────────
+  // Member mới luôn phải có subscription ACTIVE (tier FREE, quota 0). Idempotent:
+  // member đã có ACTIVE subscription (member1/member2) sẽ không bị tạo thêm.
+  const memberProfiles = [member1.memberProfile, member2.memberProfile, member3.memberProfile];
+  for (const profile of memberProfiles) {
+    if (!profile) continue;
+    const result = await prisma.$transaction((tx) =>
+      ensureActiveFreeSubscription(tx, profile.id)
+    );
+    console.log(
+      `Member ${profile.id}: ${result.created ? "created ACTIVE FREE subscription" : "already has ACTIVE subscription"}`
+    );
   }
 
   console.log("\nSeeding completed!");

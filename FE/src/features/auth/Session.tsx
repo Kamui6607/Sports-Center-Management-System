@@ -22,13 +22,17 @@ export function Session() {
     queryFn: () => authService.me(),
     enabled: session,
     retry: false,
+    refetchOnWindowFocus: true,
   });
   useEffect(() => {
-    const expired = () => {
+    const expired = (event: Event) => {
       setSession(false);
       cache.clear();
       setError(
-        new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."),
+        new Error(
+          (event as CustomEvent<string>).detail ||
+            "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+        ),
       );
     };
     window.addEventListener("session-expired", expired);

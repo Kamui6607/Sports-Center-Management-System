@@ -45,6 +45,10 @@ router.get("/", validate(UserQuerySchema, "query"), usersController.listUsers);
  * /users:
  *   post:
  *     summary: Create staff, coach, manager or member account (MEMBER creates the member profile too)
+ *     description: |
+ *       Với `role = MEMBER`, backend tạo MemberProfile + **auto-provision một MembershipSubscription ACTIVE
+ *       với gói FREE** (`maxConcurrentClasses = 0`) trong cùng transaction. COACH/STAFF/MANAGER KHÔNG được cấp
+ *       subscription. Idempotent theo member: nếu member đã có subscription ACTIVE thì không tạo thêm.
  *     tags: [Users]
  *     requestBody:
  *       required: true
