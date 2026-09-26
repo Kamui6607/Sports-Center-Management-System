@@ -236,7 +236,7 @@ router.delete(
 router.post(
   "/:roomId/transfer-schedules/preview",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   validate(RoomIdSchema, "params"),
   validate(TransferSchedulesSchema),
   roomsController.previewTransferSchedules
@@ -279,7 +279,7 @@ router.post(
 router.post(
   "/:roomId/transfer-schedules",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   validate(RoomIdSchema, "params"),
   validate(TransferSchedulesSchema),
   roomsController.transferSchedules

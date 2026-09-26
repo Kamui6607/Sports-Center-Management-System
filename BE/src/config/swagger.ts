@@ -7,7 +7,7 @@ const options: swaggerJSDoc.Options = {
       title: "Sports Center Management API",
       version: "1.0.0",
       description:
-        "Backend API for Sports Center Management System – Flow 1 (User & Course), Flow 2 (Class & Schedule), Flow 3 (Payment & Report)",
+        "Backend API for Sports Center Management System – Flow 1 (User & Membership), Flow 2 (Class & Schedule), Flow 3 (Payment & Report)",
     },
     servers: [
       { url: "http://localhost:8080/api/v1", description: "Development Server" },
@@ -226,12 +226,12 @@ const options: swaggerJSDoc.Options = {
                   data: [
                     {
                       id: "b311dfe5-8575-4ed4-9efd-8bc81a149f14",
-                      email: "coach1@sportscenter.com",
+                      email: "staff@sportscenter.com",
                       fullName: "Jane Doe",
                       phone: "0900000002",
                       gender: "FEMALE",
                       dateOfBirth: null,
-                      role: "COACH",
+                      role: "STAFF",
                       isActive: true,
                       createdAt: "2026-09-11T14:20:14.910Z",
                       memberProfile: null,
@@ -324,11 +324,11 @@ const options: swaggerJSDoc.Options = {
                         role: "MEMBER",
                         isActive: true,
                       },
-                      coursePurchases: [
+                      subscriptions: [
                         {
                           status: "ACTIVE",
-                          endDate: "2026-10-25T08:00:00.000Z",
-                          class: { id: "9f1a2b3c-0000-4000-8000-000000000001", name: "Morning Yoga", price: "500000" },
+                          endDate: "2026-10-11T14:20:14.968Z",
+                          plan: { id: "plan-basic-001", name: "Membership Monthly", price: "300000", tier: "MEMBERSHIP" },
                         },
                       ],
                     },
@@ -340,7 +340,7 @@ const options: swaggerJSDoc.Options = {
           },
         },
         MemberOk: {
-          description: "Single member with active course purchases",
+          description: "Single member with active subscription",
           content: {
             "application/json": {
               schema: {
@@ -360,11 +360,10 @@ const options: swaggerJSDoc.Options = {
                       role: "MEMBER",
                       isActive: true,
                     },
-                    coursePurchases: [
+                    subscriptions: [
                       {
                         status: "ACTIVE",
-                        class: { name: "Morning Yoga", price: "500000" },
-                        coachEarning: "425000",
+                        plan: { name: "Membership Monthly", tier: "MEMBERSHIP" },
                       },
                     ],
                   },
@@ -373,35 +372,53 @@ const options: swaggerJSDoc.Options = {
             },
           },
         },
-        MemberCoursesOk: {
+        MembershipStatusOk: {
           description:
-            "Khoa hoc member dang SO HUU (CoursePurchase ACTIVE con han) + tong chi tieu. " +
-            "Thay cho MembershipStatusOk cu (Membership da bi bo). daysRemaining = null khi khoa khong gioi han.",
+            "Effective member tier and active subscription. `effectiveTier` = tier của subscription ACTIVE " +
+            "(FREE | MEMBERSHIP | PREMIUM — FREE chỉ khi member thực sự có gói FREE ACTIVE). " +
+            "Khi member KHÔNG có subscription ACTIVE: `effectiveTier = null`, `activeSubscription = null`, " +
+            "`daysRemaining = null` — nhất quán với GET /enrollments/my/quota (không dùng \"FREE\" để đại diện).",
           content: {
             "application/json": {
               schema: {
                 type: "object",
                 example: {
                   success: true,
-                  message: "Member course status retrieved successfully",
+                  message: "Membership status retrieved successfully",
                   data: {
-                    memberId: "aecd9439-82e2-47da-90a2-2830bbe04dc4",
-                    activeCourseCount: 1,
-                    activeCourses: [
-                      {
-                        purchaseId: "f2f6a2a6-0000-4000-8000-000000000001",
-                        classId: "9f1a2b3c-0000-4000-8000-000000000001",
-                        className: "Morning Yoga",
-                        coachId: "c17a5a11-0000-4000-8000-000000000002",
-                        coachName: "Nguyen Van Cuong",
-                        price: 500000,
-                        startDate: "2026-09-25T08:00:00.000Z",
-                        endDate: "2026-10-25T08:00:00.000Z",
-                        daysRemaining: 30,
+                    effectiveTier: "MEMBERSHIP",
+                    activeSubscription: {
+                      status: "ACTIVE",
+                      endDate: "2026-10-11T14:20:14.968Z",
+                      plan: { name: "Membership Monthly", tier: "MEMBERSHIP" },
+                    },
+                    daysRemaining: 21,
+                  },
+                },
+              },
+              examples: {
+                withActiveSubscription: {
+                  summary: "Có gói ACTIVE → effectiveTier = tier của gói",
+                  value: {
+                    success: true,
+                    message: "Membership status retrieved successfully",
+                    data: {
+                      effectiveTier: "FREE",
+                      activeSubscription: {
+                        status: "ACTIVE",
+                        endDate: "2036-09-20T00:00:00.000Z",
+                        plan: { name: "FREE", tier: "FREE" },
                       },
-                    ],
-                    totalPurchases: 2,
-                    totalSpent: 800000,
+                      daysRemaining: 3650,
+                    },
+                  },
+                },
+                noActiveSubscription: {
+                  summary: "Không có gói ACTIVE → effectiveTier = null (KHÔNG phải \"FREE\")",
+                  value: {
+                    success: true,
+                    message: "Membership status retrieved successfully",
+                    data: { effectiveTier: null, activeSubscription: null, daysRemaining: null },
                   },
                 },
               },
@@ -472,76 +489,153 @@ const options: swaggerJSDoc.Options = {
             },
           },
         },
-        // -- Course Purchases (thay cho Membership Plans & Subscriptions) --
-        CoursePurchaseOk: {
-          description:
-            "Một lượt Member mua khóa học. Hoa hồng KHẤU TRỪ: Member trả đúng `price`; " +
-            "nền tảng giữ `commissionAmount` (15%); Coach sở hữu khóa nhận `coachEarning` (85%). " +
-            "`endDate = null` nghĩa là khóa không giới hạn thời hạn; `daysRemaining = null` tương ứng.",
+        // -- Membership Plans & Subscriptions --
+        PlanListOk: {
+          description: "Paginated list of membership plans (compact example)",
           content: {
             "application/json": {
               schema: {
                 type: "object",
                 example: {
                   success: true,
-                  message: "Course purchase retrieved successfully",
+                  message: "Plans retrieved successfully",
+                  data: [
+                    {
+                      id: "plan-basic-001",
+                      name: "Membership Monthly",
+                      description: "Basic monthly membership",
+                      price: "300000",
+                      durationDays: 30,
+                      tier: "MEMBERSHIP",
+                      maxConcurrentClasses: 3,
+                      isActive: true,
+                    },
+                  ],
+                  pagination: { page: 1, limit: 10, total: 3, totalPages: 1 },
+                },
+              },
+            },
+          },
+        },
+        PlanCreated: {
+          description: "Plan created",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                example: {
+                  success: true,
+                  message: "Plan created successfully",
                   data: {
-                    id: "f2f6a2a6-0000-4000-8000-000000000001",
-                    memberId: "aecd9439-82e2-47da-90a2-2830bbe04dc4",
-                    classId: "9f1a2b3c-0000-4000-8000-000000000001",
-                    coachId: "c17a5a11-0000-4000-8000-000000000002",
-                    price: "500000",
-                    commissionRate: 0.15,
-                    commissionAmount: "75000",
-                    coachEarning: "425000",
-                    startDate: "2026-09-25T08:00:00.000Z",
-                    endDate: "2026-10-25T08:00:00.000Z",
-                    status: "ACTIVE",
-                    daysRemaining: 30,
-                    class: { id: "9f1a2b3c-0000-4000-8000-000000000001", name: "Morning Yoga", price: "500000" },
-                    coach: { user: { id: "8d2f0b30-0000-4000-8000-000000000003", fullName: "Nguyễn Văn Cường" } },
-                    payments: [{ id: "322da21d-5040-44b8-90cc-cfc9eeff2631", amount: "500000", method: "BANK_TRANSFER", status: "SUCCESS" }],
+                    id: "plan-basic-004",
+                    name: "Membership Weekly",
+                    price: "100000",
+                    durationDays: 7,
+                    tier: "MEMBERSHIP",
+                    maxConcurrentClasses: 3,
+                    isActive: true,
                   },
                 },
               },
             },
           },
         },
-        CoursePurchaseListOk: {
-          description:
-            "Danh sách lượt mua khóa học (phân trang). MANAGER kèm `summary` doanh thu/hoa hồng; " +
-            "COACH (`/course-purchases/my-sales`) kèm `summary` thu nhập của mình.",
+        PlanOk: {
+          description: "Single membership plan",
           content: {
             "application/json": {
               schema: {
                 type: "object",
                 example: {
                   success: true,
-                  message: "Course purchases retrieved successfully",
+                  message: "Plan retrieved successfully",
                   data: {
-                    purchases: [
-                      {
-                        id: "f2f6a2a6-0000-4000-8000-000000000001",
-                        price: "500000",
-                        commissionAmount: "75000",
-                        coachEarning: "425000",
-                        status: "ACTIVE",
-                        startDate: "2026-09-25T08:00:00.000Z",
-                        endDate: "2026-10-25T08:00:00.000Z",
-                        daysRemaining: 30,
-                        class: { id: "9f1a2b3c-0000-4000-8000-000000000001", name: "Morning Yoga" },
-                        coach: { user: { fullName: "Nguyễn Văn Cường" } },
-                      },
-                    ],
-                    summary: {
-                      activePurchases: 9,
-                      grossRevenue: 4500000,
-                      platformCommission: 675000,
-                      coachEarnings: 3825000,
-                      commissionRate: 0.15,
-                    },
+                    id: "plan-basic-001",
+                    name: "Membership Monthly",
+                    price: "300000",
+                    durationDays: 30,
+                    tier: "MEMBERSHIP",
+                    maxConcurrentClasses: 3,
+                    isActive: true,
                   },
-                  pagination: { page: 1, limit: 10, total: 9, totalPages: 1 },
+                },
+              },
+            },
+          },
+        },
+        SubscriptionCreated: {
+          description: "Subscription created with its payment",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                example: {
+                  success: true,
+                  message: "Subscription created successfully",
+                  data: {
+                    subscription: {
+                      id: "9643ec65-bacb-4b1b-9442-239bb60bd8fa",
+                      tier: "MEMBERSHIP",
+                      startDate: "2026-09-11T14:20:14.968Z",
+                      endDate: "2026-10-11T14:20:14.968Z",
+                      status: "ACTIVE",
+                      plan: { name: "Membership Monthly", tier: "MEMBERSHIP" },
+                    },
+                    payment: { id: "322da21d-5040-44b8-90cc-cfc9eeff2631", amount: "300000", method: "CASH", status: "SUCCESS" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        SubscriptionListOk: {
+          description: "Paginated list of subscriptions (compact example)",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                example: {
+                  success: true,
+                  message: "Subscriptions retrieved successfully",
+                  data: [
+                    {
+                      id: "9643ec65-bacb-4b1b-9442-239bb60bd8fa",
+                      tier: "MEMBERSHIP",
+                      startDate: "2026-09-11T14:20:14.968Z",
+                      endDate: "2026-10-11T14:20:14.968Z",
+                      status: "ACTIVE",
+                      suspendedAt: null,
+                      remainingDays: null,
+                      plan: { name: "Membership Monthly", tier: "MEMBERSHIP" },
+                      payments: [{ id: "322da21d-5040-44b8-90cc-cfc9eeff2631", amount: "300000", status: "SUCCESS" }],
+                    },
+                  ],
+                  pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+                },
+              },
+            },
+          },
+        },
+        SubscriptionOk: {
+          description: "Single subscription",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                example: {
+                  success: true,
+                  message: "Subscription retrieved successfully",
+                  data: {
+                    id: "9643ec65-bacb-4b1b-9442-239bb60bd8fa",
+                    tier: "MEMBERSHIP",
+                    startDate: "2026-09-11T14:20:14.968Z",
+                    endDate: "2026-10-11T14:20:14.968Z",
+                    status: "SUSPENDED",
+                    suspendedAt: "2026-09-20T14:20:14.968Z",
+                    remainingDays: 21,
+                    plan: { name: "Membership Monthly", tier: "MEMBERSHIP" },
+                    member: { user: { fullName: "John Doe", email: "member1@example.com" } },
+                  },
                 },
               },
             },
@@ -876,6 +970,54 @@ const options: swaggerJSDoc.Options = {
             },
           },
         },
+        ConcurrentClassQuotaOk: {
+          description:
+            "Quota lớp học song song của chính member đang đăng nhập. " +
+            "`used` = số Class KHÁC NHAU (DISTINCT Class, KHÔNG phải số Schedule) đang có Enrollment BOOKED ở buổi SCHEDULED chưa bắt đầu; " +
+            "`remaining = max(0, limit - used)` với `limit = MembershipPlan.maxConcurrentClasses` của gói ACTIVE. " +
+            "`hasActiveSubscription = true` + `tier` = tier gói khi member có MembershipSubscription ACTIVE " +
+            "(member mới được auto-provision gói FREE nên tier = FREE, limit = 0). " +
+            "Nếu member KHÔNG có subscription ACTIVE: `hasActiveSubscription = false`, `tier = null`, `limit = 0`, `remaining = 0` — " +
+            "KHÔNG dùng tier FREE để đại diện cho trường hợp thiếu subscription. " +
+            "`classes[]` có đúng MỘT entry cho mỗi DISTINCT Class; `futureBookedScheduleCount` là số buổi tương lai đang BOOKED của Class đó " +
+            "và `scheduleId`/`scheduleStartTime`/`enrollmentId` chỉ là buổi ĐẠI DIỆN (gần nhất), không phải toàn bộ buổi.",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                example: {
+                  success: true,
+                  message: "Concurrent class quota retrieved successfully",
+                  data: {
+                    hasActiveSubscription: true,
+                    tier: "MEMBERSHIP",
+                    limit: 3,
+                    used: 2,
+                    remaining: 1,
+                    classes: [
+                      {
+                        classId: "class-1",
+                        className: "Yoga Beginner",
+                        futureBookedScheduleCount: 2,
+                        scheduleId: "schedule-1",
+                        scheduleStartTime: "2026-09-25T18:00:00.000Z",
+                        enrollmentId: "enrollment-1",
+                      },
+                      {
+                        classId: "class-2",
+                        className: "Boxing Basic",
+                        futureBookedScheduleCount: 1,
+                        scheduleId: "schedule-2",
+                        scheduleStartTime: "2026-09-26T09:00:00.000Z",
+                        enrollmentId: "enrollment-2",
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
         // -- Payments & Invoices --
         PaymentCreated: {
           description: "Payment recorded (invoice auto-created on SUCCESS)",
@@ -941,7 +1083,7 @@ const options: swaggerJSDoc.Options = {
                     method: "CASH",
                     status: "SUCCESS",
                     member: { user: { fullName: "John Doe" } },
-                    coursePurchase: { class: { name: "Morning Yoga", price: "500000" }, coachEarning: "425000" },
+                    subscription: { plan: { name: "Membership Monthly", tier: "MEMBERSHIP" } },
                     invoice: { invoiceNumber: "INV-1789136414987-001" },
                   },
                 },
@@ -968,7 +1110,8 @@ const options: swaggerJSDoc.Options = {
                       status: "ISSUED",
                       issuedAt: "2026-09-12T08:00:00.000Z",
                       memberName: "John Doe",
-                      courseName: "Morning Yoga",
+                      planName: "Membership Monthly",
+                      planTier: "MEMBERSHIP",
                       member: { user: { fullName: "John Doe" } },
                     },
                   ],
@@ -996,7 +1139,8 @@ const options: swaggerJSDoc.Options = {
                     status: "ISSUED",
                     issuedAt: "2026-09-12T08:00:00.000Z",
                     memberName: "John Doe",
-                    courseName: "Morning Yoga",
+                    planName: "Membership Monthly",
+                    planTier: "MEMBERSHIP",
                     member: { user: { fullName: "John Doe", email: "member1@example.com" } },
                     payment: { amount: "300000", method: "CASH", status: "SUCCESS" },
                   },
@@ -1022,7 +1166,7 @@ const options: swaggerJSDoc.Options = {
                     failedPayments: 0,
                     pendingPayments: 0,
                     refundedPayments: 0,
-                    revenueByMethod: { CASH: 300000, BANK_TRANSFER: 600000 },
+                    revenueByMethod: { CASH: 300000, BANK_TRANSFER: 600000, SEPAY: 300000 },
                     recentPayments: [
                       {
                         id: "322da21d-5040-44b8-90cc-cfc9eeff2631",
@@ -1052,8 +1196,7 @@ const options: swaggerJSDoc.Options = {
                     newMembers: 1,
                     activeMembers: 2,
                     expiredMembers: 1,
-                    activeCoursePurchases: 3,
-                    activeCourseRevenue: 1500000,
+                    membersByTier: { FREE: 1, MEMBERSHIP: 1, PREMIUM: 1 },
                   },
                 },
               },
@@ -1080,67 +1223,60 @@ const options: swaggerJSDoc.Options = {
             },
           },
         },
-        CourseRevenueReportOk: {
-          description: "Course revenue & commission report (thay cho membership report)",
+        MembershipReportOk: {
+          description: "Membership report",
           content: {
             "application/json": {
               schema: {
                 type: "object",
                 example: {
                   success: true,
-                  message: "Course revenue report retrieved successfully",
+                  message: "Membership report retrieved successfully",
                   data: {
-                    totalPurchases: 12,
-                    newPurchases: 4,
-                    activePurchases: 9,
-                    expiredPurchases: 2,
-                    cancelledPurchases: 1,
-                    totalRevenue: 5400000,
-                    activeGrossRevenue: 4500000,
-                    platformCommission: 675000,
-                    coachEarnings: 3825000,
-                    topCourses: [{ classId: "class-uuid", className: "Morning Yoga", purchaseCount: 5, revenue: 2500000 }],
+                    totalSubscriptions: 2,
+                    newSubscriptions: 1,
+                    activeSubscriptions: 2,
+                    expiredSubscriptions: 0,
+                    cancelledSubscriptions: 0,
+                    suspendedSubscriptions: 0,
+                    subscriptionsByTier: { MEMBERSHIP: 1, PREMIUM: 1 },
+                    totalRevenue: 900000,
                   },
                 },
               },
             },
           },
         },
-        CoursePurchaseLogListOk: {
-          description: "Paginated list of course purchase logs (thay cho subscription logs)",
+        SubscriptionLogListOk: {
+          description: "Paginated list of subscription logs",
           content: {
             "application/json": {
               schema: {
                 type: "object",
                 example: {
                   success: true,
-                  message: "Course purchase logs retrieved successfully",
-                  data: {
-                    data: [
-                      {
-                        id: "f2f6a2a6-0000-4000-8000-000000000001",
-                        action: "Mua khoa hoc",
-                        username: "Pham Van An",
-                        email: "member1@example.com",
-                        className: "Morning Yoga",
-                        coachName: "Nguyen Van Cuong",
-                        price: 500000,
-                        commissionAmount: 75000,
-                        coachEarning: 425000,
-                        status: "ACTIVE",
-                        paymentStatus: "SUCCESS",
-                        startDate: "2026-09-25T08:00:00.000Z",
-                        endDate: "2026-10-25T08:00:00.000Z",
-                        purchasedAt: "2026-09-25T08:00:00.123Z"
-                      }
-                    ],
-                    pagination: {
-                      page: 1,
-                      limit: 20,
-                      total: 1,
-                      totalPages: 1
+                  message: "Subscription logs retrieved successfully",
+                  data: [
+                    {
+                      id: "9643ec65-bacb-4b1b-9442-239bb60bd8fa",
+                      action: "Mua / Gia hạn gói",
+                      username: "Nguyễn Văn A",
+                      email: "nguyenvana@gmail.com",
+                      planName: "Gói Hội viên 1 tháng",
+                      planTier: "MEMBERSHIP",
+                      price: 500000,
+                      paymentStatus: "SUCCESS",
+                      startDate: "2026-09-18T00:00:00.000Z",
+                      endDate: "2026-10-18T00:00:00.000Z",
+                      purchasedAt: "2026-09-18T08:05:00.123Z"
                     }
-                  },
+                  ],
+                  pagination: {
+                    page: 1,
+                    limit: 20,
+                    total: 1,
+                    totalPages: 1
+                  }
                 },
               },
             },
@@ -1154,7 +1290,8 @@ const options: swaggerJSDoc.Options = {
       { name: "Users", description: "User management (Manager)" },
       { name: "Members", description: "Member profiles" },
       { name: "Coaches", description: "Coach profiles" },
-      { name: "Course Purchases", description: "Member mua khoa hoc cua Coach (hoa hong nen tang 15%)" },
+      { name: "Membership Plans", description: "Plan CRUD" },
+      { name: "Subscriptions", description: "Member subscriptions" },
       { name: "Sports", description: "Sport / discipline management" },
       { name: "Rooms", description: "Room management" },
       { name: "Classes", description: "Class management" },
@@ -1163,7 +1300,7 @@ const options: swaggerJSDoc.Options = {
       { name: "Payments", description: "Payment recording" },
       { name: "Invoices", description: "Invoice management" },
       { name: "Reports", description: "Analytics & reports" },
-      { name: "Chat", description: "Real-time messaging (Manager, Coach & Member)" },
+      { name: "Chat", description: "Real-time messaging (Manager & Staff)" },
       { name: "Attendance", description: "Class attendance tracking" },
       { name: "Training", description: "Personalized training plans and results" },
       { name: "Notifications", description: "Manage user notifications" },

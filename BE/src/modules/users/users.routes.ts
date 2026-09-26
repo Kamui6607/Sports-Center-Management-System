@@ -18,7 +18,7 @@ router.use(authenticate, authorize("MANAGER"));
  *     parameters:
  *       - in: query
  *         name: role
- *         schema: { type: string, enum: [MEMBER, COACH, MANAGER] }
+ *         schema: { type: string, enum: [MEMBER, COACH, STAFF, MANAGER] }
  *       - in: query
  *         name: isActive
  *         schema: { type: string, enum: ["true", "false"] }
@@ -44,11 +44,11 @@ router.get("/", validate(UserQuerySchema, "query"), usersController.listUsers);
  * @swagger
  * /users:
  *   post:
- *     summary: Create coach, manager or member account (MEMBER creates the member profile too)
+ *     summary: Create staff, coach, manager or member account (MEMBER creates the member profile too)
  *     description: |
- *       Với `role = MEMBER`, backend tạo kèm `MemberProfile`; với `role = COACH` tạo kèm `CoachProfile`.
- *       **Không còn auto-provision gói tập** (Membership đã bị bỏ): MEMBER mua khóa học qua
- *       `POST /course-purchases`, COACH tự mở khóa học qua `POST /classes`.
+ *       Với `role = MEMBER`, backend tạo MemberProfile + **auto-provision một MembershipSubscription ACTIVE
+ *       với gói FREE** (`maxConcurrentClasses = 0`) trong cùng transaction. COACH/STAFF/MANAGER KHÔNG được cấp
+ *       subscription. Idempotent theo member: nếu member đã có subscription ACTIVE thì không tạo thêm.
  *     tags: [Users]
  *     requestBody:
  *       required: true
@@ -61,7 +61,7 @@ router.get("/", validate(UserQuerySchema, "query"), usersController.listUsers);
  *               email: { type: string }
  *               password: { type: string }
  *               fullName: { type: string }
- *               role: { type: string, enum: [MEMBER, COACH, MANAGER] }
+ *               role: { type: string, enum: [MEMBER, COACH, STAFF, MANAGER] }
  *               fitnessGoal: { type: string, description: "Role MEMBER only" }
  *               trainingLevel: { type: string, enum: [BEGINNER, INTERMEDIATE, ADVANCED], description: "Role MEMBER only" }
  *               trainingPreference: { type: string, description: "Role MEMBER only" }
@@ -119,7 +119,7 @@ router.get("/:id", usersController.getUserById);
  *               gender: { type: string, enum: [MALE, FEMALE, OTHER] }
  *               dateOfBirth: { type: string }
  *               isActive: { type: boolean }
- *               role: { type: string, enum: [MEMBER, COACH, MANAGER] }
+ *               role: { type: string, enum: [MEMBER, COACH, STAFF, MANAGER] }
  *     responses:
  *       200: { $ref: "#/components/responses/UserOk" }
  *       400: { $ref: "#/components/responses/BadRequest" }

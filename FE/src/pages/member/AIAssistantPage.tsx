@@ -34,7 +34,10 @@ export function AIAssistantPage() {
     const userMsg: Message = {
       sender: "user",
       text,
-      time: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+      time: new Date().toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -42,23 +45,39 @@ export function AIAssistantPage() {
     setLoading(true);
 
     setTimeout(() => {
-      let reply = "Cảm ơn câu hỏi của bạn! Đội ngũ huấn luyện viên và trợ lý AI của Pulse Sports luôn sẵn sàng đồng hành cùng bạn.";
+      let reply =
+        "Cảm ơn câu hỏi của bạn! Đội ngũ huấn luyện viên và trợ lý AI của Pulse Sports luôn sẵn sàng đồng hành cùng bạn.";
 
       const lower = text.toLowerCase();
       if (lower.includes("đăng ký") || lower.includes("đặt")) {
-        reply = "Để đăng ký ca học, bạn hãy vào mục 'Tìm kiếm lớp học' trên menu bên trái, chọn lớp học yêu thích rồi nhấn 'Đặt ca học' cho khung giờ phù hợp nhé!";
-      } else if (lower.includes("gói") || lower.includes("hội viên") || lower.includes("hạn")) {
-        reply = "Bạn có thể kiểm tra chi tiết trạng thái gói tập và số ngày còn lại tại mục 'Gói hội viên'. Để gia hạn, vui lòng liên hệ quầy Lễ tân hoặc hotline trung tâm.";
-      } else if (lower.includes("yoga") || lower.includes("gym") || lower.includes("mới bắt đầu")) {
-        reply = "Với người mới bắt đầu, bạn nên kết hợp 2 buổi Yoga (tăng độ dẻo dai và hít thở đúng) cùng 2 buổi Gym nhẹ nhàng cùng HLV để làm quen với các động tác nền tảng.";
+        reply =
+          "Để đăng ký khóa học, bạn hãy vào mục 'Tìm kiếm lớp học' trên menu bên trái, chọn lớp học yêu thích rồi nhấn 'Đăng ký trọn khóa' nhé!";
+      } else if (
+        lower.includes("gói") ||
+        lower.includes("hội viên") ||
+        lower.includes("hạn")
+      ) {
+        reply =
+          "Bạn có thể kiểm tra chi tiết trạng thái gói tập và số ngày còn lại tại mục 'Gói hội viên'. Để gia hạn, vui lòng liên hệ quầy Lễ tân hoặc hotline trung tâm.";
+      } else if (
+        lower.includes("yoga") ||
+        lower.includes("gym") ||
+        lower.includes("mới bắt đầu")
+      ) {
+        reply =
+          "Với người mới bắt đầu, bạn nên kết hợp 2 buổi Yoga (tăng độ dẻo dai và hít thở đúng) cùng 2 buổi Gym nhẹ nhàng cùng HLV để làm quen với các động tác nền tảng.";
       } else if (lower.includes("lịch tập") || lower.includes("tuần này")) {
-        reply = "Bạn có thể xem lịch tập tổng thể tại mục 'Lịch tập tuần' hoặc xem chi tiết các buổi đã đặt ở mục 'Lớp của tôi'.";
+        reply =
+          "Bạn có thể xem lịch tập tổng thể tại mục 'Lịch tập tuần' hoặc xem chi tiết các buổi đã đặt ở mục 'Lớp của tôi'.";
       }
 
       const aiMsg: Message = {
         sender: "ai",
         text: reply,
-        time: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+        time: new Date().toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       };
 
       setMessages((prev) => [...prev, aiMsg]);
@@ -67,7 +86,17 @@ export function AIAssistantPage() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 120px)", gap: 16, maxWidth: 900, margin: "0 auto", width: "100%" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "calc(100vh - 120px)",
+        gap: 16,
+        maxWidth: 900,
+        margin: "0 auto",
+        width: "100%",
+      }}
+    >
       {/* HEADER */}
       <div
         style={{
@@ -96,10 +125,25 @@ export function AIAssistantPage() {
             <Bot size={22} />
           </div>
           <div>
-            <h2 style={{ fontSize: 16, fontWeight: 800, color: "#203d31", margin: 0 }}>
+            <h2
+              style={{
+                fontSize: 16,
+                fontWeight: 800,
+                color: "#203d31",
+                margin: 0,
+              }}
+            >
               Pulse AI Assistant
             </h2>
-            <span style={{ fontSize: 12, color: "#267346", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span
+              style={{
+                fontSize: 12,
+                color: "#267346",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
               ● Trực tuyến
             </span>
           </div>
@@ -239,7 +283,9 @@ export function AIAssistantPage() {
       </div>
 
       {/* QUICK PROMPTS */}
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+      <div
+        style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}
+      >
         {quickPrompts.map((q, i) => (
           <button
             key={i}
@@ -281,7 +327,12 @@ export function AIAssistantPage() {
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSend();
           }}
-          style={{ border: "none", outline: "none", boxShadow: "none", fontSize: 13 }}
+          style={{
+            border: "none",
+            outline: "none",
+            boxShadow: "none",
+            fontSize: 13,
+          }}
         />
         <button
           onClick={() => handleSend()}

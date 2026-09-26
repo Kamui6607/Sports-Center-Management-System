@@ -145,18 +145,18 @@ for (const width of [375, 1440]) {
   );
 }
 
-test("member booking dialog wraps long content and blocks dismissal during submission", async ({
+test("whole-course enrollment dialog wraps long content and blocks dismissal during submission", async ({
   page,
 }) => {
   await setup(page, "MEMBER", true);
   await page.setViewportSize({ width: 375, height: 800 });
   await page.goto("/member/classes");
   await page
-    .getByRole("button", { name: "Xem lịch & Đặt chỗ" })
+    .getByRole("button", { name: "Xem chi tiết khóa học" })
     .first()
     .click();
   const open = page
-    .getByRole("button", { name: "Đặt ca học", exact: true })
+    .getByRole("button", { name: "Đăng ký trọn khóa", exact: true })
     .first();
   await open.click();
   const dialog = page.getByRole("dialog");
@@ -172,11 +172,11 @@ test("member booking dialog wraps long content and blocks dismissal during submi
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route("**/api/v1/enrollments", async (route) => {
+  await page.route("**/api/v1/enrollments/bulk", async (route) => {
     await gate;
     await route.fallback();
   });
-  await dialog.getByRole("button", { name: "Xác nhận đặt chỗ" }).click();
+  await dialog.getByRole("button", { name: "Xác nhận đăng ký" }).click();
   await expect(
     dialog.getByRole("button", { name: "Đang xử lý..." }),
   ).toBeDisabled();
@@ -186,7 +186,7 @@ test("member booking dialog wraps long content and blocks dismissal during submi
   release();
   await expect(dialog).toHaveCount(0);
   await expect(
-    page.getByText("Đặt lớp học thành công!", { exact: false }),
+    page.getByText("Bạn đã đăng ký 4 buổi", { exact: false }),
   ).toBeVisible();
 });
 

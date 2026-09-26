@@ -44,3 +44,15 @@ export async function lockSchedules(db: DbClient, scheduleIds: string[]) {
     await lockSchedule(db, id);
   }
 }
+
+/**
+ * Serialize xử lý WEBHOOK THANH TOÁN cho MỘT payment (SePay).
+ *
+ * Hai webhook khác `sepayId` cùng trỏ về một đơn phải xếp hàng, nếu không cả hai cùng đọc
+ * `Payment.status = PENDING` rồi cùng kích hoạt gói → tạo 2 subscription cho một lần thu tiền.
+ * Lock này KHÔNG thuộc chuỗi lock enrollment: trong transaction webhook nó là lock duy nhất
+ * (claim `SepayWebhookEvent` đã tự serialize theo `sepayId`).
+ */
+export async function lockPaymentWebhook(db: DbClient, paymentId: string) {
+  await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('payment:webhook:' || ${paymentId}::text))`;
+}

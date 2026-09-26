@@ -30,11 +30,7 @@
         },
         "gender": {
           "type": "string",
-          "enum": [
-            "MALE",
-            "FEMALE",
-            "OTHER"
-          ]
+          "enum": ["MALE", "FEMALE", "OTHER"]
         },
         "dateOfBirth": {
           "type": "string"
@@ -44,23 +40,12 @@
         },
         "role": {
           "type": "string",
-          "enum": [
-            "MEMBER",
-            "COACH",
-            "STAFF",
-            "MANAGER"
-          ]
+          "enum": ["MEMBER", "COACH", "STAFF", "MANAGER"]
         }
       },
       "required": []
     },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "GET /subscriptions/member/{memberId}": {
     "path": "/subscriptions/member/{memberId}",
@@ -85,12 +70,7 @@
         "name": "status",
         "schema": {
           "type": "string",
-          "enum": [
-            "ACTIVE",
-            "EXPIRED",
-            "CANCELLED",
-            "SUSPENDED"
-          ]
+          "enum": ["ACTIVE", "EXPIRED", "CANCELLED", "SUSPENDED"]
         }
       },
       {
@@ -109,13 +89,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "404",
-      "500"
-    ]
+    "statusCodes": ["200", "400", "401", "404", "500"]
   },
   "GET /payments": {
     "path": "/payments",
@@ -139,12 +113,7 @@
         "name": "status",
         "schema": {
           "type": "string",
-          "enum": [
-            "PENDING",
-            "SUCCESS",
-            "FAILED",
-            "REFUNDED"
-          ]
+          "enum": ["PENDING", "SUCCESS", "FAILED", "REFUNDED"]
         }
       },
       {
@@ -152,10 +121,7 @@
         "name": "method",
         "schema": {
           "type": "string",
-          "enum": [
-            "CASH",
-            "BANK_TRANSFER"
-          ]
+          "enum": ["CASH", "BANK_TRANSFER"]
         }
       },
       {
@@ -188,13 +154,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "500"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "500"]
   },
   "PATCH /membership-plans/{id}": {
     "path": "/membership-plans/{id}",
@@ -233,10 +193,7 @@
         },
         "tier": {
           "type": "string",
-          "enum": [
-            "MEMBERSHIP",
-            "PREMIUM"
-          ]
+          "enum": ["MEMBERSHIP", "PREMIUM"]
         },
         "isActive": {
           "type": "boolean"
@@ -244,13 +201,7 @@
       },
       "required": []
     },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "PATCH /members/{id}": {
     "path": "/members/{id}",
@@ -283,11 +234,7 @@
         },
         "gender": {
           "type": "string",
-          "enum": [
-            "MALE",
-            "FEMALE",
-            "OTHER"
-          ]
+          "enum": ["MALE", "FEMALE", "OTHER"]
         },
         "dateOfBirth": {
           "type": "string"
@@ -297,11 +244,7 @@
         },
         "trainingLevel": {
           "type": "string",
-          "enum": [
-            "BEGINNER",
-            "INTERMEDIATE",
-            "ADVANCED"
-          ]
+          "enum": ["BEGINNER", "INTERMEDIATE", "ADVANCED"]
         },
         "trainingPreference": {
           "type": "string"
@@ -309,13 +252,7 @@
       },
       "required": []
     },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "GET /invoices/member/{memberId}": {
     "path": "/invoices/member/{memberId}",
@@ -351,14 +288,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "500"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404", "500"]
   },
   "GET /enrollments/schedule/{scheduleId}": {
     "path": "/enrollments/schedule/{scheduleId}",
@@ -394,13 +324,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "500"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "500"]
   },
   "GET /notifications": {
     "path": "/notifications",
@@ -442,13 +366,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "GET /notifications/unread-count": {
     "path": "/notifications/unread-count",
@@ -461,13 +379,7 @@
     ],
     "parameters": [],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "PATCH /notifications/mark-all-read": {
     "path": "/notifications/mark-all-read",
@@ -480,13 +392,7 @@
     ],
     "parameters": [],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "PATCH /notifications/{id}/read": {
     "path": "/notifications/{id}/read",
@@ -508,13 +414,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "POST /notifications/trigger-upcoming-reminders": {
     "path": "/notifications/trigger-upcoming-reminders",
@@ -527,13 +427,7 @@
     ],
     "parameters": [],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "GET /chat/contacts": {
     "path": "/chat/contacts",
@@ -546,13 +440,7 @@
     ],
     "parameters": [],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "GET /chat/conversations": {
     "path": "/chat/conversations",
@@ -565,13 +453,7 @@
     ],
     "parameters": [],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "GET /chat/messages/unread-count": {
     "path": "/chat/messages/unread-count",
@@ -584,13 +466,7 @@
     ],
     "parameters": [],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "GET /chat/messages": {
     "path": "/chat/messages",
@@ -611,13 +487,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "POST /chat/messages": {
     "path": "/chat/messages",
@@ -646,13 +516,7 @@
       },
       "required": []
     },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "PATCH /chat/messages/read": {
     "path": "/chat/messages/read",
@@ -674,13 +538,7 @@
       },
       "required": []
     },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "GET /attendance": {
     "path": "/attendance",
@@ -701,13 +559,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "POST /attendance": {
     "path": "/attendance",
@@ -732,30 +584,15 @@
         },
         "status": {
           "type": "string",
-          "enum": [
-            "PRESENT",
-            "ABSENT",
-            "LATE",
-            "EXCUSED"
-          ]
+          "enum": ["PRESENT", "ABSENT", "LATE", "EXCUSED"]
         },
         "note": {
           "type": "string"
         }
       },
-      "required": [
-        "scheduleId",
-        "memberId",
-        "status"
-      ]
+      "required": ["scheduleId", "memberId", "status"]
     },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "PATCH /attendance/{id}": {
     "path": "/attendance/{id}",
@@ -781,12 +618,7 @@
       "properties": {
         "status": {
           "type": "string",
-          "enum": [
-            "PRESENT",
-            "ABSENT",
-            "LATE",
-            "EXCUSED"
-          ]
+          "enum": ["PRESENT", "ABSENT", "LATE", "EXCUSED"]
         },
         "note": {
           "type": "string"
@@ -794,13 +626,7 @@
       },
       "required": []
     },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "GET /training-plans": {
     "path": "/training-plans",
@@ -821,13 +647,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "POST /training-plans": {
     "path": "/training-plans",
@@ -866,21 +686,9 @@
           "format": "date-time"
         }
       },
-      "required": [
-        "memberId",
-        "coachId",
-        "name",
-        "startDate",
-        "endDate"
-      ]
+      "required": ["memberId", "coachId", "name", "startDate", "endDate"]
     },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "POST /training-plans/results": {
     "path": "/training-plans/results",
@@ -910,18 +718,9 @@
           "type": "string"
         }
       },
-      "required": [
-        "planId",
-        "date"
-      ]
+      "required": ["planId", "date"]
     },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "PATCH /class-schedules/{id}/complete": {
     "path": "/class-schedules/{id}/complete",
@@ -943,13 +742,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "404"]
   },
   "GET /membership-plans": {
     "path": "/membership-plans",
@@ -962,10 +755,7 @@
         "name": "tier",
         "schema": {
           "type": "string",
-          "enum": [
-            "MEMBERSHIP",
-            "PREMIUM"
-          ]
+          "enum": ["MEMBERSHIP", "PREMIUM"]
         }
       },
       {
@@ -973,10 +763,7 @@
         "name": "isActive",
         "schema": {
           "type": "string",
-          "enum": [
-            "true",
-            "false"
-          ]
+          "enum": ["true", "false"]
         }
       },
       {
@@ -995,11 +782,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "500"
-    ]
+    "statusCodes": ["200", "400", "500"]
   },
   "GET /invoices": {
     "path": "/invoices",
@@ -1023,10 +806,7 @@
         "name": "status",
         "schema": {
           "type": "string",
-          "enum": [
-            "ISSUED",
-            "CANCELLED"
-          ]
+          "enum": ["ISSUED", "CANCELLED"]
         }
       },
       {
@@ -1059,13 +839,7 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "500"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "500"]
   },
   "GET /enrollments/my": {
     "path": "/enrollments/my",
@@ -1082,11 +856,7 @@
         "name": "status",
         "schema": {
           "type": "string",
-          "enum": [
-            "BOOKED",
-            "CANCELLED",
-            "COMPLETED"
-          ]
+          "enum": ["BOOKED", "CANCELLED", "COMPLETED"]
         }
       },
       {
@@ -1107,12 +877,95 @@
       }
     ],
     "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "500"
-    ]
+    "statusCodes": ["200", "400", "401", "403", "500"]
+  },
+  "POST /payments/sepay/checkout": {
+    "path": "/payments/sepay/checkout",
+    "method": "POST",
+    "summary": "Create a SePay VietQR membership checkout",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "properties": { "planId": { "type": "string" } },
+      "required": ["planId"]
+    },
+    "statusCodes": ["201", "400", "401", "403", "404", "409", "500", "503"]
+  },
+  "GET /payments/sepay/{id}": {
+    "path": "/payments/sepay/{id}",
+    "method": "GET",
+    "summary": "Get a SePay membership checkout",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    ],
+    "body": null,
+    "statusCodes": ["200", "401", "403", "404", "500"]
+  },
+  "POST /payments/sepay/mock-confirm": {
+    "path": "/payments/sepay/mock-confirm",
+    "method": "POST",
+    "summary": "DEV/DEMO confirm a SePay membership checkout",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "properties": { "paymentId": { "type": "string" } },
+      "required": ["paymentId"]
+    },
+    "statusCodes": ["200", "400", "401", "403", "404", "500"]
+  },
+  "GET /classes/{id}/course-plan": {
+    "path": "/classes/{id}/course-plan",
+    "method": "GET",
+    "summary": "View a class as ONE course (grouped timetable) + enrollment eligibility",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    ],
+    "body": null,
+    "statusCodes": ["200", "401", "404", "500"]
+  },
+  "POST /enrollments/bulk": {
+    "path": "/enrollments/bulk",
+    "method": "POST",
+    "summary": "Enroll in a whole course (all upcoming sessions)",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "properties": {
+        "classId": { "type": "string" },
+        "memberId": { "type": "string" }
+      },
+      "required": ["classId"]
+    },
+    "statusCodes": ["201", "400", "401", "403", "404", "409", "500"]
+  },
+  "POST /class-schedules/activity-plan": {
+    "path": "/class-schedules/activity-plan",
+    "method": "POST",
+    "summary": "Atomically create a complete activity plan",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object"
+    },
+    "statusCodes": ["201", "400", "401", "403", "404", "409", "500"]
   }
 }

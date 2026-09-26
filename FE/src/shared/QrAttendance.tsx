@@ -13,13 +13,20 @@ export function AttendanceQr({ scheduleId }: { scheduleId: string }) {
     enabled,
     queryFn: async ({ signal }) => {
       const started = Date.now();
-      const result = await api<{ qrToken: string; expiresIn: number }>(
+      const result = await api<{
+        qrToken: string;
+        expiresIn: number;
+        manualCode: string;
+        manualCodeExpiresIn: number;
+      }>(
         "POST /attendance/generate-qr",
         { body: { scheduleId }, signal },
       );
       return {
         ...result.data,
         expiresAt: started + result.data.expiresIn * 1000,
+        manualCodeExpiresAt:
+          started + result.data.manualCodeExpiresIn * 1000,
       };
     },
     staleTime: 0,
@@ -39,7 +46,10 @@ export function AttendanceQr({ scheduleId }: { scheduleId: string }) {
   return (
     <section className="qr-panel">
       <h3>Điểm danh bằng QR</h3>
-      <p>Hội viên quét mã để xác nhận có mặt. Mã tự làm mới sau 55 giây.</p>
+      <p>
+        Hội viên có thể quét QR hoặc nhập mã dự phòng. Tạo mã mới sẽ thu hồi mã
+        dự phòng cũ của buổi học.
+      </p>
       {!enabled ? (
         <button
           className="button primary"
@@ -68,6 +78,23 @@ export function AttendanceQr({ scheduleId }: { scheduleId: string }) {
                 />
               </div>
               <p>Còn {seconds} giây</p>
+              <div className="panel" aria-live="polite">
+                <small>MÃ DỰ PHÒNG</small>
+                <p style={{ fontSize: 28, fontWeight: 800, letterSpacing: 6 }}>
+                  {q.data.manualCode || "—"}
+                </p>
+                <p>
+                  Hết hạn sau {Math.max(0, Math.ceil(((q.data.manualCodeExpiresAt || now) - now) / 1000))}
+                  {" "}giây
+                </p>
+                <button
+                  className="button small"
+                  disabled={!q.data.manualCode}
+                  onClick={() => void navigator.clipboard?.writeText(q.data.manualCode)}
+                >
+                  Sao chép mã
+                </button>
+              </div>
             </>
           ) : (
             <p role="status">Mã đã hết hạn. Vui lòng tạo mã mới.</p>
@@ -98,8 +125,8 @@ export function ScanAttendanceQr() {
   const locked = useRef(false);
   const cache = useQueryClient();
   const scan = useMutation({
-    mutationFn: (qrToken: string) =>
-      api("POST /attendance/scan-qr", { body: { qrToken } }),
+    mutationFn: (credential: { qrToken?: string; code?: string }) =>
+      api("POST /attendance/scan-qr", { body: credential }),
     onSuccess: () => {
       setToken("");
       void cache.invalidateQueries({ queryKey: ["my-attendance"] });
@@ -109,13 +136,13 @@ export function ScanAttendanceQr() {
     },
   });
   const submit = useRef((value: string) => {
-    scan.mutate(value);
+    scan.mutate({ qrToken: value });
   });
   submit.current = (value) => {
     if (!locked.current) {
       locked.current = true;
       setCamera(false);
-      scan.mutate(value);
+      scan.mutate({ qrToken: value });
     }
   };
   useEffect(() => {
@@ -182,13 +209,21 @@ export function ScanAttendanceQr() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (token.trim()) submit.current(token.trim());
+            const value = token.trim().toUpperCase().replace(/\s/g, "");
+            if (value)
+              scan.mutate(
+                /^[A-HJ-NP-Z2-9]{6}$/.test(value)
+                  ? { code: value }
+                  : { qrToken: token.trim() },
+              );
           }}
         >
           <label>
             Mã điểm danh
-            <textarea
+            <input
               required
+              autoComplete="one-time-code"
+              placeholder="Ví dụ: K7M2QP"
               value={token}
               onChange={(e) => setToken(e.target.value)}
             />
@@ -205,6 +240,13 @@ export function ScanAttendanceQr() {
         </p>
       )}
       {scan.error && <ErrorState error={scan.error} />}
+      {scan.error instanceof ApiError &&
+        scan.error.status === 429 && (
+          <p role="alert">
+            Bạn đã nhập sai quá nhiều lần. Hãy chờ rồi thử lại hoặc nhờ huấn
+            luyện viên điểm danh trực tiếp.
+          </p>
+        )}
       {scan.error instanceof ApiError &&
         scan.error.status === 403 &&
         /gói|hết hạn/i.test(scan.error.message) && (

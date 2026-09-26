@@ -35,7 +35,7 @@ const router = Router();
  */
 router.get(
   "/",
-  authenticate, authorize("MANAGER"),
+  authenticate, authorize("MANAGER", "STAFF"),
   validate(InvoiceQuerySchema, "query"),
   invoicesController.listInvoices
 );

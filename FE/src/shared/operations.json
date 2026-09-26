@@ -330,6 +330,50 @@
       "404"
     ]
   },
+  "PATCH /training-plans/{id}": {
+    "path": "/training-plans/{id}",
+    "method": "PATCH",
+    "summary": "Change the coach of a training plan (Member changes own plan, Coach current plan, Manager any plan)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "description": "TrainingPlan ID"
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "coachId"
+      ],
+      "properties": {
+        "coachId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "CoachProfile.id của HLV mới (khác HLV hiện tại)"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "500"
+    ]
+  },
   "POST /training-plans/results": {
     "path": "/training-plans/results",
     "method": "POST",
@@ -654,6 +698,19 @@
       },
       {
         "in": "query",
+        "name": "areaType",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "POOL",
+            "INDOOR",
+            "OUTDOOR"
+          ]
+        },
+        "description": "Filter sports supporting an area type"
+      },
+      {
+        "in": "query",
         "name": "isActive",
         "schema": {
           "type": "string",
@@ -701,7 +758,8 @@
     "body": {
       "type": "object",
       "required": [
-        "name"
+        "name",
+        "areaTypes"
       ],
       "properties": {
         "name": {
@@ -711,6 +769,22 @@
         "description": {
           "type": "string",
           "example": "Yoga class improves flexibility"
+        },
+        "areaTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "POOL",
+              "INDOOR",
+              "OUTDOOR"
+            ]
+          },
+          "minItems": 1,
+          "example": [
+            "INDOOR"
+          ],
+          "description": "Area types this sport supports (at least one)"
         }
       }
     },
@@ -773,6 +847,19 @@
         },
         "description": {
           "type": "string"
+        },
+        "areaTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "POOL",
+              "INDOOR",
+              "OUTDOOR"
+            ]
+          },
+          "minItems": 1,
+          "description": "Area types this sport supports. Cannot remove a type used by an active Class."
         },
         "isActive": {
           "type": "boolean"
@@ -837,6 +924,19 @@
       },
       {
         "in": "query",
+        "name": "areaType",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "POOL",
+            "INDOOR",
+            "OUTDOOR"
+          ]
+        },
+        "description": "Filter by area type (POOL | INDOOR | OUTDOOR)"
+      },
+      {
+        "in": "query",
         "name": "isActive",
         "schema": {
           "type": "string",
@@ -885,7 +985,8 @@
       "type": "object",
       "required": [
         "name",
-        "capacity"
+        "capacity",
+        "areaType"
       ],
       "properties": {
         "name": {
@@ -899,6 +1000,15 @@
         "location": {
           "type": "string",
           "example": "Floor 1"
+        },
+        "areaType": {
+          "type": "string",
+          "enum": [
+            "POOL",
+            "INDOOR",
+            "OUTDOOR"
+          ],
+          "example": "INDOOR"
         }
       }
     },
@@ -970,6 +1080,15 @@
         "location": {
           "type": "string"
         },
+        "areaType": {
+          "type": "string",
+          "enum": [
+            "POOL",
+            "INDOOR",
+            "OUTDOOR"
+          ],
+          "description": "New area type. Upcoming schedules must use a matching Class."
+        },
         "isActive": {
           "type": "boolean"
         }
@@ -1010,6 +1129,119 @@
       "401",
       "403",
       "404",
+      "500"
+    ]
+  },
+  "POST /rooms/{roomId}/transfer-schedules/preview": {
+    "path": "/rooms/{roomId}/transfer-schedules/preview",
+    "method": "POST",
+    "summary": "Preview bulk transfer of upcoming schedules to another room (no DB changes)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "roomId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Source room (damaged room)"
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "targetRoomId"
+      ],
+      "properties": {
+        "targetRoomId": {
+          "type": "string",
+          "description": "Target room ID"
+        },
+        "from": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional lower bound (default now)"
+        },
+        "to": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional upper bound"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Transfer reason, e.g. Room damaged"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "500"
+    ]
+  },
+  "POST /rooms/{roomId}/transfer-schedules": {
+    "path": "/rooms/{roomId}/transfer-schedules",
+    "method": "POST",
+    "summary": "Bulk transfer upcoming SCHEDULED schedules to another room (atomic, all-or-nothing)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "roomId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Source room (damaged room)"
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "targetRoomId"
+      ],
+      "properties": {
+        "targetRoomId": {
+          "type": "string",
+          "description": "Target room ID"
+        },
+        "from": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional lower bound (default now)"
+        },
+        "to": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional upper bound"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Transfer reason, e.g. Room damaged"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
       "500"
     ]
   },
@@ -1181,6 +1413,69 @@
         "name": "endDate",
         "schema": {
           "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer",
+          "default": 1
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer",
+          "default": 20
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "500"
+    ]
+  },
+  "GET /reports/attendance": {
+    "path": "/reports/attendance",
+    "method": "GET",
+    "summary": "Attendance report per (member × class) with OK/WARN/RELEASE status",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "OK",
+            "WARN",
+            "RELEASE"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "classId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "memberId",
+        "schema": {
+          "type": "string",
+          "description": "MemberProfile.id"
         }
       },
       {
@@ -1641,6 +1936,11 @@
             "MEMBERSHIP",
             "PREMIUM"
           ]
+        },
+        "maxConcurrentClasses": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Quota số Class KHÁC NHAU được giữ đồng thời; bỏ trống = mặc định theo tier"
         }
       }
     },
@@ -1923,7 +2223,8 @@
         "required": true,
         "schema": {
           "type": "string"
-        }
+        },
+        "description": "memberProfile.id hoặc userId"
       }
     ],
     "body": null,
@@ -2345,6 +2646,25 @@
       "500"
     ]
   },
+  "GET /enrollments/my/quota": {
+    "path": "/enrollments/my/quota",
+    "method": "GET",
+    "summary": "Get my concurrent-class quota (Member only)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "404",
+      "500"
+    ]
+  },
   "GET /enrollments/schedule/{scheduleId}": {
     "path": "/enrollments/schedule/{scheduleId}",
     "method": "GET",
@@ -2413,6 +2733,49 @@
       "401",
       "403",
       "404",
+      "500"
+    ]
+  },
+  "POST /enrollments/{id}/transfer": {
+    "path": "/enrollments/{id}/transfer",
+    "method": "POST",
+    "summary": "Move a booking to another schedule (Member moves own booking; Staff/Manager any member)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Enrollment ID của chỗ đặt hiện tại"
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "targetScheduleId"
+      ],
+      "properties": {
+        "targetScheduleId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ClassSchedule.id của buổi muốn chuyển tới"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
       "500"
     ]
   },
@@ -2593,7 +2956,20 @@
             "PREMIUM"
           ]
         },
-        "description": "Filter by class type"
+        "description": "Filter by class tier (REGULAR | PREMIUM)"
+      },
+      {
+        "in": "query",
+        "name": "areaType",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "POOL",
+            "INDOOR",
+            "OUTDOOR"
+          ]
+        },
+        "description": "Filter by area type (POOL | INDOOR | OUTDOOR)"
       },
       {
         "in": "query",
@@ -2654,7 +3030,8 @@
       "required": [
         "name",
         "sportIds",
-        "capacity"
+        "capacity",
+        "areaType"
       ],
       "properties": {
         "name": {
@@ -2681,7 +3058,18 @@
             "REGULAR",
             "PREMIUM"
           ],
-          "default": "REGULAR"
+          "default": "REGULAR",
+          "description": "Class tier (REGULAR | PREMIUM). Different from areaType."
+        },
+        "areaType": {
+          "type": "string",
+          "enum": [
+            "POOL",
+            "INDOOR",
+            "OUTDOOR"
+          ],
+          "example": "INDOOR",
+          "description": "Area type required by this class. Every selected sport must support it."
         }
       }
     },
@@ -2766,6 +3154,15 @@
             "REGULAR",
             "PREMIUM"
           ]
+        },
+        "areaType": {
+          "type": "string",
+          "enum": [
+            "POOL",
+            "INDOOR",
+            "OUTDOOR"
+          ],
+          "description": "New area type. All sports of this class must support it, and upcoming schedules must use a matching Room."
         },
         "isActive": {
           "type": "boolean"
@@ -2856,6 +3253,48 @@
       "500"
     ]
   },
+  "POST /classes/{id}/coaches/support": {
+    "path": "/classes/{id}/coaches/support",
+    "method": "POST",
+    "summary": "Assign a support coach to class (Sends COACH_CHANGED notification to enrolled members)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Class ID"
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "coachId"
+      ],
+      "properties": {
+        "coachId": {
+          "type": "string",
+          "description": "CoachProfile ID"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "500"
+    ]
+  },
   "DELETE /classes/{id}/coaches/{coachId}": {
     "path": "/classes/{id}/coaches/{coachId}",
     "method": "DELETE",
@@ -2935,6 +3374,29 @@
       },
       {
         "in": "query",
+        "name": "weekday",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "style": "form",
+        "explode": true,
+        "description": "Lọc 1 thứ: 2=T2..7=T7, 8=CN (alias: T2..T7, MON..SUN, Thứ 2..Chủ nhật). Lặp lại param để chọn nhiều thứ. VD: ?weekday=2&weekday=CN",
+        "example": "2"
+      },
+      {
+        "in": "query",
+        "name": "weekdays",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Lọc nhiều thứ, phân tách dấu phẩy. VD: ?weekdays=2,4,8 hoặc ?weekdays=T2,T4,CN. Hợp nhất với weekday.",
+        "example": "2,4,8"
+      },
+      {
+        "in": "query",
         "name": "date",
         "schema": {
           "type": "string",
@@ -2958,7 +3420,25 @@
           "type": "string",
           "format": "date-time"
         },
-        "description": "Schedules starting before this time"
+        "description": "Schedules starting before this time (legacy start-time filtering)"
+      },
+      {
+        "in": "query",
+        "name": "from",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "description": "Overlap-range filter start (schedule.endTime > from)"
+      },
+      {
+        "in": "query",
+        "name": "to",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "description": "Overlap-range filter end (schedule.startTime < to)"
       },
       {
         "in": "query",
@@ -2988,7 +3468,7 @@
   "POST /class-schedules": {
     "path": "/class-schedules",
     "method": "POST",
-    "summary": "Create a new schedule (checks room & coach conflicts)",
+    "summary": "Create a new schedule (checks area type, room & coach conflicts)",
     "security": [
       {
         "BearerAuth": []
@@ -3097,10 +3577,14 @@
           "type": "string",
           "enum": [
             "SCHEDULED",
-            "CANCELLED",
-            "COMPLETED"
+            "CANCELLED"
           ],
-          "description": "If set to CANCELLED, all BOOKED enrollments are cancelled automatically"
+          "description": "If set to CANCELLED, all BOOKED enrollments are cancelled automatically. COMPLETED must use /complete."
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Cancellation reason (used in SCHEDULE_CANCELLED notification)"
         }
       }
     },
@@ -3688,7 +4172,7 @@
   "POST /attendance/generate-qr": {
     "path": "/attendance/generate-qr",
     "method": "POST",
-    "summary": "Generate a short-lived QR token for attendance (Coach/Manager only)",
+    "summary": "Generate a short-lived QR token + manual backup code for attendance (Coach/Manager only)",
     "security": [
       {
         "BearerAuth": []
@@ -3708,13 +4192,236 @@
       }
     },
     "statusCodes": [
-      "200"
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "500"
     ]
   },
   "POST /attendance/scan-qr": {
     "path": "/attendance/scan-qr",
     "method": "POST",
-    "summary": "Scan a QR token to mark self as PRESENT (Member only)",
+    "summary": "Check in by QR token OR manual backup code (Member only)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Chỉ gửi một trong hai: qrToken hoặc code",
+      "properties": {
+        "qrToken": {
+          "type": "string",
+          "description": "JWT token from QR code shown by Coach (khi quét QR)"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 6,
+          "description": "Mã dự phòng 6 ký tự (A-HJ-NP-Z2-9) khi không quét được QR"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "429",
+      "500"
+    ]
+  },
+  "GET /attendance/my": {
+    "path": "/attendance/my",
+    "method": "GET",
+    "summary": "Get current member's own attendance history",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PRESENT",
+            "ABSENT",
+            "LATE",
+            "EXCUSED"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "classId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer",
+          "default": 1
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer",
+          "default": 20
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "404",
+      "500"
+    ]
+  },
+  "GET /attendance/my/summary": {
+    "path": "/attendance/my/summary",
+    "method": "GET",
+    "summary": "Attendance rate per class for the current member + own penalties",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "404",
+      "500"
+    ]
+  },
+  "POST /attendance/warnings/scan": {
+    "path": "/attendance/warnings/scan",
+    "method": "POST",
+    "summary": "Scan attendance and send WARN notifications (Manager only)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "properties": {
+        "classId": {
+          "type": "string",
+          "description": "Chỉ quét một lớp (bỏ trống = tất cả)"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "500"
+    ]
+  },
+  "GET /attendance/penalties": {
+    "path": "/attendance/penalties",
+    "method": "GET",
+    "summary": "List attendance penalties (Manager only)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "APPLIED",
+            "REVOKED",
+            "EXPIRED"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "memberId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "classId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer",
+          "default": 1
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer",
+          "default": 20
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "500"
+    ]
+  },
+  "POST /attendance/penalties/preview": {
+    "path": "/attendance/penalties/preview",
+    "method": "POST",
+    "summary": "Preview members eligible for attendance penalty (Manager only, read-only)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "500"
+    ]
+  },
+  "POST /attendance/penalties/apply": {
+    "path": "/attendance/penalties/apply",
+    "method": "POST",
+    "summary": "Apply attendance penalty (Manager only, atomic transaction)",
     "security": [
       {
         "BearerAuth": []
@@ -3724,12 +4431,21 @@
     "body": {
       "type": "object",
       "required": [
-        "qrToken"
+        "memberId",
+        "classId"
       ],
       "properties": {
-        "qrToken": {
+        "memberId": {
           "type": "string",
-          "description": "JWT token from QR code shown by Coach"
+          "description": "MemberProfile.id"
+        },
+        "classId": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Bỏ trống sẽ dùng lý do hệ thống sinh"
         }
       }
     },
@@ -3738,6 +4454,266 @@
       "400",
       "401",
       "403",
+      "404",
+      "409",
+      "500"
+    ]
+  },
+  "POST /attendance/penalties/{id}/appeal": {
+    "path": "/attendance/penalties/{id}/appeal",
+    "method": "POST",
+    "summary": "Member appeals own penalty (within 72h window)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 1000
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "500"
+    ]
+  },
+  "POST /attendance/penalties/{id}/revoke": {
+    "path": "/attendance/penalties/{id}/revoke",
+    "method": "POST",
+    "summary": "Revoke a penalty (Manager only)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "restoreSlots": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "500"
+    ]
+  },
+  "POST /payments/sepay/checkout": {
+    "path": "/payments/sepay/checkout",
+    "method": "POST",
+    "summary": "Create a SePay VietQR membership checkout",
+    "security": [
+      {
+        "bearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "properties": {
+        "planId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "planId"
+      ]
+    },
+    "statusCodes": [
+      "201",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "500",
+      "503"
+    ]
+  },
+  "GET /payments/sepay/{id}": {
+    "path": "/payments/sepay/{id}",
+    "method": "GET",
+    "summary": "Get a SePay membership checkout",
+    "security": [
+      {
+        "bearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "404",
+      "500"
+    ]
+  },
+  "POST /payments/sepay/mock-confirm": {
+    "path": "/payments/sepay/mock-confirm",
+    "method": "POST",
+    "summary": "DEV/DEMO confirm a SePay membership checkout",
+    "security": [
+      {
+        "bearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "properties": {
+        "paymentId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "paymentId"
+      ]
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "500"
+    ]
+  },
+  "GET /classes/{id}/course-plan": {
+    "path": "/classes/{id}/course-plan",
+    "method": "GET",
+    "summary": "View a class as ONE course (grouped timetable) + enrollment eligibility",
+    "security": [
+      {
+        "bearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "404",
+      "500"
+    ]
+  },
+  "POST /enrollments/bulk": {
+    "path": "/enrollments/bulk",
+    "method": "POST",
+    "summary": "Enroll in a whole course (all upcoming sessions)",
+    "security": [
+      {
+        "bearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "properties": {
+        "classId": {
+          "type": "string"
+        },
+        "memberId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "classId"
+      ]
+    },
+    "statusCodes": [
+      "201",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "500"
+    ]
+  },
+  "POST /class-schedules/activity-plan": {
+    "path": "/class-schedules/activity-plan",
+    "method": "POST",
+    "summary": "Atomically create a complete activity plan",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object"
+    },
+    "statusCodes": [
+      "201",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
       "500"
     ]
   }

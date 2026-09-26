@@ -10,6 +10,7 @@ import { ClassesPage } from "./classes/ClassesPage";
 import { PaymentsPage } from "./payments/PaymentsPage";
 import { resources } from "../manage/config";
 import { ResourcePage } from "../manage/ResourcePage";
+import { ActivityPlanner } from "../manage/ActivityPlanner";
 const items = [
   ["dashboard", "Tổng quan"],
   ["members", "Hội viên"],
@@ -17,6 +18,7 @@ const items = [
   ["classes", "Đăng ký lớp"],
   ["catalogue", "Quản lý lớp học"],
   ["schedules", "Lịch & điểm danh"],
+  ["activity-planner", "Tạo lịch nhanh"],
   ["sports", "Bộ môn"],
   ["rooms", "Phòng tập"],
   ["payments", "Thanh toán & hóa đơn"],
@@ -34,6 +36,10 @@ export function ReceptionLayout(props: PortalProps) {
         />
         <Route path="/receptionist/membership" element={<MembershipPage />} />
         <Route path="/receptionist/classes" element={<ClassesPage />} />
+        <Route
+          path="/receptionist/activity-planner"
+          element={<ActivityPlanner role="STAFF" />}
+        />
         <Route path="/receptionist/payments" element={<PaymentsPage />} />
         {resources
           .filter((r) =>

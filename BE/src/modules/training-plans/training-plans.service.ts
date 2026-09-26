@@ -4,7 +4,7 @@ import { AppError } from "../../middlewares/errorHandler.js";
 import { createNotification } from "../notifications/notifications.service.js";
 
 async function verifyCoachOwnership(coachId: string, user: any) {
-  if (user.role === "MANAGER") return true;
+  if (user.role === "MANAGER" || user.role === "STAFF") return true;
   if (user.role === "COACH") {
     const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: user.id } });
     if (!coachProfile || coachProfile.id !== coachId) {
@@ -68,7 +68,7 @@ export const createResult = async (data: Prisma.TrainingResultUncheckedCreateInp
  * Quyền đổi HLV của TrainingPlan:
  * - MEMBER: chỉ plan thuộc hồ sơ của chính mình.
  * - COACH: chỉ plan mình đang phụ trách (reuse verifyCoachOwnership).
- * - MANAGER: giữ nguyên hành vi như verifyCoachOwnership (route chỉ mở cho MANAGER).
+ * - MANAGER/STAFF: giữ nguyên hành vi như verifyCoachOwnership (route chỉ mở cho MANAGER).
  */
 async function verifyPlanCoachChangeAccess(plan: { memberId: string; coachId: string }, user: any) {
   if (user.role === "MEMBER") {

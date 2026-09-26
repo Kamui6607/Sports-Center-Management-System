@@ -120,6 +120,62 @@ export const CreateScheduleSchema = z.object({
   path: ["endTime"],
 });
 
+const PlannerScheduleSchema = z.object({
+  startTime: z.string().datetime({ offset: true }),
+  endTime: z.string().datetime({ offset: true }),
+}).refine((d) => new Date(d.endTime) > new Date(d.startTime), {
+  message: "endTime must be after startTime",
+  path: ["endTime"],
+});
+
+export const CreateActivityPlanSchema = z.object({
+  sport: z.union([
+    z.object({ mode: z.literal("existing"), id: z.string().min(1) }),
+    z.object({
+      mode: z.literal("new"),
+      name: z.string().trim().min(2),
+      description: z.string().trim().optional(),
+    }),
+  ]),
+  class: z.object({
+    name: z.string().trim().min(2),
+    description: z.string().trim().optional(),
+    capacity: z.number().int().positive().max(200),
+    classType: z.enum(["REGULAR", "PREMIUM"]),
+    areaType: z.enum(["POOL", "INDOOR", "OUTDOOR"]),
+  }),
+  primaryCoachId: z.string().min(1),
+  supportCoachId: z.string().min(1).optional(),
+  roomId: z.string().min(1),
+  schedules: z.array(PlannerScheduleSchema).min(1).max(500),
+}).superRefine((data, ctx) => {
+  if (data.supportCoachId === data.primaryCoachId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["supportCoachId"],
+      message: "Support coach must be different from primary coach",
+    });
+  }
+
+  const ordered = data.schedules
+    .map((schedule, index) => ({
+      index,
+      start: new Date(schedule.startTime).getTime(),
+      end: new Date(schedule.endTime).getTime(),
+    }))
+    .sort((a, b) => a.start - b.start);
+  for (let index = 1; index < ordered.length; index += 1) {
+    if (ordered[index].start < ordered[index - 1].end) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["schedules", ordered[index].index],
+        message: "Schedules in the activity plan must not overlap",
+      });
+      break;
+    }
+  }
+});
+
 export const UpdateScheduleSchema = z.object({
   roomId: z.string().min(1).optional(),
   startTime: z.string().optional(),

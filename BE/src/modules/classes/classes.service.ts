@@ -2,12 +2,10 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { broadcastNotification } from "../notifications/notifications.service.js";
+import { evaluateCourseEligibility } from "../enrollments/course-enrollment.service.js";
 
 const classInclude = {
   sports: true,
-  ownerCoach: {
-    include: { user: { select: { id: true, fullName: true, email: true } } },
-  },
   coaches: {
     include: {
       coach: {
@@ -15,30 +13,8 @@ const classInclude = {
       },
     },
   },
-  _count: { select: { enrollments: true, schedules: true, purchases: true } },
+  _count: { select: { enrollments: true, schedules: true } },
 };
-
-/** CoachProfile của user đang đăng nhập (COACH). */
-async function resolveOwnCoachProfileId(userId: string) {
-  const coachProfile = await prisma.coachProfile.findUnique({ where: { userId } });
-  if (!coachProfile) throw new AppError("Coach profile not found", 404);
-  return coachProfile.id;
-}
-
-/**
- * Coach chỉ được thao tác trên khóa học do CHÍNH mình sở hữu (`Class.ownerCoachId`).
- * MANAGER toàn quyền. Dùng cho update/delete/assign-support-coach.
- */
-async function assertCanManageClass(cls: { ownerCoachId: string | null }, actor: { id: string; role: string }) {
-  if (actor.role === "MANAGER") return;
-  if (actor.role !== "COACH") {
-    throw new AppError("Forbidden: insufficient permissions", 403);
-  }
-  const coachProfileId = await resolveOwnCoachProfileId(actor.id);
-  if (cls.ownerCoachId !== coachProfileId) {
-    throw new AppError("Forbidden: you can only manage your own courses", 403);
-  }
-}
 
 function assertSportsSupportAreaType(sports: { name: string; areaTypes: string[] }[], areaType: string) {
   for (const sport of sports) {
@@ -61,8 +37,6 @@ export async function listClasses(query: any) {
   if (query.coachId) {
     where.coaches = { some: { coachId: query.coachId } };
   }
-  // Lọc theo Coach SỞ HỮU khóa học (khác với coachId = HLV được phân công).
-  if (query.ownerCoachId) where.ownerCoachId = query.ownerCoachId;
 
   const [total, classes] = await Promise.all([
     prisma.class.count({ where }),
@@ -75,59 +49,21 @@ export async function listClasses(query: any) {
   return { classes, pagination: buildPaginationMeta(total, page, limit) };
 }
 
-/** COACH: danh sách khóa học do CHÍNH mình sở hữu (kể cả đang tắt) — dùng cho màn quản lý khóa học của Coach. */
-export async function listMyCourses(userId: string, query: any) {
-  const coachProfileId = await resolveOwnCoachProfileId(userId);
-  return listClasses({ ...query, ownerCoachId: coachProfileId });
-}
-
-/**
- * Tạo khóa học.
- * - MANAGER: toàn quyền; có thể gán `ownerCoachId` (Coach sở hữu khóa học).
- * - COACH: chỉ tạo được khóa học CỦA CHÍNH MÌNH — owner tự động là coach đang đăng nhập và
- *   được gán luôn làm HLV chính; không được chỉ định owner khác.
- */
-export async function createClass(data: any, actor: { id: string; role: string }) {
-  const { sportIds, ownerCoachId, ...restData } = data;
-
-  if (actor.role === "COACH" && ownerCoachId) {
-    throw new AppError("Coaches cannot assign another coach as course owner", 403);
-  }
-
+export async function createClass(data: any) {
+  const { sportIds, ...restData } = data;
   const sports = await prisma.sport.findMany({ where: { id: { in: sportIds }, isActive: true } });
   if (sports.length !== sportIds.length) throw new AppError("One or more sports not found or inactive", 404);
 
   // Business rule: TẤT CẢ sport của Class đều phải support Class.areaType.
   assertSportsSupportAreaType(sports, data.areaType);
 
-  // Coach tự mở khóa học của mình; Manager có thể chỉ định Coach sở hữu.
-  let resolvedOwnerCoachId: string | null = null;
-  if (actor.role === "COACH") {
-    resolvedOwnerCoachId = await resolveOwnCoachProfileId(actor.id);
-  } else if (ownerCoachId) {
-    resolvedOwnerCoachId = (await findAssignableCoach(ownerCoachId)).id;
-  }
-
-  const newClass = await prisma.class.create({
+  const newClass = await prisma.class.create({ 
     data: {
       ...restData,
-      ownerCoachId: resolvedOwnerCoachId,
-      sports: { connect: sportIds.map((id: string) => ({ id })) },
-    },
-    include: classInclude,
+      sports: { connect: sportIds.map((id: string) => ({ id })) }
+    }, 
+    include: classInclude 
   });
-
-  // Coach sở hữu khóa học luôn là HLV chính của khóa đó (nếu khóa chưa có HLV chính).
-  if (resolvedOwnerCoachId) {
-    const existingPrimary = await prisma.classMember.findFirst({
-      where: { classId: newClass.id, isPrimary: true },
-    });
-    await prisma.classMember.upsert({
-      where: { classId_coachId: { classId: newClass.id, coachId: resolvedOwnerCoachId } },
-      update: {},
-      create: { classId: newClass.id, coachId: resolvedOwnerCoachId, isPrimary: !existingPrimary },
-    });
-  }
 
   // Broadcast NEW_CLASS notification to all active members — fire-and-forget
   prisma.memberProfile.findMany({
@@ -137,19 +73,16 @@ export async function createClass(data: any, actor: { id: string; role: string }
     const userIds = members.map((m) => m.userId);
     const typeLabel = newClass.classType === "PREMIUM" ? "Premium" : "Thường";
     const sportNames = sports.map(s => s.name).join(", ");
-    const priceLabel = Number(newClass.price) > 0
-      ? ` Giá khóa học: ${Number(newClass.price).toLocaleString("vi-VN")}đ.`
-      : " Khóa học miễn phí.";
     return broadcastNotification(
       userIds,
       "NEW_CLASS",
-      `Khóa học mới: ${newClass.name}`,
-      `Khóa học "${newClass.name}" (${sportNames} - ${typeLabel}) vừa được mở.${priceLabel} Mua khóa học để đặt lịch ngay!`,
-      { metadata: { classId: newClass.id, sportIds, price: Number(newClass.price) } }
+      `Lớp học mới: ${newClass.name}`,
+      `Lớp "${newClass.name}" (${sportNames} - ${typeLabel}) vừa được mở. Đặt chỗ ngay trước khi hết!`,
+      { metadata: { classId: newClass.id, sportIds } }
     );
   }).catch(() => {});
 
-  return getClassById(newClass.id);
+  return newClass;
 }
 
 
@@ -170,18 +103,9 @@ export async function getClassById(id: string) {
   return cls;
 }
 
-export async function updateClass(id: string, data: any, actor: { id: string; role: string }) {
+export async function updateClass(id: string, data: any) {
   const cls = await prisma.class.findUnique({ where: { id }, include: { sports: true } });
   if (!cls) throw new AppError("Class not found", 404);
-
-  // COACH chỉ sửa được khóa học của chính mình; chỉ MANAGER được đổi chủ sở hữu.
-  await assertCanManageClass(cls, actor);
-  if (actor.role !== "MANAGER" && data.ownerCoachId !== undefined) {
-    throw new AppError("Only a MANAGER can change the course owner", 403);
-  }
-  if (data.ownerCoachId) {
-    await findAssignableCoach(data.ownerCoachId);
-  }
 
   if (data.isActive === false && cls.isActive === true) {
     const upcoming = await prisma.classSchedule.count({
@@ -354,13 +278,10 @@ export async function assignCoach(classId: string, coachId: string, isPrimary: b
  * - 409: HLV đang là HLV chính của Class, hoặc trùng lịch với buổi SCHEDULED sắp tới.
  * Idempotent: HLV đã là HLV hỗ trợ thì trả về chi tiết Class và không gửi lại thông báo.
  */
-export async function assignSupportCoach(classId: string, coachId: string, actor: { id: string; role: string }) {
+export async function assignSupportCoach(classId: string, coachId: string) {
   const cls = await prisma.class.findUnique({ where: { id: classId } });
   if (!cls) throw new AppError("Class not found", 404);
   if (!cls.isActive) throw new AppError("Class is inactive", 400);
-
-  // MANAGER toàn quyền; COACH chỉ thêm HLV hỗ trợ cho khóa học của chính mình.
-  await assertCanManageClass(cls, actor);
 
   const coach = await findAssignableCoach(coachId);
 
@@ -388,21 +309,13 @@ export async function assignSupportCoach(classId: string, coachId: string, actor
   return getClassById(classId);
 }
 
-export async function removeCoach(classId: string, coachId: string, actor: { id: string; role: string }) {
+export async function removeCoach(classId: string, coachId: string) {
   const cm = await prisma.classMember.findUnique({
     where: { classId_coachId: { classId, coachId } },
     include: { class: true, coach: { include: { user: true } } }
   });
   if (!cm) throw new AppError("Coach assignment not found", 404);
-
-  // MANAGER toàn quyền; COACH chỉ thao tác trên khóa học của chính mình.
-  await assertCanManageClass(cm.class, actor);
-
-  // COACH chỉ được gỡ HLV HỖ TRỢ; đổi HLV chính phải do MANAGER thực hiện.
-  if (actor.role === "COACH" && cm.isPrimary) {
-    throw new AppError("Coaches cannot remove the primary coach; ask a MANAGER to reassign roles", 403);
-  }
-
+  
   await prisma.classMember.delete({ where: { classId_coachId: { classId, coachId } } });
   
   await notifyCoachChange(classId, cm.class.name, cm.coach.user.fullName, "REMOVED", cm.isPrimary);
@@ -410,24 +323,272 @@ export async function removeCoach(classId: string, coachId: string, actor: { id:
   return getClassById(classId);
 }
 
-export async function deleteClass(id: string, actor: { id: string; role: string }) {
+export async function deleteClass(id: string) {
   const cls = await prisma.class.findUnique({ where: { id } });
   if (!cls) throw new AppError("Class not found", 404);
-
-  // COACH chỉ được ngừng bán khóa học của chính mình.
-  await assertCanManageClass(cls, actor);
-
   const upcoming = await prisma.classSchedule.count({
     where: { classId: id, status: "SCHEDULED", startTime: { gte: new Date() } },
   });
   if (upcoming > 0) throw new AppError("Cannot deactivate class with upcoming schedules", 400);
-
-  // Không ngừng bán khóa học khi vẫn còn member đang sở hữu (ACTIVE) — tránh mất quyền đặt lịch giữa chừng.
-  const activePurchases = await prisma.coursePurchase.count({
-    where: { classId: id, status: "ACTIVE" },
-  });
-  if (activePurchases > 0)
-    throw new AppError("Cannot deactivate class with active course purchases", 400);
-
   return prisma.class.update({ where: { id }, data: { isActive: false } });
+}
+
+// ─────────────────────────────────────────
+// COURSE PLAN (gom lịch trình của Class thành 1 "khóa học")
+// ─────────────────────────────────────────
+
+const VN_TIME_ZONE = "Asia/Ho_Chi_Minh";
+/** Thứ 2..Chủ nhật theo ISO 1..7. */
+const WEEKDAY_LABELS_VI = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"];
+
+const vnWeekdayFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: VN_TIME_ZONE,
+  weekday: "short",
+});
+const vnClockFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: VN_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+const VN_WEEKDAY_TO_ISO: Record<string, number> = {
+  Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7,
+};
+
+/** Thứ trong tuần (ISO 1..7) theo giờ Việt Nam. */
+function vnWeekdayIso(date: Date): number {
+  return VN_WEEKDAY_TO_ISO[vnWeekdayFormatter.format(date).slice(0, 3)] ?? 1;
+}
+
+/** Giờ HH:mm theo giờ Việt Nam (không phụ thuộc timezone của server). */
+function vnClock(date: Date): string {
+  return vnClockFormatter.format(date);
+}
+
+function vnWeekdayLabel(iso: number): string {
+  return WEEKDAY_LABELS_VI[iso - 1] ?? `Thứ ${iso + 1}`;
+}
+
+type CourseSlot = {
+  weekday: number;
+  weekdayLabel: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  roomId: string;
+  roomName: string;
+  sessionCount: number;
+  firstSessionStart: Date;
+  lastSessionStart: Date;
+  sessionIds: string[];
+};
+
+/**
+ * GET /classes/:id/course-plan — "nguyên cái lịch trình" của Class dưới dạng MỘT khóa học.
+ *
+ * Trả về:
+ * - `course.slots[]`: các khung lịch lặp lại (Thứ + giờ + phòng) để FE hiển thị kiểu
+ *   "Thứ 2 · 18:00–19:30 · Phòng Yoga" thay vì liệt kê từng buổi rời rạc.
+ * - `course`: tổng số buổi, buổi đầu/cuối, các thứ, các phòng, độ khả dụng (còn chỗ ít nhất).
+ * - `sessions[]`: từng buổi (đã có nhãn thứ/giờ VN) + sức chứa còn lại + trạng thái đặt của member.
+ * - `registration` (chỉ khi caller là MEMBER): điều kiện đăng ký trọn khóa theo đúng bộ luật
+ *   all-or-nothing dùng chung với `POST /enrollments/bulk` (blockers + gói tập + quota + penalty).
+ */
+export async function getClassCoursePlan(
+  classId: string,
+  actor?: { id: string; role: string }
+) {
+  const now = new Date();
+
+  const cls = await prisma.class.findUnique({
+    where: { id: classId },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      classType: true,
+      areaType: true,
+      capacity: true,
+      isActive: true,
+      sports: { select: { id: true, name: true } },
+    },
+  });
+  if (!cls) throw new AppError("Class not found", 404);
+
+  // Khóa học = toàn bộ buổi SCHEDULED chưa bắt đầu, sắp theo thời gian.
+  const schedules = await prisma.classSchedule.findMany({
+    where: { classId, status: "SCHEDULED", startTime: { gt: now } },
+    orderBy: { startTime: "asc" },
+    select: {
+      id: true,
+      startTime: true,
+      endTime: true,
+      status: true,
+      roomId: true,
+      room: { select: { id: true, name: true, areaType: true } },
+      _count: {
+        select: {
+          enrollments: { where: { status: { in: ["BOOKED", "COMPLETED"] } } },
+        },
+      },
+    },
+  });
+
+  const memberProfile =
+    actor?.role === "MEMBER"
+      ? await prisma.memberProfile.findUnique({
+          where: { userId: actor.id },
+          select: { id: true },
+        })
+      : null;
+
+  // Preview điều kiện đăng ký trọn khóa — cùng nguồn luật với POST /enrollments/bulk.
+  const eligibility = memberProfile
+    ? await evaluateCourseEligibility(
+        prisma,
+        memberProfile.id,
+        { id: cls.id, classType: cls.classType, capacity: cls.capacity },
+        schedules.map((s) => ({
+          id: s.id,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          roomId: s.roomId,
+          room: { id: s.room.id, name: s.room.name },
+        }))
+      )
+    : null;
+  const eligibilityBySchedule = new Map(
+    (eligibility?.sessions ?? []).map((s) => [s.scheduleId, s])
+  );
+
+  const sessions = schedules.map((s) => {
+    const state = eligibilityBySchedule.get(s.id);
+    const bookedCount = state?.bookedCount ?? s._count.enrollments;
+    const remainingSlots = Math.max(0, cls.capacity - bookedCount);
+    const isFull = remainingSlots === 0;
+    const myEnrollmentStatus = state?.myEnrollment?.status ?? null;
+    const alreadyRegistered =
+      myEnrollmentStatus === "BOOKED" || myEnrollmentStatus === "COMPLETED";
+    const weekday = vnWeekdayIso(s.startTime);
+
+    return {
+      id: s.id,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      durationMinutes: Math.round((s.endTime.getTime() - s.startTime.getTime()) / 60000),
+      weekday,
+      weekdayLabel: vnWeekdayLabel(weekday),
+      timeLabel: `${vnClock(s.startTime)} – ${vnClock(s.endTime)}`,
+      status: s.status,
+      room: { id: s.room.id, name: s.room.name, areaType: s.room.areaType },
+      bookedCount,
+      remainingSlots,
+      isFull,
+      isBookable: !isFull,
+      canBook: !isFull && !alreadyRegistered,
+      myEnrollmentId: state?.myEnrollment?.id ?? null,
+      myEnrollmentStatus,
+      conflictWith: state?.conflictWith ?? null,
+    };
+  });
+
+  // Gom các buổi lặp lại cùng (thứ + giờ bắt đầu/kết thúc + phòng) thành 1 khung lịch.
+  const slotMap = new Map<string, CourseSlot>();
+  for (const session of sessions) {
+    const key = `${session.weekday}|${vnClock(session.startTime)}|${vnClock(session.endTime)}|${session.room.id}`;
+    const existing = slotMap.get(key);
+    if (existing) {
+      existing.sessionCount += 1;
+      existing.lastSessionStart = session.startTime;
+      existing.sessionIds.push(session.id);
+      continue;
+    }
+    slotMap.set(key, {
+      weekday: session.weekday,
+      weekdayLabel: session.weekdayLabel,
+      startTime: vnClock(session.startTime),
+      endTime: vnClock(session.endTime),
+      durationMinutes: session.durationMinutes,
+      roomId: session.room.id,
+      roomName: session.room.name,
+      sessionCount: 1,
+      firstSessionStart: session.startTime,
+      lastSessionStart: session.startTime,
+      sessionIds: [session.id],
+    });
+  }
+
+  const slots = [...slotMap.values()].sort(
+    (a, b) =>
+      a.weekday - b.weekday ||
+      a.startTime.localeCompare(b.startTime) ||
+      a.roomName.localeCompare(b.roomName)
+  );
+  const weekdays = [...new Set(sessions.map((s) => s.weekday))].sort((a, b) => a - b);
+  const rooms = [
+    ...new Map(
+      sessions.map((s) => [s.room.id, { id: s.room.id, name: s.room.name, areaType: s.room.areaType }])
+    ).values(),
+  ];
+
+  const registeredCount = sessions.filter(
+    (s) => s.myEnrollmentStatus === "BOOKED" || s.myEnrollmentStatus === "COMPLETED"
+  ).length;
+
+  const firstSession = sessions[0];
+  const lastSession = sessions[sessions.length - 1];
+
+  return {
+    course:
+      sessions.length === 0
+        ? null
+        : {
+            classId: cls.id,
+            className: cls.name,
+            description: cls.description,
+            classType: cls.classType,
+            areaType: cls.areaType,
+            capacity: cls.capacity,
+            sports: cls.sports,
+            totalSessions: sessions.length,
+            firstSessionStart: firstSession.startTime,
+            lastSessionStart: lastSession.startTime,
+            lastSessionEnd: lastSession.endTime,
+            weekdays,
+            weekdayLabels: weekdays.map(vnWeekdayLabel),
+            timeSlots: [
+              ...new Map(
+                slots.map((slot) => [
+                  `${slot.startTime}-${slot.endTime}`,
+                  {
+                    startTime: slot.startTime,
+                    endTime: slot.endTime,
+                    durationMinutes: slot.durationMinutes,
+                  },
+                ])
+              ).values(),
+            ],
+            rooms,
+            slots,
+            availability: {
+              minRemainingSlots:
+                sessions.length === 0 ? 0 : Math.min(...sessions.map((s) => s.remainingSlots)),
+              fullSessionCount: sessions.filter((s) => s.isFull).length,
+              isFullyBookable: sessions.every((s) => s.isBookable),
+            },
+          },
+    sessions,
+    registration: memberProfile
+      ? {
+          eligible: (eligibility?.blockers.length ?? 0) === 0,
+          blockers: eligibility?.blockers ?? [],
+          subscription: eligibility?.subscription ?? null,
+          quota: eligibility?.quota ?? null,
+          penalty: eligibility?.penalty ?? null,
+          registeredSessions: registeredCount,
+          remainingSessionsToRegister: sessions.length - registeredCount,
+          isFullyRegistered: sessions.length > 0 && registeredCount === sessions.length,
+        }
+      : null,
+  };
 }

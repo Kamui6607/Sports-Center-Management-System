@@ -32,6 +32,11 @@ export const labels: Record<string, string> = {
   description: "Mô tả",
   capacity: "Sức chứa",
   location: "Vị trí",
+  areaType: "Khu vực tập",
+  areaTypes: "Loại khu vực",
+  POOL: "Hồ bơi",
+  INDOOR: "Trong nhà",
+  OUTDOOR: "Ngoài trời",
   price: "Giá gói (VNĐ)",
   durationDays: "Thời hạn (ngày)",
   tier: "Hạng thành viên",
@@ -65,6 +70,11 @@ export const labels: Record<string, string> = {
   endDate: "Đến ngày",
   startAfter: "Bắt đầu sau",
   startBefore: "Bắt đầu trước",
+  from: "Khoảng thời gian từ",
+  to: "Khoảng thời gian đến",
+  weekday: "Thứ trong tuần",
+  weekdays: "Các thứ (2–8, cách nhau bằng dấu phẩy)",
+  maxConcurrentClasses: "Số lớp song song tối đa",
   currentPassword: "Mật khẩu hiện tại",
   newPassword: "Mật khẩu mới",
   MEMBER: "Hội viên",
@@ -151,6 +161,14 @@ export const money = (v: unknown) =>
       }).format(Number(v));
 export function at(row: unknown, path: string): unknown {
   if (path === "sportsLabel") return sportNames(row);
+  if (path === "areaTypesLabel") {
+    const areaTypes = row && typeof row === "object"
+      ? (row as Record<string, unknown>).areaTypes
+      : undefined;
+    return Array.isArray(areaTypes)
+      ? areaTypes.map((value) => label(String(value))).join(", ")
+      : areaTypes;
+  }
   return path
     .split(".")
     .reduce<unknown>(

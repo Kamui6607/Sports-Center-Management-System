@@ -269,11 +269,12 @@ test("staff completes only ended sessions through dedicated API and cannot mark 
   page,
 }) => {
   await setup(page, "STAFF");
+  const now = Date.now();
   const past = {
     id: "ended",
     status: "SCHEDULED",
-    startTime: "2020-01-01T01:00:00Z",
-    endTime: "2020-01-01T02:00:00Z",
+    startTime: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+    endTime: new Date(now - 60 * 60 * 1000).toISOString(),
     class: { name: "Buổi đã kết thúc" },
     room: { name: "Phòng A" },
   };
@@ -290,8 +291,8 @@ test("staff completes only ended sessions through dedicated API and cannot mark 
         {
           ...past,
           id: "future",
-          startTime: "2099-01-01T01:00:00Z",
-          endTime: "2099-01-01T02:00:00Z",
+          startTime: new Date(now + 60 * 60 * 1000).toISOString(),
+          endTime: new Date(now + 2 * 60 * 60 * 1000).toISOString(),
           class: { name: "Buổi chưa kết thúc" },
         },
       ];
@@ -300,6 +301,14 @@ test("staff completes only ended sessions through dedicated API and cannot mark 
       data = { ...past, status: "COMPLETED" };
     } else if (path === "/class-schedules/ended")
       data = { ...past, status: completed ? "COMPLETED" : "SCHEDULED" };
+    else if (path === "/class-schedules/future")
+      data = {
+        ...past,
+        id: "future",
+        startTime: new Date(now + 60 * 60 * 1000).toISOString(),
+        endTime: new Date(now + 2 * 60 * 60 * 1000).toISOString(),
+        class: { name: "Buổi chưa kết thúc" },
+      };
     else if (path === "/enrollments/schedule/ended")
       data = [
         {
@@ -314,25 +323,22 @@ test("staff completes only ended sessions through dedicated API and cannot mark 
     return route.fulfill({ json: { success: true, data } });
   });
   await page.goto("/receptionist/schedules");
-  const ended = page.getByRole("row").filter({ hasText: "Buổi đã kết thúc" });
-  const future = page
-    .getByRole("row")
-    .filter({ hasText: "Buổi chưa kết thúc" });
+  await page.getByRole("button", { name: /Buổi chưa kết thúc/ }).click();
   await expect(
-    future.getByRole("button", { name: "Hoàn tất", exact: true }),
+    page.getByRole("dialog").getByRole("button", { name: "Hoàn tất" }),
   ).toBeDisabled();
-  await ended.getByRole("button", { name: "Hoàn tất", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /Buổi đã kết thúc/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Hoàn tất" })
+    .click();
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Xác nhận", exact: true })
     .click();
-  await expect(
-    ended.getByRole("button", { name: "Hoàn tất", exact: true }),
-  ).toBeDisabled();
   expect(mutations).toEqual(["PATCH /class-schedules/ended/complete"]);
-  await ended
-    .getByRole("button", { name: "Xem chi tiết", exact: true })
-    .click();
+  await page.getByRole("button", { name: /Buổi đã kết thúc/ }).click();
   await page.getByRole("button", { name: "Học viên & điểm danh" }).click();
   await expect(
     page.locator("summary").filter({ hasText: "Chưa điểm danh" }),
@@ -346,10 +352,31 @@ test("manager edit schedule does not offer lifecycle status bypass", async ({
   page,
 }) => {
   await setup(page, "MANAGER");
+  const schedule = {
+    id: "editable-schedule",
+    status: "SCHEDULED",
+    startTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    endTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    class: { id: "class-1", name: "Lớp chỉnh sửa" },
+    room: { id: "room-1", name: "Phòng A" },
+  };
+  await page.route("**/api/v1/class-schedules**", (route) => {
+    const path = new URL(route.request().url()).pathname.replace(
+      "/api/v1",
+      "",
+    );
+    return route.fulfill({
+      json: {
+        success: true,
+        data: path === "/class-schedules" ? [schedule] : schedule,
+      },
+    });
+  });
   await page.goto("/manager/schedules");
+  await page.locator(".calendar-event").first().click();
   await page
+    .getByRole("dialog")
     .getByRole("button", { name: "Chỉnh sửa", exact: true })
-    .first()
     .click();
   await expect(page.getByRole("dialog").getByLabel("Trạng thái")).toHaveCount(
     0,

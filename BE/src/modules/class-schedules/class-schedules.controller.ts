@@ -14,6 +14,15 @@ export async function createSchedule(req: Request, res: Response, next: NextFunc
     sendCreated(res, schedule, "Schedule created successfully");
   } catch (err) { next(err); }
 }
+export async function createActivityPlan(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await schedulesService.createActivityPlan(
+      req.body,
+      req.user?.role === "MANAGER",
+    );
+    sendCreated(res, result, "Activity plan created successfully");
+  } catch (err) { next(err); }
+}
 export async function getScheduleById(req: Request, res: Response, next: NextFunction) {
   try {
     const schedule = await schedulesService.getScheduleById(req.params.id as string);

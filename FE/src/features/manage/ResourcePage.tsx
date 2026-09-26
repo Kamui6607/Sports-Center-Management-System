@@ -10,6 +10,8 @@ import {
   RefreshCw,
   Trash2,
   UserPlus,
+  UsersRound,
+  Repeat2,
 } from "lucide-react";
 import { api, contract } from "../../shared/api";
 import { canCompleteSchedule } from "../../shared/businessRules";
@@ -18,6 +20,11 @@ import { allPages } from "../../shared/pagedApi";
 import { TrainingPlans } from "../../shared/TrainingPlans";
 import type { RecordData } from "../../shared/api";
 import type { Resource } from "./config";
+import {
+  ScheduleCalendar,
+  calendarRange,
+  type ScheduleCalendarView,
+} from "./ScheduleCalendar";
 import { at, display, money } from "../../shared/config";
 import { useDebouncedValue } from "../../shared/useDebouncedValue";
 import {
@@ -49,23 +56,34 @@ export function ResourcePage({
   const [notice, setNotice] = useState("");
   const [bError, setBError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [calendarView, setCalendarView] = useState<ScheduleCalendarView>("week");
+  const [calendarCursor, setCalendarCursor] = useState(() => new Date());
   const listKey = "GET " + r.path;
   const params = contract[listKey].parameters.filter((p) => p.in === "query");
   const paginated = params.some((p) => p.name === "page");
-  const filters = params.filter(
-    (p) =>
-      !["page", "limit"].includes(p.name) && !(p.name === "role" && r.role),
-  );
+  const filters = params.filter((p) => {
+    if (["page", "limit"].includes(p.name) || (p.name === "role" && r.role)) return false;
+    if (r.slug === "schedules" && ["date", "startAfter", "startBefore", "from", "to", "weekday", "weekdays"].includes(p.name)) return false;
+    return true;
+  });
+  const visibleCalendarRange = calendarRange(calendarCursor, calendarView);
   const requestQuery = {
     ...query,
     ...(query.search !== undefined ? { search } : {}),
     ...(r.slug === "staff" ? { role: "STAFF" } : {}),
-    ...(paginated ? { page: String(page), limit: "10" } : {}),
+    ...(r.slug === "schedules"
+      ? {
+          from: visibleCalendarRange.start.toISOString(),
+          to: visibleCalendarRange.end.toISOString(),
+        }
+      : paginated ? { page: String(page), limit: "10" } : {}),
   };
   const q = useQuery({
     queryKey: ["resource", r.slug, requestQuery],
-    queryFn: ({ signal }) =>
-      api<RecordData[]>(listKey, { query: requestQuery, signal }),
+    queryFn: ({ signal }) => r.slug === "schedules"
+      ? allPages<RecordData>(listKey, { query: requestQuery, signal })
+      : api<RecordData[]>(listKey, { query: requestQuery, signal }),
   });
   const create = "POST " + (r.create || r.path);
   const update = "PATCH " + r.path + "/{id}";
@@ -86,12 +104,20 @@ export function ResourcePage({
     setBusy(true);
     setBError(undefined);
     try {
-      await api(
-        modal?.kind === "complete"
-          ? "PATCH /class-schedules/{id}/complete"
-          : remove,
-        { params: { id: String(modal!.row!.id) } },
-      );
+      if (modal?.kind === "complete")
+        await api("PATCH /class-schedules/{id}/complete", {
+          params: { id: String(modal.row!.id) },
+        });
+      else if (r.slug === "schedules")
+        await api("PATCH /class-schedules/{id}", {
+          params: { id: String(modal!.row!.id) },
+          body: {
+            status: "CANCELLED",
+            ...(cancelReason.trim() ? { reason: cancelReason.trim() } : {}),
+          },
+        });
+      else
+        await api(remove, { params: { id: String(modal!.row!.id) } });
       done();
     } catch (e) {
       setBError(e);
@@ -128,9 +154,11 @@ export function ResourcePage({
       <section className="panel">
         <div className="panel-heading">
           <div>
-            <h2>Danh sách {r.title.toLowerCase()}</h2>
+            <h2>{r.slug === "schedules" ? "Thời khóa biểu" : `Danh sách ${r.title.toLowerCase()}`}</h2>
             <p>
-              {q.data?.pagination
+              {r.slug === "schedules"
+                ? `${q.data?.data.length || 0} buổi trong khoảng đang xem`
+                : q.data?.pagination
                 ? `${q.data.pagination.total} kết quả`
                 : "Dữ liệu trung tâm"}
             </p>
@@ -162,10 +190,22 @@ export function ResourcePage({
           <Loading />
         ) : q.isError ? (
           <ErrorState error={q.error} retry={() => q.refetch()} />
-        ) : !q.data.data.length ? (
+        ) : !q.data.data.length && r.slug !== "schedules" ? (
           <Empty
             text="Không tìm thấy kết quả"
             detail="Thử thay đổi bộ lọc hoặc thêm dữ liệu mới."
+          />
+        ) : r.slug === "schedules" ? (
+          <ScheduleCalendar
+            rows={q.data.data}
+            cursor={calendarCursor}
+            view={calendarView}
+            onCursorChange={setCalendarCursor}
+            onViewChange={setCalendarView}
+            onSelect={(row) => {
+              setDetailTab("overview");
+              setModal({ kind: "detail", row });
+            }}
           />
         ) : (
           <div
@@ -265,6 +305,18 @@ export function ResourcePage({
                             <UserPlus size={17} />
                           </button>
                         )}
+                        {r.slug === "classes" && (
+                          <button
+                            aria-label="Phân công huấn luyện viên hỗ trợ"
+                            title="Phân công huấn luyện viên hỗ trợ"
+                            className="icon-button"
+                            onClick={() =>
+                              setModal({ kind: "assignSupport", row })
+                            }
+                          >
+                            <UsersRound size={17} />
+                          </button>
+                        )}
                         {r.slug === "schedules" && (
                           <button
                             className="button small"
@@ -275,6 +327,16 @@ export function ResourcePage({
                             }}
                           >
                             Hoàn tất
+                          </button>
+                        )}
+                        {r.slug === "rooms" && row.isActive !== false && (
+                          <button
+                            aria-label="Chuyển lịch sang phòng khác"
+                            title="Chuyển lịch sang phòng khác"
+                            className="icon-button"
+                            onClick={() => setModal({ kind: "transferRoom", row })}
+                          >
+                            <Repeat2 size={17} />
                           </button>
                         )}
                         {contract[remove] && (
@@ -298,6 +360,7 @@ export function ResourcePage({
                             }
                             onClick={() => {
                               setBError(undefined);
+                              setCancelReason("");
                               setModal({ kind: "delete", row });
                             }}
                           >
@@ -367,6 +430,10 @@ export function ResourcePage({
                 ? "Thêm " + r.title.toLowerCase()
                 : modal.kind === "assign"
                   ? "Phân công huấn luyện viên"
+                  : modal.kind === "assignSupport"
+                    ? "Phân công huấn luyện viên hỗ trợ"
+                    : modal.kind === "transferRoom"
+                      ? "Chuyển lịch sang phòng khác"
                   : modal.kind === "edit"
                     ? "Chỉnh sửa thông tin"
                     : modal.kind === "delete"
@@ -379,13 +446,22 @@ export function ResourcePage({
             if (!busy) setModal(null);
           }}
         >
-          {["create", "edit", "assign"].includes(modal.kind) ? (
+          {modal.kind === "transferRoom" ? (
+            <RoomScheduleTransfer
+              source={modal.row!}
+              onDone={done}
+              onCancel={() => setModal(null)}
+              onBusyChange={setBusy}
+            />
+          ) : ["create", "edit", "assign", "assignSupport"].includes(modal.kind) ? (
             <SchemaForm
               operation={
                 modal.kind === "create"
                   ? create
                   : modal.kind === "assign"
                     ? "POST /classes/{id}/coaches"
+                    : modal.kind === "assignSupport"
+                      ? "POST /classes/{id}/coaches/support"
                     : update
               }
               params={{ id: String(modal.row?.id) }}
@@ -421,6 +497,17 @@ export function ResourcePage({
                     : "Bản ghi sẽ được ngừng hoạt động và được lưu lại trong hệ thống."}{" "}
                 Bạn có muốn tiếp tục?
               </p>
+              {r.slug === "schedules" && modal.kind === "delete" && (
+                <label>
+                  Lý do hủy lịch (tối đa 500 ký tự)
+                  <textarea
+                    maxLength={500}
+                    value={cancelReason}
+                    onChange={(event) => setCancelReason(event.target.value)}
+                    placeholder="Ví dụ: Huấn luyện viên nghỉ đột xuất"
+                  />
+                </label>
+              )}
               {bError != null && <ErrorState error={bError} />}
               <div className="modal-footer">
                 <button
@@ -476,6 +563,38 @@ export function ResourcePage({
                 </div>
               )}
               {detailTab === "overview" && <Details value={detail.data.data} />}
+              {detailTab === "overview" && r.slug === "schedules" && (
+                <div className="modal-footer schedule-detail-actions">
+                  <button
+                    className="button"
+                    disabled={modal.row?.status !== "SCHEDULED"}
+                    onClick={() => setModal({ kind: "edit", row: modal.row })}
+                  >
+                    <Pencil size={16} /> Chỉnh sửa
+                  </button>
+                  <button
+                    className="button"
+                    disabled={!canCompleteSchedule(modal.row || {})}
+                    onClick={() => {
+                      setBError(undefined);
+                      setModal({ kind: "complete", row: modal.row });
+                    }}
+                  >
+                    Hoàn tất
+                  </button>
+                  <button
+                    className="button danger"
+                    disabled={modal.row?.status !== "SCHEDULED"}
+                    onClick={() => {
+                      setBError(undefined);
+                      setCancelReason("");
+                      setModal({ kind: "delete", row: modal.row });
+                    }}
+                  >
+                    <Trash2 size={16} /> Hủy lịch
+                  </button>
+                </div>
+              )}
               {detailTab === "related" &&
                 r.slug === "coaches" &&
                 Boolean(at(detail.data.data, "coachProfile.id")) && (
@@ -519,6 +638,113 @@ export function ResourcePage({
         </Modal>
       )}
     </>
+  );
+}
+function RoomScheduleTransfer({
+  source,
+  onDone,
+  onCancel,
+  onBusyChange,
+}: {
+  source: RecordData;
+  onDone: () => void;
+  onCancel: () => void;
+  onBusyChange: (busy: boolean) => void;
+}) {
+  const [targetRoomId, setTargetRoomId] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [reason, setReason] = useState("");
+  const [preview, setPreview] = useState<RecordData>();
+  const [error, setError] = useState<unknown>();
+  const [busy, setBusy] = useState(false);
+  const rooms = useQuery({
+    queryKey: ["transfer-target-rooms", source.id],
+    queryFn: ({ signal }) =>
+      allPages<RecordData>("GET /rooms", {
+        query: { isActive: "true" },
+        signal,
+      }),
+  });
+  const body = () => ({
+    targetRoomId,
+    ...(from ? { from: new Date(from).toISOString() } : {}),
+    ...(to ? { to: new Date(to).toISOString() } : {}),
+    ...(reason.trim() ? { reason: reason.trim() } : {}),
+  });
+  async function run(commit: boolean) {
+    setBusy(true);
+    onBusyChange(true);
+    setError(undefined);
+    try {
+      const result = await api<RecordData>(
+        commit
+          ? "POST /rooms/{roomId}/transfer-schedules"
+          : "POST /rooms/{roomId}/transfer-schedules/preview",
+        { params: { roomId: String(source.id) }, body: body() },
+      );
+      if (commit) onDone();
+      else setPreview(result.data);
+    } catch (caught) {
+      setError(caught);
+    } finally {
+      setBusy(false);
+      onBusyChange(false);
+    }
+  }
+  const conflicts = Array.isArray(preview?.conflicts)
+    ? (preview.conflicts as RecordData[])
+    : [];
+  return (
+    <div>
+      <p className="confirm-copy">
+        Xem trước toàn bộ lịch bị ảnh hưởng. Chỉ có thể xác nhận khi tất cả lịch
+        hợp lệ; máy chủ sẽ chuyển nguyên tử, không chuyển một phần.
+      </p>
+      {rooms.isPending ? (
+        <Loading />
+      ) : rooms.isError ? (
+        <ErrorState error={rooms.error} retry={() => rooms.refetch()} />
+      ) : (
+        <fieldset className="form-grid" disabled={busy}>
+          <label>
+            Phòng đích <b className="required">*</b>
+            <select value={targetRoomId} onChange={(event) => { setTargetRoomId(event.target.value); setPreview(undefined); }}>
+              <option value="">Chọn phòng đang hoạt động</option>
+              {rooms.data.data
+                .filter((room) => room.id !== source.id)
+                .map((room) => (
+                  <option key={String(room.id)} value={String(room.id)}>
+                    {display(room.name)} · {display(room.areaType)} · {display(room.capacity)} chỗ
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>Từ thời điểm<input type="datetime-local" value={from} onChange={(event) => { setFrom(event.target.value); setPreview(undefined); }} /></label>
+          <label>Đến thời điểm<input type="datetime-local" min={from} value={to} onChange={(event) => { setTo(event.target.value); setPreview(undefined); }} /></label>
+          <label className="wide">Lý do<textarea maxLength={500} value={reason} onChange={(event) => { setReason(event.target.value); setPreview(undefined); }} placeholder="Ví dụ: Phòng đang bảo trì" /></label>
+        </fieldset>
+      )}
+      {preview && (
+        <section className="detail-section" role="status">
+          <h3>Kết quả xem trước</h3>
+          <p>
+            Tổng {display(preview.totalSchedules)} lịch · hợp lệ {display(preview.validSchedules)} · không hợp lệ {display(preview.invalidSchedules)}
+          </p>
+          {conflicts.map((conflict, index) => (
+            <p className="error" key={String(conflict.scheduleId || index)}>
+              {display(conflict.startTime)} · {display(conflict.reason)}
+            </p>
+          ))}
+        </section>
+      )}
+      {error != null && <ErrorState error={error} />}
+      <div className="modal-footer">
+        <button className="button" disabled={busy} onClick={onCancel}>Đóng</button>
+        <button className="button" disabled={!targetRoomId || busy || Boolean(to && from && to <= from)} onClick={() => void run(false)}>{busy ? "Đang kiểm tra…" : "Xem trước"}</button>
+        <button className="button primary" disabled={busy || preview?.canTransfer !== true} onClick={() => void run(true)}>Xác nhận chuyển lịch</button>
+      </div>
+    </div>
   );
 }
 function MemberStatus({ id }: { id: string }) {
@@ -612,7 +838,12 @@ function CoachAssignments({
         const coachId = String(at(c, "coach.id") || "");
         return (
           <div className="assignment" key={i}>
-            <span>{display(at(c, "coach.user.fullName"))}</span>
+            <span>
+              {display(at(c, "coach.user.fullName"))}{" "}
+              <small className="badge">
+                {c.isPrimary ? "HLV chính" : "HLV hỗ trợ"}
+              </small>
+            </span>
             {coachId ? (
               <button
                 className="button small"

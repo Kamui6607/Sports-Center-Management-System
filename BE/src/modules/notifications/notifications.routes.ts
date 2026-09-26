@@ -133,7 +133,7 @@ router.patch("/:id/read", authenticate, notificationsController.markRead);
 router.post(
   "/trigger-upcoming-reminders",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   notificationsController.triggerUpcomingReminders
 );
 

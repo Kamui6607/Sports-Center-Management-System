@@ -1,46 +1,59 @@
 import { Request, Response, NextFunction } from "express";
 import * as enrollmentsService from "./enrollments.service.js";
-import { sendSuccess, sendCreated, sendError } from "../../utils/response.js";
+import * as quotaService from "./enrollment-quota.service.js";
+import * as courseEnrollmentService from "./course-enrollment.service.js";
+import { sendSuccess, sendCreated } from "../../utils/response.js";
+import { AppError } from "../../middlewares/errorHandler.js";
 import { prisma } from "../../config/prisma.js";
+
+/**
+ * Resolve MemberProfile của người được đặt chỗ:
+ * - MEMBER  → chính mình;
+ * - MANAGER/STAFF → bắt buộc truyền memberId (nhận cả userId hoặc profileId);
+ * - COACH   → 403 (không đặt lớp thay hội viên).
+ */
+async function resolveMemberProfileId(req: Request, bodyMemberId?: string): Promise<string> {
+  const role = req.user!.role;
+
+  if (role === "MEMBER") {
+    const profile = await prisma.memberProfile.findUnique({ where: { userId: req.user!.id } });
+    if (!profile) throw new AppError("Member profile not found", 404);
+    return profile.id;
+  }
+
+  if (role === "MANAGER" || role === "STAFF") {
+    if (!bodyMemberId) throw new AppError("memberId is required for staff/manager booking", 400);
+    const profile = await prisma.memberProfile.findFirst({
+      where: { OR: [{ id: bodyMemberId }, { userId: bodyMemberId }] },
+    });
+    if (!profile) throw new AppError("Member not found", 404);
+    return profile.id;
+  }
+
+  throw new AppError("Forbidden: Coaches cannot book classes for members", 403);
+}
 
 export async function bookClass(req: Request, res: Response, next: NextFunction) {
   try {
     const { scheduleId, memberId: bodyMemberId } = req.body;
-    const role = req.user!.role;
-    let memberProfileId: string;
-
-    if (role === "MEMBER") {
-      // Find own MemberProfile
-      const profile = await prisma.memberProfile.findUnique({
-        where: { userId: req.user!.id },
-      });
-      if (!profile) {
-        sendError(res, "Member profile not found", 404);
-        return;
-      }
-      memberProfileId = profile.id;
-    } else if (role === "MANAGER") {
-      // MANAGER phải cung cấp memberId khi đặt hộ.
-      if (!bodyMemberId) {
-        sendError(res, "memberId is required when a MANAGER books for a member", 400);
-        return;
-      }
-      // Accept userId or profileId
-      const profile = await prisma.memberProfile.findFirst({
-        where: { OR: [{ id: bodyMemberId }, { userId: bodyMemberId }] },
-      });
-      if (!profile) {
-        sendError(res, "Member not found", 404);
-        return;
-      }
-      memberProfileId = profile.id;
-    } else {
-      sendError(res, "Forbidden: Coaches cannot book classes for members", 403);
-      return;
-    }
-
-    const enrollment = await enrollmentsService.bookClass(scheduleId, memberProfileId, role);
+    const memberProfileId = await resolveMemberProfileId(req, bodyMemberId);
+    const enrollment = await enrollmentsService.bookClass(scheduleId, memberProfileId, req.user!.role);
     sendCreated(res, enrollment, "Class booked successfully");
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /enrollments/bulk — đăng ký TRỌN KHÓA (tất cả buổi sắp diễn ra của Class).
+ * All-or-nothing: 1 buổi không đủ điều kiện ⇒ 409 kèm errors.details[] và KHÔNG tạo buổi nào.
+ */
+export async function enrollWholeCourse(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { classId, memberId: bodyMemberId } = req.body;
+    const memberProfileId = await resolveMemberProfileId(req, bodyMemberId);
+    const result = await courseEnrollmentService.enrollWholeCourse(classId, memberProfileId);
+    sendCreated(res, result, "Whole course enrolled successfully");
   } catch (err) {
     next(err);
   }
@@ -86,5 +99,16 @@ export async function getScheduleEnrollments(req: Request, res: Response, next: 
       req.query
     );
     sendSuccess(res, enrollments, "Schedule enrollments retrieved successfully", 200, pagination);
+  } catch (err) { next(err); }
+}
+
+/**
+ * Quota lớp học song song của CHÍNH member đang đăng nhập (không nhận memberId từ ngoài),
+ * nên không thể xem quota của member khác.
+ */
+export async function getMyQuota(req: Request, res: Response, next: NextFunction) {
+  try {
+    const quota = await quotaService.getMyConcurrentClassQuota(req.user!.id);
+    sendSuccess(res, quota, "Concurrent class quota retrieved successfully");
   } catch (err) { next(err); }
 }

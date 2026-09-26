@@ -1,7 +1,12 @@
-import { api, contract, clearSession, saveTokens } from "../shared/api";
+import {
+  api,
+  contract,
+  clearSession,
+  saveTokens,
+  getAccessToken,
+} from "../shared/api";
 export { ApiError, BASE_URL } from "../shared/api";
-export const getAccessToken = () =>
-  sessionStorage.getItem("pulse.access") || "";
+export { getAccessToken };
 export const getRefreshToken = () =>
   sessionStorage.getItem("pulse.refresh") || "";
 export const clearTokens = clearSession;

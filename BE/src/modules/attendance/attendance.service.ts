@@ -18,7 +18,7 @@ function assertCanSetExcused(status: unknown, user: any) {
 }
 
 async function verifyCoachAccess(scheduleId: string, user: any) {
-  if (user.role === "MANAGER") return true;
+  if (user.role === "MANAGER" || user.role === "STAFF") return true;
 
   const schedule = await prisma.classSchedule.findUnique({
     where: { id: scheduleId },
@@ -52,7 +52,7 @@ export const createAttendance = async (data: Prisma.AttendanceUncheckedCreateInp
 
 /**
  * §16: roster attendance.
- * - MANAGER: xem toàn bộ roster; COACH: chỉ roster lớp mình dạy; MEMBER: chỉ bản ghi của chính mình.
+ * - MANAGER / STAFF: xem toàn bộ roster (STAFF read-only — khớp UI tiếp nhận hiện có, mutations vẫn COACH/MANAGER).
  * - COACH: chỉ lớp mình phụ trách (403 nếu không).
  * - MEMBER: chỉ trả về bản ghi điểm danh của CHÍNH MÌNH (tương thích FE member hiện tại + không lộ roster).
  */
@@ -78,7 +78,7 @@ export const getAttendancesBySchedule = async (
       where: { scheduleId, memberId: memberProfile.id },
       include: { member: { include: { user: true } } },
     });
-  } else if (actor.role !== "MANAGER") {
+  } else if (actor.role !== "MANAGER" && actor.role !== "STAFF") {
     throw new AppError("Forbidden: bạn không có quyền xem điểm danh của buổi này", 403);
   }
 
@@ -277,21 +277,20 @@ export const scanQr = async (input: { qrToken?: string; code?: string }, user: a
     throw new AppError("Bạn chưa đặt chỗ cho lớp học này nên không thể điểm danh.", 403);
   }
 
-  // Chốt chặn 2: Member phải ĐANG SỞ HỮU khóa học tại thời điểm điểm danh (thay cho kiểm tra gói tập còn hạn).
+  // Chốt chặn 2: Kiểm tra lại gói tập còn hạn tại thời điểm điểm danh
   const now = new Date();
-  const activePurchase = await prisma.coursePurchase.findFirst({
+  const activeSub = await prisma.membershipSubscription.findFirst({
     where: {
       memberId: memberProfile.id,
-      classId: enrollment.classId,
       status: "ACTIVE",
       startDate: { lte: now },
-      OR: [{ endDate: null }, { endDate: { gte: now } }],
+      endDate: { gte: now },
     },
   });
 
-  if (!activePurchase) {
+  if (!activeSub) {
     throw new AppError(
-      "Khóa học của bạn đã hết hạn hoặc bạn chưa sở hữu khóa học này. Vui lòng mua lại khóa học để vào lớp.",
+      "Gói tập của bạn đã hết hạn. Vui lòng gia hạn để có thể vào lớp học.",
       403
     );
   }

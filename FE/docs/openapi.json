@@ -100,6 +100,20 @@
           }
         }
       },
+      "TooManyRequests": {
+        "description": "Too many attempts (rate limited) — e.g. nhập sai mã điểm danh dự phòng quá nhiều lần",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "example": {
+                "success": false,
+                "message": "Bạn đã nhập sai mã điểm danh quá nhiều lần. Vui lòng thử lại sau hoặc nhờ HLV điểm danh trực tiếp."
+              }
+            }
+          }
+        }
+      },
       "ServerError": {
         "description": "Unexpected internal server error",
         "content": {
@@ -405,7 +419,7 @@
         }
       },
       "MembershipStatusOk": {
-        "description": "Effective member tier and active subscription",
+        "description": "Effective member tier and active subscription. `effectiveTier` = tier của subscription ACTIVE (FREE | MEMBERSHIP | PREMIUM — FREE chỉ khi member thực sự có gói FREE ACTIVE). Khi member KHÔNG có subscription ACTIVE: `effectiveTier = null`, `activeSubscription = null`, `daysRemaining = null` — nhất quán với GET /enrollments/my/quota (không dùng \"FREE\" để đại diện).",
         "content": {
           "application/json": {
             "schema": {
@@ -424,6 +438,39 @@
                     }
                   },
                   "daysRemaining": 21
+                }
+              }
+            },
+            "examples": {
+              "withActiveSubscription": {
+                "summary": "Có gói ACTIVE → effectiveTier = tier của gói",
+                "value": {
+                  "success": true,
+                  "message": "Membership status retrieved successfully",
+                  "data": {
+                    "effectiveTier": "FREE",
+                    "activeSubscription": {
+                      "status": "ACTIVE",
+                      "endDate": "2036-09-20T00:00:00.000Z",
+                      "plan": {
+                        "name": "FREE",
+                        "tier": "FREE"
+                      }
+                    },
+                    "daysRemaining": 3650
+                  }
+                }
+              },
+              "noActiveSubscription": {
+                "summary": "Không có gói ACTIVE → effectiveTier = null (KHÔNG phải \"FREE\")",
+                "value": {
+                  "success": true,
+                  "message": "Membership status retrieved successfully",
+                  "data": {
+                    "effectiveTier": null,
+                    "activeSubscription": null,
+                    "daysRemaining": null
+                  }
                 }
               }
             }
@@ -523,6 +570,7 @@
                     "price": "300000",
                     "durationDays": 30,
                     "tier": "MEMBERSHIP",
+                    "maxConcurrentClasses": 3,
                     "isActive": true
                   }
                 ],
@@ -552,6 +600,7 @@
                   "price": "100000",
                   "durationDays": 7,
                   "tier": "MEMBERSHIP",
+                  "maxConcurrentClasses": 3,
                   "isActive": true
                 }
               }
@@ -574,6 +623,7 @@
                   "price": "300000",
                   "durationDays": 30,
                   "tier": "MEMBERSHIP",
+                  "maxConcurrentClasses": 3,
                   "isActive": true
                 }
               }
@@ -703,6 +753,9 @@
                     "id": "c3e1ef3e-0000-4000-8000-000000000001",
                     "name": "Yoga",
                     "description": "Yoga class improves flexibility",
+                    "areaTypes": [
+                      "INDOOR"
+                    ],
                     "isActive": true,
                     "_count": {
                       "classes": 2
@@ -733,6 +786,9 @@
                   "id": "c3e1ef3e-0000-4000-8000-000000000009",
                   "name": "Boxing",
                   "description": "Boxing classes",
+                  "areaTypes": [
+                    "INDOOR"
+                  ],
                   "isActive": true
                 }
               }
@@ -752,6 +808,9 @@
                 "data": {
                   "id": "c3e1ef3e-0000-4000-8000-000000000001",
                   "name": "Yoga",
+                  "areaTypes": [
+                    "INDOOR"
+                  ],
                   "isActive": true,
                   "classes": []
                 }
@@ -775,6 +834,7 @@
                     "name": "Yoga Room A",
                     "capacity": 20,
                     "location": "Floor 1",
+                    "areaType": "INDOOR",
                     "isActive": true
                   }
                 ],
@@ -802,6 +862,7 @@
                   "id": "c3e1ef3e-0000-4000-8000-000000000103",
                   "name": "Boxing Room",
                   "capacity": 12,
+                  "areaType": "INDOOR",
                   "isActive": true
                 }
               }
@@ -823,6 +884,7 @@
                   "name": "Yoga Room A",
                   "capacity": 20,
                   "location": "Floor 1",
+                  "areaType": "INDOOR",
                   "isActive": true
                 }
               }
@@ -851,6 +913,7 @@
                     ],
                     "capacity": 15,
                     "classType": "REGULAR",
+                    "areaType": "INDOOR",
                     "isActive": true,
                     "coaches": [
                       {
@@ -897,7 +960,8 @@
                     }
                   ],
                   "capacity": 12,
-                  "classType": "REGULAR"
+                  "classType": "REGULAR",
+                  "areaType": "INDOOR"
                 }
               }
             }
@@ -923,6 +987,7 @@
                   ],
                   "capacity": 15,
                   "classType": "REGULAR",
+                  "areaType": "INDOOR",
                   "isActive": true,
                   "coaches": [
                     {
@@ -958,6 +1023,7 @@
                     "status": "SCHEDULED",
                     "class": {
                       "name": "Morning Yoga",
+                      "areaType": "INDOOR",
                       "sports": [
                         {
                           "name": "Yoga"
@@ -965,7 +1031,8 @@
                       ]
                     },
                     "room": {
-                      "name": "Yoga Room A"
+                      "name": "Yoga Room A",
+                      "areaType": "INDOOR"
                     },
                     "_count": {
                       "enrollments": 2
@@ -998,10 +1065,12 @@
                   "endTime": "2026-09-15T08:00:00.000Z",
                   "status": "SCHEDULED",
                   "class": {
-                    "name": "Morning Yoga"
+                    "name": "Morning Yoga",
+                    "areaType": "INDOOR"
                   },
                   "room": {
-                    "name": "Yoga Room A"
+                    "name": "Yoga Room A",
+                    "areaType": "INDOOR"
                   }
                 }
               }
@@ -1025,6 +1094,7 @@
                   "status": "SCHEDULED",
                   "class": {
                     "name": "Morning Yoga",
+                    "areaType": "INDOOR",
                     "sports": [
                       {
                         "name": "Yoga"
@@ -1033,7 +1103,8 @@
                     "coaches": []
                   },
                   "room": {
-                    "name": "Yoga Room A"
+                    "name": "Yoga Room A",
+                    "areaType": "INDOOR"
                   },
                   "_count": {
                     "enrollments": 2
@@ -1145,6 +1216,45 @@
                       "name": "Yoga Room A"
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ConcurrentClassQuotaOk": {
+        "description": "Quota lớp học song song của chính member đang đăng nhập. `used` = số Class KHÁC NHAU (DISTINCT Class, KHÔNG phải số Schedule) đang có Enrollment BOOKED ở buổi SCHEDULED chưa bắt đầu; `remaining = max(0, limit - used)` với `limit = MembershipPlan.maxConcurrentClasses` của gói ACTIVE. `hasActiveSubscription = true` + `tier` = tier gói khi member có MembershipSubscription ACTIVE (member mới được auto-provision gói FREE nên tier = FREE, limit = 0). Nếu member KHÔNG có subscription ACTIVE: `hasActiveSubscription = false`, `tier = null`, `limit = 0`, `remaining = 0` — KHÔNG dùng tier FREE để đại diện cho trường hợp thiếu subscription. `classes[]` có đúng MỘT entry cho mỗi DISTINCT Class; `futureBookedScheduleCount` là số buổi tương lai đang BOOKED của Class đó và `scheduleId`/`scheduleStartTime`/`enrollmentId` chỉ là buổi ĐẠI DIỆN (gần nhất), không phải toàn bộ buổi.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "example": {
+                "success": true,
+                "message": "Concurrent class quota retrieved successfully",
+                "data": {
+                  "hasActiveSubscription": true,
+                  "tier": "MEMBERSHIP",
+                  "limit": 3,
+                  "used": 2,
+                  "remaining": 1,
+                  "classes": [
+                    {
+                      "classId": "class-1",
+                      "className": "Yoga Beginner",
+                      "futureBookedScheduleCount": 2,
+                      "scheduleId": "schedule-1",
+                      "scheduleStartTime": "2026-09-25T18:00:00.000Z",
+                      "enrollmentId": "enrollment-1"
+                    },
+                    {
+                      "classId": "class-2",
+                      "className": "Boxing Basic",
+                      "futureBookedScheduleCount": 1,
+                      "scheduleId": "schedule-2",
+                      "scheduleStartTime": "2026-09-26T09:00:00.000Z",
+                      "enrollmentId": "enrollment-2"
+                    }
+                  ]
                 }
               }
             }
@@ -1644,6 +1754,7 @@
       },
       "post": {
         "summary": "Create staff, coach, manager or member account (MEMBER creates the member profile too)",
+        "description": "Với `role = MEMBER`, backend tạo MemberProfile + **auto-provision một MembershipSubscription ACTIVE\nvới gói FREE** (`maxConcurrentClasses = 0`) trong cùng transaction. COACH/STAFF/MANAGER KHÔNG được cấp\nsubscription. Idempotent theo member: nếu member đã có subscription ACTIVE thì không tạo thêm.\n",
         "tags": [
           "Users"
         ],
@@ -1927,6 +2038,100 @@
         "responses": {
           "201": {
             "description": "Success"
+          }
+        }
+      }
+    },
+    "/training-plans/{id}": {
+      "patch": {
+        "summary": "Change the coach of a training plan (Member changes own plan, Coach current plan, Manager any plan)",
+        "description": "**Business rules:**\n- MEMBER chỉ đổi được HLV của training plan thuộc hồ sơ của chính mình (403 nếu không phải).\n- COACH chỉ đổi được HLV của plan mình đang phụ trách; MANAGER đổi được mọi plan.\n- `coachId` mới phải tồn tại, đang hoạt động và có role COACH (404 nếu không hợp lệ).\n- Không cho gán lại đúng HLV hiện tại (409).\n- Chỉ cập nhật `TrainingPlan.coachId`; KHÔNG thay đổi enrollment/class/schedule/attendance.\n- Hội viên (khi người khác đổi) và HLV mới nhận notification TRAINING_PLAN_ASSIGNED.\n",
+        "tags": [
+          "Training"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "TrainingPlan ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "coachId"
+                ],
+                "properties": {
+                  "coachId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "CoachProfile.id của HLV mới (khác HLV hiện tại)"
+                  }
+                }
+              },
+              "example": {
+                "coachId": "c1a2b3c4-0000-4000-8000-000000000002"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Training plan coach updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Training plan coach updated successfully",
+                  "data": {
+                    "id": "b7e3d6f0-0000-4000-8000-000000000001",
+                    "memberId": "member-1",
+                    "coachId": "c1a2b3c4-0000-4000-8000-000000000002",
+                    "name": "Giảm cân 8 tuần",
+                    "coach": {
+                      "user": {
+                        "fullName": "Coach Two"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       }
@@ -2431,6 +2636,19 @@
           },
           {
             "in": "query",
+            "name": "areaType",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "POOL",
+                "INDOOR",
+                "OUTDOOR"
+              ]
+            },
+            "description": "Filter sports supporting an area type"
+          },
+          {
+            "in": "query",
             "name": "isActive",
             "schema": {
               "type": "string",
@@ -2482,7 +2700,8 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "name"
+                  "name",
+                  "areaTypes"
                 ],
                 "properties": {
                   "name": {
@@ -2492,6 +2711,22 @@
                   "description": {
                     "type": "string",
                     "example": "Yoga class improves flexibility"
+                  },
+                  "areaTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "POOL",
+                        "INDOOR",
+                        "OUTDOOR"
+                      ]
+                    },
+                    "minItems": 1,
+                    "example": [
+                      "INDOOR"
+                    ],
+                    "description": "Area types this sport supports (at least one)"
                   }
                 }
               }
@@ -2580,6 +2815,19 @@
                   "description": {
                     "type": "string"
                   },
+                  "areaTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "POOL",
+                        "INDOOR",
+                        "OUTDOOR"
+                      ]
+                    },
+                    "minItems": 1,
+                    "description": "Area types this sport supports. Cannot remove a type used by an active Class."
+                  },
                   "isActive": {
                     "type": "boolean"
                   }
@@ -2663,6 +2911,19 @@
           },
           {
             "in": "query",
+            "name": "areaType",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "POOL",
+                "INDOOR",
+                "OUTDOOR"
+              ]
+            },
+            "description": "Filter by area type (POOL | INDOOR | OUTDOOR)"
+          },
+          {
+            "in": "query",
             "name": "isActive",
             "schema": {
               "type": "string",
@@ -2717,7 +2978,8 @@
                 "type": "object",
                 "required": [
                   "name",
-                  "capacity"
+                  "capacity",
+                  "areaType"
                 ],
                 "properties": {
                   "name": {
@@ -2731,6 +2993,15 @@
                   "location": {
                     "type": "string",
                     "example": "Floor 1"
+                  },
+                  "areaType": {
+                    "type": "string",
+                    "enum": [
+                      "POOL",
+                      "INDOOR",
+                      "OUTDOOR"
+                    ],
+                    "example": "INDOOR"
                   }
                 }
               }
@@ -2824,6 +3095,15 @@
                   "location": {
                     "type": "string"
                   },
+                  "areaType": {
+                    "type": "string",
+                    "enum": [
+                      "POOL",
+                      "INDOOR",
+                      "OUTDOOR"
+                    ],
+                    "description": "New area type. Upcoming schedules must use a matching Class."
+                  },
                   "isActive": {
                     "type": "boolean"
                   }
@@ -2883,6 +3163,156 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/rooms/{roomId}/transfer-schedules/preview": {
+      "post": {
+        "summary": "Preview bulk transfer of upcoming schedules to another room (no DB changes)",
+        "tags": [
+          "Rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "roomId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Source room (damaged room)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "targetRoomId"
+                ],
+                "properties": {
+                  "targetRoomId": {
+                    "type": "string",
+                    "description": "Target room ID"
+                  },
+                  "from": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Optional lower bound (default now)"
+                  },
+                  "to": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Optional upper bound"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Transfer reason, e.g. Room damaged"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preview with totalSchedules/validSchedules/invalidSchedules/canTransfer/conflicts"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/rooms/{roomId}/transfer-schedules": {
+      "post": {
+        "summary": "Bulk transfer upcoming SCHEDULED schedules to another room (atomic, all-or-nothing)",
+        "description": "Validates areaType/capacity/room+coach conflicts per schedule, re-checks inside a Prisma transaction, then notifies enrolled members with SCHEDULE_ROOM_CHANGED.",
+        "tags": [
+          "Rooms"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "roomId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Source room (damaged room)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "targetRoomId"
+                ],
+                "properties": {
+                  "targetRoomId": {
+                    "type": "string",
+                    "description": "Target room ID"
+                  },
+                  "from": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Optional lower bound (default now)"
+                  },
+                  "to": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Optional upper bound"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Transfer reason, e.g. Room damaged"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transferred with sourceRoom/targetRoom/transferredCount/schedules"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -3105,6 +3535,116 @@
         "responses": {
           "200": {
             "$ref": "#/components/responses/SubscriptionLogListOk"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/reports/attendance": {
+      "get": {
+        "summary": "Attendance report per (member × class) with OK/WARN/RELEASE status",
+        "description": "Cửa sổ cố định: tối đa 10 buổi ĐÃ KẾT THÚC gần nhất của (member × class) — KHÔNG theo schedule,\nnên đổi buổi trong cùng lớp không reset lịch sử.\n`rate = (PRESENT + LATE) / (PRESENT + LATE + ABSENT + NO_SHOW)`; EXCUSED không vào tử/mẫu.\nsampleSize < 5 -> OK; rate >= 80% -> OK; 70% <= rate < 80% -> WARN; rate < 70% -> RELEASE.\n",
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OK",
+                "WARN",
+                "RELEASE"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "classId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "memberId",
+            "schema": {
+              "type": "string",
+              "description": "MemberProfile.id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attendance report",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "message": "Attendance report retrieved successfully",
+                  "data": {
+                    "summary": {
+                      "total": 12,
+                      "ok": 9,
+                      "warn": 2,
+                      "release": 1
+                    },
+                    "rows": [
+                      {
+                        "memberId": "member-uuid",
+                        "memberName": "Nguyễn Văn A",
+                        "classId": "class-uuid",
+                        "className": "Yoga cơ bản",
+                        "sampleSize": 8,
+                        "presentCount": 5,
+                        "lateCount": 0,
+                        "absentCount": 2,
+                        "noShowCount": 1,
+                        "excusedCount": 1,
+                        "attendanceRate": 62.5,
+                        "status": "RELEASE",
+                        "activePenalty": null
+                      }
+                    ]
+                  },
+                  "pagination": {
+                    "page": 1,
+                    "limit": 20,
+                    "total": 12,
+                    "totalPages": 1
+                  }
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -3607,6 +4147,7 @@
       },
       "post": {
         "summary": "Create membership plan",
+        "description": "MANAGER tạo gói tập. `maxConcurrentClasses` = quota lớp học song song: số Class KHÁC NHAU\ntối đa hội viên được giữ đồng thời (>= 0). Bỏ trống => mặc định theo tier (MEMBERSHIP 3 / PREMIUM 6).\nMEMBER không có quyền gọi API này.\n",
         "tags": [
           "Membership Plans"
         ],
@@ -3641,8 +4182,20 @@
                       "MEMBERSHIP",
                       "PREMIUM"
                     ]
+                  },
+                  "maxConcurrentClasses": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Quota số Class KHÁC NHAU được giữ đồng thời; bỏ trống = mặc định theo tier"
                   }
                 }
+              },
+              "example": {
+                "name": "Membership Monthly",
+                "price": 300000,
+                "durationDays": 30,
+                "tier": "MEMBERSHIP",
+                "maxConcurrentClasses": 3
               }
             }
           }
@@ -3703,6 +4256,7 @@
       },
       "patch": {
         "summary": "Update membership plan",
+        "description": "MANAGER cập nhật gói tập (kể cả `maxConcurrentClasses` — quota lớp học song song, >= 0; integer).\n\n**`maxConcurrentClasses` là config của TỪNG plan, không phải field derived của `tier`**:\n- `PATCH { \"tier\": \"PREMIUM\" }` → chỉ đổi tier, **GIỮ NGUYÊN** quota hiện tại (không tự đổi 3 → 6).\n- `PATCH { \"tier\": \"PREMIUM\", \"maxConcurrentClasses\": 6 }` → đổi cả hai.\n- `POST /membership-plans` không truyền quota mới áp default theo tier (FREE 0 / MEMBERSHIP 3 / PREMIUM 6);\n  giá trị explicit luôn được ưu tiên.\n\nQuota mới áp dụng cho lần đặt lớp TIẾP THEO; KHÔNG tự hủy các lớp hội viên đang giữ\n(grandfathering: có thể `used > limit` nhưng `remaining = 0`).\n",
         "tags": [
           "Membership Plans"
         ],
@@ -3742,10 +4296,18 @@
                       "PREMIUM"
                     ]
                   },
+                  "maxConcurrentClasses": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Quota số Class KHÁC NHAU được giữ đồng thời"
+                  },
                   "isActive": {
                     "type": "boolean"
                   }
                 }
+              },
+              "example": {
+                "maxConcurrentClasses": 6
               }
             }
           }
@@ -3985,6 +4547,7 @@
     "/members/{id}/membership-status": {
       "get": {
         "summary": "Get member effective tier and active subscription",
+        "description": "`effectiveTier` = tier của MembershipSubscription ACTIVE (FREE | MEMBERSHIP | PREMIUM).\nKhi member KHÔNG có subscription ACTIVE → `effectiveTier = null`, `activeSubscription = null`,\n`daysRemaining = null` (KHÔNG dùng \"FREE\" để đại diện cho \"không có gói\") — nhất quán với\n`GET /enrollments/my/quota`. Authorization không đổi: MANAGER / STAFF.\n",
         "tags": [
           "Members"
         ],
@@ -3995,7 +4558,8 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "memberProfile.id hoặc userId"
           }
         ],
         "responses": {
@@ -4537,7 +5101,7 @@
     "/enrollments": {
       "post": {
         "summary": "Book a class (Member books own class; Staff/Manager book for a member)",
-        "description": "**Business Rules (Chốt chặn nghiệp vụ):**\n- Membership must be ACTIVE at booking time.\n- Membership `endDate` must be ≥ `schedule.startTime` — cannot book a class that happens after your plan expires.\n- PREMIUM class requires PREMIUM tier.\n- No double-booking the same schedule.\n- No two schedules with overlapping time.\n- Class capacity must not be exceeded.\n",
+        "description": "**Business Rules (Chốt chặn nghiệp vụ):**\n- Membership must be ACTIVE at booking time.\n- Membership `endDate` must be ≥ `schedule.startTime` — cannot book a class that happens after your plan expires.\n- PREMIUM class requires PREMIUM tier.\n- **Concurrent-class quota**: số Class KHÁC NHAU đang giữ (Enrollment `BOOKED` ở buổi `SCHEDULED` chưa bắt đầu)\n  không được vượt `MembershipPlan.maxConcurrentClasses` của gói đang ACTIVE. Class đã giữ không tiêu thêm quota.\n  Vượt quota → **403 `CONCURRENT_CLASS_LIMIT_REACHED`** kèm `tier`/`limit`/`used`/`remaining`.\n  Member gói FREE có `limit = 0` nên mọi booking Class mới đều bị 403 quota (FE nên gợi ý nâng cấp gói).\n  Xem chi tiết cách tính ở `GET /enrollments/my/quota`.\n- No double-booking the same schedule.\n- No two schedules with overlapping time.\n- Class capacity must not be exceeded.\n",
         "tags": [
           "Enrollments"
         ],
@@ -4584,7 +5148,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "description": "Forbidden — one of:\n- No active membership\n- Membership expires before class date\n- PREMIUM class requires PREMIUM plan\n",
+            "description": "Forbidden — one of:\n- No active membership\n- Membership expires before class date\n- PREMIUM class requires PREMIUM plan\n- Concurrent-class quota exceeded (`MembershipPlan.maxConcurrentClasses`)\n- Member đang bị hình phạt chuyên cần ở Class này\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -4610,6 +5174,20 @@
                     "value": {
                       "success": false,
                       "message": "Premium membership required to book this class."
+                    }
+                  },
+                  "concurrent_class_limit_reached": {
+                    "summary": "Vượt quota lớp học song song (distinct Class)",
+                    "value": {
+                      "success": false,
+                      "message": "Bạn đã đạt giới hạn 3 lớp học song song của gói MEMBERSHIP. Vui lòng hủy hoặc chuyển một lớp đang đặt trước khi đăng ký lớp mới.",
+                      "errors": {
+                        "code": "CONCURRENT_CLASS_LIMIT_REACHED",
+                        "tier": "MEMBERSHIP",
+                        "limit": 3,
+                        "used": 3,
+                        "remaining": 0
+                      }
                     }
                   }
                 }
@@ -4660,6 +5238,37 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/enrollments/my/quota": {
+      "get": {
+        "summary": "Get my concurrent-class quota (Member only)",
+        "description": "**Quota lớp học song song** — số Class KHÁC NHAU tối đa mà hội viên được giữ đồng thời,\nlấy từ `MembershipPlan.maxConcurrentClasses` của MembershipSubscription đang ACTIVE.\n\nCách tính `used` (tính động từ DB, KHÔNG lưu counter trên Member):\n- Chỉ tính `Enrollment.status = BOOKED` ở `ClassSchedule.status = SCHEDULED` và `startTime > now`.\n- Đếm **DISTINCT Class**: một Class có nhiều buổi BOOKED vẫn chỉ chiếm 1 quota (`classes[]` có 1 entry/Class,\n  kèm `futureBookedScheduleCount`; `scheduleId`/`scheduleStartTime` chỉ là buổi đại diện).\n- KHÔNG tính: Enrollment `COMPLETED`/`CANCELLED`, buổi đã bắt đầu, buổi `CANCELLED`/`COMPLETED`.\n\n`remaining = max(0, limit - used)`. Transfer trong cùng Class (BR-08) không đổi quota.\nDowngrade gói không tự hủy lớp đang giữ: có thể `used > limit` (grandfathering) nhưng\n`remaining = 0` nên không đặt thêm Class mới cho tới khi `used < limit`.\n\nSubscription:\n- Member mới được auto-provision gói **FREE** (`tier = FREE`, `maxConcurrentClasses = 0`) nên response\n  thường có `hasActiveSubscription = true`, `tier = \"FREE\"`, `limit = 0`.\n- Dữ liệu cũ/bất thường KHÔNG có subscription ACTIVE: `hasActiveSubscription = false`, `tier = null`,\n  `limit = 0`, `used` = số Class đang giữ (nếu có), `remaining = 0`.\n  `tier = null` KHÔNG có nghĩa là tier FREE.\n\nChỉ trả quota của CHÍNH hội viên đang đăng nhập (không có tham số `memberId`).\n",
+        "tags": [
+          "Enrollments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ConcurrentClassQuotaOk"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -4733,6 +5342,77 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/enrollments/{id}/transfer": {
+      "post": {
+        "summary": "Move a booking to another schedule (Member moves own booking; Staff/Manager any member)",
+        "description": "**Business rules (Chốt chặn nghiệp vụ):**\n- Chỉ chuyển chỗ đặt (Enrollment) sang buổi khác — KHÔNG sửa ClassSchedule/Class/Room.\n- MEMBER chỉ chuyển chỗ của chính mình (403 nếu không phải); COACH bị chặn.\n- **BR-08**: `targetScheduleId` phải thuộc CÙNG Class với Enrollment hiện tại (khác Class -> 400).\n  Member không được dùng endpoint này để chuyển sang Class khác.\n- Chỗ cũ phải `BOOKED` và buổi cũ chưa diễn ra; buổi mới phải `SCHEDULED` và chưa bắt đầu.\n- Áp dụng đầy đủ luật đặt chỗ cho buổi mới: gói tập ACTIVE còn hạn tới ngày học, PREMIUM class cần tier PREMIUM,\n  còn sức chứa, không trùng chỗ, không trùng giờ (bỏ qua chỗ cũ đang được chuyển đi).\n- **Quota lớp học song song KHÔNG đổi**: transfer giữ nguyên Class (BR-08) nên không tiêu thêm quota mới —\n  `used`/`remaining` của `GET /enrollments/my/quota` không thay đổi. Vẫn khóa `lockMemberQuota`\n  cùng thứ tự lock với booking (memberQuota -> memberClass -> schedule) để không chen với request khác.\n- **BR-09**: các transfer của cùng `(memberId, classId)` được serialize bằng advisory lock + compare-and-set,\n  nên một Enrollment không thể bị chuyển đồng thời sang nhiều buổi: chỉ 1 request thắng (200), request còn lại 409.\n- Toàn bộ trong 1 transaction: fail thì rollback, hội viên giữ nguyên chỗ cũ.\n- Chỗ cũ chuyển `CANCELLED` (giữ lịch sử); buổi mới nếu từng bị hủy trước đây sẽ được kích hoạt lại (BR-07).\n",
+        "tags": [
+          "Enrollments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Enrollment ID của chỗ đặt hiện tại"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "targetScheduleId"
+                ],
+                "properties": {
+                  "targetScheduleId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ClassSchedule.id của buổi muốn chuyển tới"
+                  }
+                }
+              },
+              "example": {
+                "targetScheduleId": "a1b2c3d4-0000-0000-0000-000000000002"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/EnrollmentOk"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -4958,7 +5638,20 @@
                 "PREMIUM"
               ]
             },
-            "description": "Filter by class type"
+            "description": "Filter by class tier (REGULAR | PREMIUM)"
+          },
+          {
+            "in": "query",
+            "name": "areaType",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "POOL",
+                "INDOOR",
+                "OUTDOOR"
+              ]
+            },
+            "description": "Filter by area type (POOL | INDOOR | OUTDOOR)"
           },
           {
             "in": "query",
@@ -5025,7 +5718,8 @@
                 "required": [
                   "name",
                   "sportIds",
-                  "capacity"
+                  "capacity",
+                  "areaType"
                 ],
                 "properties": {
                   "name": {
@@ -5052,7 +5746,18 @@
                       "REGULAR",
                       "PREMIUM"
                     ],
-                    "default": "REGULAR"
+                    "default": "REGULAR",
+                    "description": "Class tier (REGULAR | PREMIUM). Different from areaType."
+                  },
+                  "areaType": {
+                    "type": "string",
+                    "enum": [
+                      "POOL",
+                      "INDOOR",
+                      "OUTDOOR"
+                    ],
+                    "example": "INDOOR",
+                    "description": "Area type required by this class. Every selected sport must support it."
                   }
                 }
               }
@@ -5159,6 +5864,15 @@
                       "REGULAR",
                       "PREMIUM"
                     ]
+                  },
+                  "areaType": {
+                    "type": "string",
+                    "enum": [
+                      "POOL",
+                      "INDOOR",
+                      "OUTDOOR"
+                    ],
+                    "description": "New area type. All sports of this class must support it, and upcoming schedules must use a matching Room."
                   },
                   "isActive": {
                     "type": "boolean"
@@ -5289,6 +6003,68 @@
         }
       }
     },
+    "/classes/{id}/coaches/support": {
+      "post": {
+        "summary": "Assign a support coach to class (Sends COACH_CHANGED notification to enrolled members)",
+        "description": "Gán HLV hỗ trợ cho Class. Mỗi Class chỉ có duy nhất 1 HLV chính (isPrimary = true), HLV hỗ trợ luôn được lưu với isPrimary = false nên endpoint này không nhận isPrimary. Idempotent khi HLV đã là HLV hỗ trợ của Class (không gửi lại thông báo). Trả 409 nếu HLV đang là HLV chính của Class hoặc trùng lịch với buổi SCHEDULED sắp tới.\n",
+        "tags": [
+          "Classes"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Class ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "coachId"
+                ],
+                "properties": {
+                  "coachId": {
+                    "type": "string",
+                    "description": "CoachProfile ID"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ClassOk"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/classes/{id}/coaches/{coachId}": {
       "delete": {
         "summary": "Remove coach from class (Sends COACH_CHANGED notification to enrolled members)",
@@ -5340,6 +6116,7 @@
     "/class-schedules": {
       "get": {
         "summary": "Get list of schedules",
+        "description": "date/startAfter/startBefore use legacy start-time filtering. from/to use overlap-range filtering (schedule.startTime < to AND schedule.endTime > from). weekday/weekdays filter by Thứ 2..CN on startTime in Asia/Ho_Chi_Minh (ISO 1=Mon..7=Sun after normalization).",
         "tags": [
           "Class Schedules"
         ],
@@ -5374,6 +6151,29 @@
           },
           {
             "in": "query",
+            "name": "weekday",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "style": "form",
+            "explode": true,
+            "description": "Lọc 1 thứ: 2=T2..7=T7, 8=CN (alias: T2..T7, MON..SUN, Thứ 2..Chủ nhật). Lặp lại param để chọn nhiều thứ. VD: ?weekday=2&weekday=CN",
+            "example": "2"
+          },
+          {
+            "in": "query",
+            "name": "weekdays",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Lọc nhiều thứ, phân tách dấu phẩy. VD: ?weekdays=2,4,8 hoặc ?weekdays=T2,T4,CN. Hợp nhất với weekday.",
+            "example": "2,4,8"
+          },
+          {
+            "in": "query",
             "name": "date",
             "schema": {
               "type": "string",
@@ -5397,7 +6197,25 @@
               "type": "string",
               "format": "date-time"
             },
-            "description": "Schedules starting before this time"
+            "description": "Schedules starting before this time (legacy start-time filtering)"
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Overlap-range filter start (schedule.endTime > from)"
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Overlap-range filter end (schedule.startTime < to)"
           },
           {
             "in": "query",
@@ -5432,7 +6250,8 @@
         }
       },
       "post": {
-        "summary": "Create a new schedule (checks room & coach conflicts)",
+        "summary": "Create a new schedule (checks area type, room & coach conflicts)",
+        "description": "Business rule: Class.areaType must equal Room.areaType. Checked before capacity and conflict checks.",
         "tags": [
           "Class Schedules"
         ],
@@ -5531,6 +6350,7 @@
       },
       "patch": {
         "summary": "Update schedule (re-checks conflicts if room/time changed)",
+        "description": "Closed schedules (CANCELLED/COMPLETED) are immutable. status=COMPLETED is rejected here — use PATCH /class-schedules/{id}/complete.",
         "tags": [
           "Class Schedules"
         ],
@@ -5566,10 +6386,14 @@
                     "type": "string",
                     "enum": [
                       "SCHEDULED",
-                      "CANCELLED",
-                      "COMPLETED"
+                      "CANCELLED"
                     ],
-                    "description": "If set to CANCELLED, all BOOKED enrollments are cancelled automatically"
+                    "description": "If set to CANCELLED, all BOOKED enrollments are cancelled automatically. COMPLETED must use /complete."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Cancellation reason (used in SCHEDULE_CANCELLED notification)"
                   }
                 }
               }
@@ -5602,6 +6426,7 @@
       },
       "delete": {
         "summary": "Cancel schedule (automatically cancels all BOOKED enrollments)",
+        "description": "Idempotent for already-CANCELLED schedules (no duplicate notification). Rejects COMPLETED schedules.",
         "tags": [
           "Class Schedules"
         ],
@@ -5846,6 +6671,7 @@
     "/auth/register": {
       "post": {
         "summary": "Register a new member account",
+        "description": "Tạo tài khoản MEMBER + MemberProfile. **Backend tự động cấp kèm một MembershipSubscription ACTIVE\nvới gói FREE** (`MembershipPlan.tier = FREE`, `maxConcurrentClasses = 0`) — idempotent, không tạo trùng\nnếu member đã có subscription ACTIVE. Vì vậy ngay sau khi đăng ký, `GET /enrollments/my/quota` trả\n`hasActiveSubscription = true`, `tier = \"FREE\"`, `limit = 0`, `used = 0`, `remaining = 0`.\n",
         "tags": [
           "Auth"
         ],
@@ -6187,6 +7013,8 @@
     },
     "/attendance": {
       "get": {
+        "summary": "Get attendance roster of a schedule (MANAGER/STAFF: full roster; COACH: only own classes; MEMBER: only own records)",
+        "description": "**Authorization:**\n- MANAGER / STAFF: xem toàn bộ roster (STAFF read-only, mutations vẫn chỉ COACH/MANAGER).\n- COACH: chỉ lớp mình phụ trách (403 nếu không).\n- MEMBER: chỉ nhận bản ghi điểm danh của CHÍNH MÌNH (không lộ roster của người khác).\n",
         "tags": [
           "Attendance"
         ],
@@ -6208,10 +7036,27 @@
         "responses": {
           "200": {
             "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       },
       "post": {
+        "summary": "Record attendance for a member in a schedule (COACH: own classes; MANAGER: any class)",
+        "description": "**Authorization:** COACH (chỉ lớp mình phụ trách) và MANAGER ghi được `PRESENT`/`ABSENT`/`LATE`.\n`EXCUSED` CHỈ MANAGER xác nhận — COACH gửi EXCUSED bị 403 (enforce ở service, không chỉ controller).\nMEMBER/STAFF không có quyền ghi attendance.\n",
         "tags": [
           "Attendance"
         ],
@@ -6256,6 +7101,8 @@
     },
     "/attendance/{id}": {
       "patch": {
+        "summary": "Update an attendance record (EXCUSED: MANAGER only)",
+        "description": "**Authorization:** COACH (chỉ attendance thuộc lớp mình phụ trách) và MANAGER.\n`EXCUSED` CHỈ MANAGER — COACH gửi EXCUSED bị 403 (enforce ở service).\n",
         "tags": [
           "Attendance"
         ],
@@ -6304,7 +7151,8 @@
     },
     "/attendance/generate-qr": {
       "post": {
-        "summary": "Generate a short-lived QR token for attendance (Coach/Manager only)",
+        "summary": "Generate a short-lived QR token + manual backup code for attendance (Coach/Manager only)",
+        "description": "Trả về 2 cách điểm danh cho buổi học:\n- `qrToken`: JWT token (mặc định 600 giây = 10 phút) để member quét QR.\n- `manualCode`: mã dự phòng 6 ký tự (alphabet A-HJ-NP-Z2-9, không có 0/O/1/I) cho member\n  KHÔNG quét được QR (camera hỏng). TTL 90 giây.\n\nMỗi lần gọi endpoint này sẽ THU HỒI mã dự phòng cũ còn hiệu lực của CÙNG buổi học —\ntại một thời điểm chỉ có đúng một mã hợp lệ trên mỗi schedule.\n",
         "tags": [
           "Attendance"
         ],
@@ -6334,15 +7182,47 @@
         },
         "responses": {
           "200": {
-            "description": "QR token generated"
+            "description": "QR token + manual backup code generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "success": true,
+                  "message": "QR token generated successfully",
+                  "data": {
+                    "qrToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.signature",
+                    "expiresIn": 600,
+                    "manualCode": "K7M2QP",
+                    "manualCodeExpiresIn": 90
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       }
     },
     "/attendance/scan-qr": {
       "post": {
-        "summary": "Scan a QR token to mark self as PRESENT (Member only)",
-        "description": "**Chốt chặn 2:** Tại thời điểm quét QR, hệ thống kiểm tra lại gói tập của member có còn hạn hay không.\nDù đã đặt lịch thành công trước đó, nếu gói hết hạn trước khi đi học → bị từ chối điểm danh.\n",
+        "summary": "Check in by QR token OR manual backup code (Member only)",
+        "description": "Gửi ĐÚNG MỘT trong hai field — member KHÔNG gửi `scheduleId` (key lạ bị 400):\n- `qrToken`: JWT trong mã QR do COACH/MANAGER hiển thị.\n- `code`: mã dự phòng 6 ký tự cho member không quét được QR (camera hỏng).\n  Nhận cả chữ thường và khoảng trắng thừa (tự chuẩn hoá trim + uppercase).\n\n**Chốt chặn 2:** tại thời điểm điểm danh, hệ thống kiểm tra lại member có enrollment\nBOOKED/COMPLETED cho buổi học và gói tập còn hạn hay không. Dù đã đặt lịch thành công\ntrước đó, nếu gói hết hạn trước khi đi học → bị từ chối điểm danh.\n\n**Chống dò mã (chỉ áp dụng cho `code`):** sai/hết hạn/thu hồi/không tồn tại dùng chung\nmột message; một mã bị dùng hỏng 5 lần → thu hồi; một member sai 10 lần trong 15 phút → 429.\n",
         "tags": [
           "Attendance"
         ],
@@ -6357,22 +7237,30 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "qrToken"
-                ],
+                "additionalProperties": false,
+                "description": "Chỉ gửi một trong hai: qrToken hoặc code",
                 "properties": {
                   "qrToken": {
                     "type": "string",
-                    "description": "JWT token from QR code shown by Coach"
+                    "description": "JWT token from QR code shown by Coach (khi quét QR)"
+                  },
+                  "code": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6,
+                    "description": "Mã dự phòng 6 ký tự (A-HJ-NP-Z2-9) khi không quét được QR"
                   }
                 }
+              },
+              "example": {
+                "code": "K7M2QP"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Marked as PRESENT successfully",
+            "description": "Marked as PRESENT successfully (note phân biệt QR vs mã dự phòng)",
             "content": {
               "application/json": {
                 "schema": {
@@ -6380,16 +7268,18 @@
                 },
                 "example": {
                   "success": true,
+                  "message": "Điểm danh thành công",
                   "data": {
                     "id": "att-uuid",
-                    "status": "PRESENT"
+                    "status": "PRESENT",
+                    "note": "Điểm danh bằng mã dự phòng (nhập tay)"
                   }
                 }
               }
             }
           },
           "400": {
-            "description": "QR expired or invalid",
+            "description": "QR/code sai, hết hạn hoặc body sai cấu trúc",
             "content": {
               "application/json": {
                 "schema": {
@@ -6408,6 +7298,26 @@
                     "value": {
                       "success": false,
                       "message": "Mã QR không hợp lệ."
+                    }
+                  },
+                  "manual_code_invalid": {
+                    "summary": "Manual code wrong/expired/revoked",
+                    "value": {
+                      "success": false,
+                      "message": "Mã điểm danh không hợp lệ hoặc đã hết hạn."
+                    }
+                  },
+                  "both_credentials": {
+                    "summary": "Gửi cả qrToken và code (hoặc key lạ như scheduleId)",
+                    "value": {
+                      "success": false,
+                      "message": "Validation failed",
+                      "errors": [
+                        {
+                          "field": "code",
+                          "message": "Chỉ gửi một trong hai: qrToken hoặc code"
+                        }
+                      ]
                     }
                   }
                 }
@@ -6433,7 +7343,7 @@
                     }
                   },
                   "subscription_expired": {
-                    "summary": "Subscription expired at scan time",
+                    "summary": "Subscription expired at check-in time",
                     "value": {
                       "success": false,
                       "message": "Gói tập của bạn đã hết hạn. Vui lòng gia hạn để có thể vào lớp học."
@@ -6442,6 +7352,561 @@
                 }
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance/my": {
+      "get": {
+        "summary": "Get current member's own attendance history",
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PRESENT",
+                "ABSENT",
+                "LATE",
+                "EXCUSED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "classId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated own attendance records",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "message": "Attendance retrieved successfully",
+                  "data": [
+                    {
+                      "id": "att-uuid",
+                      "memberId": "member-uuid",
+                      "scheduleId": "schedule-uuid",
+                      "status": "ABSENT",
+                      "note": "SYSTEM_NO_SHOW",
+                      "schedule": {
+                        "id": "schedule-uuid",
+                        "startTime": "2026-09-15T07:00:00+07:00",
+                        "status": "COMPLETED",
+                        "class": {
+                          "id": "class-uuid",
+                          "name": "Yoga cơ bản"
+                        }
+                      }
+                    }
+                  ],
+                  "pagination": {
+                    "page": 1,
+                    "limit": 20,
+                    "total": 1,
+                    "totalPages": 1
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance/my/summary": {
+      "get": {
+        "summary": "Attendance rate per class for the current member + own penalties",
+        "description": "Trả về bucket theo (member × class): sampleSize, present/late/absent/noShow/excused,\nattendanceRate, status (OK | WARN | RELEASE) cùng danh sách hình phạt của chính member\n(kèm `canAppeal` để FE bật nút khiếu nại trong cửa sổ 72 giờ).\n",
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attendance summary",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "message": "Attendance summary retrieved successfully",
+                  "data": {
+                    "memberId": "member-uuid",
+                    "memberName": "Nguyễn Văn A",
+                    "thresholds": {
+                      "minSample": 5,
+                      "warnBelow": 80,
+                      "releaseBelow": 70,
+                      "appealWindowHours": 72
+                    },
+                    "buckets": [
+                      {
+                        "memberId": "member-uuid",
+                        "memberName": "Nguyễn Văn A",
+                        "classId": "class-uuid",
+                        "className": "Yoga cơ bản",
+                        "sampleSize": 5,
+                        "presentCount": 3,
+                        "lateCount": 0,
+                        "absentCount": 0,
+                        "noShowCount": 2,
+                        "excusedCount": 0,
+                        "attendanceRate": 60,
+                        "status": "RELEASE"
+                      }
+                    ],
+                    "penalties": [
+                      {
+                        "id": "penalty-uuid",
+                        "classId": "class-uuid",
+                        "className": "Yoga cơ bản",
+                        "status": "APPLIED",
+                        "reason": "Chuyên cần 60% (5 buổi được tính) — dưới ngưỡng 70%.",
+                        "attendanceRate": 60,
+                        "sampleSize": 5,
+                        "releasedCount": 2,
+                        "blockedUntil": "2026-10-23T07:00:00+07:00",
+                        "canAppeal": true
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance/warnings/scan": {
+      "post": {
+        "summary": "Scan attendance and send WARN notifications (Manager only)",
+        "description": "Gửi `ATTENDANCE_WARNING` cho các (member × class) có 70% <= rate < 80%.\nKhông gửi trùng khi cùng rate (dedupe theo classId + attendanceRate).\n",
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "classId": {
+                    "type": "string",
+                    "description": "Chỉ quét một lớp (bỏ trống = tất cả)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scan result: { checked, warnBuckets, sent, skippedDuplicate }"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance/penalties": {
+      "get": {
+        "summary": "List attendance penalties (Manager only)",
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "APPLIED",
+                "REVOKED",
+                "EXPIRED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "memberId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "classId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated penalties"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance/penalties/preview": {
+      "post": {
+        "summary": "Preview members eligible for attendance penalty (Manager only, read-only)",
+        "description": "KHÔNG mutate DB, KHÔNG cancel enrollment, KHÔNG gửi notification.\nTrả về các (member × class) đủ điều kiện RELEASE kèm reason và số chỗ sẽ bị thu hồi.\n",
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preview list",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "message": "Penalty preview generated",
+                  "data": {
+                    "totalPreviewed": 1,
+                    "items": [
+                      {
+                        "memberId": "member-uuid",
+                        "memberName": "Nguyễn Văn A",
+                        "classId": "class-uuid",
+                        "className": "Yoga cơ bản",
+                        "attendanceRate": 62.5,
+                        "sampleSize": 8,
+                        "futureBookedEnrollmentCount": 2,
+                        "reason": "Chuyên cần 62.5% (8 buổi được tính: 5 có mặt, 0 đi muộn, 2 vắng, 1 không điểm danh) — dưới ngưỡng 70%."
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance/penalties/apply": {
+      "post": {
+        "summary": "Apply attendance penalty (Manager only, atomic transaction)",
+        "description": "Một transaction atomic: tạo `AttendancePenalty` (APPLIED, blockedUntil = now + 30 ngày)\n+ cancel toàn bộ Enrollment BOOKED ở các buổi CHƯA bắt đầu của đúng (member × class).\nKhông đụng COMPLETED/CANCELLED và không đụng Class khác. Hội viên nhận notification ATTENDANCE_PENALTY\nvà bị chặn đặt lại Class này tới blockedUntil.\n",
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "memberId",
+                  "classId"
+                ],
+                "properties": {
+                  "memberId": {
+                    "type": "string",
+                    "description": "MemberProfile.id"
+                  },
+                  "classId": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Bỏ trống sẽ dùng lý do hệ thống sinh"
+                  }
+                }
+              },
+              "example": {
+                "memberId": "member-uuid",
+                "classId": "class-uuid"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Penalty applied (kèm releasedCount, releasedEnrollmentIds, blockedUntil)"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance/penalties/{id}/appeal": {
+      "post": {
+        "summary": "Member appeals own penalty (within 72h window)",
+        "description": "Không tự động gỡ hình phạt; chỉ lưu audit (appealedAt, appealReason) và báo cho người quyết định.",
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 1000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Appeal recorded"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/attendance/penalties/{id}/revoke": {
+      "post": {
+        "summary": "Revoke a penalty (Manager only)",
+        "description": "status -> REVOKED, hội viên được đặt lại Class. `restoreSlots = true` sẽ cố khôi phục các chỗ\nđã thu hồi nhưng CHỈ khi an toàn (buổi chưa bắt đầu, còn capacity, không trùng giờ) — không overbooking.\n",
+        "tags": [
+          "Attendance"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "restoreSlots": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Penalty revoked (kèm restoredCount, skipped[])"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"

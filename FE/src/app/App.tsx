@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Session } from "../features/auth/Session";
 import "../styles.css";
 import { ErrorBoundary } from "../shared/ErrorBoundary";
+import { ToastViewport } from "../shared/toast";
 const client = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, staleTime: 30000, refetchOnWindowFocus: false },
@@ -15,6 +16,7 @@ export default function App() {
       <QueryClientProvider client={client}>
         <BrowserRouter>
           <Session />
+          <ToastViewport />
         </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>

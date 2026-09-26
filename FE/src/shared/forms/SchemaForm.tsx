@@ -105,9 +105,15 @@ export function SchemaForm({
     ...Object.fromEntries(
       Object.entries(schema?.properties || {}).map(([k, s]) => [
         k,
-        initial[k] ??
+        k === "areaTypes" && /\/sports(?:\/|$)/.test(operation)
+          ? Array.isArray(initial[k])
+            ? String(initial[k][0] || "INDOOR")
+            : String(initial[k] || "INDOOR")
+          : initial[k] ??
           (k === "sportIds"
             ? classSports(initial).map((s) => s.id)
+            : k === "areaType" && operation === "POST /rooms"
+              ? "INDOOR"
             : (s.default ?? "")),
       ]),
     ),
@@ -134,6 +140,9 @@ export function SchemaForm({
       let v = values[k];
       if (v === "" || v === undefined || v === null) continue;
       if (s.type === "number" || s.type === "integer") v = Number(v);
+      if (k === "areaTypes" && /\/sports(?:\/|$)/.test(operation)) {
+        v = [String(v)];
+      }
       if (s.format === "date-time") {
         if (!Number.isFinite(Date.parse(String(v)))) {
           setError(new Error("Ngày giờ không hợp lệ."));
@@ -289,7 +298,17 @@ export function SchemaForm({
               >
                 {label(k)}
                 {required && <b className="required"> *</b>}
-                {choices[k] ? (
+                {k === "areaTypes" && /\/sports(?:\/|$)/.test(operation) ? (
+                  <select
+                    required={required}
+                    value={String(value)}
+                    onChange={(e) => change(k, e.target.value)}
+                  >
+                    <option value="INDOOR">Trong nhà</option>
+                    <option value="OUTDOOR">Ngoài trời</option>
+                    <option value="POOL">Hồ bơi</option>
+                  </select>
+                ) : choices[k] ? (
                   <select
                     aria-invalid={
                       (error instanceof ApiError &&

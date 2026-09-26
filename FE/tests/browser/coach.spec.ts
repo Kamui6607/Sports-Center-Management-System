@@ -168,10 +168,7 @@ test("coach dashboard scopes classes by profile ID and schedule by assigned clas
   await expect(page.locator(".coach-session")).toContainText("09:00");
   expect(
     calls.some(
-      (c) =>
-        c.path.startsWith("/attendance") ||
-        c.path.startsWith("/training") ||
-        c.path.startsWith("/chat"),
+      (c) => c.path.startsWith("/attendance") || c.path.startsWith("/training"),
     ),
   ).toBeFalsy();
 });

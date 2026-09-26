@@ -1,12 +1,19 @@
 import { CancelSubscription } from "../../shared/CancelSubscription";
-import { effectiveSubscription } from "../../shared/businessRules";
+import "./membership.css";
+import {
+  effectiveSubscription,
+  isEffectiveSubscription,
+} from "../../shared/businessRules";
 import { formatMemberDate } from "../../shared/memberFormat";
 import { ErrorState } from "../../shared/feedback";
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
 import { membershipApi } from "../../api/membership.api";
-import { CreditCard, Check } from "lucide-react";
+import { sepayApi } from "../../api/sepay.api";
+import { SepayCheckoutModal } from "../../shared/SepayCheckout";
+import type { MembershipPlan, SepayCheckout } from "../../types/member";
+import { CreditCard, Check, QrCode } from "lucide-react";
 import {
   LoadingSpinner,
   EmptyState,
@@ -16,6 +23,45 @@ import {
 export function MembershipPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<"current" | "plans">("current");
+  const [paymentPlan, setPaymentPlan] = useState<MembershipPlan | null>(null);
+  const storageKey = `pulse.pending-checkout.${user?.id}`;
+  const [checkout, setCheckout] = useState<SepayCheckout | null>(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(storageKey) || "null");
+    } catch {
+      return null;
+    }
+  });
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  useEffect(() => {
+    if (checkout) sessionStorage.setItem(storageKey, JSON.stringify(checkout));
+  }, [checkout, storageKey]);
+  const createCheckout = useMutation({
+    mutationFn: (planId: string) => sepayApi.createCheckout(planId),
+    onSuccess: (data) => {
+      setCheckout(data);
+      setCheckoutOpen(true);
+    },
+    onError: (error) => {
+      const pending = sepayApi.pendingCheckoutFromError(error);
+      if (pending) {
+        setCheckout(pending);
+        setCheckoutOpen(true);
+      }
+    },
+  });
+
+  const startCheckout = (plan: MembershipPlan) => {
+    setPaymentPlan(plan);
+    setCheckout(null);
+    createCheckout.reset();
+    createCheckout.mutate(plan.id);
+  };
+
+  const closeCheckout = () => {
+    setCheckoutOpen(false);
+    createCheckout.reset();
+  };
 
   // Fetch current user subscriptions
   const {
@@ -27,6 +73,7 @@ export function MembershipPage() {
     queryFn: () =>
       user?.id ? membershipApi.getMySubscriptions(user.id) : null,
     enabled: Boolean(user?.id),
+    refetchOnWindowFocus: "always",
   });
 
   // Fetch all plans
@@ -350,6 +397,38 @@ export function MembershipPage() {
       ) : (
         /* MEMBERSHIP PLANS TAB */
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <section className="membership-hero">
+            <div>
+              <span className="membership-eyebrow">PULSE MEMBERSHIP</span>
+              <h2>
+                Đầu tư cho sức khỏe.
+                <br />
+                Bắt đầu từ hôm nay.
+              </h2>
+              <p>
+                Chọn gói phù hợp với nhịp sống của bạn và dành thời gian cho một
+                cơ thể khỏe hơn mỗi ngày.
+              </p>
+              <div className="membership-trust">
+                <span>
+                  <Check size={16} /> Thanh toán VietQR
+                </span>
+                <span>
+                  <Check size={16} /> Theo dõi gói trực tuyến
+                </span>
+              </div>
+            </div>
+            <div className="membership-hero-mark" aria-hidden="true">
+              <CreditCard size={68} />
+              <span>
+                MOVE.
+                <br />
+                GROW.
+                <br />
+                REPEAT.
+              </span>
+            </div>
+          </section>
           {plansLoading ? (
             <LoadingSpinner text="Đang tải danh sách gói tập..." />
           ) : plansError ? (
@@ -366,11 +445,15 @@ export function MembershipPage() {
             >
               {plans.map((p) => {
                 const isPremium = p.tier === "PREMIUM";
+                const registered = subscriptions.find(
+                  (s) => s.planId === p.id && isEffectiveSubscription(s),
+                );
                 const priceFormatted = Number(p.price).toLocaleString("vi-VN");
 
                 return (
                   <div
                     key={p.id}
+                    className={`membership-plan-card ${isPremium ? "premium" : ""}`}
                     style={{
                       backgroundColor: "#ffffff",
                       borderRadius: 18,
@@ -402,7 +485,7 @@ export function MembershipPage() {
                           letterSpacing: 0.5,
                         }}
                       >
-                        PHỔ BIẾN NHẤT
+                        TRẢI NGHIỆM PREMIUM
                       </span>
                     )}
 
@@ -427,6 +510,24 @@ export function MembershipPage() {
                       >
                         {p.name}
                       </h3>
+                      {registered && (
+                        <p className="membership-daily">
+                          <Check size={14} /> Đang sử dụng · đến{" "}
+                          {formatMemberDate(registered.endDate)}
+                        </p>
+                      )}
+                      {Number(p.price) > 0 && p.durationDays > 0 && (
+                        <div className="membership-daily">
+                          Khoảng{" "}
+                          <strong>
+                            {Math.round(
+                              Number(p.price) / p.durationDays,
+                            ).toLocaleString("vi-VN")}{" "}
+                            đ/ngày
+                          </strong>{" "}
+                          · {p.durationDays} ngày tập luyện
+                        </div>
+                      )}
                       <p
                         style={{
                           fontSize: 13,
@@ -533,21 +634,33 @@ export function MembershipPage() {
                         borderTop: "1px solid #f2f5f3",
                       }}
                     >
-                      <div
+                      <button
+                        className="button primary"
+                        style={{ width: "100%", justifyContent: "center" }}
+                        disabled={
+                          Number(p.price) <= 0 || createCheckout.isPending
+                        }
+                        onClick={() => startCheckout(p)}
+                      >
+                        <QrCode size={17} />
+                        {createCheckout.isPending && paymentPlan?.id === p.id
+                          ? "Đang tạo mã..."
+                          : registered
+                            ? "Gia hạn qua VietQR"
+                            : "Chuyển khoản VietQR"}
+                      </button>
+                      <p
                         style={{
                           textAlign: "center",
-                          fontSize: 12,
-                          color: "#58695f",
+                          fontSize: 11,
+                          color: "#667085",
                           lineHeight: 1.4,
-                          padding: "8px 12px",
-                          backgroundColor: "#f9fbfa",
-                          borderRadius: 8,
+                          margin: "10px 0 0",
                         }}
                       >
-                        ℹ️ Vui lòng liên hệ Lễ tân (Reception Desk) hoặc Hotline
-                        trung tâm để đăng ký / gia hạn trực tiếp qua chuyển
-                        khoản hoặc tiền mặt.
-                      </div>
+                        Quét mã bằng ứng dụng ngân hàng. Gói được kích hoạt sau
+                        khi SePay xác nhận tiền vào.
+                      </p>
                     </div>
                   </div>
                 );
@@ -555,6 +668,23 @@ export function MembershipPage() {
             </div>
           )}
         </div>
+      )}
+      <SepayCheckoutModal
+        checkout={checkout}
+        open={checkoutOpen}
+        onConfirmed={() => sessionStorage.removeItem(storageKey)}
+        selectedPlan={paymentPlan}
+        onClose={closeCheckout}
+        onCreateNew={() => {
+          const plan =
+            paymentPlan ?? plans.find((p) => p.id === checkout?.plan?.id);
+          if (plan) startCheckout(plan);
+        }}
+      />
+      {checkout && !checkoutOpen && (
+        <button className="button" onClick={() => setCheckoutOpen(true)}>
+          Xem trạng thái giao dịch {checkout.orderCode}
+        </button>
       )}
     </div>
   );

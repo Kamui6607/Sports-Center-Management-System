@@ -1,34 +1,72 @@
-import { CoachFeedback } from "../../shared/CoachFeedback";
-import { sportNames } from "../../shared/sports";
-import { ErrorState } from "../../shared/feedback";
-import { formatMemberDate } from "../../shared/memberFormat";
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Calendar, Clock, MapPin, Users } from "lucide-react";
 import { classesApi } from "../../api/classes.api";
 import { enrollmentsApi } from "../../api/enrollments.api";
-import type { ClassSchedule } from "../../types/member";
-import { ArrowLeft, Calendar, Clock, MapPin, Users } from "lucide-react";
 import {
-  LoadingSpinner,
-  EmptyState,
-  StatusBadge,
-  ConfirmModal,
   AlertBanner,
+  ConfirmModal,
+  EmptyState,
+  LoadingSpinner,
+  StatusBadge,
 } from "../../components/common";
+import { CoachFeedback } from "../../shared/CoachFeedback";
+import { ErrorState } from "../../shared/feedback";
+import { formatMemberDate } from "../../shared/memberFormat";
+import { sportNames } from "../../shared/sports";
+import type {
+  CoursePlanSession,
+  CourseRegistrationBlocker,
+} from "../../types/member";
+
+function courseBlockers(error: unknown): CourseRegistrationBlocker[] {
+  const raw =
+    (error as { details?: unknown; errors?: unknown } | undefined)?.details ??
+    (error as { errors?: unknown } | undefined)?.errors;
+  const details = (raw as { details?: unknown } | undefined)?.details;
+  return Array.isArray(details) ? (details as CourseRegistrationBlocker[]) : [];
+}
+
+function blockerText(blocker: CourseRegistrationBlocker) {
+  if (!blocker.startTime) return blocker.message;
+  return `${blocker.message} (${formatMemberDate(blocker.startTime, {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}${blocker.roomName ? ` · ${blocker.roomName}` : ""})`;
+}
+
+function sessionLabel(session: CoursePlanSession) {
+  if (session.myEnrollmentStatus === "BOOKED")
+    return { text: "Đã đặt", color: "#267346", background: "#edfcf2" };
+  if (session.myEnrollmentStatus === "COMPLETED")
+    return { text: "Đã hoàn thành", color: "#026aa2", background: "#f0f9ff" };
+  if (session.isFull)
+    return { text: "Hết chỗ", color: "#d92d20", background: "#fef3f2" };
+  if (session.conflictWith)
+    return {
+      text: `Trùng giờ với ${session.conflictWith.className}`,
+      color: "#b54708",
+      background: "#fffaeb",
+    };
+  return { text: "Chưa đặt", color: "#475467", background: "#f2f4f7" };
+}
+
+const cardStyle = {
+  background: "#ffffff",
+  borderRadius: 20,
+  border: "1px solid #e7ece9",
+  padding: 28,
+};
 
 export function ClassDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  const [selectedSchedule, setSelectedSchedule] =
-    useState<ClassSchedule | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<unknown>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-  // Fetch Class Detail
   const {
     data: cls,
     isLoading,
@@ -38,56 +76,49 @@ export function ClassDetailPage() {
     queryFn: () => (id ? classesApi.getClassById(id) : null),
     enabled: Boolean(id),
   });
-
-  // Fetch Class Schedules
   const {
-    data: scheduleData,
-    isLoading: scheduleLoading,
-    error: scheduleError,
+    data: plan,
+    isLoading: planLoading,
+    error: planError,
   } = useQuery({
-    queryKey: ["class-schedules", id],
-    queryFn: () =>
-      id ? classesApi.getSchedules({ classId: id, status: "SCHEDULED" }) : null,
+    queryKey: ["course-plan", id],
+    queryFn: () => (id ? classesApi.getCoursePlan(id) : null),
     enabled: Boolean(id),
   });
-
   const enrollments = useQuery({
     queryKey: ["my-enrollments", "feedback-eligibility"],
     queryFn: () => enrollmentsApi.getMyEnrollments(),
   });
 
-  // Booking Mutation
-  const bookMutation = useMutation({
-    mutationFn: (scheduleId: string) => enrollmentsApi.bookClass(scheduleId),
-    onSuccess: () => {
+  const enrollCourseMutation = useMutation({
+    mutationFn: () => enrollmentsApi.enrollWholeCourse(id!),
+    onSuccess: (result) => {
+      const { summary } = result;
       setActionSuccess(
-        "Đặt lớp học thành công! Chúc bạn có buổi tập hiệu quả.",
+        summary.enrolledNow > 0
+          ? `Bạn đã đăng ký ${summary.enrolledNow} buổi của khóa "${result.className}". Hiện đã có ${summary.totalRegistered}/${summary.totalSessions} buổi trong khóa của bạn.`
+          : `Bạn đã đăng ký đủ ${summary.totalSessions} buổi của khóa này trước đó.`,
       );
       setActionError(null);
       setConfirmOpen(false);
-      setSelectedSchedule(null);
-
-      // Invalidate queries to refresh state
-      queryClient.invalidateQueries({ queryKey: ["class", id] });
-      queryClient.invalidateQueries({ queryKey: ["class-schedules", id] });
-      queryClient.invalidateQueries({ queryKey: ["my-enrollments"] });
-      queryClient.invalidateQueries({ queryKey: ["member-schedule"] });
+      for (const key of [
+        ["class", id],
+        ["course-plan", id],
+        ["my-enrollments"],
+        ["my-enrollment-quota"],
+        ["member-schedule"],
+        ["classes"],
+      ])
+        queryClient.invalidateQueries({ queryKey: key });
     },
     onError: (err: unknown) => {
-      if (err instanceof Error) {
-        setActionError(err.message);
-      } else {
-        setActionError(
-          "Đặt lịch thất bại. Vui lòng kiểm tra lại điều kiện đặt chỗ.",
-        );
-      }
+      setActionError(err);
       setConfirmOpen(false);
     },
   });
 
   if (isLoading) return <LoadingSpinner text="Đang tải thông tin lớp học..." />;
-
-  if (error || !cls) {
+  if (error || !cls)
     return (
       <EmptyState
         title="Không tìm thấy thông tin lớp học"
@@ -97,82 +128,117 @@ export function ClassDetailPage() {
         }
         action={
           <button
+            className="button primary"
             onClick={() => navigate("/member/classes")}
-            style={{
-              padding: "10px 18px",
-              backgroundColor: "#203d31",
-              color: "#ffffff",
-              borderRadius: 8,
-              border: "none",
-              cursor: "pointer",
-            }}
           >
             Quay lại danh sách lớp
           </button>
         }
       />
     );
-  }
 
   const coaches = cls.coaches || [];
-  const schedules = scheduleData?.schedules || [];
+  const course = plan?.course;
+  const registration = plan?.registration;
+  const mutationBlockers = courseBlockers(actionError);
+
+  const blockerActions = (blockers: CourseRegistrationBlocker[]) => {
+    const codes = blockers.map((blocker) => blocker.code);
+    const needsMembership = codes.some((code) =>
+      [
+        "SUBSCRIPTION_ENDS_BEFORE_COURSE_END",
+        "NO_ACTIVE_SUBSCRIPTION",
+        "PREMIUM_REQUIRED",
+      ].includes(code),
+    );
+    const membershipLabel = codes.includes("NO_ACTIVE_SUBSCRIPTION")
+      ? "Mua gói"
+      : codes.includes("PREMIUM_REQUIRED")
+        ? "Nâng cấp gói"
+        : "Gia hạn ngay";
+    return (
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {needsMembership && (
+          <button
+            className="button primary"
+            onClick={() => navigate("/member/membership")}
+          >
+            {membershipLabel}
+          </button>
+        )}
+        {codes.includes("CONCURRENT_CLASS_LIMIT_REACHED") && (
+          <button
+            className="button"
+            onClick={() => navigate("/member/my-classes")}
+          >
+            Xem các lớp đang giữ
+          </button>
+        )}
+        {codes.includes("ATTENDANCE_PENALTY_ACTIVE") && (
+          <span style={{ alignSelf: "center", fontSize: 13 }}>
+            Vui lòng liên hệ quản lý trung tâm để được hỗ trợ.
+          </span>
+        )}
+      </div>
+    );
+  };
+  const blockerList = (blockers: CourseRegistrationBlocker[]) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <ul style={{ margin: 0, paddingLeft: 22 }}>
+        {blockers.map((blocker, index) => (
+          <li key={`${blocker.code}-${blocker.sessionId || index}`}>
+            {blockerText(blocker)}
+          </li>
+        ))}
+      </ul>
+      {blockerActions(blockers)}
+    </div>
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {actionError && /gói|hết hạn|Premium/i.test(actionError) && (
-        <button
-          className="button primary"
-          onClick={() => navigate("/member/membership")}
-        >
-          Gia hạn ngay
-        </button>
-      )}
-      {/* BACK BUTTON */}
-      <div>
-        <button
-          onClick={() => navigate("/member/classes")}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            background: "none",
-            border: "none",
-            color: "#54655d",
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer",
-            padding: 0,
-          }}
-        >
-          <ArrowLeft size={16} /> Quay lại danh sách lớp
-        </button>
-      </div>
+      <button
+        onClick={() => navigate("/member/classes")}
+        style={{
+          alignSelf: "flex-start",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          background: "none",
+          border: "none",
+          color: "#54655d",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        <ArrowLeft size={16} /> Quay lại danh sách lớp
+      </button>
 
       {actionSuccess && (
         <AlertBanner
           type="success"
-          title="Thành công"
+          title="Đăng ký thành công"
           message={actionSuccess}
         />
       )}
-
-      {actionError && (
-        <AlertBanner
-          type="error"
-          title="Không thể đặt lịch"
-          message={actionError}
-        />
+      {actionError !== null && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <AlertBanner
+            type="error"
+            title="Không thể đăng ký trọn khóa"
+            message={
+              actionError instanceof Error
+                ? actionError.message
+                : "Đăng ký khóa học thất bại. Vui lòng thử lại."
+            }
+          />
+          {mutationBlockers.length > 0 && blockerList(mutationBlockers)}
+        </div>
       )}
 
-      {/* CLASS OVERVIEW CARD */}
-      <div
-        style={{
-          background: "#ffffff",
-          borderRadius: 20,
-          border: "1px solid #e7ece9",
-          padding: 28,
-        }}
-      >
+      <section style={cardStyle}>
         <div
           style={{
             display: "flex",
@@ -203,7 +269,6 @@ export function ClassDetailPage() {
             Tối đa: <strong>{cls.capacity} học viên/ca</strong>
           </span>
         </div>
-
         <h1
           style={{
             fontSize: 26,
@@ -214,7 +279,6 @@ export function ClassDetailPage() {
         >
           {cls.name}
         </h1>
-
         <p
           style={{
             color: "#475467",
@@ -227,8 +291,6 @@ export function ClassDetailPage() {
           {cls.description ||
             "Lớp học được thiết kế chuyên sâu giúp học viên nâng cao kỹ thuật, phát triển thể lực và giữ vững phong độ."}
         </p>
-
-        {/* COACHES ROW */}
         <div style={{ paddingTop: 18, borderTop: "1px solid #f2f5f3" }}>
           <h3
             style={{
@@ -246,9 +308,9 @@ export function ClassDetailPage() {
             </span>
           ) : (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-              {coaches.map((c) => (
+              {coaches.map((assigned) => (
                 <div
-                  key={c.id}
+                  key={assigned.id}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -270,24 +332,19 @@ export function ClassDetailPage() {
                       alignItems: "center",
                       justifyContent: "center",
                       fontWeight: 700,
-                      fontSize: 14,
                     }}
                   >
-                    {c.coach?.user?.fullName?.charAt(0) || "C"}
+                    {assigned.coach?.user?.fullName?.charAt(0) || "C"}
                   </div>
                   <div>
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        fontSize: 13,
-                        color: "#203d31",
-                      }}
-                    >
-                      {c.coach?.user?.fullName}
-                    </div>
+                    <strong style={{ fontSize: 13, color: "#203d31" }}>
+                      {assigned.coach?.user?.fullName}
+                    </strong>
                     <div style={{ fontSize: 11, color: "#58695f" }}>
-                      {c.coach?.specialization ||
-                        "Huấn luyện viên chuyên nghiệp"}
+                      {assigned.isPrimary ? "HLV chính" : "HLV hỗ trợ"}
+                      {assigned.coach?.specialization
+                        ? ` · ${assigned.coach.specialization}`
+                        : ""}
                     </div>
                   </div>
                 </div>
@@ -295,26 +352,26 @@ export function ClassDetailPage() {
             </div>
           )}
         </div>
-      </div>
+      </section>
 
       {coaches.map(
-        (c) =>
-          c.coach?.id && (
-            <details className="detail-disclosure" key={c.coach.id}>
-              <summary>Đánh giá · {c.coach.user?.fullName}</summary>
+        (assigned) =>
+          assigned.coach?.id && (
+            <details className="detail-disclosure" key={assigned.coach.id}>
+              <summary>Đánh giá · {assigned.coach.user?.fullName}</summary>
               <div className="workflow-card">
                 <CoachFeedback
-                  coachId={c.coach.id}
+                  coachId={assigned.coach.id}
                   classId={cls.id}
                   role="MEMBER"
                   canReview={Boolean(
                     enrollments.data?.enrollments.some(
-                      (e) =>
-                        ["BOOKED", "COMPLETED"].includes(e.status) &&
-                        (e.classId === cls.id ||
-                          e.schedule?.class?.id === cls.id ||
-                          e.schedule?.class?.coaches?.some(
-                            (assigned) => assigned.coach?.id === c.coach.id,
+                      (enrollment) =>
+                        ["BOOKED", "COMPLETED"].includes(enrollment.status) &&
+                        (enrollment.classId === cls.id ||
+                          enrollment.schedule?.class?.id === cls.id ||
+                          enrollment.schedule?.class?.coaches?.some(
+                            (coach) => coach.coach?.id === assigned.coach.id,
                           )),
                     ),
                   )}
@@ -323,252 +380,237 @@ export function ClassDetailPage() {
             </details>
           ),
       )}
-      {/* SCHEDULES & BOOKING SECTION */}
-      <div
-        style={{
-          background: "#ffffff",
-          borderRadius: 20,
-          border: "1px solid #e7ece9",
-          padding: 28,
-        }}
-      >
-        <div
+
+      <section style={cardStyle}>
+        <h2
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 20,
+            fontSize: 18,
+            fontWeight: 800,
+            color: "#203d31",
+            margin: "0 0 4px",
           }}
         >
-          <div>
-            <h2
-              style={{
-                fontSize: 18,
-                fontWeight: 800,
-                color: "#203d31",
-                margin: "0 0 4px",
-              }}
-            >
-              Lịch học sắp diễn ra
-            </h2>
-            <p style={{ margin: 0, color: "#58695f", fontSize: 13 }}>
-              Chọn ca học phù hợp với thời gian của bạn và bấm Đặt chỗ
-            </p>
-          </div>
-        </div>
-
-        {scheduleError ? (
-          <ErrorState error={scheduleError} />
-        ) : scheduleLoading ? (
-          <LoadingSpinner text="Đang tải các ca học..." />
-        ) : schedules.length === 0 ? (
+          Khóa học
+        </h2>
+        <p style={{ margin: "0 0 20px", color: "#58695f", fontSize: 13 }}>
+          Toàn bộ lịch trình của lớp — đăng ký một lần cho cả khóa
+        </p>
+        {planError ? (
+          <ErrorState error={planError} />
+        ) : planLoading ? (
+          <LoadingSpinner text="Đang tải lịch trình khóa học..." />
+        ) : !course ? (
           <EmptyState
             icon={<Calendar size={36} />}
             title="Chưa có ca học sắp tới"
             description="Hiện chưa có ca học nào được lên lịch cho lớp này. Vui lòng quay lại sau."
           />
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {schedules.map((sch) => {
-              const startTime = new Date(sch.startTime);
-              const endTime = new Date(sch.endTime);
-              const isPast = startTime <= new Date();
-
-              const bookedEnrollments = sch._count?.enrollments ?? 0;
-              const remaining = Math.max(0, cls.capacity - bookedEnrollments);
-              const isFull = remaining === 0;
-
-              return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 10,
+                color: "#475467",
+                fontSize: 13,
+              }}
+            >
+              <strong>{course.totalSessions} buổi</strong>
+              <span>·</span>
+              <span>
+                {formatMemberDate(course.firstSessionStart)} →{" "}
+                {formatMemberDate(course.lastSessionStart)}
+              </span>
+              <span>·</span>
+              <span>Tối đa {course.capacity} học viên/buổi</span>
+            </div>
+            <div style={{ display: "grid", gap: 10 }}>
+              {course.slots.map((slot) => (
                 <div
-                  key={sch.id}
+                  key={`${slot.weekday}-${slot.startTime}-${slot.roomId}`}
                   style={{
                     display: "flex",
-                    alignItems: "center",
                     justifyContent: "space-between",
+                    alignItems: "center",
                     flexWrap: "wrap",
-                    gap: 16,
-                    padding: "16px 20px",
-                    borderRadius: 14,
-                    backgroundColor: isPast ? "#f9fafb" : "#fcfdfc",
-                    border: "1px solid #e7ece9",
+                    gap: 12,
+                    padding: "14px 16px",
+                    border: "1px solid #d4ebbf",
+                    background: "#f8fcef",
+                    borderRadius: 12,
                   }}
                 >
-                  <div
+                  <div>
+                    <strong style={{ color: "#203d31", fontSize: 14 }}>
+                      {slot.weekdayLabel} · {slot.startTime}–{slot.endTime} ·{" "}
+                      {slot.roomName}
+                    </strong>
+                    <div
+                      style={{ color: "#667085", fontSize: 12, marginTop: 4 }}
+                    >
+                      {formatMemberDate(slot.firstSessionStart)} →{" "}
+                      {formatMemberDate(slot.lastSessionStart)}
+                    </div>
+                  </div>
+                  <span
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 20,
-                      flexWrap: "wrap",
+                      background: "#ffffff",
+                      border: "1px solid #d4ebbf",
+                      borderRadius: 999,
+                      padding: "5px 10px",
+                      color: "#376228",
+                      fontSize: 12,
+                      fontWeight: 700,
                     }}
                   >
-                    {/* Date Badge */}
-                    <div
-                      style={{
-                        textAlign: "center",
-                        minWidth: 70,
-                        backgroundColor: "#f2f8eb",
-                        border: "1px solid #d4ebbf",
-                        borderRadius: 10,
-                        padding: "8px 10px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: "#376228",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        {startTime.toLocaleDateString("vi-VN", {
-                          weekday: "short",
-                        })}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 18,
-                          fontWeight: 800,
-                          color: "#203d31",
-                        }}
-                      >
-                        {startTime.getDate()}/{startTime.getMonth() + 1}
-                      </div>
-                    </div>
-
-                    {/* Time & Room Details */}
-                    <div>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          fontSize: 15,
-                          fontWeight: 700,
-                          color: "#203d31",
-                        }}
-                      >
-                        <Clock size={16} color="#58695f" />
-                        <span>
-                          {formatMemberDate(startTime, {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}{" "}
-                          -{" "}
-                          {formatMemberDate(endTime, {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 14,
-                          marginTop: 4,
-                          fontSize: 13,
-                          color: "#54655d",
-                        }}
-                      >
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
-                          <MapPin size={14} color="#58695f" />
-                          Phòng: <strong>{sch.room?.name || "Sân tập"}</strong>
-                        </span>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
-                          <Users size={14} color="#58695f" />
-                          Còn trống:{" "}
-                          <strong
-                            style={{ color: isFull ? "#d92d20" : "#267346" }}
-                          >
-                            {isFull
-                              ? "Hết chỗ"
-                              : `${remaining}/${cls.capacity}`}
-                          </strong>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ACTION BUTTON */}
-                  <div>
-                    <button
-                      disabled={
-                        isPast ||
-                        isFull ||
-                        bookMutation.isPending ||
-                        !cls.isActive ||
-                        sch.status !== "SCHEDULED"
-                      }
-                      onClick={() => {
-                        setSelectedSchedule(sch);
-                        setConfirmOpen(true);
-                        setActionError(null);
-                        setActionSuccess(null);
-                      }}
-                      style={{
-                        padding: "10px 22px",
-                        backgroundColor:
-                          isPast || isFull ? "#e4e7e6" : "#203d31",
-                        color: isPast || isFull ? "#8c9b94" : "#ffffff",
-                        border: "none",
-                        borderRadius: 10,
-                        fontWeight: 700,
-                        fontSize: 13,
-                        cursor: isPast || isFull ? "not-allowed" : "pointer",
-                        transition: "background 0.15s",
-                      }}
-                    >
-                      {isPast ? "Đã qua" : isFull ? "Đã đầy chỗ" : "Đặt ca học"}
-                    </button>
-                  </div>
+                    {slot.sessionCount} buổi
+                  </span>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color:
+                    course.availability.minRemainingSlots === 0
+                      ? "#d92d20"
+                      : "#267346",
+                  fontSize: 13,
+                  fontWeight: 700,
+                }}
+              >
+                <Users size={16} /> Còn {course.availability.minRemainingSlots}/
+                {course.capacity} chỗ/buổi
+              </span>
+              {course.availability.fullSessionCount > 0 && (
+                <span style={{ color: "#d92d20", fontSize: 13 }}>
+                  Có {course.availability.fullSessionCount} buổi đã hết chỗ
+                </span>
+              )}
+            </div>
+            {registration && !registration.eligible && (
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 10 }}
+              >
+                <AlertBanner
+                  type="warning"
+                  title="Chưa thể đăng ký trọn khóa"
+                  message="Vui lòng xử lý các điều kiện dưới đây trước khi đăng ký."
+                />
+                {blockerList(registration.blockers)}
+              </div>
+            )}
+            <button
+              className="button primary"
+              disabled={
+                enrollCourseMutation.isPending ||
+                !registration ||
+                !registration.eligible ||
+                course.availability.minRemainingSlots === 0
+              }
+              onClick={() => {
+                setActionError(null);
+                setActionSuccess(null);
+                setConfirmOpen(true);
+              }}
+              style={{ alignSelf: "flex-start" }}
+            >
+              {!registration ||
+              !registration.eligible ||
+              course.availability.minRemainingSlots === 0
+                ? "Chưa thể đăng ký"
+                : "Đăng ký trọn khóa"}
+            </button>
+            <details className="detail-disclosure">
+              <summary>Xem {course.totalSessions} buổi học</summary>
+              <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                {plan.sessions.map((session) => {
+                  const label = sessionLabel(session);
+                  return (
+                    <div
+                      key={session.id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: 14,
+                        padding: "14px 16px",
+                        border: "1px solid #e7ece9",
+                        borderRadius: 12,
+                      }}
+                    >
+                      <div>
+                        <strong style={{ color: "#203d31", fontSize: 13 }}>
+                          <Clock
+                            size={14}
+                            style={{ verticalAlign: "middle" }}
+                          />{" "}
+                          {session.weekdayLabel} · {session.timeLabel}
+                        </strong>
+                        <div
+                          style={{
+                            color: "#667085",
+                            fontSize: 12,
+                            marginTop: 5,
+                          }}
+                        >
+                          {formatMemberDate(session.startTime)} ·{" "}
+                          <MapPin
+                            size={13}
+                            style={{ verticalAlign: "middle" }}
+                          />{" "}
+                          {session.room.name} ·{" "}
+                          {session.isFull
+                            ? "Hết chỗ"
+                            : `Còn ${session.remainingSlots}/${course.capacity}`}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          padding: "5px 9px",
+                          borderRadius: 999,
+                          color: label.color,
+                          background: label.background,
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {label.text}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* CONFIRMATION MODAL */}
       <ConfirmModal
         isOpen={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        onConfirm={() => {
-          if (selectedSchedule) {
-            bookMutation.mutate(selectedSchedule.id);
-          }
-        }}
-        title="Xác nhận Đặt lịch Ca học"
-        message={`Bạn có chắc chắn muốn đặt ca học "${cls.name}" vào ngày ${
-          selectedSchedule
-            ? formatMemberDate(selectedSchedule.startTime) +
-              " (" +
-              formatMemberDate(selectedSchedule.startTime, {
-                hour: "2-digit",
-                minute: "2-digit",
-              }) +
-              " - " +
-              formatMemberDate(selectedSchedule.endTime, {
-                hour: "2-digit",
-                minute: "2-digit",
-              }) +
-              ")"
+        onConfirm={() => enrollCourseMutation.mutate()}
+        title="Xác nhận đăng ký trọn khóa"
+        message={
+          course
+            ? `Bạn sẽ đăng ký khóa "${course.className}" gồm ${course.totalSessions} buổi, từ ${formatMemberDate(course.firstSessionStart)} đến ${formatMemberDate(course.lastSessionEnd)}. Lịch học: ${course.slots.map((slot) => `${slot.weekdayLabel} ${slot.startTime}–${slot.endTime}`).join("; ")}. Học phí theo gói hội viên hiện tại.`
             : ""
-        }?`}
-        confirmText="Xác nhận đặt chỗ"
+        }
+        confirmText="Xác nhận đăng ký"
         cancelText="Để sau"
-        loading={bookMutation.isPending}
+        loading={enrollCourseMutation.isPending}
       />
     </div>
   );

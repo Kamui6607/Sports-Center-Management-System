@@ -7,7 +7,7 @@ export const CreateUserSchema = z.object({
   phone: z.string().regex(/^[0-9+\-() ]*$/, "Phone must not contain special characters").optional(),
   gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
   dateOfBirth: z.string().optional(),
-  role: z.enum(["MEMBER", "COACH", "MANAGER"]),
+  role: z.enum(["MEMBER", "COACH", "STAFF", "MANAGER"]),
   fitnessGoal: z.string().optional(),
   trainingLevel: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]).optional(),
   trainingPreference: z.string().optional(),
@@ -19,13 +19,13 @@ export const UpdateUserSchema = z.object({
   gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
   dateOfBirth: z.string().optional(),
   isActive: z.boolean().optional(),
-  role: z.enum(["MEMBER", "COACH", "MANAGER"]).optional(),
+  role: z.enum(["MEMBER", "COACH", "STAFF", "MANAGER"]).optional(),
 });
 
 export const UserQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
-  role: z.enum(["MEMBER", "COACH", "MANAGER"]).optional(),
+  role: z.enum(["MEMBER", "COACH", "STAFF", "MANAGER"]).optional(),
   isActive: z.string().optional(),
   search: z.string().optional(),
 });

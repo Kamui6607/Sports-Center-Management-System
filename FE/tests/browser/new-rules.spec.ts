@@ -42,6 +42,90 @@ async function fixture(page: Page, role = "MEMBER") {
       };
     else if (path === "/classes") data = [cls];
     else if (path === "/classes/c1") data = cls;
+    else if (path === "/classes/c1/course-plan")
+      data = {
+        course: {
+          classId: "c1",
+          className: cls.name,
+          description: null,
+          classType: "REGULAR",
+          areaType: "INDOOR",
+          capacity: 20,
+          sports: [],
+          totalSessions: 1,
+          firstSessionStart: "2026-09-21T03:00:00Z",
+          lastSessionStart: "2026-09-21T03:00:00Z",
+          lastSessionEnd: "2026-09-21T04:00:00Z",
+          weekdays: [1],
+          weekdayLabels: ["Thứ 2"],
+          timeSlots: [
+            { startTime: "10:00", endTime: "11:00", durationMinutes: 60 },
+          ],
+          rooms: [],
+          slots: [
+            {
+              weekday: 1,
+              weekdayLabel: "Thứ 2",
+              startTime: "10:00",
+              endTime: "11:00",
+              durationMinutes: 60,
+              roomId: "r1",
+              roomName: "Phòng A",
+              sessionCount: 1,
+              firstSessionStart: "2026-09-21T03:00:00Z",
+              lastSessionStart: "2026-09-21T03:00:00Z",
+              sessionIds: ["future"],
+            },
+          ],
+          availability: {
+            minRemainingSlots: 20,
+            fullSessionCount: 0,
+            isFullyBookable: true,
+          },
+        },
+        sessions: [
+          {
+            id: "future",
+            startTime: "2026-09-21T03:00:00Z",
+            endTime: "2026-09-21T04:00:00Z",
+            durationMinutes: 60,
+            weekday: 1,
+            weekdayLabel: "Thứ 2",
+            timeLabel: "10:00–11:00",
+            status: "SCHEDULED",
+            room: { id: "r1", name: "Phòng A", areaType: "INDOOR" },
+            bookedCount: 0,
+            remainingSlots: 20,
+            isFull: false,
+            isBookable: true,
+            canBook: true,
+            myEnrollmentId: null,
+            myEnrollmentStatus: null,
+            conflictWith: null,
+          },
+        ],
+        registration: {
+          eligible: true,
+          blockers: [],
+          subscription: {
+            tier: "MEMBERSHIP",
+            endDate: "2026-12-31T00:00:00Z",
+            planName: "Gói test",
+          },
+          quota: {
+            tier: "MEMBERSHIP",
+            limit: 3,
+            used: 0,
+            remaining: 3,
+            classes: [],
+            hasActiveSubscription: true,
+          },
+          penalty: null,
+          registeredSessions: 0,
+          remainingSessionsToRegister: 1,
+          isFullyRegistered: false,
+        },
+      };
     else if (path === "/sports")
       data = [
         { id: "s1", name: "Yoga", isActive: true },
@@ -274,45 +358,37 @@ test("expired membership QR response offers renewal and never reports success", 
   ).toHaveCount(0);
 });
 
-test("booking conflict preserves server message and does not report a booking", async ({
+test("whole-course conflict preserves every blocker and does not report success", async ({
   page,
 }) => {
   await fixture(page);
-  await page.route("**/class-schedules?**", (route) =>
-    route.fulfill({
-      json: {
-        success: true,
-        data: [
-          {
-            id: "future",
-            startTime: "2026-09-21T03:00:00Z",
-            endTime: "2026-09-21T04:00:00Z",
-            status: "SCHEDULED",
-            class: { capacity: 20 },
-            room: { name: "Phòng A" },
-            _count: { enrollments: 0 },
-          },
-        ],
-      },
-    }),
-  );
-  await page.route("**/enrollments", (route) =>
+  await page.route("**/enrollments/bulk", (route) =>
     route.fulfill({
       status: 409,
       json: {
         success: false,
-        message: "You have a conflicting class 'Yoga buổi sáng' at this time",
+        message: "Không thể đăng ký trọn khóa",
+        errors: {
+          code: "COURSE_ENROLLMENT_FAILED",
+          details: [
+            {
+              code: "TIME_CONFLICT",
+              message: 'Buổi học trùng giờ với lớp "Yoga buổi sáng".',
+              startTime: "2026-09-21T03:00:00Z",
+            },
+          ],
+        },
       },
     }),
   );
   await page.goto("/member/classes/c1");
-  await page.getByRole("button", { name: "Đặt ca học" }).first().click();
+  await page.getByRole("button", { name: "Đăng ký trọn khóa" }).click();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: /Xác nhận/ })
+    .getByRole("button", { name: "Xác nhận đăng ký" })
     .click();
   await expect(
-    page.getByText(/Bạn bị trùng giờ với lớp đã đăng ký/),
+    page.getByText(/Buổi học trùng giờ với lớp "Yoga buổi sáng"/),
   ).toBeVisible();
-  await expect(page.getByText(/Đặt lớp học thành công/)).toHaveCount(0);
+  await expect(page.getByText(/Đăng ký thành công/)).toHaveCount(0);
 });

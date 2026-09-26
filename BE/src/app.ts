@@ -13,7 +13,8 @@ import authRoutes from "./modules/auth/auth.routes.js";
 import userRoutes from "./modules/users/users.routes.js";
 import memberRoutes from "./modules/members/members.routes.js";
 import coachRoutes from "./modules/coaches/coaches.routes.js";
-import coursePurchaseRoutes from "./modules/course-purchases/course-purchases.routes.js";
+import membershipPlanRoutes from "./modules/membership-plans/membership-plans.routes.js";
+import subscriptionRoutes from "./modules/subscriptions/subscriptions.routes.js";
 import sportRoutes from "./modules/sports/sports.routes.js";
 import roomRoutes from "./modules/rooms/rooms.routes.js";
 import classRoutes from "./modules/classes/classes.routes.js";
@@ -30,12 +31,31 @@ import feedbackRoutes from "./modules/feedbacks/feedbacks.routes.js";
 
 const app = express();
 
+app.set("etag", false);
+
 // Global middlewares
 app.use(helmet());
 app.use(cors());
 app.use(morgan("dev"));
-app.use(express.json());
+app.use(
+  express.json({
+    // Giữ raw bytes của body: chữ ký HMAC-SHA256 webhook SePay ký trên
+    // `{timestamp}.{rawBody}` — KHÔNG thể re-serialize từ req.body (key order/whitespace lệch).
+    verify: (req, _res, buf) => {
+      (req as import("express").Request & { rawBody?: Buffer }).rawBody =
+        Buffer.from(buf);
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
+
+// API dữ liệu theo phiên: cấm cache (browser/CDN) — tránh conditional request/304.
+// Bỏ qua /docs (tài nguyên Swagger UI tĩnh vẫn nên được cache).
+app.use("/api/v1", (req, res, next) => {
+  if (req.path.startsWith("/docs")) return next();
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
 
 // Swagger
 app.use(
@@ -61,7 +81,8 @@ app.use(`${v1}/auth`, authRoutes);
 app.use(`${v1}/users`, userRoutes);
 app.use(`${v1}/members`, memberRoutes);
 app.use(`${v1}/coaches`, coachRoutes);
-app.use(`${v1}/course-purchases`, coursePurchaseRoutes);
+app.use(`${v1}/membership-plans`, membershipPlanRoutes);
+app.use(`${v1}/subscriptions`, subscriptionRoutes);
 app.use(`${v1}/sports`, sportRoutes);
 app.use(`${v1}/rooms`, roomRoutes);
 app.use(`${v1}/classes`, classRoutes);

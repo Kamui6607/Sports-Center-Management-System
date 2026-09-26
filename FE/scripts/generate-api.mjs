@@ -1,6 +1,22 @@
 import fs from "node:fs";
+const openApiUrl =
+  "https://sports-center-management-system.onrender.com/api/v1/docs/swagger-ui-init.js";
+const openApiFile = new URL("../docs/openapi.json", import.meta.url);
+
+if (process.argv.includes("--live")) {
+  const source = await fetch(openApiUrl).then((response) => {
+    if (!response.ok)
+      throw new Error(`Cannot download Swagger (${response.status})`);
+    return response.text();
+  });
+  const match = source.match(
+    /"swaggerDoc"\s*:\s*([\s\S]+?),\s*"customOptions"\s*:/,
+  );
+  if (!match) throw new Error("Cannot locate swaggerDoc in Swagger UI bundle");
+  fs.writeFileSync(openApiFile, JSON.stringify(JSON.parse(match[1]), null, 2));
+}
 const doc = JSON.parse(
-  fs.readFileSync(new URL("../docs/openapi.json", import.meta.url), "utf8"),
+  fs.readFileSync(openApiFile, "utf8"),
 );
 const schemaType = (s) =>
   s.enum
@@ -36,8 +52,14 @@ const exampleType = (v) =>
 let ts =
   "// Generated from Swagger. Response types describe documented examples, not exhaustive schemas.\n";
 const ops = {};
-let md =
-  "# OpenAPI endpoint inventory\n\nSource: https://sports-center-management-system.onrender.com/api/v1/docs/swagger-ui-init.js\n\nSnapshot: 2026-09-20. Production base: https://sports-center-management-system.onrender.com/api/v1\n\nResponse examples are documentation only, never application data. Coaches use undefined bearerAuth capitalization; client sends the documented HTTP Bearer token.\n";
+let md = `# OpenAPI endpoint inventory
+
+Source: ${openApiUrl}
+
+Snapshot: ${new Date().toISOString().slice(0, 10)}. Production base: https://sports-center-management-system.onrender.com/api/v1
+
+Response examples are documentation only, never application data. The client sends the documented HTTP Bearer token.
+`;
 for (const [p, methods] of Object.entries(doc.paths))
   for (const [m, o] of Object.entries(methods)) {
     const key = m.toUpperCase() + " " + p;

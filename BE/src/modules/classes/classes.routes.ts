@@ -101,52 +101,51 @@ router.get(
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
+router.get("/:id", authenticate, classesController.getClassById);
+
 /**
  * @swagger
- * /classes/my:
+ * /classes/{id}/course-plan:
  *   get:
- *     summary: List my own courses (COACH)
- *     description: Trả các khóa học mà Coach đang đăng nhập SỞ HỮU (`Class.ownerCoachId`), kể cả khóa đã tắt bán.
+ *     summary: View a class as ONE course (grouped recurring timetable) + whole-course enrollment eligibility
+ *     description: |
+ *       **"Nguyên cái lịch trình" của một Class** — dùng cho màn hình chi tiết lớp của hội viên.
+ *
+ *       Thay vì liệt kê từng buổi rời rạc, BE gom TẤT CẢ buổi `SCHEDULED` chưa bắt đầu thành:
+ *       - `course.slots[]`: khung lịch lặp lại theo (Thứ + giờ + phòng), ví dụ "Thứ 2 · 18:00–19:30 · Phòng Yoga",
+ *         kèm `sessionCount`, `firstSessionStart`, `lastSessionStart`, `sessionIds`.
+ *       - `course`: tổng số buổi, buổi đầu/cuối, các thứ, các phòng, `timeSlots`, `availability`
+ *         (`minRemainingSlots` = chỗ trống ít nhất qua các buổi, `fullSessionCount`, `isFullyBookable`).
+ *       - `sessions[]`: từng buổi kèm `weekdayLabel`/`timeLabel` (giờ VN), `remainingSlots`, `isFull`,
+ *         `canBook`, `myEnrollmentStatus` của chính hội viên (nếu caller là MEMBER).
+ *       - `registration` (chỉ MEMBER): preview điều kiện **đăng ký trọn khóa** theo đúng bộ luật
+ *         all-or-nothing của `POST /enrollments/bulk` — `eligible`, `blockers[]` (code + message + sessionId),
+ *         `subscription`, `quota`, `penalty`, `registeredSessions`, `isFullyRegistered`.
+ *
+ *       Thứ/giờ được tính theo múi giờ **Asia/Ho_Chi_Minh**, không phụ thuộc timezone của server.
  *     tags: [Classes]
  *     security:
  *       - BearerAuth: []
  *     parameters:
- *       - in: query
- *         name: isActive
- *         schema: { type: string, enum: ["true", "false"] }
- *       - in: query
- *         name: page
- *         schema: { type: integer, default: 1 }
- *       - in: query
- *         name: limit
- *         schema: { type: integer, default: 10 }
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Class ID
  *     responses:
- *       200: { $ref: "#/components/responses/ClassListOk" }
+ *       200: { $ref: "#/components/responses/ClassOk" }
  *       401: { $ref: "#/components/responses/Unauthorized" }
- *       403: { $ref: "#/components/responses/Forbidden" }
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.get(
-  "/my",
-  authenticate, authorize("COACH"),
-  validate(ClassQuerySchema, "query"),
-  classesController.listMyCourses
-);
-
-router.get("/:id", authenticate, classesController.getClassById);
+router.get("/:id/course-plan", authenticate, classesController.getClassCoursePlan);
 
 /**
  * @swagger
  * /classes:
  *   post:
- *     summary: Create a new course (MANAGER any; COACH creates own course)
- *     description: |
- *       - **MANAGER**: tạo khóa học bất kỳ, có thể gán `ownerCoachId` (Coach sở hữu khóa học).
- *       - **COACH**: chỉ tạo được khóa học CỦA CHÍNH MÌNH — backend tự gán `ownerCoachId` = coach
- *         đang đăng nhập và thêm coach đó làm **HLV chính** của khóa; gửi `ownerCoachId` khác sẽ bị 403.
- *       - `price` = giá Member phải trả (Member trả đúng giá này; nền tảng giữ 15% hoa hồng, Coach nhận 85%).
- *       - `durationDays` = thời hạn sử dụng kể từ lúc mua; bỏ trống ⇒ khóa không giới hạn thời hạn.
+ *     summary: Create a new class
  *     tags: [Classes]
  *     requestBody:
  *       required: true
@@ -183,24 +182,6 @@ router.get("/:id", authenticate, classesController.getClassById);
  *                 enum: [POOL, INDOOR, OUTDOOR]
  *                 example: "INDOOR"
  *                 description: "Area type required by this class. Every selected sport must support it."
- *               price:
- *                 type: number
- *                 default: 0
- *                 description: "Giá khóa học Member phải trả (0 = miễn phí)."
- *               durationDays:
- *                 type: integer
- *                 description: "Thời hạn sử dụng kể từ lúc mua; bỏ trống = vĩnh viễn."
- *               ownerCoachId:
- *                 type: string
- *                 description: "MANAGER only — CoachProfile.id của Coach sở hữu khóa học."
- *           example:
- *             name: "Morning Yoga"
- *             sportIds: ["sport-uuid"]
- *             capacity: 20
- *             classType: "REGULAR"
- *             areaType: "INDOOR"
- *             price: 500000
- *             durationDays: 30
  *     responses:
  *       201: { $ref: "#/components/responses/ClassCreated" }
  *       400: { $ref: "#/components/responses/BadRequest" }
@@ -212,7 +193,7 @@ router.get("/:id", authenticate, classesController.getClassById);
 router.post(
   "/",
   authenticate,
-  authorize("MANAGER", "COACH"),
+  authorize("MANAGER", "STAFF"),
   validate(CreateClassSchema),
   classesController.createClass
 );
@@ -221,9 +202,7 @@ router.post(
  * @swagger
  * /classes/{id}:
  *   patch:
- *     summary: Update course (MANAGER any; COACH only own course)
- *     description: |
- *       COACH chỉ sửa được khóa học do mình sở hữu (`Class.ownerCoachId`); đổi `ownerCoachId` chỉ MANAGER được phép.
+ *     summary: Update class
  *     tags: [Classes]
  *     parameters:
  *       - in: path
@@ -256,16 +235,6 @@ router.post(
  *                 type: string
  *                 enum: [POOL, INDOOR, OUTDOOR]
  *                 description: "New area type. All sports of this class must support it, and upcoming schedules must use a matching Room."
- *               price:
- *                 type: number
- *                 description: "Giá khóa học Member phải trả (Member trả đúng giá này)."
- *               durationDays:
- *                 type: integer
- *                 nullable: true
- *                 description: "Thời hạn sử dụng kể từ lúc mua; null = vĩnh viễn."
- *               ownerCoachId:
- *                 type: string
- *                 description: "MANAGER only — đổi Coach sở hữu khóa học."
  *               isActive:
  *                 type: boolean
  *     responses:
@@ -279,7 +248,7 @@ router.post(
 router.patch(
   "/:id",
   authenticate,
-  authorize("MANAGER", "COACH"),
+  authorize("MANAGER", "STAFF"),
   validate(UpdateClassSchema),
   classesController.updateClass
 );
@@ -288,8 +257,7 @@ router.patch(
  * @swagger
  * /classes/{id}:
  *   delete:
- *     summary: Deactivate course (soft delete; MANAGER any, COACH only own course)
- *     description: Không thể ngừng bán khi khóa còn buổi SCHEDULED sắp tới hoặc còn member đang sở hữu (CoursePurchase ACTIVE).
+ *     summary: Deactivate class (soft delete)
  *     tags: [Classes]
  *     parameters:
  *       - in: path
@@ -308,7 +276,7 @@ router.patch(
 router.delete(
   "/:id",
   authenticate,
-  authorize("MANAGER", "COACH"),
+  authorize("MANAGER", "STAFF"),
   classesController.deleteClass
 );
 
@@ -352,7 +320,7 @@ router.delete(
 router.post(
   "/:id/coaches",
   authenticate,
-  authorize("MANAGER"),
+  authorize("MANAGER", "STAFF"),
   validate(AssignCoachSchema),
   classesController.assignCoach
 );
@@ -399,7 +367,7 @@ router.post(
 router.post(
   "/:id/coaches/support",
   authenticate,
-  authorize("MANAGER", "COACH"),
+  authorize("MANAGER", "STAFF"),
   validate(AssignSupportCoachSchema),
   classesController.assignSupportCoach
 );
@@ -434,7 +402,7 @@ router.post(
 router.delete(
   "/:id/coaches/:coachId",
   authenticate,
-  authorize("MANAGER", "COACH"),
+  authorize("MANAGER", "STAFF"),
   classesController.removeCoach
 );
 

@@ -1,4 +1,5 @@
 import operations from "./operations.json";
+import { toast } from "./toast";
 import { localizeApiError } from "./apiErrors";
 import { terminalSessionError } from "./businessRules";
 import type { LoginOk, ProfileOk, PostAuthLoginRequest } from "./generated";
@@ -47,6 +48,7 @@ export const BASE_URL = (
 ).replace(/\/$/, "");
 let accessToken = sessionStorage.getItem("pulse.access") || "";
 let refreshToken = sessionStorage.getItem("pulse.refresh") || "";
+export const getAccessToken = () => accessToken;
 export const hasSession = () => Boolean(accessToken || refreshToken);
 export function clearSession() {
   accessToken = "";
@@ -66,6 +68,7 @@ export class ApiError extends Error {
     public status: number,
     public errors: Envelope<unknown>["errors"] = [],
     public terminalSession = false,
+    public details?: unknown,
   ) {
     super(message);
   }
@@ -80,6 +83,7 @@ async function transport(
   try {
     res = await fetch(BASE_URL + path, {
       method,
+      cache: "no-store",
       headers: {
         Accept: "application/json",
         ...(body !== undefined && !(body instanceof FormData)
@@ -114,17 +118,16 @@ async function transport(
     );
   }
   if (!res.ok || payload.success === false) {
-    const localized = localizeApiError(
-      payload.message,
-      payload.errors,
-      res.status,
-    );
-    throw new ApiError(
+    const rawErrors = (payload as unknown as { errors?: unknown }).errors;
+    const localized = localizeApiError(payload.message, rawErrors, res.status);
+    const error = new ApiError(
       localized.message,
       res.status,
       localized.errors,
       terminalSessionError(String(payload.message || "")),
+      rawErrors,
     );
+    throw error;
   }
   return payload;
 }
@@ -153,7 +156,7 @@ async function refresh() {
     })();
   return refreshing;
 }
-export async function api<T = RecordData>(
+async function apiRequest<T = RecordData>(
   key: string,
   options: {
     params?: Record<string, string>;
@@ -229,6 +232,56 @@ export async function api<T = RecordData>(
       window.dispatchEvent(new Event("session-expired"));
     }
     throw e;
+  }
+}
+export async function api<T = RecordData>(
+  key: string,
+  options: Parameters<typeof apiRequest>[1] = {},
+): Promise<Envelope<T>> {
+  try {
+    const result = await apiRequest<T>(key, options);
+    if (
+      !key.startsWith("GET ") &&
+      !/\/auth\/refresh-token|\/notifications\/.*read|\/chat\//.test(key)
+    ) {
+      const message =
+        key === "POST /payments/sepay/checkout"
+          ? "Đã tạo mã thanh toán. Vui lòng chuyển khoản để kích hoạt gói."
+          : key === "POST /payments/sepay/mock-confirm"
+            ? "Đã gửi xác nhận giả lập. Đang kiểm tra trạng thái thanh toán."
+            : /[À-ỹ]/.test(result.message || "")
+              ? result.message
+              : "Thao tác đã thực hiện thành công.";
+      toast("success", message);
+    }
+    return result;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError")
+      throw error;
+    const code =
+      error instanceof ApiError
+        ? (error.details as { code?: string } | undefined)?.code
+        : undefined;
+    if (
+      error instanceof ApiError &&
+      error.status === 409 &&
+      code === "SEPAY_PAYMENT_PENDING"
+    ) {
+      toast(
+        "info",
+        "Bạn có đơn đang chờ thanh toán. Đã mở lại mã QR của đơn cũ.",
+      );
+    } else {
+      toast(
+        "error",
+        code === "SEPAY_NOT_CONFIGURED"
+          ? "Thanh toán online chưa được cấu hình. Vui lòng thanh toán tại quầy hoặc thử lại sau."
+          : error instanceof Error
+            ? error.message
+            : "Thao tác không thành công. Vui lòng thử lại.",
+      );
+    }
+    throw error;
   }
 }
 export const authService = {

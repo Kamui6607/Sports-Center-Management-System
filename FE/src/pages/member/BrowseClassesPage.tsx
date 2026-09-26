@@ -3,12 +3,42 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { classesApi } from "../../api/classes.api";
-import { Search, Volleyball, Users, Sparkles, ArrowRight } from "lucide-react";
+import type { AreaType } from "../../types/member";
+import {
+  Search,
+  Volleyball,
+  CalendarDays,
+  Clock3,
+  ArrowRight,
+} from "lucide-react";
 import {
   LoadingSpinner,
   EmptyState,
   StatusBadge,
 } from "../../components/common";
+
+function CoursePatternSummary({ classId }: { classId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["course-plan", classId],
+    queryFn: () => classesApi.getCoursePlan(classId),
+  });
+  if (isLoading)
+    return <span style={{ color: "#98a2b3" }}>Đang tải lịch học...</span>;
+  const slots = data?.course?.slots || [];
+  if (!slots.length)
+    return <span style={{ color: "#98a2b3" }}>Chưa có lịch học sắp tới</span>;
+  return slots.slice(0, 4).map((slot) => (
+    <div
+      key={`${slot.weekday}-${slot.startTime}-${slot.roomId}`}
+      style={{ display: "flex", alignItems: "center", gap: 6 }}
+    >
+      <Clock3 size={14} color="#58695f" />
+      <span>
+        {slot.weekdayLabel} · {slot.startTime}–{slot.endTime}
+      </span>
+    </div>
+  ));
+}
 
 export function BrowseClassesPage() {
   const navigate = useNavigate();
@@ -18,6 +48,7 @@ export function BrowseClassesPage() {
   const [selectedType, setSelectedType] = useState<"REGULAR" | "PREMIUM" | "">(
     "",
   );
+  const [selectedArea, setSelectedArea] = useState<AreaType | "">("");
   const [page, setPage] = useState(1);
 
   // Fetch sports for filtering
@@ -32,12 +63,20 @@ export function BrowseClassesPage() {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["classes", search, selectedSport, selectedType, page],
+    queryKey: [
+      "classes",
+      search,
+      selectedSport,
+      selectedType,
+      selectedArea,
+      page,
+    ],
     queryFn: () =>
       classesApi.getClasses({
         search: search || undefined,
         sportId: selectedSport || undefined,
         classType: selectedType || undefined,
+        areaType: selectedArea || undefined,
         isActive: true,
         page,
         limit: 12,
@@ -153,12 +192,29 @@ export function BrowseClassesPage() {
           </select>
         </div>
 
-        {(search || selectedSport || selectedType) && (
+        <div style={{ flex: "0 1 180px" }}>
+          <select
+            aria-label="Lọc theo khu vực tập"
+            value={selectedArea}
+            onChange={(e) => {
+              setSelectedArea(e.target.value as AreaType | "");
+              setPage(1);
+            }}
+          >
+            <option value="">Tất cả khu vực</option>
+            <option value="INDOOR">Trong nhà</option>
+            <option value="OUTDOOR">Ngoài trời</option>
+            <option value="POOL">Hồ bơi</option>
+          </select>
+        </div>
+
+        {(search || selectedSport || selectedType || selectedArea) && (
           <button
             onClick={() => {
               setSearch("");
               setSelectedSport("");
               setSelectedType("");
+              setSelectedArea("");
               setPage(1);
             }}
             style={{
@@ -199,145 +255,130 @@ export function BrowseClassesPage() {
             gap: 20,
           }}
         >
-          {classes.map((c) => {
-            const coaches = c.coaches || [];
-            const primaryCoach = coaches[0]?.coach?.user?.fullName;
-
-            return (
-              <div
-                key={c.id}
-                style={{
-                  backgroundColor: "#ffffff",
-                  borderRadius: 16,
-                  border: "1px solid #e7ece9",
-                  padding: 22,
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.02)",
-                  transition: "box-shadow 0.2s, transform 0.2s",
-                }}
-              >
-                <div>
-                  <div
+          {classes.map((c) => (
+            <div
+              key={c.id}
+              style={{
+                backgroundColor: "#ffffff",
+                borderRadius: 16,
+                border: "1px solid #e7ece9",
+                padding: 22,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.02)",
+                transition: "box-shadow 0.2s, transform 0.2s",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    marginBottom: 12,
+                  }}
+                >
+                  <span
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      marginBottom: 12,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "#203d31",
-                        backgroundColor: "#f2f8eb",
-                        padding: "3px 9px",
-                        borderRadius: 6,
-                        border: "1px solid #d4ebbf",
-                      }}
-                    >
-                      {sportNames(c)}
-                    </span>
-                    <StatusBadge status={c.classType} />
-                  </div>
-
-                  <h3
-                    style={{
-                      fontSize: 18,
-                      fontWeight: 800,
-                      color: "#203d31",
-                      margin: "0 0 8px",
-                      lineHeight: 1.3,
-                    }}
-                  >
-                    {c.name}
-                  </h3>
-
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: "#667085",
-                      lineHeight: 1.5,
-                      margin: "0 0 16px",
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {c.description ||
-                      "Lớp học tiêu chuẩn rèn luyện thể chất với giáo trình bài bản và chuyên nghiệp."}
-                  </p>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 8,
                       fontSize: 12,
-                      color: "#475467",
+                      fontWeight: 700,
+                      color: "#203d31",
+                      backgroundColor: "#f2f8eb",
+                      padding: "3px 9px",
+                      borderRadius: 6,
+                      border: "1px solid #d4ebbf",
                     }}
                   >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 6 }}
-                    >
-                      <Users size={14} color="#58695f" />
-                      <span>
-                        Sức chứa: <strong>{c.capacity} học viên</strong>
-                      </span>
-                    </div>
-
-                    {primaryCoach && (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        <Sparkles size={14} color="#58695f" />
-                        <span>
-                          HLV chính: <strong>{primaryCoach}</strong>
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                    {sportNames(c)}
+                  </span>
+                  <StatusBadge status={c.classType} />
                 </div>
+
+                <h3
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: "#203d31",
+                    margin: "0 0 8px",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {c.name}
+                </h3>
+
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#667085",
+                    lineHeight: 1.5,
+                    margin: "0 0 16px",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                >
+                  {c.description ||
+                    "Lớp học tiêu chuẩn rèn luyện thể chất với giáo trình bài bản và chuyên nghiệp."}
+                </p>
 
                 <div
                   style={{
-                    marginTop: 20,
-                    paddingTop: 16,
-                    borderTop: "1px solid #f2f5f3",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    fontSize: 12,
+                    color: "#475467",
                   }}
                 >
-                  <button
-                    onClick={() => navigate(`/member/classes/${c.id}`)}
+                  <div
                     style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "#f2f8eb",
-                      color: "#203d31",
-                      border: "1px solid #d4ebbf",
-                      borderRadius: 10,
-                      fontSize: 13,
-                      fontWeight: 700,
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      cursor: "pointer",
-                      transition: "background 0.15s",
+                      gap: 6,
+                      fontWeight: 700,
+                      color: "#203d31",
                     }}
                   >
-                    Xem lịch & Đặt chỗ <ArrowRight size={15} />
-                  </button>
+                    <CalendarDays size={15} color="#376228" />
+                    <span>Lịch học trong tuần</span>
+                  </div>
+                  <CoursePatternSummary classId={c.id} />
                 </div>
               </div>
-            );
-          })}
+
+              <div
+                style={{
+                  marginTop: 20,
+                  paddingTop: 16,
+                  borderTop: "1px solid #f2f5f3",
+                }}
+              >
+                <button
+                  onClick={() => navigate(`/member/classes/${c.id}`)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 16px",
+                    backgroundColor: "#f2f8eb",
+                    color: "#203d31",
+                    border: "1px solid #d4ebbf",
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    cursor: "pointer",
+                    transition: "background 0.15s",
+                  }}
+                >
+                  Xem chi tiết khóa học <ArrowRight size={15} />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
       <div className="pagination">

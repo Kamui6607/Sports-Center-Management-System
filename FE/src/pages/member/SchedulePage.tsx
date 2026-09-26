@@ -1,4 +1,9 @@
 import { formatMemberDate } from "../../shared/memberFormat";
+import {
+  MEMBER_TIME_ZONE,
+  memberDateKey,
+  memberWeekStart,
+} from "../../shared/memberCalendar";
 import { ErrorState } from "../../shared/feedback";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -13,19 +18,14 @@ import {
   List,
   Calendar as CalendarIcon,
 } from "lucide-react";
-import { LoadingSpinner, EmptyState} from "../../components/common";
+import { LoadingSpinner, EmptyState } from "../../components/common";
 
 export function SchedulePage() {
   const navigate = useNavigate();
 
   // State for week navigation
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-    const monday = new Date(d.setDate(diff));
-    monday.setHours(0, 0, 0, 0);
-    return monday;
+    return memberWeekStart();
   });
 
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
@@ -33,7 +33,8 @@ export function SchedulePage() {
   // Fetch all booked enrollments
   const { data, isLoading, error } = useQuery({
     queryKey: ["my-enrollments", "BOOKED", 50],
-    queryFn: () => enrollmentsApi.getMyEnrollments({ status: "BOOKED", limit: 50 }),
+    queryFn: () =>
+      enrollmentsApi.getMyEnrollments({ status: "BOOKED", limit: 50 }),
   });
 
   const enrollments = data?.enrollments || [];
@@ -41,29 +42,24 @@ export function SchedulePage() {
   // Generate 7 days of the current week
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const day = new Date(currentWeekStart);
-    day.setDate(day.getDate() + i);
+    day.setUTCDate(day.getUTCDate() + i);
     return day;
   });
 
   const nextWeek = () => {
     const d = new Date(currentWeekStart);
-    d.setDate(d.getDate() + 7);
+    d.setUTCDate(d.getUTCDate() + 7);
     setCurrentWeekStart(d);
   };
 
   const prevWeek = () => {
     const d = new Date(currentWeekStart);
-    d.setDate(d.getDate() - 7);
+    d.setUTCDate(d.getUTCDate() - 7);
     setCurrentWeekStart(d);
   };
 
   const resetToThisWeek = () => {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(d.setDate(diff));
-    monday.setHours(0, 0, 0, 0);
-    setCurrentWeekStart(monday);
+    setCurrentWeekStart(memberWeekStart());
   };
 
   return (
@@ -83,7 +79,14 @@ export function SchedulePage() {
         }}
       >
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#203d31", margin: "0 0 4px" }}>
+          <h1
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              color: "#203d31",
+              margin: "0 0 4px",
+            }}
+          >
             Lịch tập cá nhân
           </h1>
           <p style={{ margin: 0, color: "#58695f", fontSize: 13 }}>
@@ -91,9 +94,24 @@ export function SchedulePage() {
           </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
           {/* Week navigator */}
-          <div style={{ display: "flex", alignItems: "center", backgroundColor: "#f2f5f3", borderRadius: 10, padding: 3 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              backgroundColor: "#f2f5f3",
+              borderRadius: 10,
+              padding: 3,
+            }}
+          >
             <button
               onClick={prevWeek}
               style={{
@@ -139,12 +157,29 @@ export function SchedulePage() {
           </div>
 
           <span style={{ fontSize: 13, fontWeight: 700, color: "#203d31" }}>
-            {weekDays[0].toLocaleDateString("vi-VN", { day: "numeric", month: "numeric" })} -{" "}
-            {weekDays[6].toLocaleDateString("vi-VN", { day: "numeric", month: "numeric", year: "numeric" })}
+            {weekDays[0].toLocaleDateString("vi-VN", {
+              timeZone: MEMBER_TIME_ZONE,
+              day: "numeric",
+              month: "numeric",
+            })}{" "}
+            -{" "}
+            {weekDays[6].toLocaleDateString("vi-VN", {
+              timeZone: MEMBER_TIME_ZONE,
+              day: "numeric",
+              month: "numeric",
+              year: "numeric",
+            })}
           </span>
 
           {/* Toggle View */}
-          <div style={{ display: "flex", backgroundColor: "#f2f5f3", borderRadius: 8, padding: 2 }}>
+          <div
+            style={{
+              display: "flex",
+              backgroundColor: "#f2f5f3",
+              borderRadius: 8,
+              padding: 2,
+            }}
+          >
             <button
               onClick={() => setViewMode("calendar")}
               style={{
@@ -187,7 +222,9 @@ export function SchedulePage() {
 
       {isLoading ? (
         <LoadingSpinner text="Đang tải thời khóa biểu..." />
-      ) : error ? <ErrorState error={error} /> : viewMode === "calendar" ? (
+      ) : error ? (
+        <ErrorState error={error} />
+      ) : viewMode === "calendar" ? (
         /* WEEKLY CALENDAR VIEW */
         <div
           style={{
@@ -197,13 +234,12 @@ export function SchedulePage() {
           }}
         >
           {weekDays.map((date) => {
-            const isToday =
-              date.toDateString() === new Date().toDateString();
+            const isToday = memberDateKey(date) === memberDateKey(new Date());
 
-            const dateStr = date.toISOString().split("T")[0];
+            const dateStr = memberDateKey(date);
             const dayClasses = enrollments.filter((item) => {
               if (!item.schedule?.startTime) return false;
-              return item.schedule.startTime.startsWith(dateStr);
+              return memberDateKey(item.schedule.startTime) === dateStr;
             });
 
             return (
@@ -228,18 +264,51 @@ export function SchedulePage() {
                     borderBottom: "1px solid #edf2ee",
                   }}
                 >
-                  <div style={{ fontSize: 11, fontWeight: 700, color: isToday ? "#376228" : "#58695f", textTransform: "uppercase" }}>
-                    {date.toLocaleDateString("vi-VN", { weekday: "short" })}
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: isToday ? "#376228" : "#58695f",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {date.toLocaleDateString("vi-VN", {
+                      timeZone: MEMBER_TIME_ZONE,
+                      weekday: "short",
+                    })}
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: isToday ? "#203d31" : "#475467" }}>
-                    {date.getDate()}/{date.getMonth() + 1}
+                  <div
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 800,
+                      color: isToday ? "#203d31" : "#475467",
+                    }}
+                  >
+                    {date.getUTCDate()}/{date.getUTCMonth() + 1}
                   </div>
                 </div>
 
                 {/* Day Content */}
-                <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                <div
+                  style={{
+                    padding: 8,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    flex: 1,
+                  }}
+                >
                   {dayClasses.length === 0 ? (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1, color: "#58695f", fontSize: 11 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flex: 1,
+                        color: "#58695f",
+                        fontSize: 11,
+                      }}
+                    >
                       Nghỉ tập
                     </div>
                   ) : (
@@ -251,7 +320,9 @@ export function SchedulePage() {
                       return (
                         <div
                           key={item.id}
-                          onClick={() => navigate(`/member/classes/${item.classId}`)}
+                          onClick={() =>
+                            navigate(`/member/classes/${item.classId}`)
+                          }
                           style={{
                             backgroundColor: "#f2f8eb",
                             border: "1px solid #d4ebbf",
@@ -264,15 +335,45 @@ export function SchedulePage() {
                             transition: "transform 0.15s",
                           }}
                         >
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#203d31", lineHeight: 1.2 }}>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "#203d31",
+                              lineHeight: 1.2,
+                            }}
+                          >
                             {sch.class?.name}
                           </div>
-                          <div style={{ fontSize: 11, color: "#475467", display: "flex", alignItems: "center", gap: 4 }}>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "#475467",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
                             <Clock size={12} color="#58695f" />
-                            {formatMemberDate(startTime, { hour: "2-digit", minute: "2-digit" })} -{" "}
-                            {formatMemberDate(endTime, { hour: "2-digit", minute: "2-digit" })}
+                            {formatMemberDate(startTime, {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}{" "}
+                            -{" "}
+                            {formatMemberDate(endTime, {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </div>
-                          <div style={{ fontSize: 10, color: "#667085", display: "flex", alignItems: "center", gap: 4 }}>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: "#667085",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
                             <MapPin size={11} color="#58695f" />
                             {sch.room?.name}
                           </div>
@@ -311,16 +412,32 @@ export function SchedulePage() {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#203d31" }}>
+                  <div
+                    style={{ fontSize: 16, fontWeight: 700, color: "#203d31" }}
+                  >
                     {item.schedule?.class?.name}
                   </div>
-                  <div style={{ display: "flex", gap: 16, marginTop: 4, fontSize: 13, color: "#475467" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 16,
+                      marginTop: 4,
+                      fontSize: 13,
+                      color: "#475467",
+                    }}
+                  >
+                    <span>📅 {formatMemberDate(item.schedule?.startTime)}</span>
                     <span>
-                      📅 {formatMemberDate(item.schedule?.startTime)}
-                    </span>
-                    <span>
-                      ⏰ {formatMemberDate(item.schedule?.startTime, { hour: "2-digit", minute: "2-digit" })} -{" "}
-                      {formatMemberDate(item.schedule?.endTime, { hour: "2-digit", minute: "2-digit" })}
+                      ⏰{" "}
+                      {formatMemberDate(item.schedule?.startTime, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}{" "}
+                      -{" "}
+                      {formatMemberDate(item.schedule?.endTime, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </span>
                     <span>🏛️ Phòng {item.schedule?.room?.name}</span>
                   </div>

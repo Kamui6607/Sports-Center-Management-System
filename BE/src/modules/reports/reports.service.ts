@@ -56,6 +56,7 @@ export async function getRevenueReport(startDate: string, endDate: string) {
     revenueByMethod: {
       CASH: methodMap["CASH"] ?? 0,
       BANK_TRANSFER: methodMap["BANK_TRANSFER"] ?? 0,
+      SEPAY: methodMap["SEPAY"] ?? 0,
     },
     recentPayments,
     note: "totalRevenue = cash collected (paidAt in range). Refunds not yet deducted.",
@@ -68,8 +69,8 @@ export async function getMemberReport(startDate: string, endDate: string) {
   const end = new Date(`${endDate}T23:59:59.999+07:00`);
   const now = new Date();
 
-  // BR-19: Use distinct memberId to count PEOPLE not purchases
-  const [totalMembers, newMembers, activePurchases] = await Promise.all([
+  // BR-19: Use distinct memberId to count PEOPLE not subscriptions
+  const [totalMembers, newMembers, activeSubs] = await Promise.all([
     // Count members whose user is still MEMBER role and active
     prisma.memberProfile.count({
       where: { user: { role: "MEMBER", isActive: true } },
@@ -80,31 +81,35 @@ export async function getMemberReport(startDate: string, endDate: string) {
         user: { role: "MEMBER", isActive: true },
       },
     }),
-    // "Member đang hoạt động" = đang sở hữu ít nhất 1 khóa học còn hiệu lực
-    // (thay cho định nghĩa cũ "đang có MembershipSubscription ACTIVE").
-    prisma.coursePurchase.findMany({
-      where: {
-        status: "ACTIVE",
-        startDate: { lte: now },
-        OR: [{ endDate: null }, { endDate: { gte: now } }],
-      },
-      select: { memberId: true, price: true },
+    prisma.membershipSubscription.findMany({
+      where: { status: "ACTIVE", startDate: { lte: now }, endDate: { gte: now } },
+      select: { memberId: true, tier: true },
     }),
   ]);
 
-  // Count distinct members owning at least one active course
-  const activeMemberIds = new Set(activePurchases.map((p) => p.memberId));
-  const activeCount = activeMemberIds.size;
-  const activeCourseRevenue = activePurchases.reduce((sum, p) => sum + Number(p.price), 0);
+  // Count distinct members (max tier per person)
+  const memberTierMap: Record<string, string> = {};
+  for (const s of activeSubs) {
+    // Priority: PREMIUM > MEMBERSHIP
+    if (!memberTierMap[s.memberId] || s.tier === "PREMIUM") {
+      memberTierMap[s.memberId] = s.tier;
+    }
+  }
+
+  const activeCount = Object.keys(memberTierMap).length;
+  const tierCounts: Record<string, number> = { FREE: 0, MEMBERSHIP: 0, PREMIUM: 0 };
+  for (const tier of Object.values(memberTierMap)) {
+    tierCounts[tier] = (tierCounts[tier] ?? 0) + 1;
+  }
+  tierCounts.FREE = totalMembers - activeCount;
 
   return {
     totalMembers,
     newMembers,
     activeMembers: activeCount,
     expiredMembers: totalMembers - activeCount,
-    activeCoursePurchases: activePurchases.length,
-    activeCourseRevenue,
-    note: "activeMembers = distinct members owning at least one ACTIVE course purchase (Membership tiers removed).",
+    membersByTier: tierCounts,
+    note: "membersByTier counts PEOPLE (max tier per person), not subscriptions.",
   };
 }
 
@@ -168,85 +173,56 @@ export async function getEnrollmentReport(startDate: string, endDate: string) {
   };
 }
 
-/**
- * Báo cáo doanh thu khóa học (thay cho báo cáo Membership cũ).
- * Tách rõ 3 con số: tổng tiền Member trả (`price`), hoa hồng nền tảng, phần trả cho Coach.
- */
-export async function getCourseRevenueReport(startDate: string, endDate: string) {
+export async function getMembershipReport(startDate: string, endDate: string) {
   // BR-26: VN timezone boundary
   const start = new Date(`${startDate}T00:00:00+07:00`);
   const end = new Date(`${endDate}T23:59:59.999+07:00`);
   const now = new Date();
   const dateFilter = { createdAt: { gte: start, lte: end } };
 
-  const [totalPurchases, newPurchases, byStatus, revenueAgg, activeAgg, topCourses] = await Promise.all([
-    prisma.coursePurchase.count(),
-    prisma.coursePurchase.count({ where: dateFilter }),
-    prisma.coursePurchase.groupBy({
+  const [totalSubs, newSubs, byStatus, byTier, revenueAgg] = await Promise.all([
+    prisma.membershipSubscription.count(),
+    prisma.membershipSubscription.count({ where: dateFilter }),
+    prisma.membershipSubscription.groupBy({
       by: ["status"],
       _count: true,
     }),
-    // BR-20: Use paidAt for actual cash-collected revenue (chỉ payment gắn với lượt mua khóa học)
+    // BR-19: Count subscriptions currently effective (not just in date range) by tier
+    prisma.membershipSubscription.groupBy({
+      by: ["tier"],
+      where: { status: "ACTIVE", startDate: { lte: now }, endDate: { gte: now } },
+      _count: true,
+    }),
+    // BR-20: Use paidAt for revenue
     prisma.payment.aggregate({
       where: {
         paidAt: { gte: start, lte: end },
         status: "SUCCESS",
-        coursePurchaseId: { not: null },
+        subscriptionId: { not: null },
       },
       _sum: { amount: true },
-    }),
-    // Hoa hồng nền tảng & phần Coach của các lượt mua ĐANG hiệu lực (đối soát chi trả Coach)
-    prisma.coursePurchase.aggregate({
-      where: {
-        status: "ACTIVE",
-        startDate: { lte: now },
-        OR: [{ endDate: null }, { endDate: { gte: now } }],
-      },
-      _sum: { price: true, commissionAmount: true, coachEarning: true },
-      _count: true,
-    }),
-    // Top khóa học bán chạy trong kỳ
-    prisma.coursePurchase.groupBy({
-      by: ["classId"],
-      where: { ...dateFilter, status: { not: "CANCELLED" } },
-      _count: { classId: true },
-      _sum: { price: true },
-      orderBy: { _count: { classId: "desc" } },
-      take: 5,
     }),
   ]);
 
   const statusMap: Record<string, number> = {};
   for (const s of byStatus) statusMap[s.status] = s._count;
 
-  const classDetails = await prisma.class.findMany({
-    where: { id: { in: topCourses.map((c) => c.classId) } },
-    select: { id: true, name: true, price: true },
-  });
-  const classMap = new Map(classDetails.map((c) => [c.id, c]));
+  const tierMap: Record<string, number> = { MEMBERSHIP: 0, PREMIUM: 0 };
+  for (const t of byTier) tierMap[t.tier] = t._count;
 
   return {
-    totalPurchases,
-    newPurchases,
-    activePurchases: statusMap["ACTIVE"] ?? 0,
-    expiredPurchases: statusMap["EXPIRED"] ?? 0,
-    cancelledPurchases: statusMap["CANCELLED"] ?? 0,
+    totalSubscriptions: totalSubs,
+    newSubscriptions: newSubs,
+    activeSubscriptions: statusMap["ACTIVE"] ?? 0,
+    expiredSubscriptions: statusMap["EXPIRED"] ?? 0,
+    cancelledSubscriptions: statusMap["CANCELLED"] ?? 0,
+    suspendedSubscriptions: statusMap["SUSPENDED"] ?? 0,
+    subscriptionsByTier: tierMap,
     totalRevenue: Number(revenueAgg._sum.amount ?? 0),
-    activeGrossRevenue: Number(activeAgg._sum.price ?? 0),
-    platformCommission: Number(activeAgg._sum.commissionAmount ?? 0),
-    coachEarnings: Number(activeAgg._sum.coachEarning ?? 0),
-    topCourses: topCourses.map((c) => ({
-      classId: c.classId,
-      className: classMap.get(c.classId)?.name ?? "Unknown",
-      purchaseCount: c._count.classId,
-      revenue: Number(c._sum.price ?? 0),
-    })),
-    note: "totalRevenue = payments gắn coursePurchaseId (paidAt trong kỳ). platformCommission/coachEarnings chỉ tính lượt mua đang ACTIVE.",
   };
 }
 
-/** Log chi tiết từng lượt Member mua khóa học (thay cho subscription-logs cũ). */
-export async function getCoursePurchaseLogs(startDate?: string, endDate?: string, pageStr?: string, limitStr?: string) {
+export async function getSubscriptionLogs(startDate?: string, endDate?: string, pageStr?: string, limitStr?: string) {
   const page = Math.max(1, parseInt(pageStr ?? "1") || 1);
   const limit = Math.min(100, Math.max(1, parseInt(limitStr ?? "20") || 20));
   const skip = (page - 1) * limit;
@@ -258,37 +234,33 @@ export async function getCoursePurchaseLogs(startDate?: string, endDate?: string
     where.createdAt = { gte: start, lte: end };
   }
 
-  const [total, purchases] = await Promise.all([
-    prisma.coursePurchase.count({ where }),
-    prisma.coursePurchase.findMany({
+  const [total, subs] = await Promise.all([
+    prisma.membershipSubscription.count({ where }),
+    prisma.membershipSubscription.findMany({
       where,
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
       include: {
         member: { include: { user: { select: { fullName: true, email: true } } } },
-        class: { select: { id: true, name: true, price: true } },
-        coach: { include: { user: { select: { fullName: true } } } },
+        plan: { select: { name: true, price: true } },
         payments: { select: { amount: true, status: true, paidAt: true }, take: 1, orderBy: { createdAt: "desc" } }
       }
     })
   ]);
 
-  const formattedLogs = purchases.map(p => ({
-    id: p.id,
-    action: "Mua khóa học",
-    username: p.member.user.fullName,
-    email: p.member.user.email,
-    className: p.class.name,
-    coachName: p.coach?.user.fullName ?? null,
-    price: Number(p.payments[0]?.amount ?? p.price),
-    commissionAmount: Number(p.commissionAmount),
-    coachEarning: Number(p.coachEarning),
-    status: p.status,
-    paymentStatus: p.payments[0]?.status ?? "N/A",
-    startDate: p.startDate,
-    endDate: p.endDate,
-    purchasedAt: p.createdAt, // Real-time timestamp
+  const formattedLogs = subs.map(sub => ({
+    id: sub.id,
+    action: "Mua / Gia hạn gói", // Action description as requested
+    username: sub.member.user.fullName,
+    email: sub.member.user.email,
+    planName: sub.plan.name,
+    planTier: sub.tier,
+    price: Number(sub.payments[0]?.amount ?? sub.plan.price),
+    paymentStatus: sub.payments[0]?.status ?? "N/A",
+    startDate: sub.startDate,
+    endDate: sub.endDate,
+    purchasedAt: sub.createdAt, // Real-time timestamp
   }));
 
   return {

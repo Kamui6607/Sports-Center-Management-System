@@ -264,6 +264,110 @@ export async function createSchedule(data: any) {
   });
 }
 
+/**
+ * Creates the complete quick-planner workflow in one database transaction.
+ * Any validation or conflict error rolls back the sport, class, assignments,
+ * and every schedule created by this request.
+ */
+export async function createActivityPlan(data: any, canCreateSport: boolean) {
+  if (data.sport.mode === "new" && !canCreateSport) {
+    throw new AppError("Only managers can create a new sport", 403);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const room = await tx.room.findUnique({ where: { id: data.roomId } });
+    if (!room || !room.isActive) throw new AppError("Room not found or inactive", 404);
+    if (room.areaType !== data.class.areaType) {
+      throw new AppError(
+        `Class area type "${data.class.areaType}" does not match Room area type "${room.areaType}"`,
+        400,
+      );
+    }
+    if (room.capacity < data.class.capacity) {
+      throw new AppError("Room capacity is too small for this class", 400);
+    }
+
+    const coachIds = [data.primaryCoachId, data.supportCoachId].filter(
+      (id): id is string => Boolean(id),
+    );
+    const coaches = await tx.coachProfile.findMany({
+      where: {
+        id: { in: coachIds },
+        user: { isActive: true, role: "COACH" },
+      },
+      select: { id: true },
+    });
+    if (coaches.length !== coachIds.length) {
+      throw new AppError("Active coach not found", 404);
+    }
+
+    await lockScheduleResources(tx, [data.roomId], coachIds);
+
+    let sport;
+    if (data.sport.mode === "new") {
+      const existing = await tx.sport.findUnique({ where: { name: data.sport.name } });
+      if (existing) throw new AppError("Sport with this name already exists", 409);
+      sport = await tx.sport.create({
+        data: {
+          name: data.sport.name,
+          description: data.sport.description || undefined,
+          areaTypes: [data.class.areaType],
+        },
+      });
+    } else {
+      sport = await tx.sport.findUnique({ where: { id: data.sport.id } });
+      if (!sport || !sport.isActive) {
+        throw new AppError("Sport not found or inactive", 404);
+      }
+      if (!sport.areaTypes.includes(data.class.areaType)) {
+        throw new AppError(
+          `Sport "${sport.name}" does not support area type "${data.class.areaType}"`,
+          400,
+        );
+      }
+    }
+
+    const cls = await tx.class.create({
+      data: {
+        name: data.class.name,
+        description: data.class.description || undefined,
+        capacity: data.class.capacity,
+        classType: data.class.classType,
+        areaType: data.class.areaType,
+        sports: { connect: { id: sport.id } },
+        coaches: {
+          create: coachIds.map((coachId) => ({
+            coachId,
+            isPrimary: coachId === data.primaryCoachId,
+          })),
+        },
+      },
+    });
+
+    const createdSchedules = [];
+    for (const schedule of data.schedules) {
+      const startTime = new Date(schedule.startTime);
+      const endTime = new Date(schedule.endTime);
+      await checkConflicts(tx, room.id, cls.id, startTime, endTime);
+      createdSchedules.push(await tx.classSchedule.create({
+        data: {
+          classId: cls.id,
+          roomId: room.id,
+          startTime,
+          endTime,
+          status: "SCHEDULED",
+        },
+      }));
+    }
+
+    return {
+      class: cls,
+      sport,
+      schedulesCreated: createdSchedules.length,
+    };
+  }, { timeout: 30_000 });
+}
+
 export async function getScheduleById(id: string) {
   const schedule = await prisma.classSchedule.findUnique({
     where: { id },

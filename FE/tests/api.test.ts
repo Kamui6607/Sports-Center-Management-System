@@ -23,17 +23,15 @@ describe("API client contract and authentication", () => {
   it("does not refresh a session revoked by Dynamic Auth", async () => {
     sessionStorage.setItem("pulse.access", "old");
     sessionStorage.setItem("pulse.refresh", "refresh");
-    const fetch = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            success: false,
-            message: "Unauthorized: account is locked",
-          }),
-          { status: 401 },
-        ),
-      );
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: false,
+          message: "Unauthorized: account is locked",
+        }),
+        { status: 401 },
+      ),
+    );
     vi.stubGlobal("fetch", fetch);
     const { api, hasSession } = await import("../src/shared/api");
     await expect(api("GET /auth/me")).rejects.toThrow("Tài khoản đã bị khóa");
@@ -91,7 +89,11 @@ describe("API client contract and authentication", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
   it("rejects undocumented pagination and encodes path parameters", async () => {
-    const fetch = vi.fn().mockResolvedValue(envelope({}));
+    const fetch = vi
+      .fn()
+      .mockImplementation(async (url: string) =>
+        envelope(url.includes("/class-schedules") ? [] : {}),
+      );
     vi.stubGlobal("fetch", fetch);
     const { api } = await import("../src/shared/api");
     await expect(
@@ -200,6 +202,41 @@ describe("member API uses the shared session transport", () => {
     expect(fetch.mock.calls[0][0]).toContain(
       "/enrollments/my?status=BOOKED&page=1&limit=100",
     );
+  });
+  it("uses the deployed transfer, quota, calendar and whole-course contracts", async () => {
+    const fetch = vi
+      .fn()
+      .mockImplementation(async (url: string) =>
+        envelope(url.includes("/class-schedules") ? [] : {}),
+      );
+    vi.stubGlobal("fetch", fetch);
+    const { enrollmentsApi } = await import("../src/api/enrollments.api");
+    const { classesApi } = await import("../src/api/classes.api");
+    await enrollmentsApi.transferEnrollment("enrollment-1", "schedule-2");
+    expect(fetch.mock.calls[0][0]).toMatch(
+      /\/enrollments\/enrollment-1\/transfer$/,
+    );
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+      targetScheduleId: "schedule-2",
+    });
+    await enrollmentsApi.getMyQuota();
+    expect(fetch.mock.calls[1][0]).toMatch(/\/enrollments\/my\/quota$/);
+    await classesApi.getSchedules({
+      from: "2026-09-21T00:00:00+07:00",
+      to: "2026-09-28T00:00:00+07:00",
+      weekdays: "2,4,8",
+    });
+    const url = new URL(fetch.mock.calls[2][0]);
+    expect(url.searchParams.get("weekdays")).toBe("2,4,8");
+    expect(url.searchParams.get("from")).toBe("2026-09-20T17:00:00.000Z");
+    expect(url.searchParams.get("to")).toBe("2026-09-27T17:00:00.000Z");
+    await classesApi.getCoursePlan("class-1");
+    expect(fetch.mock.calls[3][0]).toMatch(/\/classes\/class-1\/course-plan$/);
+    await enrollmentsApi.enrollWholeCourse("class-1");
+    expect(fetch.mock.calls[4][0]).toMatch(/\/enrollments\/bulk$/);
+    expect(JSON.parse(fetch.mock.calls[4][1].body)).toEqual({
+      classId: "class-1",
+    });
   });
   it("shares token changes with the existing API and localizes member errors", async () => {
     const fetch = vi.fn().mockResolvedValue(

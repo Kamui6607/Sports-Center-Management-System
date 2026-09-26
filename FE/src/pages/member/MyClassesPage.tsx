@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { enrollmentsApi } from "../../api/enrollments.api";
+import { classesApi } from "../../api/classes.api";
 import type { Enrollment, EnrollmentStatus } from "../../types/member";
 import {
   CalendarCheck,
@@ -12,7 +13,9 @@ import {
   MapPin,
   Volleyball,
   CheckCircle2,
+  ArrowRightLeft,
 } from "lucide-react";
+import { ErrorState, Loading, Modal } from "../../shared/ui";
 import {
   LoadingSpinner,
   EmptyState,
@@ -28,12 +31,30 @@ export function MyClassesPage() {
   const [activeTab, setActiveTab] = useState<EnrollmentStatus>("BOOKED");
   const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [targetScheduleId, setTargetScheduleId] = useState("");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Fetch enrollments by status
   const { data, isLoading, error } = useQuery({
     queryKey: ["my-enrollments", activeTab],
     queryFn: () => enrollmentsApi.getMyEnrollments({ status: activeTab }),
+  });
+
+  const quota = useQuery({
+    queryKey: ["my-enrollment-quota"],
+    queryFn: () => enrollmentsApi.getMyQuota(),
+  });
+
+  const transferSchedules = useQuery({
+    queryKey: ["transfer-schedules", selectedEnrollment?.classId],
+    enabled: transferOpen && Boolean(selectedEnrollment?.classId),
+    queryFn: () =>
+      classesApi.getSchedules({
+        classId: selectedEnrollment!.classId,
+        status: "SCHEDULED",
+        from: new Date().toISOString(),
+      }),
   });
 
   // Cancel Mutation
@@ -55,6 +76,24 @@ export function MyClassesPage() {
         text: err instanceof Error ? err.message : "Không thể hủy đăng ký ca học này.",
       });
       setConfirmCancelOpen(false);
+    },
+  });
+
+  const transferMutation = useMutation({
+    mutationFn: () =>
+      enrollmentsApi.transferEnrollment(
+        selectedEnrollment!.id,
+        targetScheduleId,
+      ),
+    onSuccess: () => {
+      setMessage({ type: "success", text: "Đã đổi buổi học thành công." });
+      setTransferOpen(false);
+      setSelectedEnrollment(null);
+      setTargetScheduleId("");
+      void queryClient.invalidateQueries({ queryKey: ["my-enrollments"] });
+      void queryClient.invalidateQueries({ queryKey: ["member-schedule"] });
+      void queryClient.invalidateQueries({ queryKey: ["class-schedules"] });
+      void queryClient.invalidateQueries({ queryKey: ["my-enrollment-quota"] });
     },
   });
 
@@ -111,6 +150,39 @@ export function MyClassesPage() {
           type={message.type}
           message={message.text}
         />
+      )}
+
+      {quota.isSuccess && (
+        <section className="panel" aria-label="Hạn mức lớp học">
+          <div className="panel-heading">
+            <div>
+              <h2>Hạn mức lớp đang giữ</h2>
+              <p>
+                {quota.data.used}/{quota.data.limit} lớp · còn {quota.data.remaining}
+                {" "}lớp với gói {quota.data.tier || "chưa kích hoạt"}
+              </p>
+            </div>
+            <span className="badge">
+              {quota.data.hasActiveSubscription ? "Đang hiệu lực" : "Cần mua gói"}
+            </span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label="Mức sử dụng hạn mức lớp"
+            aria-valuemin={0}
+            aria-valuemax={Math.max(1, quota.data.limit)}
+            aria-valuenow={quota.data.used}
+            style={{ height: 8, borderRadius: 99, background: "#e7ece9", overflow: "hidden" }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${quota.data.limit ? Math.min(100, (quota.data.used / quota.data.limit) * 100) : 100}%`,
+                background: quota.data.remaining ? "#376228" : "#d97706",
+              }}
+            />
+          </div>
+        </section>
       )}
 
       {/* TABS */}
@@ -296,6 +368,20 @@ export function MyClassesPage() {
                     <button
                       onClick={() => {
                         setSelectedEnrollment(item);
+                        setTargetScheduleId("");
+                        transferMutation.reset();
+                        setTransferOpen(true);
+                      }}
+                      className="button small"
+                    >
+                      <ArrowRightLeft size={14} /> Đổi buổi
+                    </button>
+                  )}
+
+                  {canCancel && (
+                    <button
+                      onClick={() => {
+                        setSelectedEnrollment(item);
                         setConfirmCancelOpen(true);
                       }}
                       style={{
@@ -335,6 +421,84 @@ export function MyClassesPage() {
         isDanger={true}
         loading={cancelMutation.isPending}
       />
+
+      {transferOpen && selectedEnrollment && (
+        <Modal
+          title="Đổi buổi trong cùng lớp"
+          dismissible={!transferMutation.isPending}
+          onClose={() => setTransferOpen(false)}
+          maxWidth={680}
+        >
+          <p className="confirm-copy">
+            Chọn một buổi khác của lớp “{selectedEnrollment.schedule?.class?.name}”.
+            Chỗ cũ chỉ được hủy khi máy chủ xác nhận chỗ mới hợp lệ.
+          </p>
+          {transferSchedules.isPending ? (
+            <Loading variant="cards" />
+          ) : transferSchedules.isError ? (
+            <ErrorState
+              error={transferSchedules.error}
+              retry={() => transferSchedules.refetch()}
+            />
+          ) : (
+            <div className="detail-list" role="radiogroup" aria-label="Buổi học mới">
+              {(transferSchedules.data?.schedules || [])
+                .filter((schedule) => schedule.id !== selectedEnrollment.scheduleId)
+                .map((schedule) => {
+                  const count = schedule._count?.enrollments ?? 0;
+                  const remaining =
+                    schedule.availableSlots ??
+                    Math.max(0, schedule.class.capacity - count);
+                  const disabled =
+                    schedule.isFull === true ||
+                    remaining <= 0 ||
+                    new Date(schedule.startTime) <= new Date();
+                  return (
+                    <label className="assignment" key={schedule.id}>
+                      <input
+                        type="radio"
+                        name="targetSchedule"
+                        value={schedule.id}
+                        checked={targetScheduleId === schedule.id}
+                        disabled={disabled || transferMutation.isPending}
+                        onChange={() => setTargetScheduleId(schedule.id)}
+                      />
+                      <span>
+                        <strong>{formatMemberDate(schedule.startTime)}</strong>{" "}
+                        · {formatMemberDate(schedule.startTime, { hour: "2-digit", minute: "2-digit" })}
+                        {" – "}{formatMemberDate(schedule.endTime, { hour: "2-digit", minute: "2-digit" })}
+                        {" · "}{schedule.room?.name || "Chưa có phòng"}
+                      </span>
+                      <span className={`badge ${disabled ? "muted" : ""}`}>
+                        {disabled ? "Hết chỗ" : `Còn ${remaining} chỗ`}
+                      </span>
+                    </label>
+                  );
+                })}
+              {!transferSchedules.data?.schedules.some(
+                (schedule) => schedule.id !== selectedEnrollment.scheduleId,
+              ) && <p>Hiện chưa có buổi khác để chuyển.</p>}
+            </div>
+          )}
+          {transferMutation.error && <ErrorState error={transferMutation.error} />}
+          <div className="modal-footer">
+            <button
+              className="button"
+              disabled={transferMutation.isPending}
+              onClick={() => setTransferOpen(false)}
+            >
+              Giữ buổi hiện tại
+            </button>
+            <button
+              className="button primary"
+              disabled={!targetScheduleId || transferMutation.isPending}
+              onClick={() => transferMutation.mutate()}
+            >
+              {transferMutation.isPending ? "Đang đổi buổi…" : "Xác nhận đổi buổi"}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

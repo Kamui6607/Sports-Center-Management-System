@@ -59,7 +59,78 @@ This project is built using modern Node.js tools and practices:
    DATABASE_URL="postgresql://user:password@localhost:5432/sport_center?schema=public"
    JWT_ACCESS_SECRET="your_access_secret"
    JWT_REFRESH_SECRET="your_refresh_secret"
+   JWT_ACCESS_EXPIRES_IN="15m"
+   JWT_REFRESH_EXPIRES_IN="7d"
+
+   # ── SePay online payment (chuyển khoản VietQR + webhook) ──
+   # Hội viên tự mua gói: BE tạo đơn PENDING + mã thanh toán + ảnh VietQR;
+   # SePay gọi webhook khi phát hiện giao dịch ⇒ BE kích hoạt gói + tạo hóa đơn + thông báo.
+   SEPAY_WEBHOOK_API_KEY=""            # Phương thức API Key ở bước "Bảo mật" khi tạo webhook trên my.sepay.vn
+   SEPAY_WEBHOOK_SECRET=""             # Phương thức HMAC-SHA256 (khuyến nghị) — Secret key ở cùng bước đó
+   SEPAY_QR_BASE_URL="https://qr.sepay.vn/img"
+   SEPAY_QR_TEMPLATE="compact"         # compact | qronly | standee | (trống = QR chuẩn VietQR)
+   SEPAY_CODE_PREFIX="SEVQR"           # khớp "Cấu trúc mã thanh toán" trên my.sepay.vn (tiền tố 2-5 ký tự)
+   SEPAY_CODE_SUFFIX_LENGTH="8"        # hậu tố số, SePay khuyến nghị 6-8
+   VIETQR_BANK_ID="Sacombank"          # short_name/alias/code/BIN trong banks.json của SePay
+   VIETQR_ACCOUNT_NO="0703339186"      # số tài khoản (hoặc VA) nhận tiền
+   VIETQR_ACCOUNT_NAME="NGUYEN TRAN TU"
+   VIETQR_PAYMENT_TTL_MINUTES="15"
+   SEPAY_MOCK_MODE="true"              # BẮT BUỘC false ở production
+   # Đối soát chủ động qua SePay API v2 (tùy chọn — dùng khi webhook không tới được BE)
+   SEPAY_API_TOKEN=""                  # my.sepay.vn → Cấu hình Công ty → API Access (Test mode có token riêng)
+   SEPAY_API_BASE_URL="https://userapi.sepay.vn/v2"   # Test mode: https://userapi-sandbox.sepay.vn/v2
+   SEPAY_RECONCILE_MIN_SECONDS="5"     # Khoảng cách tối thiểu giữa 2 lần đối soát cho cùng một đơn
    ```
+
+   *SePay chi tiết:* https://developer.sepay.vn — cấu hình tại my.sepay.vn:
+   1. **Cấu hình Công ty → Cấu trúc mã thanh toán**: tiền tố `SEVQR`, hậu tố 6-8 ký tự, Loại ký tự **Số nguyên**
+      (khớp `SEPAY_CODE_PREFIX` / `SEPAY_CODE_SUFFIX_LENGTH`). Mã đơn BE sinh có dạng `SEVQR12345678`.
+   2. **Webhook**: URL `http://<server>/api/v1/payments/sepay/webhook`, chọn xác thực ở bước Bảo mật:
+       **HMAC-SHA256** (khuyến nghị): dán Secret key vào `SEPAY_WEBHOOK_SECRET` — SePay gửi header
+       `X-SePay-Signature` + `X-SePay-Timestamp`, BE verify chữ ký trên raw body; hoặc **API Key**:
+       dán key vào `SEPAY_WEBHOOK_API_KEY` (SePay gửi `Authorization: Apikey <key>`).
+       Bật "Chỉ gửi khi có mã thanh toán: Tiền vào".
+   Chạy localhost thì SePay **không gọi được** webhook ⇒ expose BE bằng ngrok, hoặc để `SEPAY_MOCK_MODE=true`
+   và xác nhận giao dịch bằng `POST /payments/sepay/mock-confirm` (dev/demo/e2e).
+   Giá trị mặc định của từng biến nằm trong `src/config/sepay.ts`.
+
+   **Troubleshooting: đã chuyển khoản mà đơn vẫn `PENDING` (FE cứ "đang chờ ngân hàng xác nhận")**
+   `Payment.status` CHỈ đổi khi BE nhận được webhook từ SePay (hoặc `mock-confirm`) — BE không tự dò
+   biến động số dư. Chạy BE ở `localhost` thì SePay không gọi được vào máy bạn, nên đơn đứng nguyên
+   `PENDING` (log BE chỉ có `GET /payments/sepay/{id}` lặp lại, KHÔNG có `POST /payments/sepay/webhook`).
+   Checklist:
+
+   1. Mở tunnel tới cổng BE rồi copy URL HTTPS:
+      ```bash
+      ngrok http 8080        # hoặc: cloudflared tunnel --url http://localhost:8080
+      ```
+   2. my.sepay.vn → Webhooks → sửa webhook → URL = `https://<tunnel>/api/v1/payments/sepay/webhook`
+      → kiểm tra công tắc **Trạng thái = Bật** (lưu webhook không tự bật lại) → bật "Tự động gửi lại khi server trả lỗi".
+   3. Bấm `⋯ → Gửi thử`: kết quả phải là **Thành công** (endpoint trả HTTP 200/201 + `{"success":true}`).
+      Báo `Connection Refused` / `DNS Error` / `Timeout` ⇒ tunnel hoặc URL sai (SePay không đi tới localhost được).
+   4. Kiểm tra `Webhooks → Lịch sử gửi` (HTTP status, `error_code`, response body) và `Sự cố`.
+      SePay chỉ retry **7 lần trong ~33 phút**, sau đó đánh dấu Failed ⇒ nếu webhook đã bị mất, chạy lại
+      tunnel rồi vào **Sự cố → Gửi lại** (hoặc `Lịch sử gửi → Phát lại`) để bắn lại đúng giao dịch đó.
+   5. Không muốn dùng tiền thật: bật **Test mode** trên my.sepay.vn → tạo tài khoản ngân hàng Test mode với
+      **đúng số tài khoản** trong `VIETQR_ACCOUNT_NO` → tạo webhook trỏ về URL tunnel → `Giao dịch → Mô phỏng`
+      (số tiền phải khớp CHÍNH XÁC giá gói, nội dung chứa mã đơn `SEVQR…`). Test mode bỏ xác thực SSL nhưng
+      vẫn cần URL public.
+   6. Không dựng tunnel: `SEPAY_MOCK_MODE=true` (BE) + `VITE_SEPAY_MOCK_MODE=true` (FE) ⇒ trong modal hiện nút
+      **"DEV: giả lập SePay đã thu tiền"** (gọi `/payments/sepay/mock-confirm`).
+   7. **Không dựng tunnel vẫn muốn tiền thật tự chốt (khuyến nghị cho dev):** đặt `SEPAY_API_TOKEN`
+      (my.sepay.vn → Cấu hình Công ty → API Access) ⇒ trong lúc FE polling `GET /payments/sepay/{id}`, BE gọi
+      SePay API v2 tìm giao dịch khớp mã đơn ⇒ đơn tự chuyển `SUCCESS` sau ≤ 4 giây, **không cần webhook/ngrok**.
+      Test mode dùng token riêng + `SEPAY_API_BASE_URL="https://userapi-sandbox.sepay.vn/v2"`.
+      BE chỉ chốt khi khớp CHẶT mã đơn + số tiền + tài khoản nhận, có throttle `SEPAY_RECONCILE_MIN_SECONDS`
+      (SePay giới hạn 3 request/giây) và chống chốt trùng bằng advisory lock.
+
+   Khi tiền về nhưng KHÔNG kích hoạt được gói, BE ghi vết để đối soát thủ công và cố ý KHÔNG activate lần hai:
+   lệch số tiền / tiền về sau khi đơn đã đóng ⇒ `Payment.note` + notification + `SepayWebhookEvent`
+   (`MISMATCH` / `LATE`); đơn đã `SUCCESS` (VD đã chốt bằng mock/đối soát API) mà lại có thêm giao dịch khớp
+   tiền ⇒ `SepayWebhookEvent` với `DUPLICATE / PAYMENT_ALREADY_PAID` (cần hoàn tiền nếu là lần chuyển thứ 2).
+   Muốn đối soát tay, xem docs SePay → Đối soát giao dịch (`GET https://userapi.sepay.vn/v2/transactions`).
+
+
 
 3. **Database Setup:**
    Run Prisma migrations to set up your PostgreSQL database schema:

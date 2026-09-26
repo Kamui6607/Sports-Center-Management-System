@@ -17,6 +17,26 @@ async function fixtureApi(page: any, role = "MANAGER") {
         });
         return;
       }
+      if (
+        path === "/notifications/unread-count" ||
+        path === "/chat/messages/unread-count"
+      ) {
+        await route.fulfill({
+          json: { success: true, message: "", data: { unreadCount: 0 } },
+        });
+        return;
+      }
+      if (
+        path === "/notifications" ||
+        path === "/chat/contacts" ||
+        path === "/chat/conversations" ||
+        path === "/chat/messages"
+      ) {
+        await route.fulfill({
+          json: { success: true, message: "", data: [] },
+        });
+        return;
+      }
       const response: any = Object.entries(operation.responses).find(([code]) =>
         code.startsWith("2"),
       )?.[1];
@@ -69,6 +89,12 @@ test("manager routes, real-schema forms and mobile navigation render", async ({
   await expect(
     page.getByText("900.000", { exact: false }).first(),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Thông báo", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Thông báo gần đây" })).toBeVisible();
+  await page.getByRole("button", { name: "Thông báo", exact: true }).click();
+  await page.getByRole("button", { name: "Mở tin nhắn" }).click();
+  await expect(page.getByRole("region", { name: "Cửa sổ tin nhắn" })).toBeVisible();
+  await page.getByRole("button", { name: "Đóng tin nhắn" }).first().click();
   await page.screenshot({
     path: "artifacts/dashboard-test-fixtures.png",
     fullPage: true,
@@ -83,6 +109,7 @@ test("manager routes, real-schema forms and mobile navigation render", async ({
     "rooms",
     "classes",
     "schedules",
+    "activity-planner",
     "reports",
     "roles",
     "audit-logs",
@@ -92,6 +119,19 @@ test("manager routes, real-schema forms and mobile navigation render", async ({
     await expect(page.locator("main h1")).toBeVisible();
     await expect(page.getByText("Không tìm thấy trang")).toHaveCount(0);
   }
+  await page.goto("/manager/activity-planner");
+  await expect(page.getByRole("heading", { name: "Tạo lịch hoạt động nhanh" })).toBeVisible();
+  await expect(page.getByText(/Học vào các thứ/)).toBeVisible();
+  await page.getByRole("button", { name: "Thêm slot giờ" }).click();
+  await expect(page.getByLabel("Slot 2 bắt đầu")).toBeVisible();
+  await page.getByLabel("Tên lớp").fill("Yoga buổi tối");
+  await page.getByRole("button", { name: "Tạo toàn bộ lịch hoạt động" }).click();
+  const plannerError = page.getByRole("dialog");
+  await expect(plannerError).toBeVisible();
+  await expect(plannerError).toContainText("Chưa chọn bộ môn");
+  await expect(plannerError).toContainText("Chưa chọn huấn luyện viên chính");
+  await plannerError.getByRole("button", { name: "Quay lại chỉnh sửa" }).click();
+  await expect(page.getByLabel("Tên lớp")).toHaveValue("Yoga buổi tối");
   await page.goto("/manager/rooms");
   await page
     .getByRole("button", { name: "Thêm phòng tập", exact: true })
@@ -106,6 +146,7 @@ test("manager routes, real-schema forms and mobile navigation render", async ({
   expect((await sent).postDataJSON()).toEqual({
     name: "Test Room",
     capacity: 12,
+    areaType: "INDOOR",
   });
   await expect(page.getByRole("status")).toContainText("Đã lưu thay đổi");
   await page.setViewportSize({ width: 390, height: 844 });
