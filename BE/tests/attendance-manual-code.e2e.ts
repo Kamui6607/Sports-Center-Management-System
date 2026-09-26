@@ -5,7 +5,7 @@
  *
  * Nguyên tắc:
  * - Fixture (user / room / class / schedule / enrollment) tạo trực tiếp qua Prisma;
- *   đăng ký gói qua API thật (POST /memberships-plans + POST /subscriptions).
+ *   quyền vào lớp có được bằng MUA KHÓA HỌC qua API thật (POST /course-purchases).
  * - Hành vi nghiệp vụ (generate-qr, scan-qr, chống brute-force, phân quyền) gọi qua HTTP API thật.
  * - Mọi fixture có tiền tố E2E + mã RUN riêng và được dọn sạch ở cuối (kể cả khi test fail).
  *
@@ -14,7 +14,8 @@
  * 2) Mã dự phòng: chữ thường/khoảng trắng, rotate mã cũ, sai/hết hạn/thu hồi, message không lộ thông tin.
  * 3) Bảo mật: member KHÔNG gửi scheduleId; mã của buổi không đặt chỗ bị từ chối + bị thu hồi khi lạm dụng.
  * 4) Chống brute-force theo member: 10 lần sai/15 phút → 429 (kể cả khi sau đó nhập mã đúng).
- * 5) Chốt chặn gói tập (gói hết hạn → 403) và phân quyền COACH/MANAGER/STAFF/MEMBER.
+ * 5) Chốt chặn SỞ HỮU KHÓA HỌC (chưa mua / khóa hết hạn → 403) và phân quyền COACH/MANAGER/MEMBER
+ *    (role STAFF đã bị bỏ khỏi hệ thống).
  */
 import "dotenv/config";
 import jwt from "jsonwebtoken";
@@ -108,7 +109,7 @@ const created = {
   memberProfileIds: [] as string[],
   classIds: [] as string[],
   roomIds: [] as string[],
-  planIds: [] as string[],
+  purchaseIds: [] as string[],
 };
 
 type FixtureUser = {
@@ -120,7 +121,7 @@ type FixtureUser = {
 };
 
 async function createUser(
-  role: "MEMBER" | "COACH" | "STAFF" | "MANAGER",
+  role: "MEMBER" | "COACH" | "MANAGER",
   tag: string,
   hashedPassword: string
 ): Promise<FixtureUser> {
@@ -184,6 +185,9 @@ async function createClass(
       name: `E2E Attendance ${tag} ${RUN}`,
       areaType: "INDOOR",
       capacity: 30,
+      // Khóa học có giá để test được luồng mua khóa (hoa hồng khấu trừ).
+      price: 500000,
+      durationDays: 30,
       ...(opts.coachProfileId
         ? { coaches: { create: [{ coachId: opts.coachProfileId, isPrimary: true }] } }
         : {}),
@@ -208,20 +212,19 @@ async function enroll(memberProfileId: string, classId: string, scheduleId: stri
   });
 }
 
-async function createPlan(managerToken: string, payload: Record<string, unknown>): Promise<any> {
-  const res = await http("POST", "/membership-plans", { token: managerToken, body: payload });
-  if (res.status !== 201) throw new Error(`createPlan failed: ${safe(res)}`);
-  created.planIds.push(res.body.data.id);
-  return res.body.data;
-}
-
-async function subscribe(managerToken: string, memberProfileId: string, planId: string): Promise<string> {
-  const res = await http("POST", "/subscriptions", {
+/**
+ * Mua khóa học qua API thật (MANAGER mua hộ member): POST /course-purchases.
+ * Trả về CoursePurchase.id để test có thể chỉnh (vd: ép hết hạn).
+ */
+async function purchaseCourse(managerToken: string, memberProfileId: string, classId: string): Promise<string> {
+  const res = await http("POST", "/course-purchases", {
     token: managerToken,
-    body: { memberId: memberProfileId, planId, paymentMethod: "CASH" },
+    body: { memberId: memberProfileId, classId, method: "CASH" },
   });
-  if (res.status !== 201) throw new Error(`subscribe failed: ${safe(res)}`);
-  return res.body.data.subscription.id as string;
+  if (res.status !== 201) throw new Error(`purchaseCourse failed: ${safe(res)}`);
+  const id = res.body.data.id as string;
+  created.purchaseIds.push(id);
+  return id;
 }
 
 // ─── API action helpers ───────────────────────────────────────────────────
@@ -255,8 +258,6 @@ async function failureCount(memberProfileId: string): Promise<number> {
 type Ctx = {
   manager: FixtureUser;
   coach: FixtureUser;
-  staff: FixtureUser;
-  planId: string;
   classA: { classId: string; scheduleIds: string[] };
   classB: { classId: string; scheduleIds: string[] };
 };
@@ -523,30 +524,58 @@ async function scenarioMemberThrottle(ctx: Ctx, member: FixtureUser): Promise<vo
   check("không tạo attendance khi bị throttle", (await attendanceCount(member.memberProfileId, sA3)) === 0);
 }
 
-/** 5) Chốt chặn gói tập: member không có gói ACTIVE không điểm danh được, dù QR hay mã. */
-async function scenarioSubscriptionGate(ctx: Ctx, member: FixtureUser): Promise<void> {
-  section("5) Chốt chặn gói tập (QR + mã dự phòng)");
+/**
+ * 5) Chốt chặn SỞ HỮU KHÓA HỌC (thay cho chốt chặn gói tập cũ):
+ * - Chưa mua khóa học → 403 dù QR hay mã dự phòng.
+ * - Đã mua nhưng khóa HẾT HẠN → 403 kèm thông báo mua lại.
+ */
+async function scenarioCourseGate(ctx: Ctx, member: FixtureUser): Promise<void> {
+  section("5) Chốt chặn sở hữu khóa học (QR + mã dự phòng)");
   const sA4 = ctx.classA.scheduleIds[3];
 
   const g = await generateQr(ctx.manager.token, sA4);
   const byCode = await scanQr(member.token, { code: String(g.body?.data?.manualCode) });
   check(
-    "mã hợp lệ nhưng gói hết hạn → 403 (thông báo gia hạn)",
-    byCode.status === 403 && /hết hạn/.test(String(byCode.body?.message)),
+    "member CHƯA mua khóa học, mã hợp lệ → 403 (chưa sở hữu)",
+    byCode.status === 403 && /mua (lại )?khóa học/.test(String(byCode.body?.message)),
     byCode.body
   );
 
   const g2 = await generateQr(ctx.manager.token, sA4);
   const byQr = await scanQr(member.token, { qrToken: g2.body?.data?.qrToken });
   check(
-    "QR hợp lệ nhưng gói hết hạn → 403 (giữ nguyên hành vi cũ)",
-    byQr.status === 403 && /hết hạn/.test(String(byQr.body?.message)),
+    "member CHƯA mua khóa học, QR hợp lệ → 403",
+    byQr.status === 403 && /mua (lại )?khóa học/.test(String(byQr.body?.message)),
     byQr.body
   );
-  check("không tạo attendance cho member hết hạn gói", (await attendanceCount(member.memberProfileId, sA4)) === 0);
+  check("không tạo attendance khi chưa sở hữu khóa", (await attendanceCount(member.memberProfileId, sA4)) === 0);
+
+  // Mua khóa học rồi ép hết hạn để test chốt chặn hạn sử dụng.
+  const purchaseId = await purchaseCourse(ctx.manager.token, member.memberProfileId, ctx.classA.classId);
+  await prisma.coursePurchase.update({
+    where: { id: purchaseId },
+    data: { endDate: new Date(Date.now() - DAY) },
+  });
+
+  const g3 = await generateQr(ctx.manager.token, sA4);
+  const expiredCode = await scanQr(member.token, { code: String(g3.body?.data?.manualCode) });
+  check(
+    "khóa đã hết hạn → 403 (thông báo mua lại)",
+    expiredCode.status === 403 && /hết hạn/.test(String(expiredCode.body?.message)),
+    expiredCode.body
+  );
+
+  const g4 = await generateQr(ctx.manager.token, sA4);
+  const expiredQr = await scanQr(member.token, { qrToken: g4.body?.data?.qrToken });
+  check(
+    "khóa hết hạn, QR hợp lệ → 403 (giữ nguyên hành vi cũ)",
+    expiredQr.status === 403 && /hết hạn/.test(String(expiredQr.body?.message)),
+    expiredQr.body
+  );
+  check("không tạo attendance cho member có khóa hết hạn", (await attendanceCount(member.memberProfileId, sA4)) === 0);
 }
 
-/** 6) Phân quyền: không mở quyền ghi attendance cho STAFF; member không tự sinh mã. */
+/** 6) Phân quyền: không mở quyền ghi attendance cho COACH/MEMBER; member không tự sinh mã. */
 async function scenarioAuthorization(ctx: Ctx, member: FixtureUser): Promise<void> {
   section("6) Phân quyền generate-qr / scan-qr / POST attendance");
   const sA1 = ctx.classA.scheduleIds[0];
@@ -565,23 +594,23 @@ async function scenarioAuthorization(ctx: Ctx, member: FixtureUser): Promise<voi
   const memberGenerates = await generateQr(member.token, sA1);
   check("MEMBER gọi generate-qr → 403", memberGenerates.status === 403, memberGenerates.body);
 
-  const staffGenerates = await generateQr(ctx.staff.token, sA1);
-  check("STAFF gọi generate-qr → 403 (không mở quyền sinh mã)", staffGenerates.status === 403, staffGenerates.body);
-
   const coachScans = await scanQr(ctx.coach.token, { code: WRONG_CODE });
   check("COACH gọi scan-qr → 403 (chỉ MEMBER)", coachScans.status === 403, coachScans.body);
-
-  const staffScans = await scanQr(ctx.staff.token, { code: WRONG_CODE });
-  check("STAFF gọi scan-qr → 403", staffScans.status === 403, staffScans.body);
 
   const anonymous = await scanQr(undefined, { code: WRONG_CODE });
   check("không token gọi scan-qr → 401", anonymous.status === 401, anonymous.body);
 
-  const staffWrites = await http("POST", "/attendance", {
-    token: ctx.staff.token,
-    body: { scheduleId: sA1, memberId: member.memberProfileId, status: "PRESENT" },
+  // COACH được ghi attendance lớp MÌNH phụ trách (lớp A) — nên test ranh giới phân quyền
+  // bằng lớp KHÔNG phụ trách (B): verifyCoachAccess phải chặn 403 trước mọi kiểm tra khác.
+  const coachWrites = await http("POST", "/attendance", {
+    token: ctx.coach.token,
+    body: { scheduleId: sB1, memberId: member.memberProfileId, status: "PRESENT" },
   });
-  check("STAFF ghi attendance qua POST /attendance → 403 (giữ nguyên read-only)", staffWrites.status === 403, staffWrites.body);
+  check(
+    "COACH ghi attendance lớp KHÔNG phụ trách → 403",
+    coachWrites.status === 403 && /not assigned/i.test(String(coachWrites.body?.message)),
+    coachWrites.body
+  );
 
   const memberWrites = await http("POST", "/attendance", {
     token: member.token,
@@ -594,14 +623,14 @@ async function scenarioAuthorization(ctx: Ctx, member: FixtureUser): Promise<voi
 async function cleanup(): Promise<void> {
   const memberIds = created.memberProfileIds;
   if (memberIds.length > 0) {
-    // Thứ tự theo FK: log thử mã → enrollment/attendance/penalty → invoice → payment → subscription → member.
+    // Thứ tự theo FK: log thử mã → enrollment/attendance/penalty → invoice → payment → course purchase → member.
     await prisma.attendanceManualCodeAttempt.deleteMany({ where: { memberId: { in: memberIds } } });
     await prisma.enrollment.deleteMany({ where: { memberId: { in: memberIds } } });
     await prisma.attendance.deleteMany({ where: { memberId: { in: memberIds } } });
     await prisma.attendancePenalty.deleteMany({ where: { memberId: { in: memberIds } } });
     await prisma.invoice.deleteMany({ where: { memberId: { in: memberIds } } });
     await prisma.payment.deleteMany({ where: { memberId: { in: memberIds } } });
-    await prisma.membershipSubscription.deleteMany({ where: { memberId: { in: memberIds } } });
+    await prisma.coursePurchase.deleteMany({ where: { memberId: { in: memberIds } } });
   }
   if (created.userIds.length > 0) {
     // Mã dự phòng do manager/coach của fixture cấp (phòng khi class chưa cascade hết).
@@ -612,7 +641,6 @@ async function cleanup(): Promise<void> {
     await prisma.class.deleteMany({ where: { id: { in: created.classIds } } });
   }
   if (created.roomIds.length > 0) await prisma.room.deleteMany({ where: { id: { in: created.roomIds } } });
-  if (created.planIds.length > 0) await prisma.membershipPlan.deleteMany({ where: { id: { in: created.planIds } } });
   if (created.userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: created.userIds } } });
 }
 
@@ -628,25 +656,17 @@ async function main(): Promise<void> {
     await setupRoom();
     const manager = await createUser("MANAGER", "manager", hashed);
     const coach = await createUser("COACH", "coach", hashed);
-    const staff = await createUser("STAFF", "staff", hashed);
     const members: FixtureUser[] = [];
     for (let i = 1; i <= 6; i++) members.push(await createUser("MEMBER", `member${i}`, hashed));
 
     const classA = await createClass("A", 4, { coachProfileId: coach.coachProfileId });
     const classB = await createClass("B", 1);
 
-    const plan = await createPlan(manager.token, {
-      name: `E2E Attendance Plan ${RUN}`,
-      price: 300000,
-      durationDays: 30,
-      tier: "MEMBERSHIP",
-      maxConcurrentClasses: 5,
-    });
-    // member1..member5 có gói ACTIVE; member6 cố tình KHÔNG có gói để test chốt chặn 2.
-    for (let i = 0; i < 5; i++) await subscribe(manager.token, members[i].memberProfileId, plan.id);
+    // member1..member5 MUA khóa A (CoursePurchase ACTIVE); member6 cố tình KHÔNG mua để test chốt chặn sở hữu khóa.
+    for (let i = 0; i < 5; i++) await purchaseCourse(manager.token, members[i].memberProfileId, classA.classId);
 
     // Đặt chỗ: 3 member vào buổi A1, member4 vào A3 (test throttle), member5 vào A1 (nhưng dùng mã của A2),
-    // member6 vào A4 (không có gói).
+    // member6 vào A4 (chưa mua khóa học).
     await enroll(members[0].memberProfileId, classA.classId, classA.scheduleIds[0]);
     await enroll(members[1].memberProfileId, classA.classId, classA.scheduleIds[0]);
     await enroll(members[2].memberProfileId, classA.classId, classA.scheduleIds[0]);
@@ -654,14 +674,14 @@ async function main(): Promise<void> {
     await enroll(members[4].memberProfileId, classA.classId, classA.scheduleIds[0]);
     await enroll(members[5].memberProfileId, classA.classId, classA.scheduleIds[3]);
 
-    const ctx: Ctx = { manager, coach, staff, planId: plan.id, classA, classB };
+    const ctx: Ctx = { manager, coach, classA, classB };
 
     await scenarioQrRegression(ctx, members[0]);
     await scenarioManualCode(ctx, members[1]);
     await scenarioInputGuards(ctx, members[2]);
     await scenarioWrongScheduleMisuse(ctx, members[4]);
     await scenarioMemberThrottle(ctx, members[3]);
-    await scenarioSubscriptionGate(ctx, members[5]);
+    await scenarioCourseGate(ctx, members[5]);
     await scenarioAuthorization(ctx, members[0]);
   } catch (err) {
     failures.push(`Lỗi không mong đợi: ${(err as Error).message}`);

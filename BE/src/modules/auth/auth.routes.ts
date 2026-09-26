@@ -16,12 +16,15 @@ const router = Router();
  * @swagger
  * /auth/register:
  *   post:
- *     summary: Register a new member account
+ *     summary: Register a new MEMBER or COACH account (Guest đăng ký)
  *     description: |
- *       Tạo tài khoản MEMBER + MemberProfile. **Backend tự động cấp kèm một MembershipSubscription ACTIVE
- *       với gói FREE** (`MembershipPlan.tier = FREE`, `maxConcurrentClasses = 0`) — idempotent, không tạo trùng
- *       nếu member đã có subscription ACTIVE. Vì vậy ngay sau khi đăng ký, `GET /enrollments/my/quota` trả
- *       `hasActiveSubscription = true`, `tier = "FREE"`, `limit = 0`, `used = 0`, `remaining = 0`.
+ *       Guest (người tham quan) tự đăng ký tài khoản nền tảng:
+ *       - `role = MEMBER` (mặc định): tạo kèm **MemberProfile** — dùng để MUA KHÓA HỌC và đặt lịch.
+ *       - `role = COACH`: tạo kèm **CoachProfile** — Coach tự mở khóa học của mình (`POST /classes`)
+ *         và nhận 85% doanh thu mỗi lượt học viên mua (nền tảng giữ 15% hoa hồng).
+ *
+ *       `MANAGER` KHÔNG thể tự đăng ký — chỉ MANAGER hiện hữu tạo được qua `POST /users`.
+ *       Không còn auto-provision gói tập (Membership đã bị bỏ).
  *     tags: [Auth]
  *     security: []
  *     requestBody:
@@ -38,6 +41,17 @@ const router = Router();
  *               phone: { type: string, pattern: "^[0-9+]{9,15}$", description: "Optional, 9-15 digits, can start with +" }
  *               gender: { type: string, enum: [MALE, FEMALE, OTHER] }
  *               dateOfBirth: { type: string, format: date, description: "Must be in the past" }
+ *               role: { type: string, enum: [MEMBER, COACH], default: MEMBER, description: "Loại tài khoản Guest muốn tạo" }
+ *               specialization: { type: string, description: "Chỉ dùng khi role = COACH" }
+ *               experienceYears: { type: integer, description: "Chỉ dùng khi role = COACH" }
+ *               bio: { type: string, description: "Chỉ dùng khi role = COACH" }
+ *           example:
+ *             email: "coach3@sportscenter.com"
+ *             password: "Coach@123"
+ *             fullName: "Lê Văn HLV"
+ *             role: "COACH"
+ *             specialization: "Boxing"
+ *             experienceYears: 4
  *     responses:
  *       201: { $ref: "#/components/responses/RegisterCreated" }
  *       400: { $ref: "#/components/responses/BadRequest" }

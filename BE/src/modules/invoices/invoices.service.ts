@@ -10,7 +10,12 @@ const invoiceInclude = {
   },
   payment: {
     include: {
-      subscription: { include: { plan: true } },
+      coursePurchase: {
+        include: {
+          class: { select: { id: true, name: true, price: true } },
+          coach: { include: { user: { select: { id: true, fullName: true } } } },
+        },
+      },
     },
   },
 };

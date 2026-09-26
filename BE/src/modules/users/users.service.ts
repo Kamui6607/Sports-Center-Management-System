@@ -2,7 +2,6 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { hashPassword } from "../../utils/bcrypt.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
-import { ensureActiveFreeSubscription } from "../subscriptions/free-subscription.service.js";
 import type { CreateUserInput, UpdateUserInput, UserQueryInput } from "./users.schema.js";
 
 const userSelect = {
@@ -72,10 +71,11 @@ export async function createUser(data: CreateUserInput) {
         }
       : {};
 
-  // Tạo user + (MEMBER) MemberProfile + subscription FREE ACTIVE trong cùng transaction.
-  // COACH/STAFF/MANAGER KHÔNG được auto-provision subscription (không có memberProfile).
+  // Tạo user + profile tương ứng role trong cùng transaction.
+  // MEMBER/COACH/MANAGER đều KHÔNG còn auto-provision gói tập (Membership đã bị bỏ):
+  // MEMBER mua khóa học qua `POST /course-purchases`, COACH tự mở khóa học qua `POST /classes`.
   return prisma.$transaction(async (tx) => {
-    const created = await tx.user.create({
+    return tx.user.create({
       data: {
         email: data.email,
         password: hashed,
@@ -88,12 +88,6 @@ export async function createUser(data: CreateUserInput) {
       },
       select: userSelect,
     });
-
-    if (created.memberProfile) {
-      await ensureActiveFreeSubscription(tx, created.memberProfile.id);
-    }
-
-    return created;
   });
 }
 
@@ -124,10 +118,11 @@ export async function updateUser(id: string, data: UpdateUserInput, requesterId:
   // BR-16: 1 user 1 role - Prevent role change if active engagements exist
   if (data.role && data.role !== user.role) {
     if (user.role === "MEMBER") {
-      const activeSubs = await prisma.membershipSubscription.count({
+      // Member đang sở hữu khóa học (CoursePurchase ACTIVE) → phải hủy trước khi đổi role.
+      const activePurchases = await prisma.coursePurchase.count({
         where: { member: { userId: id }, status: "ACTIVE" }
       });
-      if (activeSubs > 0) throw new AppError("Cannot change role: MEMBER has active subscriptions. Cancel them first.", 400);
+      if (activePurchases > 0) throw new AppError("Cannot change role: MEMBER has active course purchases. Cancel them first.", 400);
 
       const bookedEnrollments = await prisma.enrollment.count({
         where: { member: { userId: id }, status: "BOOKED" }
@@ -144,6 +139,12 @@ export async function updateUser(id: string, data: UpdateUserInput, requesterId:
         }
       });
       if (upcomingSchedules > 0) throw new AppError("Cannot change role: COACH is assigned to upcoming classes.", 400);
+
+      // Khóa học của Coach đang có member sở hữu (ACTIVE) → không đổi role để tránh mồ côi quyền lợi.
+      const activeSales = await prisma.coursePurchase.count({
+        where: { coach: { userId: id }, status: "ACTIVE" }
+      });
+      if (activeSales > 0) throw new AppError("Cannot change role: COACH owns courses with active purchases.", 400);
     }
   }
 

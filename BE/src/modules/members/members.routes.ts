@@ -35,7 +35,7 @@ const router = Router();
  */
 router.get(
   "/",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate, authorize("MANAGER"),
   validate(MemberQuerySchema, "query"),
   membersController.listMembers
 );
@@ -60,7 +60,7 @@ router.get(
  */
 router.get(
   "/:id",
-  authenticate, authorize("MANAGER", "STAFF", "COACH"),
+  authenticate, authorize("MANAGER", "COACH"),
   membersController.getMemberById
 );
 
@@ -99,21 +99,20 @@ router.get(
  */
 router.patch(
   "/:id",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate, authorize("MANAGER"),
   validate(UpdateMemberSchema),
   membersController.updateMember
 );
 
 /**
  * @swagger
- * /members/{id}/membership-status:
+ * /members/{id}/courses:
  *   get:
- *     summary: Get member effective tier and active subscription
+ *     summary: Get member's owned courses + spending summary
  *     description: |
- *       `effectiveTier` = tier của MembershipSubscription ACTIVE (FREE | MEMBERSHIP | PREMIUM).
- *       Khi member KHÔNG có subscription ACTIVE → `effectiveTier = null`, `activeSubscription = null`,
- *       `daysRemaining = null` (KHÔNG dùng "FREE" để đại diện cho "không có gói") — nhất quán với
- *       `GET /enrollments/my/quota`. Authorization không đổi: MANAGER / STAFF.
+ *       Thay cho `GET /members/{id}/membership-status` cũ (Membership đã bị bỏ).
+ *       Trả các khóa học member đang SỞ HỮU (`CoursePurchase` ACTIVE + còn hạn) kèm `daysRemaining`
+ *       (`null` = khóa không giới hạn thời hạn), cùng `totalPurchases` / `totalSpent`.
  *     tags: [Members]
  *     parameters:
  *       - in: path
@@ -122,16 +121,16 @@ router.patch(
  *         schema: { type: string }
  *         description: memberProfile.id hoặc userId
  *     responses:
- *       200: { $ref: "#/components/responses/MembershipStatusOk" }
+ *       200: { $ref: "#/components/responses/CoursePurchaseListOk" }
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       403: { $ref: "#/components/responses/Forbidden" }
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
 router.get(
-  "/:id/membership-status",
-  authenticate, authorize("MANAGER", "STAFF"),
-  membersController.getMembershipStatus
+  "/:id/courses",
+  authenticate, authorize("MANAGER"),
+  membersController.getCourseStatus
 );
 
 export default router;

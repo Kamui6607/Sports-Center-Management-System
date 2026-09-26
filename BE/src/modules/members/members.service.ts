@@ -19,6 +19,20 @@ const memberInclude = {
   },
 };
 
+/** Lượt mua khóa học đang hiệu lực (ACTIVE, còn hạn) của member — thay cho subscription ACTIVE cũ. */
+const activePurchaseInclude = {
+  where: {
+    status: "ACTIVE" as const,
+    startDate: { lte: new Date() },
+    OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+  },
+  orderBy: { createdAt: "desc" as const },
+  include: {
+    class: { select: { id: true, name: true, price: true, durationDays: true } },
+    coach: { include: { user: { select: { id: true, fullName: true } } } },
+  },
+};
+
 export async function listMembers(query: MemberQueryInput) {
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
@@ -46,12 +60,7 @@ export async function listMembers(query: MemberQueryInput) {
       take: limit,
       include: {
         ...memberInclude,
-        subscriptions: {
-          where: { status: "ACTIVE", startDate: { lte: new Date() }, endDate: { gte: new Date() } },
-          orderBy: { endDate: "desc" },
-          take: 1,
-          include: { plan: true },
-        },
+        coursePurchases: activePurchaseInclude,
       },
       orderBy: { user: { fullName: "asc" } },
     }),
@@ -68,12 +77,7 @@ export async function getMemberById(id: string) {
     },
     include: {
       ...memberInclude,
-      subscriptions: {
-        where: { status: "ACTIVE", startDate: { lte: new Date() }, endDate: { gte: new Date() } },
-        include: { plan: true },
-        orderBy: { endDate: "desc" },
-        take: 1,
-      },
+      coursePurchases: activePurchaseInclude,
     },
   });
   if (!memberProfile) throw new AppError("Member not found", 404);
@@ -109,33 +113,57 @@ export async function updateMember(id: string, data: UpdateMemberInput) {
   return getMemberById(id);
 }
 
-export async function getMembershipStatus(memberId: string) {
+/**
+ * Tình trạng khóa học của member (thay cho `getMembershipStatus` cũ):
+ * danh sách khóa học đang sở hữu (ACTIVE + còn hạn) kèm số ngày còn lại,
+ * tổng số lượt mua và tổng tiền đã chi.
+ */
+export async function getCourseStatus(memberId: string) {
   const memberProfile = await prisma.memberProfile.findFirst({
     where: { OR: [{ id: memberId }, { userId: memberId }] },
   });
   if (!memberProfile) throw new AppError("Member not found", 404);
 
-  const activeSub = await prisma.membershipSubscription.findFirst({
-    where: {
-      memberId: memberProfile.id,
-      status: "ACTIVE",
-      startDate: { lte: new Date() },
-      endDate: { gte: new Date() },
-    },
-    include: { plan: true },
-    orderBy: [{ tier: "desc" }, { endDate: "desc" }],
-  });
+  const now = new Date();
+  const [activePurchases, totals] = await Promise.all([
+    prisma.coursePurchase.findMany({
+      where: {
+        memberId: memberProfile.id,
+        status: "ACTIVE",
+        startDate: { lte: now },
+        OR: [{ endDate: null }, { endDate: { gte: now } }],
+      },
+      include: {
+        class: { select: { id: true, name: true, price: true, durationDays: true } },
+        coach: { include: { user: { select: { id: true, fullName: true } } } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.coursePurchase.aggregate({
+      where: { memberId: memberProfile.id, status: { not: "CANCELLED" } },
+      _sum: { price: true },
+      _count: true,
+    }),
+  ]);
 
-  /**
-   * effectiveTier = tier của gói ACTIVE (FREE | MEMBERSHIP | PREMIUM).
-   * Không có subscription ACTIVE → `null`, KHÔNG dùng "FREE" để đại diện cho "không có gói"
-   * (FREE chỉ là tier THẬT khi member thực sự có subscription FREE ACTIVE).
-   * Nhất quán với semantics của GET /enrollments/my/quota.
-   */
-  const effectiveTier = activeSub ? activeSub.tier : null;
-  const daysRemaining = activeSub
-    ? Math.ceil((activeSub.endDate.getTime() - Date.now()) / 86400000)
-    : null;
-
-  return { effectiveTier, activeSubscription: activeSub, daysRemaining };
+  return {
+    memberId: memberProfile.id,
+    activeCourseCount: activePurchases.length,
+    activeCourses: activePurchases.map((p) => ({
+      purchaseId: p.id,
+      classId: p.classId,
+      className: p.class.name,
+      coachId: p.coachId,
+      coachName: p.coach?.user.fullName ?? null,
+      price: Number(p.price),
+      startDate: p.startDate,
+      endDate: p.endDate,
+      /** null = khóa không giới hạn thời hạn. */
+      daysRemaining: p.endDate
+        ? Math.max(0, Math.ceil((p.endDate.getTime() - now.getTime()) / 86_400_000))
+        : null,
+    })),
+    totalPurchases: totals._count,
+    totalSpent: Number(totals._sum.price ?? 0),
+  };
 }

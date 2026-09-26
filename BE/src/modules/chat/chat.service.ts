@@ -135,11 +135,10 @@ export const chatService = {
   },
 
   async getContacts(role: string) {
-    // Logic: 
-    // STAFF -> MANAGER, COACH
+    // Logic (sau khi bỏ role STAFF):
     // MEMBER -> COACH
-    // COACH -> MEMBER, STAFF, MANAGER
-    // MANAGER -> STAFF, COACH
+    // COACH -> MEMBER, MANAGER
+    // MANAGER -> MEMBER, COACH
     let allowedRoles: any[] = [];
     
     switch (role) {
@@ -147,13 +146,10 @@ export const chatService = {
         allowedRoles = ["COACH"];
         break;
       case "COACH":
-        allowedRoles = ["MEMBER", "STAFF", "MANAGER"];
-        break;
-      case "STAFF":
-        allowedRoles = ["MANAGER", "COACH"];
+        allowedRoles = ["MEMBER", "MANAGER"];
         break;
       case "MANAGER":
-        allowedRoles = ["STAFF", "COACH"];
+        allowedRoles = ["MEMBER", "COACH"];
         break;
       default:
         allowedRoles = [];

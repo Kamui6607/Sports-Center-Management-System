@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const CreateEnrollmentSchema = z.object({
   scheduleId: z.string().min(1),
-  memberId: z.string().optional(), // required when staff/manager books for a member
+  memberId: z.string().optional(), // Bắt buộc khi MANAGER đặt hộ member (userId hoặc MemberProfile.id)
 });
 
 // Chuyển chỗ đặt sang buổi khác (không sửa lịch — chỉ đổi Enrollment).

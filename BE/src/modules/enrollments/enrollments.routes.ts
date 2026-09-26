@@ -11,20 +11,20 @@ const router = Router();
  * @swagger
  * /enrollments:
  *   post:
- *     summary: Book a class (Member books own class; Staff/Manager book for a member)
+ *     summary: Book a class schedule (Member books for self; Manager books for a member)
  *     description: |
- *       **Business Rules (Chốt chặn nghiệp vụ):**
- *       - Membership must be ACTIVE at booking time.
- *       - Membership `endDate` must be ≥ `schedule.startTime` — cannot book a class that happens after your plan expires.
- *       - PREMIUM class requires PREMIUM tier.
- *       - **Concurrent-class quota**: số Class KHÁC NHAU đang giữ (Enrollment `BOOKED` ở buổi `SCHEDULED` chưa bắt đầu)
- *         không được vượt `MembershipPlan.maxConcurrentClasses` của gói đang ACTIVE. Class đã giữ không tiêu thêm quota.
- *         Vượt quota → **403 `CONCURRENT_CLASS_LIMIT_REACHED`** kèm `tier`/`limit`/`used`/`remaining`.
- *         Member gói FREE có `limit = 0` nên mọi booking Class mới đều bị 403 quota (FE nên gợi ý nâng cấp gói).
- *         Xem chi tiết cách tính ở `GET /enrollments/my/quota`.
+ *       **Business Rules (Chốt chặn nghiệp vụ) — sau khi bỏ Membership:**
+ *       - Member phải **đã MUA khóa học** (`CoursePurchase` ACTIVE) của Class này → nếu chưa,
+ *         trả **403 `COURSE_NOT_PURCHASED`**. Quyền vào lớp đến từ việc mua khóa học, không còn từ gói tập.
+ *       - Khóa học phải **còn hạn tại thời điểm buổi học diễn ra** (`CoursePurchase.endDate ≥ schedule.startTime`;
+ *         `endDate = null` nghĩa là khóa không giới hạn thời hạn).
+ *       - **Không còn quota "số lớp song song"** (đã bỏ cùng `MembershipPlan.maxConcurrentClasses`):
+ *         member được đặt mọi buổi của những khóa học mình đã mua.
+ *       - Không còn yêu cầu tier PREMIUM cho lớp `classType = PREMIUM` (chỉ còn là thuộc tính phân loại).
  *       - No double-booking the same schedule.
  *       - No two schedules with overlapping time.
  *       - Class capacity must not be exceeded.
+ *       - Member đang bị hình phạt chuyên cần ở Class này thì không được đặt lại.
  *     tags: [Enrollments]
  *     security:
  *       - BearerAuth: []
@@ -37,7 +37,7 @@ const router = Router();
  *             required: [scheduleId]
  *             properties:
  *               scheduleId: { type: string, format: uuid }
- *               memberId: { type: string, format: uuid, description: "Required when booked by Staff/Manager" }
+ *               memberId: { type: string, format: uuid, description: "Bắt buộc khi MANAGER đặt hộ member (userId hoặc MemberProfile.id)" }
  *           example:
  *             scheduleId: "a1b2c3d4-0000-0000-0000-000000000001"
  *     responses:
@@ -47,31 +47,23 @@ const router = Router();
  *       403:
  *         description: |
  *           Forbidden — one of:
- *           - No active membership
- *           - Membership expires before class date
- *           - PREMIUM class requires PREMIUM plan
- *           - Concurrent-class quota exceeded (`MembershipPlan.maxConcurrentClasses`)
+ *           - Member chưa mua khóa học (`COURSE_NOT_PURCHASED`)
+ *           - Khóa học hết hạn trước ngày buổi học diễn ra
  *           - Member đang bị hình phạt chuyên cần ở Class này
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *             examples:
- *               no_membership:
- *                 summary: No active membership
- *                 value: { success: false, message: "Bạn không có gói tập đang hoạt động. Vui lòng mua gói để đặt lịch." }
- *               plan_expires_before_class:
- *                 summary: Plan expires before class
- *                 value: { success: false, message: "Gói tập của bạn sẽ hết hạn ngày 25/09/2026, trước khi lớp học diễn ra ngày 30/09/2026. Vui lòng gia hạn gói để đặt lịch." }
- *               premium_required:
- *                 summary: PREMIUM class requires PREMIUM plan
- *                 value: { success: false, message: "Premium membership required to book this class." }
- *               concurrent_class_limit_reached:
- *                 summary: Vượt quota lớp học song song (distinct Class)
- *                 value:
- *                   success: false
- *                   message: "Bạn đã đạt giới hạn 3 lớp học song song của gói MEMBERSHIP. Vui lòng hủy hoặc chuyển một lớp đang đặt trước khi đăng ký lớp mới."
- *                   errors: { code: "CONCURRENT_CLASS_LIMIT_REACHED", tier: "MEMBERSHIP", limit: 3, used: 3, remaining: 0 }
+ *               course_not_purchased:
+ *                 summary: Member chưa mua khóa học
+ *                 value: { success: false, message: "Bạn chưa sở hữu khóa học \"Yoga cơ bản\". Vui lòng mua khóa học để đặt lịch.", errors: { code: "COURSE_NOT_PURCHASED", classId: "class-uuid" } }
+ *               course_expired_before_class:
+ *                 summary: Khóa học hết hạn trước ngày học
+ *                 value: { success: false, message: "Khóa học \"Yoga cơ bản\" của bạn hết hạn ngày 25/09/2026, trước khi buổi học diễn ra ngày 30/09/2026. Vui lòng mua lại khóa học để đặt lịch." }
+ *               attendance_penalty:
+ *                 summary: Đang bị hình phạt chuyên cần ở Class này
+ *                 value: { success: false, message: "Bạn đang bị tạm khoá đặt chỗ lớp này đến 30/09/2026 00:00 do chuyên cần 60% (5 buổi được tính). Vui lòng liên hệ quản lý nếu cần khiếu nại." }
  *       404: { $ref: "#/components/responses/NotFound" }
  *       409: { $ref: "#/components/responses/Conflict" }
  *       500: { $ref: "#/components/responses/ServerError" }
@@ -107,44 +99,8 @@ router.get(
   enrollmentsController.getMyEnrollments
 );
 
-/**
- * @swagger
- * /enrollments/my/quota:
- *   get:
- *     summary: Get my concurrent-class quota (Member only)
- *     description: |
- *       **Quota lớp học song song** — số Class KHÁC NHAU tối đa mà hội viên được giữ đồng thời,
- *       lấy từ `MembershipPlan.maxConcurrentClasses` của MembershipSubscription đang ACTIVE.
- *
- *       Cách tính `used` (tính động từ DB, KHÔNG lưu counter trên Member):
- *       - Chỉ tính `Enrollment.status = BOOKED` ở `ClassSchedule.status = SCHEDULED` và `startTime > now`.
- *       - Đếm **DISTINCT Class**: một Class có nhiều buổi BOOKED vẫn chỉ chiếm 1 quota (`classes[]` có 1 entry/Class,
- *         kèm `futureBookedScheduleCount`; `scheduleId`/`scheduleStartTime` chỉ là buổi đại diện).
- *       - KHÔNG tính: Enrollment `COMPLETED`/`CANCELLED`, buổi đã bắt đầu, buổi `CANCELLED`/`COMPLETED`.
- *
- *       `remaining = max(0, limit - used)`. Transfer trong cùng Class (BR-08) không đổi quota.
- *       Downgrade gói không tự hủy lớp đang giữ: có thể `used > limit` (grandfathering) nhưng
- *       `remaining = 0` nên không đặt thêm Class mới cho tới khi `used < limit`.
- *
- *       Subscription:
- *       - Member mới được auto-provision gói **FREE** (`tier = FREE`, `maxConcurrentClasses = 0`) nên response
- *         thường có `hasActiveSubscription = true`, `tier = "FREE"`, `limit = 0`.
- *       - Dữ liệu cũ/bất thường KHÔNG có subscription ACTIVE: `hasActiveSubscription = false`, `tier = null`,
- *         `limit = 0`, `used` = số Class đang giữ (nếu có), `remaining = 0`.
- *         `tier = null` KHÔNG có nghĩa là tier FREE.
- *
- *       Chỉ trả quota của CHÍNH hội viên đang đăng nhập (không có tham số `memberId`).
- *     tags: [Enrollments]
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200: { $ref: "#/components/responses/ConcurrentClassQuotaOk" }
- *       401: { $ref: "#/components/responses/Unauthorized" }
- *       403: { $ref: "#/components/responses/Forbidden" }
- *       404: { $ref: "#/components/responses/NotFound" }
- *       500: { $ref: "#/components/responses/ServerError" }
- */
-router.get("/my/quota", authenticate, authorize("MEMBER"), enrollmentsController.getMyQuota);
+// Ghi chú: endpoint quota lớp học song song (`GET /enrollments/my/quota`) đã bị GỠ BỎ cùng Membership.
+// Danh sách khóa học Member đã mua (nguồn quyền đặt lịch) nằm ở `GET /course-purchases/my`.
 
 /**
  * @swagger
@@ -166,7 +122,7 @@ router.get("/my/quota", authenticate, authorize("MEMBER"), enrollmentsController
  */
 router.get(
   "/schedule/:scheduleId",
-  authenticate, authorize("MANAGER", "COACH", "STAFF"),
+  authenticate, authorize("MANAGER", "COACH"),
   validate(EnrollmentQuerySchema, "query"),
   enrollmentsController.getScheduleEnrollments
 );
@@ -196,7 +152,7 @@ router.delete("/:id", authenticate, enrollmentsController.cancelEnrollment);
  * @swagger
  * /enrollments/{id}/transfer:
  *   post:
- *     summary: Move a booking to another schedule (Member moves own booking; Staff/Manager any member)
+ *     summary: Move a booking to another schedule (Member moves own booking; Manager any member)
  *     description: |
  *       **Business rules (Chốt chặn nghiệp vụ):**
  *       - Chỉ chuyển chỗ đặt (Enrollment) sang buổi khác — KHÔNG sửa ClassSchedule/Class/Room.
@@ -204,11 +160,9 @@ router.delete("/:id", authenticate, enrollmentsController.cancelEnrollment);
  *       - **BR-08**: `targetScheduleId` phải thuộc CÙNG Class với Enrollment hiện tại (khác Class -> 400).
  *         Member không được dùng endpoint này để chuyển sang Class khác.
  *       - Chỗ cũ phải `BOOKED` và buổi cũ chưa diễn ra; buổi mới phải `SCHEDULED` và chưa bắt đầu.
- *       - Áp dụng đầy đủ luật đặt chỗ cho buổi mới: gói tập ACTIVE còn hạn tới ngày học, PREMIUM class cần tier PREMIUM,
- *         còn sức chứa, không trùng chỗ, không trùng giờ (bỏ qua chỗ cũ đang được chuyển đi).
- *       - **Quota lớp học song song KHÔNG đổi**: transfer giữ nguyên Class (BR-08) nên không tiêu thêm quota mới —
- *         `used`/`remaining` của `GET /enrollments/my/quota` không thay đổi. Vẫn khóa `lockMemberQuota`
- *         cùng thứ tự lock với booking (memberQuota -> memberClass -> schedule) để không chen với request khác.
+ *       - Áp dụng đầy đủ luật đặt chỗ cho buổi mới: Member đã mua khóa học (CoursePurchase ACTIVE) và khóa
+ *         còn hạn tới ngày học, còn sức chứa, không trùng chỗ, không trùng giờ (bỏ qua chỗ cũ đang được chuyển đi).
+ *       - Vẫn khóa theo thứ tự member -> (member × class) -> schedule để không chen với request khác.
  *       - **BR-09**: các transfer của cùng `(memberId, classId)` được serialize bằng advisory lock + compare-and-set,
  *         nên một Enrollment không thể bị chuyển đồng thời sang nhiều buổi: chỉ 1 request thắng (200), request còn lại 409.
  *       - Toàn bộ trong 1 transaction: fail thì rollback, hội viên giữ nguyên chỗ cũ.

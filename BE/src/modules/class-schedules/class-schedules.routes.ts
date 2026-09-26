@@ -180,7 +180,7 @@ router.get(
 router.post(
   "/",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER"),
   validate(CreateScheduleSchema),
   schedulesController.createSchedule
 );
@@ -233,7 +233,7 @@ router.post(
 router.patch(
   "/:id",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER"),
   validate(ScheduleIdSchema, "params"),
   validate(UpdateScheduleSchema),
   schedulesController.updateSchedule
@@ -263,7 +263,7 @@ router.patch(
 router.delete(
   "/:id",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER"),
   validate(ScheduleIdSchema, "params"),
   schedulesController.deleteSchedule
 );
@@ -290,7 +290,7 @@ router.delete(
 router.patch(
   "/:id/complete",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER"),
   validate(ScheduleIdSchema, "params"),
   schedulesController.completeSchedule
 );

@@ -5,12 +5,15 @@ import { buildPaginationMeta } from "../../utils/pagination.js";
 export type NotificationTypeEnum =
   // Tài khoản
   | "MEMBER_REGISTERED"
+  | "COACH_REGISTERED"
   // Chat
   | "CHAT_MESSAGE"
-  // Gói tập
-  | "SUBSCRIPTION_EXPIRING"
-  | "SUBSCRIPTION_EXPIRED"
-  | "SUBSCRIPTION_CANCELLED"
+  // Khóa học (thay cho SUBSCRIPTION_* cũ)
+  | "COURSE_PURCHASED"
+  | "COURSE_SOLD"
+  | "COURSE_EXPIRING"
+  | "COURSE_EXPIRED"
+  | "COURSE_CANCELLED"
   // Lịch học
   | "UPCOMING_CLASS"
   | "SCHEDULE_CANCELLED"

@@ -101,13 +101,52 @@ router.get(
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
+/**
+ * @swagger
+ * /classes/my:
+ *   get:
+ *     summary: List my own courses (COACH)
+ *     description: Trả các khóa học mà Coach đang đăng nhập SỞ HỮU (`Class.ownerCoachId`), kể cả khóa đã tắt bán.
+ *     tags: [Classes]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: isActive
+ *         schema: { type: string, enum: ["true", "false"] }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *     responses:
+ *       200: { $ref: "#/components/responses/ClassListOk" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *       500: { $ref: "#/components/responses/ServerError" }
+ */
+router.get(
+  "/my",
+  authenticate, authorize("COACH"),
+  validate(ClassQuerySchema, "query"),
+  classesController.listMyCourses
+);
+
 router.get("/:id", authenticate, classesController.getClassById);
 
 /**
  * @swagger
  * /classes:
  *   post:
- *     summary: Create a new class
+ *     summary: Create a new course (MANAGER any; COACH creates own course)
+ *     description: |
+ *       - **MANAGER**: tạo khóa học bất kỳ, có thể gán `ownerCoachId` (Coach sở hữu khóa học).
+ *       - **COACH**: chỉ tạo được khóa học CỦA CHÍNH MÌNH — backend tự gán `ownerCoachId` = coach
+ *         đang đăng nhập và thêm coach đó làm **HLV chính** của khóa; gửi `ownerCoachId` khác sẽ bị 403.
+ *       - `price` = giá Member phải trả (Member trả đúng giá này; nền tảng giữ 15% hoa hồng, Coach nhận 85%).
+ *       - `durationDays` = thời hạn sử dụng kể từ lúc mua; bỏ trống ⇒ khóa không giới hạn thời hạn.
  *     tags: [Classes]
  *     requestBody:
  *       required: true
@@ -144,6 +183,24 @@ router.get("/:id", authenticate, classesController.getClassById);
  *                 enum: [POOL, INDOOR, OUTDOOR]
  *                 example: "INDOOR"
  *                 description: "Area type required by this class. Every selected sport must support it."
+ *               price:
+ *                 type: number
+ *                 default: 0
+ *                 description: "Giá khóa học Member phải trả (0 = miễn phí)."
+ *               durationDays:
+ *                 type: integer
+ *                 description: "Thời hạn sử dụng kể từ lúc mua; bỏ trống = vĩnh viễn."
+ *               ownerCoachId:
+ *                 type: string
+ *                 description: "MANAGER only — CoachProfile.id của Coach sở hữu khóa học."
+ *           example:
+ *             name: "Morning Yoga"
+ *             sportIds: ["sport-uuid"]
+ *             capacity: 20
+ *             classType: "REGULAR"
+ *             areaType: "INDOOR"
+ *             price: 500000
+ *             durationDays: 30
  *     responses:
  *       201: { $ref: "#/components/responses/ClassCreated" }
  *       400: { $ref: "#/components/responses/BadRequest" }
@@ -155,7 +212,7 @@ router.get("/:id", authenticate, classesController.getClassById);
 router.post(
   "/",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER", "COACH"),
   validate(CreateClassSchema),
   classesController.createClass
 );
@@ -164,7 +221,9 @@ router.post(
  * @swagger
  * /classes/{id}:
  *   patch:
- *     summary: Update class
+ *     summary: Update course (MANAGER any; COACH only own course)
+ *     description: |
+ *       COACH chỉ sửa được khóa học do mình sở hữu (`Class.ownerCoachId`); đổi `ownerCoachId` chỉ MANAGER được phép.
  *     tags: [Classes]
  *     parameters:
  *       - in: path
@@ -197,6 +256,16 @@ router.post(
  *                 type: string
  *                 enum: [POOL, INDOOR, OUTDOOR]
  *                 description: "New area type. All sports of this class must support it, and upcoming schedules must use a matching Room."
+ *               price:
+ *                 type: number
+ *                 description: "Giá khóa học Member phải trả (Member trả đúng giá này)."
+ *               durationDays:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: "Thời hạn sử dụng kể từ lúc mua; null = vĩnh viễn."
+ *               ownerCoachId:
+ *                 type: string
+ *                 description: "MANAGER only — đổi Coach sở hữu khóa học."
  *               isActive:
  *                 type: boolean
  *     responses:
@@ -210,7 +279,7 @@ router.post(
 router.patch(
   "/:id",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER", "COACH"),
   validate(UpdateClassSchema),
   classesController.updateClass
 );
@@ -219,7 +288,8 @@ router.patch(
  * @swagger
  * /classes/{id}:
  *   delete:
- *     summary: Deactivate class (soft delete)
+ *     summary: Deactivate course (soft delete; MANAGER any, COACH only own course)
+ *     description: Không thể ngừng bán khi khóa còn buổi SCHEDULED sắp tới hoặc còn member đang sở hữu (CoursePurchase ACTIVE).
  *     tags: [Classes]
  *     parameters:
  *       - in: path
@@ -238,7 +308,7 @@ router.patch(
 router.delete(
   "/:id",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER", "COACH"),
   classesController.deleteClass
 );
 
@@ -282,7 +352,7 @@ router.delete(
 router.post(
   "/:id/coaches",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER"),
   validate(AssignCoachSchema),
   classesController.assignCoach
 );
@@ -329,7 +399,7 @@ router.post(
 router.post(
   "/:id/coaches/support",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER", "COACH"),
   validate(AssignSupportCoachSchema),
   classesController.assignSupportCoach
 );
@@ -364,7 +434,7 @@ router.post(
 router.delete(
   "/:id/coaches/:coachId",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER", "COACH"),
   classesController.removeCoach
 );
 

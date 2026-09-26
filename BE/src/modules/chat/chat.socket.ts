@@ -33,7 +33,7 @@ export const setupSocket = (io: Server) => {
         if (data.receiverId) {
           io.to(data.receiverId).emit("newMessage", message);
         } else {
-          // If no receiver, it's a global chat for all staff/managers
+          // If no receiver, it's a global chat for all coaches/managers
           // Emit to a global room or broadcast
           io.emit("newMessage", message);
         }

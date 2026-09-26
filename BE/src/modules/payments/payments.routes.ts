@@ -22,7 +22,7 @@ const router = Router();
  *             required: [memberId, amount, method]
  *             properties:
  *               memberId: { type: string }
- *               subscriptionId: { type: string }
+ *               coursePurchaseId: { type: string, description: "Lượt mua khóa học mà payment thanh toán cho" }
  *               amount: { type: number }
  *               method: { type: string, enum: [CASH, BANK_TRANSFER] }
  *               status: { type: string, enum: [PENDING, SUCCESS, FAILED] }
@@ -38,7 +38,7 @@ const router = Router();
  */
 router.post(
   "/",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate, authorize("MANAGER"),
   validate(CreatePaymentSchema),
   paymentsController.createPayment
 );
@@ -74,7 +74,7 @@ router.post(
  */
 router.get(
   "/",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate, authorize("MANAGER"),
   validate(PaymentQuerySchema, "query"),
   paymentsController.listPayments
 );

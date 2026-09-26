@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const CreatePaymentSchema = z.object({
   memberId: z.string().min(1),
-  subscriptionId: z.string().optional(),
+  /** Lượt mua khóa học mà payment này thanh toán (thay cho subscriptionId cũ). */
+  coursePurchaseId: z.string().optional(),
   amount: z.number().positive(),
   method: z.enum(["CASH", "BANK_TRANSFER"]),
   status: z.enum(["PENDING", "SUCCESS", "FAILED"]).default("SUCCESS"),

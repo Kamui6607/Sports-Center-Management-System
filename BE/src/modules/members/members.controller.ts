@@ -23,9 +23,9 @@ export async function updateMember(req: Request, res: Response, next: NextFuncti
   } catch (err) { next(err); }
 }
 
-export async function getMembershipStatus(req: Request, res: Response, next: NextFunction) {
+export async function getCourseStatus(req: Request, res: Response, next: NextFunction) {
   try {
-    const status = await membersService.getMembershipStatus(req.params.id as string);
-    sendSuccess(res, status, "Membership status retrieved successfully");
+    const status = await membersService.getCourseStatus(req.params.id as string);
+    sendSuccess(res, status, "Member course status retrieved successfully");
   } catch (err) { next(err); }
 }

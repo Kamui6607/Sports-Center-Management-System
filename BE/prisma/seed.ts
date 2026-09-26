@@ -1,8 +1,7 @@
 import "dotenv/config";
-import { PrismaClient, UserRole, MemberTier, ClassType, AreaType, PaymentMethod, PaymentStatus } from "@prisma/client";
+import { PrismaClient, UserRole, ClassType, AreaType, PaymentMethod, PaymentStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { FREE_PLAN } from "../src/config/membership.js";
-import { ensureActiveFreeSubscription } from "../src/modules/subscriptions/free-subscription.service.js";
+import { splitCoursePrice, COURSE_COMMISSION_RATE } from "../src/config/commission.js";
 
 const prisma = new PrismaClient();
 
@@ -13,7 +12,6 @@ async function main() {
 
   // ─── USERS ───────────────────────────────────────────
   const managerPwd = await bcrypt.hash("Manager@123", SALT);
-  const staffPwd = await bcrypt.hash("Staff@123", SALT);
   const coachPwd = await bcrypt.hash("Coach@123", SALT);
   const memberPwd = await bcrypt.hash("Member@123", SALT);
 
@@ -32,21 +30,6 @@ async function main() {
     },
   });
   console.log("Manager:", manager.email);
-
-  // Staff (Receptionist)
-  const staff = await prisma.user.upsert({
-    where: { email: "staff@sportscenter.com" },
-    update: {},
-    create: {
-      email: "staff@sportscenter.com",
-      password: staffPwd,
-      fullName: "Lê Thị Lễ Tân",
-      phone: "0900000002",
-      role: UserRole.STAFF,
-      isActive: true,
-    },
-  });
-  console.log("Staff:", staff.email);
 
   // Coach 1
   const coach1 = await prisma.user.upsert({
@@ -159,70 +142,6 @@ async function main() {
   });
   console.log("Member 3:", member3.email);
 
-  // ─── MEMBERSHIP PLANS ────────────────────────────────
-  const planBasic = await prisma.membershipPlan.upsert({
-    where: { id: "plan-basic-001" },
-    update: {},
-    create: {
-      id: "plan-basic-001",
-      name: "Membership Monthly",
-      description: "Gói thành viên cơ bản 1 tháng. Được đăng ký các lớp thông thường.",
-      price: 300000,
-      durationDays: 30,
-      tier: MemberTier.MEMBERSHIP,
-      maxConcurrentClasses: 3,
-      isActive: true,
-    },
-  });
-
-  const planQuarterly = await prisma.membershipPlan.upsert({
-    where: { id: "plan-quarterly-001" },
-    update: {},
-    create: {
-      id: "plan-quarterly-001",
-      name: "Membership Quarterly",
-      description: "Gói thành viên cơ bản 3 tháng. Tiết kiệm hơn so với gói tháng.",
-      price: 800000,
-      durationDays: 90,
-      tier: MemberTier.MEMBERSHIP,
-      maxConcurrentClasses: 3,
-      isActive: true,
-    },
-  });
-
-  const planPremium = await prisma.membershipPlan.upsert({
-    where: { id: "plan-premium-001" },
-    update: {},
-    create: {
-      id: "plan-premium-001",
-      name: "Premium Monthly",
-      description: "Gói Premium 1 tháng. Đăng ký lớp Premium, AI workout recommendation, ưu tiên booking.",
-      price: 600000,
-      durationDays: 30,
-      tier: MemberTier.PREMIUM,
-      maxConcurrentClasses: 6,
-      isActive: true,
-    },
-  });
-
-  // Gói FREE hệ thống — Member mới được auto-provision subscription ACTIVE với plan này (quota 0).
-  // Chỉ MỘT plan FREE duy nhất: upsert theo id cố định, provisioning runtime cũng reuse plan FREE active.
-  await prisma.membershipPlan.upsert({
-    where: { id: "plan-free-001" },
-    update: {},
-    create: {
-      id: "plan-free-001",
-      name: FREE_PLAN.name,
-      description: FREE_PLAN.description,
-      price: FREE_PLAN.price,
-      durationDays: FREE_PLAN.durationDays,
-      tier: MemberTier.FREE,
-      maxConcurrentClasses: 0,
-      isActive: true,
-    },
-  });
-  console.log("Membership Plans created");
-
   // ─── SPORTS ──────────────────────────────────────────
   const yoga = await prisma.sport.upsert({
     where: { name: "Yoga" },
@@ -302,51 +221,78 @@ async function main() {
 
   const yogaClass = await prisma.class.upsert({
     where: { id: "class-yoga-001" },
-    update: { sports: { set: [{ id: yoga.id }] }, areaType: AreaType.INDOOR },
+    update: {
+      sports: { set: [{ id: yoga.id }] },
+      areaType: AreaType.INDOOR,
+      price: 500000,
+      durationDays: 30,
+      ownerCoachId: coachProfile1?.id ?? null,
+    },
     create: {
       // Seed dùng ID custom ổn định (không phải UUID) để test/dev dễ tham chiếu.
       // API giữ string.min(1), KHÔNG ép uuid để tương thích các ID này.
       id: "class-yoga-001",
       name: "Yoga Buổi Sáng",
-      description: "Lớp Yoga nhẹ nhàng buổi sáng, phù hợp mọi trình độ.",
+      description: "Khóa Yoga nhẹ nhàng buổi sáng, phù hợp mọi trình độ.",
       sports: { connect: [{ id: yoga.id }] },
       capacity: 15,
       classType: ClassType.REGULAR,
       areaType: AreaType.INDOOR,
+      price: 500000,
+      durationDays: 30,
+      ownerCoachId: coachProfile1?.id ?? null,
       isActive: true,
     },
   });
 
   const hiitClass = await prisma.class.upsert({
     where: { id: "class-hiit-001" },
-    update: { sports: { set: [{ id: hiit.id }] }, areaType: AreaType.INDOOR },
+    update: {
+      sports: { set: [{ id: hiit.id }] },
+      areaType: AreaType.INDOOR,
+      price: 450000,
+      durationDays: 30,
+      ownerCoachId: coachProfile2?.id ?? null,
+    },
     create: {
       id: "class-hiit-001",
       name: "HIIT Cardio",
-      description: "Lớp HIIT cường độ cao, đốt cháy calo tối đa.",
+      description: "Khóa HIIT cường độ cao, đốt cháy calo tối đa.",
       sports: { connect: [{ id: hiit.id }] },
       capacity: 12,
       classType: ClassType.REGULAR,
       areaType: AreaType.INDOOR,
+      price: 450000,
+      durationDays: 30,
+      ownerCoachId: coachProfile2?.id ?? null,
       isActive: true,
     },
   });
 
   const premiumYoga = await prisma.class.upsert({
     where: { id: "class-yoga-premium-001" },
-    update: { sports: { set: [{ id: yoga.id }] }, areaType: AreaType.INDOOR },
+    update: {
+      sports: { set: [{ id: yoga.id }] },
+      areaType: AreaType.INDOOR,
+      price: 900000,
+      durationDays: 45,
+      ownerCoachId: coachProfile1?.id ?? null,
+    },
     create: {
       id: "class-yoga-premium-001",
       name: "Premium Yoga & Meditation",
-      description: "Lớp Yoga Premium với coach 1-1 và thiền định chuyên sâu.",
+      description: "Khóa Yoga Premium với coach 1-1 và thiền định chuyên sâu.",
       sports: { connect: [{ id: yoga.id }] },
       capacity: 8,
       classType: ClassType.PREMIUM,
       areaType: AreaType.INDOOR,
+      price: 900000,
+      durationDays: 45,
+      ownerCoachId: coachProfile1?.id ?? null,
       isActive: true,
     },
   });
-  console.log("Classes created");
+  console.log("Courses (classes) created with price/owner coach");
 
   // Assign coaches
   if (coachProfile1) {
@@ -426,130 +372,128 @@ async function main() {
   });
   console.log("Class Schedules created");
 
-  // ─── SUBSCRIPTIONS (for member1 and member2) ─────────
+  // ─── COURSE PURCHASES (Member mua khóa học của Coach) ─────────────────
+  // Mô hình hoa hồng KHẤU TRỪ: Member trả đúng giá niêm yết; nền tảng giữ 15%; Coach nhận 85%.
   const member1Profile = member1.memberProfile;
   const member2Profile = member2.memberProfile;
+  const member3Profile = member3.memberProfile;
 
-  // Seed chạy lại KHÔNG được tạo subscription trùng: chỉ seed gói trả phí khi member chưa có gói ACTIVE.
-  const hasActiveSubscription = async (memberProfileId: string) =>
-    (await prisma.membershipSubscription.count({
-      where: { memberId: memberProfileId, status: "ACTIVE" },
-    })) > 0;
-
-  if (member1Profile && !(await hasActiveSubscription(member1Profile.id))) {
-    const subStartDate = new Date();
-    const subEndDate = new Date();
-    subEndDate.setDate(subEndDate.getDate() + planBasic.durationDays);
-
-    const sub1 = await prisma.membershipSubscription.create({
-      data: {
-        memberId: member1Profile.id,
-        planId: planBasic.id,
-        tier: MemberTier.MEMBERSHIP,
-        startDate: subStartDate,
-        endDate: subEndDate,
-        status: "ACTIVE",
-      },
+  /** Seed 1 lượt mua khóa học (idempotent: member đã có lượt ACTIVE cho khóa này thì bỏ qua). */
+  async function seedCoursePurchase(opts: {
+    memberProfileId: string;
+    memberName: string;
+    course: { id: string; name: string; price: unknown; durationDays: number | null; ownerCoachId: string | null };
+    method: PaymentMethod;
+    note: string;
+    invoiceSuffix: string;
+  }) {
+    const existing = await prisma.coursePurchase.findFirst({
+      where: { memberId: opts.memberProfileId, classId: opts.course.id, status: "ACTIVE" },
     });
+    if (existing) {
+      console.log(`  - ${opts.course.name}: member đã có lượt mua ACTIVE, bỏ qua`);
+      return existing;
+    }
 
-    // Payment + Invoice for subscription
-    const payment1 = await prisma.payment.create({
-      data: {
-        memberId: member1Profile.id,
-        subscriptionId: sub1.id,
-        amount: planBasic.price,
-        method: PaymentMethod.CASH,
-        status: PaymentStatus.SUCCESS,
-        paidAt: new Date(),
-        createdById: staff.id,
-        note: "Thanh toán tại quầy",
-      },
+    const { price, commissionAmount, coachEarning } = splitCoursePrice(Number(opts.course.price));
+    const startDate = new Date();
+    const endDate = opts.course.durationDays
+      ? new Date(startDate.getTime() + opts.course.durationDays * 86_400_000)
+      : null;
+
+    return prisma.$transaction(async (tx) => {
+      const purchase = await tx.coursePurchase.create({
+        data: {
+          memberId: opts.memberProfileId,
+          classId: opts.course.id,
+          coachId: opts.course.ownerCoachId,
+          price,
+          commissionRate: COURSE_COMMISSION_RATE,
+          commissionAmount,
+          coachEarning,
+          startDate,
+          endDate,
+          status: "ACTIVE",
+        },
+      });
+
+      const payment = await tx.payment.create({
+        data: {
+          memberId: opts.memberProfileId,
+          coursePurchaseId: purchase.id,
+          amount: price,
+          method: opts.method,
+          status: PaymentStatus.SUCCESS,
+          paidAt: new Date(),
+          createdById: manager.id,
+          note: opts.note,
+        },
+      });
+
+      await tx.invoice.create({
+        data: {
+          invoiceNumber: `INV-${Date.now()}-${opts.invoiceSuffix}`,
+          memberId: opts.memberProfileId,
+          paymentId: payment.id,
+          subtotal: price,
+          discount: 0,
+          total: price,
+          status: "ISSUED",
+          issuedAt: new Date(),
+          memberName: opts.memberName,
+          courseName: opts.course.name,
+        },
+      });
+
+      console.log(
+        `  - ${opts.course.name}: giá ${price.toLocaleString("vi-VN")}đ → nền tảng ${commissionAmount.toLocaleString("vi-VN")}đ / Coach ${coachEarning.toLocaleString("vi-VN")}đ`
+      );
+      return purchase;
     });
-
-    await prisma.invoice.create({
-      data: {
-        invoiceNumber: `INV-${Date.now()}-001`,
-        memberId: member1Profile.id,
-        paymentId: payment1.id,
-        subtotal: planBasic.price,
-        discount: 0,
-        total: planBasic.price,
-        status: "ISSUED",
-        issuedAt: new Date(),
-      },
-    });
-
-    console.log("Subscription for member1 created");
   }
 
-  if (member2Profile && !(await hasActiveSubscription(member2Profile.id))) {
-    const subStartDate = new Date();
-    const subEndDate = new Date();
-    subEndDate.setDate(subEndDate.getDate() + planPremium.durationDays);
-
-    const sub2 = await prisma.membershipSubscription.create({
-      data: {
-        memberId: member2Profile.id,
-        planId: planPremium.id,
-        tier: MemberTier.PREMIUM,
-        startDate: subStartDate,
-        endDate: subEndDate,
-        status: "ACTIVE",
-      },
+  if (member1Profile) {
+    await seedCoursePurchase({
+      memberProfileId: member1Profile.id,
+      memberName: member1.fullName,
+      course: yogaClass,
+      method: PaymentMethod.CASH,
+      note: "Thanh toán tại quầy",
+      invoiceSuffix: "001",
     });
-
-    const payment2 = await prisma.payment.create({
-      data: {
-        memberId: member2Profile.id,
-        subscriptionId: sub2.id,
-        amount: planPremium.price,
-        method: PaymentMethod.BANK_TRANSFER,
-        status: PaymentStatus.SUCCESS,
-        paidAt: new Date(),
-        createdById: staff.id,
-        note: "Chuyển khoản online",
-      },
-    });
-
-    await prisma.invoice.create({
-      data: {
-        invoiceNumber: `INV-${Date.now()}-002`,
-        memberId: member2Profile.id,
-        paymentId: payment2.id,
-        subtotal: planPremium.price,
-        discount: 0,
-        total: planPremium.price,
-        status: "ISSUED",
-        issuedAt: new Date(),
-      },
-    });
-
-    console.log("Subscription for member2 created");
   }
 
-  // ─── AUTO FREE SUBSCRIPTION cho MEMBER chưa có gói ACTIVE ────────────
-  // Member mới luôn phải có subscription ACTIVE (tier FREE, quota 0). Idempotent:
-  // member đã có ACTIVE subscription (member1/member2) sẽ không bị tạo thêm.
-  const memberProfiles = [member1.memberProfile, member2.memberProfile, member3.memberProfile];
-  for (const profile of memberProfiles) {
-    if (!profile) continue;
-    const result = await prisma.$transaction((tx) =>
-      ensureActiveFreeSubscription(tx, profile.id)
-    );
-    console.log(
-      `Member ${profile.id}: ${result.created ? "created ACTIVE FREE subscription" : "already has ACTIVE subscription"}`
-    );
+  if (member2Profile) {
+    await seedCoursePurchase({
+      memberProfileId: member2Profile.id,
+      memberName: member2.fullName,
+      course: premiumYoga,
+      method: PaymentMethod.BANK_TRANSFER,
+      note: "Chuyển khoản online",
+      invoiceSuffix: "002",
+    });
+  }
+
+  if (member3Profile) {
+    await seedCoursePurchase({
+      memberProfileId: member3Profile.id,
+      memberName: member3.fullName,
+      course: hiitClass,
+      method: PaymentMethod.CASH,
+      note: "Thanh toán tại quầy",
+      invoiceSuffix: "003",
+    });
   }
 
   console.log("\nSeeding completed!");
-  console.log("\nTest Accounts:");
+  console.log("\nTest Accounts (4 roles: Manager / Coach / Member — Guest không cần tài khoản):");
   console.log("  Manager:  manager@sportscenter.com / Manager@123");
-  console.log("  Staff:    staff@sportscenter.com   / Staff@123");
-  console.log("  Coach 1:  coach1@sportscenter.com  / Coach@123");
-  console.log("  Coach 2:  coach2@sportscenter.com  / Coach@123");
-  console.log("  Member 1: member1@example.com      / Member@123  [MEMBERSHIP tier]");
-  console.log("  Member 2: member2@example.com      / Member@123  [PREMIUM tier]");
-  console.log("  Member 3: member3@example.com      / Member@123  [FREE tier]");
+  console.log("  Coach 1:  coach1@sportscenter.com  / Coach@123   [sở hữu: Yoga Buổi Sáng, Premium Yoga & Meditation]");
+  console.log("  Coach 2:  coach2@sportscenter.com  / Coach@123   [sở hữu: HIIT Cardio]");
+  console.log("  Member 1: member1@example.com      / Member@123  [đã mua: Yoga Buổi Sáng]");
+  console.log("  Member 2: member2@example.com      / Member@123  [đã mua: Premium Yoga & Meditation]");
+  console.log("  Member 3: member3@example.com      / Member@123  [đã mua: HIIT Cardio]");
+  console.log("\nHoa hồng nền tảng: Member trả ĐÚNG giá khóa học; nền tảng giữ 15%; Coach nhận 85%.");
 }
 
 main()

@@ -23,19 +23,19 @@ export async function getEnrollmentReport(req: Request, res: Response, next: Nex
     sendSuccess(res, report, "Enrollment report retrieved successfully");
   } catch (err) { next(err); }
 }
-export async function getMembershipReport(req: Request, res: Response, next: NextFunction) {
+export async function getCourseRevenueReport(req: Request, res: Response, next: NextFunction) {
   try {
     const { startDate, endDate } = req.query as any;
-    const report = await reportsService.getMembershipReport(startDate, endDate);
-    sendSuccess(res, report, "Membership report retrieved successfully");
+    const report = await reportsService.getCourseRevenueReport(startDate, endDate);
+    sendSuccess(res, report, "Course revenue report retrieved successfully");
   } catch (err) { next(err); }
 }
 
-export async function getSubscriptionLogs(req: Request, res: Response, next: NextFunction) {
+export async function getCoursePurchaseLogs(req: Request, res: Response, next: NextFunction) {
   try {
     const { startDate, endDate, page, limit } = req.query as any;
-    const report = await reportsService.getSubscriptionLogs(startDate, endDate, page, limit);
-    sendSuccess(res, report, "Subscription logs retrieved successfully");
+    const report = await reportsService.getCoursePurchaseLogs(startDate, endDate, page, limit);
+    sendSuccess(res, report, "Course purchase logs retrieved successfully");
   } catch (err) { next(err); }
 }
 

@@ -11,10 +11,11 @@ datasource db {
 // ENUMS
 // ─────────────────────────────────────────
 
+/// Nền tảng: khách (Guest) không cần role — tham quan public API rồi tự đăng ký
+/// thành MEMBER hoặc COACH. MANAGER toàn quyền quản trị.
 enum UserRole {
   MEMBER
   COACH
-  STAFF
   MANAGER
 }
 
@@ -24,17 +25,11 @@ enum Gender {
   OTHER
 }
 
-enum MemberTier {
-  FREE
-  MEMBERSHIP
-  PREMIUM
-}
-
-enum MembershipStatus {
+/// Trạng thái một lượt mua khóa học của Member.
+enum CoursePurchaseStatus {
   ACTIVE
   EXPIRED
   CANCELLED
-  SUSPENDED
 }
 
 enum TrainingLevel {
@@ -138,7 +133,7 @@ model MemberProfile {
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
-  subscriptions      MembershipSubscription[]
+  coursePurchases    CoursePurchase[]
   enrollments        Enrollment[]
   payments           Payment[]
   invoices           Invoice[]
@@ -162,6 +157,10 @@ model CoachProfile {
   classes       ClassMember[]
   trainingPlans TrainingPlan[]
   feedbacks     CoachFeedback[]
+  /// Khóa học do chính Coach tạo (Coach được phép mở khóa học riêng).
+  ownedClasses  Class[]          @relation("ClassOwner")
+  /// Các lượt mua khóa học thuộc khóa do Coach này sở hữu (snapshot lúc mua — dùng để đối soát hoa hồng).
+  courseSales   CoursePurchase[]
 }
 
 model ManagerProfile {
@@ -173,47 +172,45 @@ model ManagerProfile {
 }
 
 // ─────────────────────────────────────────
-// MEMBERSHIP
+// COURSE PURCHASE (mua khóa học — thay thế Membership)
 // ─────────────────────────────────────────
 
-model MembershipPlan {
-  id                   String     @id @default(uuid())
-  name                 String
-  description          String?
-  price                Decimal    @db.Decimal(12, 2)
-  durationDays         Int
-  tier                 MemberTier // MEMBERSHIP or PREMIUM
-  /// Quota lớp học song song: số Class KHÁC NHAU tối đa mà hội viên được giữ đồng thời (>= 0).
-  /// Một Class = 1 quota dù hội viên có nhiều buổi BOOKED. Hệ thống đếm DISTINCT Class có
-  /// Enrollment BOOKED ở ClassSchedule SCHEDULED chưa bắt đầu. Do Manager cấu hình qua API.
-  maxConcurrentClasses Int
-  isActive             Boolean    @default(true)
-  createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
-
-  subscriptions MembershipSubscription[]
-}
-
-model MembershipSubscription {
-  id            String           @id @default(uuid())
-  memberId      String
-  member        MemberProfile    @relation(fields: [memberId], references: [id])
-  planId        String
-  plan          MembershipPlan   @relation(fields: [planId], references: [id])
-  tier          MemberTier // copied from plan at time of subscription
-  startDate     DateTime
-  endDate       DateTime
-  status        MembershipStatus @default(ACTIVE)
-  // BR-15: Suspension tracking
-  suspendedAt   DateTime? // When suspension started
-  remainingDays Int? // Days remaining when suspended (for resume logic)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+/// Một lượt Member mua khóa học (Class) của Coach.
+///
+/// Mô hình hoa hồng (chốt): **khấu trừ** — Member trả ĐÚNG giá niêm yết `price`;
+/// nền tảng giữ `commissionAmount` = `commissionRate` × `price` (mặc định 15%);
+/// Coach sở hữu khóa học nhận `coachEarning` = `price` − `commissionAmount` (85%).
+/// Cả 3 con số được snapshot tại thời điểm mua để đối soát/hóa đơn không đổi về sau.
+model CoursePurchase {
+  id               String               @id @default(uuid())
+  memberId         String
+  member           MemberProfile        @relation(fields: [memberId], references: [id])
+  classId          String
+  class            Class                @relation(fields: [classId], references: [id])
+  /// Coach sở hữu khóa học tại thời điểm mua (snapshot); null nếu khóa do Manager tạo không gán Coach.
+  coachId          String?
+  coach            CoachProfile?        @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  /// Giá Member phải trả (= Class.price lúc mua).
+  price            Decimal              @db.Decimal(12, 2)
+  /// Tỷ lệ hoa hồng nền tảng giữ lại (0.15 = 15%).
+  commissionRate   Float                @default(0.15)
+  /// Hoa hồng nền tảng thu (Manager theo dõi doanh thu nền tảng).
+  commissionAmount Decimal              @db.Decimal(12, 2)
+  /// Phần Coach nhận được.
+  coachEarning     Decimal              @db.Decimal(12, 2)
+  startDate        DateTime
+  /// null = khóa học không giới hạn thời hạn (Class.durationDays = null).
+  endDate          DateTime?
+  status           CoursePurchaseStatus @default(ACTIVE)
+  cancelledAt      DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   payments Payment[]
 
   @@index([memberId])
-  @@index([planId])
+  @@index([classId])
+  @@index([coachId])
   @@index([status])
   @@index([endDate])
 }
@@ -259,20 +256,30 @@ model Class {
   // Many-to-Many with Sport
   sports Sport[]
 
-  capacity  Int
-  classType ClassType @default(REGULAR)
-  // Khu vực mà lớp học yêu cầu (POOL | INDOOR | OUTDOOR).
-  // Khác với classType (REGULAR | PREMIUM là hạng lớp).
-  areaType  AreaType
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  capacity     Int
+  classType    ClassType     @default(REGULAR)
+  /// Khu vực mà lớp học yêu cầu (POOL | INDOOR | OUTDOOR).
+  /// Khác với classType (REGULAR | PREMIUM là hạng lớp).
+  areaType     AreaType
+  /// Giá khóa học Member phải trả để được đặt lịch (0 = miễn phí).
+  price        Decimal       @default(0) @db.Decimal(12, 2)
+  /// Thời hạn sử dụng kể từ lúc mua (null = vĩnh viễn).
+  durationDays Int?
+  /// Coach sở hữu khóa học (Coach tự tạo khóa của mình). Manager tạo hộ cũng có thể gán.
+  ownerCoachId String?
+  ownerCoach   CoachProfile? @relation("ClassOwner", fields: [ownerCoachId], references: [id], onDelete: SetNull)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   coaches     ClassMember[]
   schedules   ClassSchedule[]
   enrollments Enrollment[]
   feedbacks   CoachFeedback[]
   penalties   AttendancePenalty[]
+  purchases   CoursePurchase[]
+
+  @@index([ownerCoachId])
 }
 
 // Coach assignment to class (many-to-many)
@@ -340,26 +347,27 @@ model Enrollment {
 // ─────────────────────────────────────────
 
 model Payment {
-  id              String                  @id @default(uuid())
-  memberId        String
-  member          MemberProfile           @relation(fields: [memberId], references: [id])
-  subscriptionId  String?
-  subscription    MembershipSubscription? @relation(fields: [subscriptionId], references: [id])
-  amount          Decimal                 @db.Decimal(12, 2)
-  method          PaymentMethod
-  status          PaymentStatus           @default(PENDING)
-  transactionCode String?                 @unique
-  note            String?
-  paidAt          DateTime?
-  createdById     String?
-  createdBy       User?                   @relation("PaymentCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  id               String          @id @default(uuid())
+  memberId         String
+  member           MemberProfile   @relation(fields: [memberId], references: [id])
+  /// Lượt mua khóa học mà payment này thanh toán (thay cho subscriptionId cũ).
+  coursePurchaseId String?
+  coursePurchase   CoursePurchase? @relation(fields: [coursePurchaseId], references: [id])
+  amount           Decimal         @db.Decimal(12, 2)
+  method           PaymentMethod
+  status           PaymentStatus   @default(PENDING)
+  transactionCode  String?         @unique
+  note             String?
+  paidAt           DateTime?
+  createdById      String?
+  createdBy        User?           @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   invoice Invoice?
 
   @@index([memberId])
-  @@index([subscriptionId])
+  @@index([coursePurchaseId])
   @@index([status])
   @@index([createdAt])
 }
@@ -378,8 +386,7 @@ model Invoice {
   issuedAt      DateTime      @default(now())
   // BR-25: Snapshot fields — immutable record of who paid for what
   memberName    String? // Copied from user.fullName at time of issue
-  planName      String? // Copied from plan.name at time of issue
-  planTier      String? // Copied from plan.tier at time of issue
+  courseName    String? // Copied from Class.name at time of issue (thay cho planName/planTier cũ)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -572,12 +579,15 @@ model CoachFeedback {
 enum NotificationType {
   // ── Tài khoản ──
   MEMBER_REGISTERED // Chào mừng hội viên mới đăng ký
+  COACH_REGISTERED // Chào mừng huấn luyện viên mới đăng ký
   // ── Chat ──
   CHAT_MESSAGE // Nhận tin nhắn mới
-  // ── Gói tập ──
-  SUBSCRIPTION_EXPIRING // Gói sắp hết hạn (5 ngày trước)
-  SUBSCRIPTION_EXPIRED // Gói đã hết hạn
-  SUBSCRIPTION_CANCELLED // Gói bị hủy (kèm lý do)
+  // ── Khóa học ──
+  COURSE_PURCHASED // Mua khóa học thành công
+  COURSE_SOLD // Coach có người mua khóa học của mình
+  COURSE_EXPIRING // Khóa học sắp hết hạn (5 ngày trước)
+  COURSE_EXPIRED // Khóa học đã hết hạn
+  COURSE_CANCELLED // Lượt mua khóa học bị hủy (kèm lý do)
   // ── Lịch học ──
   UPCOMING_CLASS // Nhắc lớp sắp học (24h trước)
   SCHEDULE_CANCELLED // Lịch học bị hủy

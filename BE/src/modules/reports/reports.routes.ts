@@ -83,9 +83,15 @@ router.get("/enrollments", validate(DateRangeSchema, "query"), reportsController
 
 /**
  * @swagger
- * /reports/memberships:
+ * /reports/courses:
  *   get:
- *     summary: Membership subscription report (by status, tier, revenue)
+ *     summary: Course revenue & commission report (thay cho báo cáo memberships)
+ *     description: |
+ *       Tổng hợp lượt mua khóa học theo trạng thái + doanh thu/hoa hồng:
+ *       - `totalRevenue`: tiền thực thu (payments SUCCESS gắn `coursePurchaseId`, theo `paidAt` trong kỳ).
+ *       - `platformCommission` (15%) / `coachEarnings` (85%): chỉ tính các lượt mua đang **ACTIVE**
+ *         — dùng để đối soát chi trả cho Coach.
+ *       - `topCourses`: 5 khóa học bán chạy nhất trong kỳ.
  *     tags: [Reports]
  *     parameters:
  *       - in: query
@@ -97,13 +103,30 @@ router.get("/enrollments", validate(DateRangeSchema, "query"), reportsController
  *         required: true
  *         schema: { type: string }
  *     responses:
- *       200: { $ref: "#/components/responses/MembershipReportOk" }
+ *       200:
+ *         description: Course revenue report
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: Course revenue report retrieved successfully
+ *               data:
+ *                 totalPurchases: 12
+ *                 newPurchases: 4
+ *                 activePurchases: 9
+ *                 expiredPurchases: 2
+ *                 cancelledPurchases: 1
+ *                 totalRevenue: 5400000
+ *                 activeGrossRevenue: 4500000
+ *                 platformCommission: 675000
+ *                 coachEarnings: 3825000
+ *                 topCourses: [{ classId: "class-uuid", className: "Morning Yoga", purchaseCount: 5, revenue: 2500000 }]
  *       400: { $ref: "#/components/responses/BadRequest" }
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       403: { $ref: "#/components/responses/Forbidden" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.get("/memberships", validate(DateRangeSchema, "query"), reportsController.getMembershipReport);
+router.get("/courses", validate(DateRangeSchema, "query"), reportsController.getCourseRevenueReport);
 
 /**
  * @swagger
@@ -194,6 +217,53 @@ router.get(
   reportsController.getAttendanceReport
 );
 
-router.get("/subscription-logs", reportsController.getSubscriptionLogs);
+/**
+ * @swagger
+ * /reports/course-purchase-logs:
+ *   get:
+ *     summary: Detailed log of course purchases (thay cho subscription-logs)
+ *     description: Mỗi dòng gồm member, khóa học, Coach sở hữu, giá, hoa hồng nền tảng và phần Coach nhận.
+ *     tags: [Reports]
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200:
+ *         description: Course purchase logs
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: Course purchase logs retrieved successfully
+ *               data:
+ *                 data:
+ *                   - id: "purchase-uuid"
+ *                     action: "Mua khóa học"
+ *                     username: "Phạm Văn An"
+ *                     email: "member1@example.com"
+ *                     className: "Morning Yoga"
+ *                     coachName: "Nguyễn Văn Cường"
+ *                     price: 500000
+ *                     commissionAmount: 75000
+ *                     coachEarning: 425000
+ *                     status: ACTIVE
+ *                     paymentStatus: SUCCESS
+ *                 pagination: { page: 1, limit: 20, total: 1, totalPages: 1 }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       500: { $ref: "#/components/responses/ServerError" }
+ */
+router.get("/course-purchase-logs", reportsController.getCoursePurchaseLogs);
 
 export default router;

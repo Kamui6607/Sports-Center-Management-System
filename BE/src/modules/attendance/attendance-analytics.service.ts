@@ -76,15 +76,16 @@ export async function computeAttendanceBuckets(
   const classIds = [...new Set([...grouped.values()].map((g) => g.classId))];
   const scheduleIds = [...new Set([...grouped.values()].flatMap((g) => g.schedules.map((s) => s.id)))];
 
-  const [members, classes, subscriptions, attendances] = await Promise.all([
+  const [members, classes, purchases, attendances] = await Promise.all([
     db.memberProfile.findMany({
       where: { id: { in: memberIds } },
       select: { id: true, user: { select: { id: true, fullName: true } } },
     }),
     db.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true } }),
-    db.membershipSubscription.findMany({
+    // Lượt mua khóa học của các member liên quan — dùng để xác định buổi nào "được tính".
+    db.coursePurchase.findMany({
       where: { memberId: { in: memberIds } },
-      select: { memberId: true, status: true, startDate: true, endDate: true, suspendedAt: true },
+      select: { memberId: true, status: true, startDate: true, endDate: true },
     }),
     db.attendance.findMany({
       where: { memberId: { in: memberIds }, scheduleId: { in: scheduleIds } },
@@ -94,21 +95,22 @@ export async function computeAttendanceBuckets(
 
   const memberMap = new Map(members.map((m) => [m.id, m]));
   const classMap = new Map(classes.map((c) => [c.id, c]));
-  const subsByMember = new Map<string, typeof subscriptions>();
-  for (const sub of subscriptions) {
-    subsByMember.set(sub.memberId, [...(subsByMember.get(sub.memberId) ?? []), sub]);
+  const purchasesByMember = new Map<string, typeof purchases>();
+  for (const p of purchases) {
+    purchasesByMember.set(p.memberId, [...(purchasesByMember.get(p.memberId) ?? []), p]);
   }
   const attendanceMap = new Map(attendances.map((a) => [`${a.memberId}|${a.scheduleId}`, a]));
 
-  /** Buổi chỉ được tính khi member có gói bao phủ (ACTIVE) hoặc đang trong giai đoạn SUSPENDED. */
-  const isCoveredByMembership = (memberId: string, at: Date) => {
-    const subs = subsByMember.get(memberId) ?? [];
-    return subs.some((sub) => {
-      if (sub.status === "ACTIVE") return sub.startDate <= at && at <= sub.endDate;
-      if (sub.status === "SUSPENDED") {
-        return Boolean(sub.suspendedAt && sub.suspendedAt <= at && at <= sub.endDate);
-      }
-      return false;
+  /**
+   * Buoi chi duoc tinh khi member SO HUU khoa hoc bao phu thoi diem do (CoursePurchase ACTIVE/EXPIRED)
+   * - thay cho dieu kien MembershipSubscription cu. Luot mua da CANCELLED khong tinh.
+   */
+  const isCoveredByCoursePurchase = (memberId: string, at: Date) => {
+    const rows = purchasesByMember.get(memberId) ?? [];
+    return rows.some((p) => {
+      if (p.status === "CANCELLED") return false;
+      if (p.startDate > at) return false;
+      return p.endDate === null || at <= p.endDate;
     });
   };
 
@@ -121,7 +123,7 @@ export async function computeAttendanceBuckets(
     let excusedCount = 0;
 
     for (const schedule of entry.schedules) {
-      if (!isCoveredByMembership(entry.memberId, schedule.startTime)) continue;
+      if (!isCoveredByCoursePurchase(entry.memberId, schedule.startTime)) continue;
       const attendance = attendanceMap.get(`${entry.memberId}|${schedule.id}`);
       if (!attendance) {
         noShowCount++; // buổi đã kết thúc nhưng chưa có bản ghi điểm danh

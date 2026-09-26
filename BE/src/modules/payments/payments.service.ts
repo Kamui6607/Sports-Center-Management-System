@@ -24,13 +24,13 @@ export async function createPayment(data: any, createdById: string) {
   });
   if (!memberProfile) throw new AppError("Member not found", 404);
 
-  if (data.subscriptionId) {
-    const sub = await prisma.membershipSubscription.findUnique({
-      where: { id: data.subscriptionId },
+  if (data.coursePurchaseId) {
+    const purchase = await prisma.coursePurchase.findUnique({
+      where: { id: data.coursePurchaseId },
     });
-    if (!sub) throw new AppError("Subscription not found", 404);
-    if (sub.memberId !== memberProfile.id) {
-      throw new AppError("Subscription belongs to a different member", 400);
+    if (!purchase) throw new AppError("Course purchase not found", 404);
+    if (purchase.memberId !== memberProfile.id) {
+      throw new AppError("Course purchase belongs to a different member", 400);
     }
   }
 
@@ -39,7 +39,7 @@ export async function createPayment(data: any, createdById: string) {
     const payment = await tx.payment.create({
       data: {
         memberId: memberProfile.id,
-        subscriptionId: data.subscriptionId,
+        coursePurchaseId: data.coursePurchaseId || null,
         amount: data.amount,
         method: data.method,
         status: data.status ?? "SUCCESS",
@@ -90,7 +90,12 @@ export async function listPayments(query: any) {
       where, skip, take: limit,
       include: {
         member: { include: { user: { select: { fullName: true, email: true } } } },
-        subscription: { include: { plan: { select: { name: true, tier: true } } } },
+        coursePurchase: {
+          include: {
+            class: { select: { id: true, name: true, price: true } },
+            coach: { include: { user: { select: { id: true, fullName: true } } } },
+          },
+        },
         invoice: true,
       },
       orderBy: { createdAt: "desc" },
@@ -104,7 +109,12 @@ export async function getPaymentById(id: string, currentUser: any) {
     where: { id },
     include: {
       member: { include: { user: { select: { fullName: true, email: true, phone: true } } } },
-      subscription: { include: { plan: true } },
+      coursePurchase: {
+        include: {
+          class: true,
+          coach: { include: { user: { select: { id: true, fullName: true, email: true } } } },
+        },
+      },
       invoice: true,
       createdBy: { select: { fullName: true, email: true } },
     },

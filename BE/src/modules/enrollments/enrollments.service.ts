@@ -5,53 +5,38 @@ import { buildPaginationMeta } from "../../utils/pagination.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { lockMemberClass, lockMemberQuota, lockSchedule } from "../../utils/dbLocks.js";
 import { findActivePenalty } from "../attendance/attendance-penalties.service.js";
-import {
-  assertConcurrentClassQuota,
-  findActiveSubscription,
-} from "./enrollment-quota.service.js";
+import { assertCourseAccess } from "../course-purchases/course-access.service.js";
 
 type BookableSchedule = {
   id: string;
   startTime: Date;
   endTime: Date;
-  class: { id: string; classType: string; capacity: number };
+  class: { id: string; name: string; classType: string; capacity: number };
 };
 
 /**
  * Bộ luật đặt chỗ dùng chung cho bookClass và transferEnrollment:
- * gói tập (ACTIVE, còn hạn tới lúc lớp bắt đầu, tier PREMIUM), quota lớp học song song,
+ * quyền vào lớp (Member đã MUA khóa học và khóa còn hạn tới lúc lớp bắt đầu),
  * sức chứa, trùng chỗ, trùng giờ.
  * `excludeEnrollmentId`: dùng khi transfer — chỗ cũ sắp được nhả nên không tính là trùng giờ.
- * `quotaExemptClassId`: dùng khi transfer — vì BR-08 giữ nguyên Class nên không tiêu quota mới (§9).
  * Trả về enrollment cũ (đang CANCELLED) nếu có, để caller kích hoạt lại theo BR-07.
+ *
+ * Lưu ý (thay đổi khi bỏ Membership): không còn kiểm tra gói tập, tier PREMIUM hay quota
+ * "số lớp song song". Member được đặt mọi buổi của những khóa học mình đã mua.
  */
 async function assertCanBook(
   tx: Prisma.TransactionClient,
   memberProfileId: string,
   schedule: BookableSchedule,
-  options: { excludeEnrollmentId?: string; quotaExemptClassId?: string } = {}
+  options: { excludeEnrollmentId?: string } = {}
 ) {
-  // Chốt chặn 1: subscription phải ACTIVE và còn hạn đến ngày lớp học diễn ra.
-  const activeSub = await findActiveSubscription(tx, memberProfileId);
-
-  if (!activeSub) {
-    throw new AppError(
-      "Bạn không có gói tập đang hoạt động. Vui lòng mua gói để đặt lịch.",
-      403
-    );
-  }
-
-  if (activeSub.endDate < schedule.startTime) {
-    const expiredDate = activeSub.endDate.toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-    const classDate = schedule.startTime.toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-    throw new AppError(
-      `Gói tập của bạn sẽ hết hạn ngày ${expiredDate}, trước khi lớp học diễn ra ngày ${classDate}. Vui lòng gia hạn gói để đặt lịch.`,
-      403
-    );
-  }
-
-  if (schedule.class.classType === "PREMIUM" && activeSub.tier !== "PREMIUM")
-    throw new AppError("Premium membership required to book this class.", 403);
+  // Chốt chặn 1: Member phải đã mua khóa học này và khóa còn hạn tới ngày buổi học diễn ra.
+  // Chưa mua → 403 COURSE_NOT_PURCHASED; hết hạn trước ngày học → 403 kèm ngày hết hạn.
+  await assertCourseAccess(tx, memberProfileId, {
+    classId: schedule.class.id,
+    classLabel: schedule.class.name,
+    startTime: schedule.startTime,
+  });
 
   // §12: hình phạt chuyên cần đang hiệu lực chỉ chặn đúng Class đó (không chặn Class khác).
   const penalty = await findActivePenalty(tx, memberProfileId, schedule.class.id);
@@ -62,12 +47,6 @@ async function assertCanBook(
       403
     );
   }
-
-  // Quota lớp học song song: chỉ chặn khi Member THÊM một Class mới vượt maxConcurrentClasses.
-  // Class đã giữ (có buổi BOOKED tương lai) không tiêu thêm quota; ngược lại nếu đã đủ quota -> 403.
-  await assertConcurrentClassQuota(tx, memberProfileId, schedule.class.id, {
-    quotaExempt: options.quotaExemptClassId === schedule.class.id,
-  });
 
   // Capacity check (đếm BOOKED + COMPLETED, khớp _count ở schedule detail).
   const bookedCount = await tx.enrollment.count({
@@ -133,16 +112,16 @@ export async function bookClass(
     throw new AppError("Cannot book a past class", 400);
 
   return prisma.$transaction(async (tx) => {
-    // Serialize booking theo member + schedule để chống overbooking & vượt quota khi concurrent:
+    // Serialize booking theo member + schedule để chống overbooking khi concurrent:
     // 2 request của cùng member phải xếp hàng, request sau thấy dữ liệu mới nhất.
     // Lock sống trong transaction, tự release khi commit/rollback.
-    // Lock order: memberQuota -> (member × class) -> schedule — giống transferEnrollment
-    // và attendance penalty apply/restore.
+    // Lock order: member (serialize mọi mutation enrollment của member) -> (member × class) -> schedule
+    // — giống transferEnrollment và attendance penalty apply/restore.
     await lockMemberQuota(tx, memberProfileId);
     await lockMemberClass(tx, memberProfileId, schedule.class.id);
     await lockSchedule(tx, scheduleId);
 
-    // 2-5. Gói tập / sức chứa / trùng chỗ / trùng giờ — dùng chung với transferEnrollment.
+    // 2-5. Quyền vào lớp (đã mua khóa học) / sức chứa / trùng chỗ / trùng giờ — dùng chung với transferEnrollment.
     const existing = await assertCanBook(tx, memberProfileId, schedule);
 
     // 6. Create or Reactivate enrollment
@@ -335,8 +314,8 @@ export async function transferEnrollment(
     throw new AppError("Cannot transfer to a past class", 400);
 
   return prisma.$transaction(async (tx) => {
-    // Quota là tài nguyên theo memberId nên phải lock TRƯỚC (lock order: memberQuota ->
-    // memberClass -> schedule).
+    // Lock theo member trước (serialize mọi mutation enrollment của member), rồi (member × class)
+    // và cuối cùng là buổi đích (lock order: member -> memberClass -> schedule).
     await lockMemberQuota(tx, enrollment.memberId);
     // BR-09: serialize mọi transfer của cùng (memberId, classId). Thiếu lock này, 2 request
     // đồng thời (lock schedule đích khác nhau) có thể cùng thấy enrollment BOOKED rồi cùng commit
@@ -364,8 +343,6 @@ export async function transferEnrollment(
 
     const existingTarget = await assertCanBook(tx, enrollment.memberId, target, {
       excludeEnrollmentId: enrollment.id,
-      // §9: transfer chỉ đổi buổi TRONG CÙNG Class (BR-08) => số Class không đổi, không tiêu quota mới.
-      quotaExemptClassId: enrollment.classId,
     });
 
     const enrollmentInclude = {

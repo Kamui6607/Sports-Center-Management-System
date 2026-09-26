@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import * as enrollmentsService from "./enrollments.service.js";
-import * as quotaService from "./enrollment-quota.service.js";
 import { sendSuccess, sendCreated, sendError } from "../../utils/response.js";
 import { prisma } from "../../config/prisma.js";
 
@@ -20,10 +19,10 @@ export async function bookClass(req: Request, res: Response, next: NextFunction)
         return;
       }
       memberProfileId = profile.id;
-    } else if (role === "MANAGER" || role === "STAFF") {
-      // MANAGER or STAFF must provide memberId
+    } else if (role === "MANAGER") {
+      // MANAGER phải cung cấp memberId khi đặt hộ.
       if (!bodyMemberId) {
-        sendError(res, "memberId is required for staff/manager booking", 400);
+        sendError(res, "memberId is required when a MANAGER books for a member", 400);
         return;
       }
       // Accept userId or profileId
@@ -87,16 +86,5 @@ export async function getScheduleEnrollments(req: Request, res: Response, next: 
       req.query
     );
     sendSuccess(res, enrollments, "Schedule enrollments retrieved successfully", 200, pagination);
-  } catch (err) { next(err); }
-}
-
-/**
- * Quota lớp học song song của CHÍNH member đang đăng nhập (không nhận memberId từ ngoài),
- * nên không thể xem quota của member khác.
- */
-export async function getMyQuota(req: Request, res: Response, next: NextFunction) {
-  try {
-    const quota = await quotaService.getMyConcurrentClassQuota(req.user!.id);
-    sendSuccess(res, quota, "Concurrent class quota retrieved successfully");
   } catch (err) { next(err); }
 }

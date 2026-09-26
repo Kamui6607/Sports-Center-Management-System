@@ -8,9 +8,16 @@ export async function listClasses(req: Request, res: Response, next: NextFunctio
     sendSuccess(res, classes, "Classes retrieved successfully", 200, pagination);
   } catch (err) { next(err); }
 }
+/** GET /classes/my — COACH xem các khóa học do chính mình sở hữu. */
+export async function listMyCourses(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { classes, pagination } = await classesService.listMyCourses(req.user!.id, req.query);
+    sendSuccess(res, classes, "My courses retrieved successfully", 200, pagination);
+  } catch (err) { next(err); }
+}
 export async function createClass(req: Request, res: Response, next: NextFunction) {
   try {
-    const cls = await classesService.createClass(req.body);
+    const cls = await classesService.createClass(req.body, { id: req.user!.id, role: req.user!.role });
     sendCreated(res, cls, "Class created successfully");
   } catch (err) { next(err); }
 }
@@ -22,7 +29,10 @@ export async function getClassById(req: Request, res: Response, next: NextFuncti
 }
 export async function updateClass(req: Request, res: Response, next: NextFunction) {
   try {
-    const cls = await classesService.updateClass(req.params.id as string, req.body);
+    const cls = await classesService.updateClass(req.params.id as string, req.body, {
+      id: req.user!.id,
+      role: req.user!.role,
+    });
     sendSuccess(res, cls, "Class updated successfully");
   } catch (err) { next(err); }
 }
@@ -34,19 +44,30 @@ export async function assignCoach(req: Request, res: Response, next: NextFunctio
 }
 export async function assignSupportCoach(req: Request, res: Response, next: NextFunction) {
   try {
-    const cls = await classesService.assignSupportCoach(req.params.id as string, req.body.coachId);
+    const cls = await classesService.assignSupportCoach(
+      req.params.id as string,
+      req.body.coachId,
+      { id: req.user!.id, role: req.user!.role }
+    );
     sendSuccess(res, cls, "Support coach assigned successfully");
   } catch (err) { next(err); }
 }
 export async function removeCoach(req: Request, res: Response, next: NextFunction) {
   try {
-    const cls = await classesService.removeCoach(req.params.id as string, req.params.coachId as string);
+    const cls = await classesService.removeCoach(
+      req.params.id as string,
+      req.params.coachId as string,
+      { id: req.user!.id, role: req.user!.role }
+    );
     sendSuccess(res, cls, "Coach removed successfully");
   } catch (err) { next(err); }
 }
 export async function deleteClass(req: Request, res: Response, next: NextFunction) {
   try {
-    const cls = await classesService.deleteClass(req.params.id as string);
+    const cls = await classesService.deleteClass(req.params.id as string, {
+      id: req.user!.id,
+      role: req.user!.role,
+    });
     sendSuccess(res, cls, "Class deactivated successfully");
   } catch (err) { next(err); }
 }

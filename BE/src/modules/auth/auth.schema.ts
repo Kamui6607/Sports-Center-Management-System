@@ -14,6 +14,15 @@ export const RegisterSchema = z.object({
     .refine(v => !v || !isNaN(Date.parse(v)), "Invalid date of birth")
     .refine(v => !v || new Date(v) <= new Date(), "Date of birth cannot be in the future")
     .optional(),
+  /**
+   * Guest tự đăng ký thành MEMBER (mua khóa học) hoặc COACH (mở khóa học của riêng mình).
+   * MANAGER không được phép tự đăng ký — chỉ MANAGER hiện hữu tạo được qua `POST /users`.
+   */
+  role: z.enum(["MEMBER", "COACH"]).default("MEMBER"),
+  // Các field dưới chỉ áp dụng khi role = COACH (hồ sơ huấn luyện viên).
+  specialization: z.string().max(200).optional(),
+  experienceYears: z.number().int().min(0).max(80).optional(),
+  bio: z.string().max(2000).optional(),
 });
 
 export const LoginSchema = z.object({

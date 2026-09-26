@@ -9,7 +9,6 @@ import {
 } from "../../utils/jwt.js";
 import { hashToken } from "../../utils/hashToken.js";
 import { createNotification } from "../notifications/notifications.service.js";
-import { ensureActiveFreeSubscription } from "../subscriptions/free-subscription.service.js";
 import type { RegisterInput, UpdateProfileInput } from "./auth.schema.js";
 
 export async function register(data: RegisterInput) {
@@ -18,48 +17,63 @@ export async function register(data: RegisterInput) {
 
   const hashed = await hashPassword(data.password);
 
-  // Tạo user + MemberProfile + subscription FREE ACTIVE trong CÙNG transaction:
-  // mọi MEMBER mới luôn có gói ACTIVE (tier FREE, maxConcurrentClasses = 0), không rơi vào
-  // trạng thái "không có subscription". Idempotent: đã có ACTIVE subscription thì không tạo thêm.
-  const user = await prisma.$transaction(async (tx) => {
-    const created = await tx.user.create({
-      data: {
-        email: data.email,
-        password: hashed,
-        fullName: data.fullName,
-        phone: data.phone,
-        gender: data.gender,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-        role: "MEMBER",
-        memberProfile: { create: {} },
-      },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        phone: true,
-        gender: true,
-        dateOfBirth: true,
-        role: true,
-        isActive: true,
-        memberProfile: true,
-      },
-    });
+  // Guest tự đăng ký:
+  // - MEMBER → tạo kèm MemberProfile (mua khóa học để đặt lịch).
+  // - COACH  → tạo kèm CoachProfile (mở khóa học của riêng mình, hưởng 85% doanh thu).
+  // Không còn auto-provision gói tập (Membership đã bị bỏ).
+  const isCoach = data.role === "COACH";
 
-    if (created.memberProfile) {
-      await ensureActiveFreeSubscription(tx, created.memberProfile.id);
-    }
-
-    return created;
+  const user = await prisma.user.create({
+    data: {
+      email: data.email,
+      password: hashed,
+      fullName: data.fullName,
+      phone: data.phone,
+      gender: data.gender,
+      dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+      role: data.role,
+      ...(isCoach
+        ? {
+            coachProfile: {
+              create: {
+                specialization: data.specialization,
+                experienceYears: data.experienceYears,
+                bio: data.bio,
+              },
+            },
+          }
+        : { memberProfile: { create: {} } }),
+    },
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+      phone: true,
+      gender: true,
+      dateOfBirth: true,
+      role: true,
+      isActive: true,
+      memberProfile: true,
+      coachProfile: true,
+    },
   });
 
   // Gửi thông báo chào mừng (fire-and-forget, không block response)
-  createNotification(
-    user.id,
-    "MEMBER_REGISTERED",
-    "Chào mừng đến với Trung tâm Thể thao!",
-    `Xin chào ${user.fullName}! Tài khoản của bạn đã được tạo thành công. Hãy khám phá các gói tập và lớp học phù hợp với bạn.`
-  ).catch(() => {}); // Không để lỗi notification phá vỡ response đăng ký
+  if (isCoach) {
+    createNotification(
+      user.id,
+      "COACH_REGISTERED",
+      "Chào mừng Huấn luyện viên đến với nền tảng!",
+      `Xin chào ${user.fullName}! Tài khoản HLV của bạn đã được tạo. Bạn có thể tự mở khóa học của mình và nhận 85% doanh thu mỗi lượt học viên mua (nền tảng giữ 15% hoa hồng).`
+    ).catch(() => {});
+  } else {
+    createNotification(
+      user.id,
+      "MEMBER_REGISTERED",
+      "Chào mừng đến với Trung tâm Thể thao!",
+      `Xin chào ${user.fullName}! Tài khoản của bạn đã được tạo thành công. Hãy khám phá các khóa học và mua khóa học bạn muốn tham gia.`
+    ).catch(() => {});
+  }
 
   return user;
 }
