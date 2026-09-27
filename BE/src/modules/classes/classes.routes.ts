@@ -5,6 +5,7 @@ import { validate } from "../../middlewares/validate.js";
 import {
   CreateClassSchema,
   UpdateClassSchema,
+  ApproveClassSchema,
   AssignCoachSchema,
   AssignSupportCoachSchema,
   ClassQuerySchema,
@@ -193,10 +194,54 @@ router.get("/:id/course-plan", authenticate, classesController.getClassCoursePla
 router.post(
   "/",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER", "COACH"),
   validate(CreateClassSchema),
   classesController.createClass
 );
+
+/**
+ * @swagger
+ * /classes/{id}/review:
+ *   patch:
+ *     summary: Manager duyệt hoặc từ chối class do Coach tạo (PENDING → APPROVED/REJECTED)
+ *     tags: [Classes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [action]
+ *             properties:
+ *               action:
+ *                 type: string
+ *                 enum: [APPROVE, REJECT]
+ *               reason:
+ *                 type: string
+ *                 maxLength: 500
+ *                 description: Lý do từ chối (tùy chọn)
+ *     responses:
+ *       200: { $ref: "#/components/responses/ClassOk" }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *       500: { $ref: "#/components/responses/ServerError" }
+ */
+router.patch(
+  "/:id/review",
+  authenticate,
+  authorize("MANAGER"),
+  validate(ApproveClassSchema),
+  classesController.reviewClass
+);
+
 
 /**
  * @swagger
@@ -248,7 +293,7 @@ router.post(
 router.patch(
   "/:id",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER"),
   validate(UpdateClassSchema),
   classesController.updateClass
 );
@@ -276,7 +321,7 @@ router.patch(
 router.delete(
   "/:id",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER"),
   classesController.deleteClass
 );
 
@@ -320,7 +365,7 @@ router.delete(
 router.post(
   "/:id/coaches",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER"),
   validate(AssignCoachSchema),
   classesController.assignCoach
 );
@@ -367,7 +412,7 @@ router.post(
 router.post(
   "/:id/coaches/support",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER"),
   validate(AssignSupportCoachSchema),
   classesController.assignSupportCoach
 );
@@ -402,7 +447,7 @@ router.post(
 router.delete(
   "/:id/coaches/:coachId",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER"),
   classesController.removeCoach
 );
 

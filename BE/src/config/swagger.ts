@@ -233,7 +233,7 @@ const options: swaggerJSDoc.Options = {
                       gender: "FEMALE",
                       dateOfBirth: null,
                       avatarUrl: null,
-                      role: "STAFF",
+                      role: "MEMBER",
                       isActive: true,
                       createdAt: "2026-09-11T14:20:14.910Z",
                       memberProfile: null,

@@ -2,7 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { hashPassword } from "../../utils/bcrypt.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
-import { ensureActiveFreeSubscription } from "../subscriptions/free-subscription.service.js";
+
 import { disconnectUserSockets } from "../chat/chat.socket.js";
 import type { CreateUserInput, UpdateUserInput, UserQueryInput } from "./users.schema.js";
 
@@ -74,8 +74,8 @@ export async function createUser(data: CreateUserInput) {
         }
       : {};
 
-  // Tạo user + (MEMBER) MemberProfile + subscription FREE ACTIVE trong cùng transaction.
-  // COACH/STAFF/MANAGER KHÔNG được auto-provision subscription (không có memberProfile).
+  // Tạo user + profile tương ứng trong cùng transaction.
+  // COACH/MANAGER KHÔNG được auto-provision subscription.
   return prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
       data: {
@@ -92,8 +92,7 @@ export async function createUser(data: CreateUserInput) {
     });
 
     if (created.memberProfile) {
-      await ensureActiveFreeSubscription(tx, created.memberProfile.id);
-    }
+      }
 
     return created;
   });
@@ -126,13 +125,8 @@ export async function updateUser(id: string, data: UpdateUserInput, requesterId:
   // BR-16: 1 user 1 role - Prevent role change if active engagements exist
   if (data.role && data.role !== user.role) {
     if (user.role === "MEMBER") {
-      const activeSubs = await prisma.membershipSubscription.count({
-        where: { member: { userId: id }, status: "ACTIVE" }
-      });
-      if (activeSubs > 0) throw new AppError("Cannot change role: MEMBER has active subscriptions. Cancel them first.", 400);
-
       const bookedEnrollments = await prisma.enrollment.count({
-        where: { member: { userId: id }, status: "BOOKED" }
+        where: { member: { userId: id }, status: "BOOKED" },
       });
       if (bookedEnrollments > 0) throw new AppError("Cannot change role: MEMBER has upcoming booked classes. Cancel them first.", 400);
     }

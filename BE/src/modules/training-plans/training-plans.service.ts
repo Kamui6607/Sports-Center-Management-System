@@ -4,7 +4,7 @@ import { AppError } from "../../middlewares/errorHandler.js";
 import { createNotification } from "../notifications/notifications.service.js";
 
 async function verifyCoachOwnership(coachId: string, user: any) {
-  if (user.role === "MANAGER" || user.role === "STAFF") return true;
+  if (user.role === "MANAGER") return true;
   if (user.role === "COACH") {
     const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: user.id } });
     if (!coachProfile || coachProfile.id !== coachId) {
@@ -57,7 +57,7 @@ const planInclude = {
 
 /**
  * GET /training-plans — PHẠM VI theo actor đăng nhập (KHÔNG tin query từ client):
- * - MANAGER/STAFF: xem toàn bộ (lọc `memberId` nếu có).
+ * - MANAGER: xem toàn bộ (lọc `memberId` nếu có).
  * - COACH: chỉ plan do CHÍNH mình phụ trách (kết hợp `memberId` nếu có).
  * - MEMBER: chỉ plan của chính mình; truyền `memberId` người khác ⇒ 403.
  */
@@ -65,7 +65,7 @@ export const getPlans = async (
   memberId: string | undefined,
   actor: { id: string; role: string }
 ) => {
-  if (actor.role === "MANAGER" || actor.role === "STAFF") {
+  if (actor.role === "MANAGER") {
     return prisma.trainingPlan.findMany({
       where: memberId ? { memberId } : undefined,
       include: planInclude,
@@ -108,7 +108,7 @@ export const createResult = async (data: Prisma.TrainingResultUncheckedCreateInp
  * Quyền đổi HLV của TrainingPlan:
  * - MEMBER: chỉ plan thuộc hồ sơ của chính mình.
  * - COACH: chỉ plan mình đang phụ trách (reuse verifyCoachOwnership).
- * - MANAGER/STAFF: giữ nguyên hành vi như verifyCoachOwnership (route chỉ mở cho MANAGER).
+ * - MANAGER: giữ nguyên hành vi như verifyCoachOwnership (route chỉ mở cho MANAGER).
  */
 async function verifyPlanCoachChangeAccess(plan: { memberId: string; coachId: string }, user: any) {
   if (user.role === "MEMBER") {

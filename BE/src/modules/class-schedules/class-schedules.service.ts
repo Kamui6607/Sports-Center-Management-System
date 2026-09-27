@@ -274,10 +274,15 @@ export async function createSchedule(data: any) {
  * Any validation or conflict error rolls back the sport, class, assignments,
  * and every schedule created by this request.
  */
-export async function createActivityPlan(data: any, canCreateSport: boolean) {
+export async function createActivityPlan(data: any, actor: { id: string; role: string }) {
+  const isCoach = actor.role === "COACH";
+  const canCreateSport = !isCoach; // Coach không được tạo sport mới
+
   if (data.sport.mode === "new" && !canCreateSport) {
-    throw new AppError("Only managers can create a new sport", 403);
+    throw new AppError("Only managers can create a new sport in activity-plan", 403);
   }
+
+  const initialStatus = isCoach ? "PENDING" : "APPROVED";
 
   return prisma.$transaction(async (tx) => {
     const room = await tx.room.findUnique({ where: { id: data.roomId } });
@@ -290,6 +295,15 @@ export async function createActivityPlan(data: any, canCreateSport: boolean) {
     }
     if (room.capacity < data.class.capacity) {
       throw new AppError("Room capacity is too small for this class", 400);
+    }
+
+    // Coach dùng activity-plan: primaryCoachId phải là chính mình
+    if (isCoach) {
+      const coachProfile = await tx.coachProfile.findUnique({ where: { userId: actor.id } });
+      if (!coachProfile) throw new AppError("Coach profile not found", 404);
+      if (data.primaryCoachId !== coachProfile.id) {
+        throw new AppError("Coach can only set themselves as primary coach", 403);
+      }
     }
 
     const coachIds = [data.primaryCoachId, data.supportCoachId].filter(
@@ -339,6 +353,9 @@ export async function createActivityPlan(data: any, canCreateSport: boolean) {
         capacity: data.class.capacity,
         classType: data.class.classType,
         areaType: data.class.areaType,
+        price: data.class.price ?? 0,
+        status: initialStatus,
+        createdById: actor.id,
         sports: { connect: { id: sport.id } },
         coaches: {
           create: coachIds.map((coachId) => ({
@@ -349,29 +366,48 @@ export async function createActivityPlan(data: any, canCreateSport: boolean) {
       },
     });
 
+    // Đảm bảo CoachWallet tồn tại cho primary coach
+    const primaryCoach = coaches.find((c) => c.id === data.primaryCoachId);
+    if (primaryCoach) {
+      await tx.coachWallet.upsert({
+        where: { coachId: primaryCoach.id },
+        create: { coachId: primaryCoach.id, balance: 0 },
+        update: {},
+      });
+    }
+
+    // Coach tạo PENDING → chỉ tạo schedule khi APPROVED sau (không tạo schedule lúc PENDING)
+    // Manager tạo APPROVED → tạo schedule ngay
     const createdSchedules = [];
-    for (const schedule of data.schedules) {
-      const startTime = new Date(schedule.startTime);
-      const endTime = new Date(schedule.endTime);
-      await checkConflicts(tx, room.id, cls.id, startTime, endTime);
-      createdSchedules.push(await tx.classSchedule.create({
-        data: {
-          classId: cls.id,
-          roomId: room.id,
-          startTime,
-          endTime,
-          status: "SCHEDULED",
-        },
-      }));
+    if (!isCoach) {
+      for (const schedule of data.schedules) {
+        const startTime = new Date(schedule.startTime);
+        const endTime = new Date(schedule.endTime);
+        await checkConflicts(tx, room.id, cls.id, startTime, endTime);
+        createdSchedules.push(await tx.classSchedule.create({
+          data: {
+            classId: cls.id,
+            roomId: room.id,
+            startTime,
+            endTime,
+            status: "SCHEDULED",
+          },
+        }));
+      }
     }
 
     return {
       class: cls,
       sport,
       schedulesCreated: createdSchedules.length,
+      status: initialStatus,
+      note: isCoach
+        ? "Class created as PENDING and awaiting Manager approval. Schedules will be set after approval."
+        : undefined,
     };
   }, { timeout: 30_000 });
 }
+
 
 export async function getScheduleById(id: string) {
   const schedule = await prisma.classSchedule.findUnique({

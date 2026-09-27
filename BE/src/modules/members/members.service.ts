@@ -47,13 +47,7 @@ export async function listMembers(query: MemberQueryInput) {
       take: limit,
       include: {
         ...memberInclude,
-        subscriptions: {
-          where: { status: "ACTIVE", startDate: { lte: new Date() }, endDate: { gte: new Date() } },
-          orderBy: { endDate: "desc" },
-          take: 1,
-          include: { plan: true },
         },
-      },
       orderBy: { user: { fullName: "asc" } },
     }),
   ]);
@@ -69,13 +63,7 @@ export async function getMemberById(id: string) {
     },
     include: {
       ...memberInclude,
-      subscriptions: {
-        where: { status: "ACTIVE", startDate: { lte: new Date() }, endDate: { gte: new Date() } },
-        include: { plan: true },
-        orderBy: { endDate: "desc" },
-        take: 1,
       },
-    },
   });
   if (!memberProfile) throw new AppError("Member not found", 404);
   return memberProfile;
@@ -120,16 +108,7 @@ export async function getMembershipStatus(memberId: string) {
   });
   if (!memberProfile) throw new AppError("Member not found", 404);
 
-  const activeSub = await prisma.membershipSubscription.findFirst({
-    where: {
-      memberId: memberProfile.id,
-      status: "ACTIVE",
-      startDate: { lte: new Date() },
-      endDate: { gte: new Date() },
-    },
-    include: { plan: true },
-    orderBy: [{ tier: "desc" }, { endDate: "desc" }],
-  });
+  const activeSub = null;
 
   /**
    * effectiveTier = tier của gói ACTIVE (FREE | MEMBERSHIP | PREMIUM).

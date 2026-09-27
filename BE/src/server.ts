@@ -1,20 +1,4 @@
-import "dotenv/config";
-import app from "./app.js";
-import { env } from "./config/env.js";
-import { prisma } from "./config/prisma.js";
-import { sepayConfig } from "./config/sepay.js";
 
-import http from "http";
-import { Server } from "socket.io";
-import { setupSocket } from "./modules/chat/chat.socket.js";
-import {
-  flushNotificationOutbox,
-  OUTBOX_FLUSH_INTERVAL_MS,
-} from "./modules/notifications/outbox.service.js";
-import {
-  LIFECYCLE_INTERVAL_MS,
-  runSubscriptionLifecycleJobs,
-} from "./modules/subscriptions/subscription-lifecycle.service.js";
 
 async function main() {
   // Fail-fast: `SEPAY_MOCK_MODE` chỉ dành cho dev/demo/e2e — bật nhầm ở production là lỗ hổng
@@ -42,7 +26,7 @@ async function main() {
   // F01: worker outbox — gửi nốt notification PENDING (retry sau crash/lỗi tạm thời).
   // Các luồng nghiệp vụ đã flush ngay sau commit; worker này là lưới an toàn.
   const outboxTimer = setInterval(() => {
-    void flushNotificationOutbox().catch((err) =>
+    void flushNotificationOutbox().catch((err: any) =>
       console.warn("[OUTBOX] flush lỗi:", (err as Error).message)
     );
   }, OUTBOX_FLUSH_INTERVAL_MS);
@@ -50,11 +34,11 @@ async function main() {
 
   // B07: job vòng đời gói tập — hết hạn (stored-state), nhắc sắp hết hạn, đóng SePay PENDING quá TTL.
   // Chạy ngay sau boot (đồng bộ dữ liệu cũ) rồi lặp 15 phút; lỗi job không làm chết server.
-  void runSubscriptionLifecycleJobs().catch((err) =>
+  void runSubscriptionLifecycleJobs().catch((err: any) =>
     console.warn("[LIFECYCLE] lỗi lượt đầu:", (err as Error).message)
   );
   const lifecycleTimer = setInterval(() => {
-    void runSubscriptionLifecycleJobs().catch((err) =>
+    void runSubscriptionLifecycleJobs().catch((err: any) =>
       console.warn("[LIFECYCLE] lỗi:", (err as Error).message)
     );
   }, LIFECYCLE_INTERVAL_MS);
@@ -66,7 +50,7 @@ async function main() {
   });
 }
 
-main().catch((err) => {
+main().catch((err: any) => {
   console.error("Failed to start server:", err);
   process.exit(1);
 });

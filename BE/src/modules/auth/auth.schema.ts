@@ -14,6 +14,9 @@ export const RegisterSchema = z.object({
     .refine(v => !v || !isNaN(Date.parse(v)), "Invalid date of birth")
     .refine(v => !v || new Date(v) <= new Date(), "Date of birth cannot be in the future")
     .optional(),
+  // Guest có thể chọn đăng ký làm MEMBER hoặc COACH; mặc định MEMBER.
+  // MANAGER không được tự đăng ký — phải được Manager tạo qua POST /users.
+  role: z.enum(["MEMBER", "COACH"]).default("MEMBER"),
 });
 
 export const LoginSchema = z.object({

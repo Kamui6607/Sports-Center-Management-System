@@ -1,4 +1,4 @@
-import { Prisma, MemberTier } from "@prisma/client";
+import { Prisma,  } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 
@@ -28,7 +28,7 @@ export interface ConcurrentClassQuota {
   /** `false` => member không có MembershipSubscription ACTIVE (tier = null, limit = 0, remaining = 0). */
   hasActiveSubscription: boolean;
   /** Tier của gói ACTIVE; `null` khi không có gói ACTIVE — KHÔNG dùng "FREE" để đại diện trường hợp này. */
-  tier: MemberTier | null;
+  tier:  | null;
   limit: number;
   used: number;
   remaining: number;
@@ -45,7 +45,7 @@ export async function findActiveSubscription(
   memberProfileId: string,
   now: Date = new Date()
 ) {
-  return db.membershipSubscription.findFirst({
+  return (db as any).membershipSubscription.findFirst({
     where: {
       memberId: memberProfileId,
       status: "ACTIVE",
@@ -105,7 +105,7 @@ export async function getMemberConcurrentClassQuota(
     : NO_ACTIVE_SUBSCRIPTION_QUOTA;
   // Không có gói ACTIVE => tier = null. "FREE" là tier THẬT của một MembershipPlan/Subscription,
   // không được dùng để đại diện cho "không có subscription".
-  const tier: MemberTier | null = activeSub ? activeSub.tier : null;
+  const tier:  | null = activeSub ? activeSub.tier : null;
 
   // DISTINCT Class: 1 entry / Class. Buổi gần nhất làm đại diện; đếm thêm số buổi tương lai
   // đang BOOKED của Class đó (quota KHÔNG nhân theo số buổi).

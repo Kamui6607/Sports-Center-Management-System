@@ -18,7 +18,7 @@ router.use(authenticate, authorize("MANAGER"));
  *     parameters:
  *       - in: query
  *         name: role
- *         schema: { type: string, enum: [MEMBER, COACH, STAFF, MANAGER] }
+ *         schema: { type: string, enum: [MEMBER, COACH, MANAGER] }
  *       - in: query
  *         name: isActive
  *         schema: { type: string, enum: ["true", "false"] }
@@ -47,7 +47,7 @@ router.get("/", validate(UserQuerySchema, "query"), usersController.listUsers);
  *     summary: Create staff, coach, manager or member account (MEMBER creates the member profile too)
  *     description: |
  *       Với `role = MEMBER`, backend tạo MemberProfile + **auto-provision một MembershipSubscription ACTIVE
- *       với gói FREE** (`maxConcurrentClasses = 0`) trong cùng transaction. COACH/STAFF/MANAGER KHÔNG được cấp
+ *       với gói FREE** (`maxConcurrentClasses = 0`) trong cùng transaction. COACH/MANAGER KHÔNG được cấp
  *       subscription. Idempotent theo member: nếu member đã có subscription ACTIVE thì không tạo thêm.
  *     tags: [Users]
  *     requestBody:
@@ -61,7 +61,7 @@ router.get("/", validate(UserQuerySchema, "query"), usersController.listUsers);
  *               email: { type: string }
  *               password: { type: string }
  *               fullName: { type: string }
- *               role: { type: string, enum: [MEMBER, COACH, STAFF, MANAGER] }
+ *               role: { type: string, enum: [MEMBER, COACH, MANAGER] }
  *               fitnessGoal: { type: string, description: "Role MEMBER only" }
  *               trainingLevel: { type: string, enum: [BEGINNER, INTERMEDIATE, ADVANCED], description: "Role MEMBER only" }
  *               trainingPreference: { type: string, description: "Role MEMBER only" }
@@ -119,7 +119,7 @@ router.get("/:id", usersController.getUserById);
  *               gender: { type: string, enum: [MALE, FEMALE, OTHER] }
  *               dateOfBirth: { type: string }
  *               isActive: { type: boolean }
- *               role: { type: string, enum: [MEMBER, COACH, STAFF, MANAGER] }
+ *               role: { type: string, enum: [MEMBER, COACH, MANAGER] }
  *     responses:
  *       200: { $ref: "#/components/responses/UserOk" }
  *       400: { $ref: "#/components/responses/BadRequest" }

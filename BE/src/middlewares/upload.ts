@@ -126,3 +126,37 @@ export function avatarUpload(req: Request, res: Response, next: NextFunction) {
     return next();
   });
 }
+
+export const CV_UPLOAD_DIR = path.join(uploadDir, "cvs");
+if (!fs.existsSync(CV_UPLOAD_DIR)) {
+  fs.mkdirSync(CV_UPLOAD_DIR, { recursive: true });
+}
+
+export const cvMulter = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, CV_UPLOAD_DIR),
+    filename: (_req, _file, cb) => {
+      cb(null, `${randomUUID()}.pdf`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype !== "application/pdf") {
+      cb(new AppError("CV must be a PDF file.", 400));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+export function cvUpload(req: Request, res: Response, next: NextFunction) {
+  cvMulter.single("cv")(req, res, (err: unknown) => {
+    if (!err) return next();
+    if (err instanceof AppError) return next(err);
+    if (err instanceof multer.MulterError) {
+      const message = err.code === "LIMIT_FILE_SIZE" ? "CV must be at most 10MB." : `Upload failed: ${err.message}`;
+      return next(new AppError(message, 400));
+    }
+    return next(err as Error);
+  });
+}

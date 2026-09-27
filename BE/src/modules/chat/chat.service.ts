@@ -8,9 +8,8 @@ import { CHAT_UPLOAD_DIR } from "../../middlewares/upload.js";
 
 const allowedContacts: Record<string, UserRole[]> = {
   MEMBER: ["COACH"],
-  COACH: ["MEMBER", "STAFF", "MANAGER"],
-  STAFF: ["MANAGER", "COACH"],
-  MANAGER: ["STAFF", "COACH"],
+  COACH: ["MEMBER", "MANAGER"],
+  MANAGER: [ "COACH"],
 };
 
 async function assertCanContact(senderId: string, receiverId?: string) {
@@ -260,7 +259,7 @@ export const chatService = {
     // Logic: 
     // STAFF -> MANAGER, COACH
     // MEMBER -> COACH
-    // COACH -> MEMBER, STAFF, MANAGER
+    // COACH -> MEMBER, MANAGER
     // MANAGER -> STAFF, COACH
     const allowedRoles = allowedContacts[role] ?? [];
 

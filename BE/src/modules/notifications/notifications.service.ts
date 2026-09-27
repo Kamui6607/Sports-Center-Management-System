@@ -8,9 +8,9 @@ export type NotificationTypeEnum =
   // Chat
   | "CHAT_MESSAGE"
   // Gói tập
-  | "SUBSCRIPTION_EXPIRING"
-  | "SUBSCRIPTION_EXPIRED"
-  | "SUBSCRIPTION_CANCELLED"
+  
+  
+  
   // Lịch học
   | "UPCOMING_CLASS"
   | "SCHEDULE_CANCELLED"
@@ -21,6 +21,10 @@ export type NotificationTypeEnum =
   // Kế hoạch tập luyện
   | "TRAINING_PLAN_ASSIGNED"
   // Lớp học mới
+  | "CLASS_APPROVED"
+  | "CLASS_REJECTED"
+  | "WITHDRAWAL_APPROVED"
+  | "WITHDRAWAL_REJECTED"
   | "NEW_CLASS"
   | "COACH_CHANGED"
   // Chuyên cần (Attendance)

@@ -10,7 +10,7 @@ const invoiceInclude = {
   },
   payment: {
     include: {
-      subscription: { include: { plan: true } },
+      
     },
   },
 };

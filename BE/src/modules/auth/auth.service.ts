@@ -10,7 +10,6 @@ import {
 import { hashToken } from "../../utils/hashToken.js";
 import { removeStoredAvatar } from "../../utils/avatarStorage.js";
 import { createNotification } from "../notifications/notifications.service.js";
-import { ensureActiveFreeSubscription } from "../subscriptions/free-subscription.service.js";
 import { disconnectUserSockets } from "../chat/chat.socket.js";
 import type { RegisterInput, UpdateProfileInput } from "./auth.schema.js";
 
@@ -19,11 +18,16 @@ export async function register(data: RegisterInput) {
   if (existing) throw new AppError("Email is already in use", 409);
 
   const hashed = await hashPassword(data.password);
+  const role = data.role ?? "MEMBER";
 
-  // Tạo user + MemberProfile + subscription FREE ACTIVE trong CÙNG transaction:
-  // mọi MEMBER mới luôn có gói ACTIVE (tier FREE, maxConcurrentClasses = 0), không rơi vào
-  // trạng thái "không có subscription". Idempotent: đã có ACTIVE subscription thì không tạo thêm.
+  // Tạo user + profile tương ứng trong CÙNG transaction.
+  // MEMBER → MemberProfile; COACH → CoachProfile (chờ Manager duyệt class sau).
   const user = await prisma.$transaction(async (tx) => {
+    const profileCreate =
+      role === "COACH"
+        ? { coachProfile: { create: {} } }
+        : { memberProfile: { create: {} } };
+
     const created = await tx.user.create({
       data: {
         email: data.email,
@@ -32,8 +36,9 @@ export async function register(data: RegisterInput) {
         phone: data.phone,
         gender: data.gender,
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-        role: "MEMBER",
-        memberProfile: { create: {} },
+        role,
+        isActive: role === "COACH" ? false : true,
+        ...profileCreate,
       },
       select: {
         id: true,
@@ -45,23 +50,33 @@ export async function register(data: RegisterInput) {
         role: true,
         isActive: true,
         memberProfile: true,
+        coachProfile: true,
       },
     });
-
-    if (created.memberProfile) {
-      await ensureActiveFreeSubscription(tx, created.memberProfile.id);
-    }
 
     return created;
   });
 
   // Gửi thông báo chào mừng (fire-and-forget, không block response)
+  const welcomeBody =
+    role === "COACH"
+      ? `Xin chào ${user.fullName}! Tài khoản Coach của bạn đã được tạo. Hãy nộp CV (PDF) để Manager xét duyệt và kích hoạt tài khoản.`
+      : `Xin chào ${user.fullName}! Tài khoản của bạn đã được tạo thành công. Hãy khám phá các khóa học phù hợp với bạn.`;
+
   createNotification(
     user.id,
     "MEMBER_REGISTERED",
     "Chào mừng đến với Trung tâm Thể thao!",
-    `Xin chào ${user.fullName}! Tài khoản của bạn đã được tạo thành công. Hãy khám phá các gói tập và lớp học phù hợp với bạn.`
-  ).catch(() => {}); // Không để lỗi notification phá vỡ response đăng ký
+    welcomeBody
+  ).catch(() => {});
+
+  // Với COACH: cấp accessToken ngay dù isActive=false,
+  // để FE dùng token này gọi POST /coaches/me/cv upload CV ngay sau đăng ký.
+  // Token chỉ được dùng ở endpoint có `authenticateIncludingInactive`.
+  if (role === "COACH") {
+    const accessToken = signAccessToken({ id: user.id, role: user.role });
+    return { ...user, accessToken, requireCvUpload: true };
+  }
 
   return user;
 }

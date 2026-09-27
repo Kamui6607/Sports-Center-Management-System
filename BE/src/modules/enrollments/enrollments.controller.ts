@@ -9,7 +9,7 @@ import { prisma } from "../../config/prisma.js";
 /**
  * Resolve MemberProfile của người được đặt chỗ:
  * - MEMBER  → chính mình;
- * - MANAGER/STAFF → bắt buộc truyền memberId (nhận cả userId hoặc profileId);
+ * - MANAGER → bắt buộc truyền memberId (nhận cả userId hoặc profileId);
  * - COACH   → 403 (không đặt lớp thay hội viên).
  */
 async function resolveMemberProfileId(req: Request, bodyMemberId?: string): Promise<string> {
@@ -21,7 +21,7 @@ async function resolveMemberProfileId(req: Request, bodyMemberId?: string): Prom
     return profile.id;
   }
 
-  if (role === "MANAGER" || role === "STAFF") {
+  if (role === "MANAGER") {
     if (!bodyMemberId) throw new AppError("memberId is required for staff/manager booking", 400);
     const profile = await prisma.memberProfile.findFirst({
       where: { OR: [{ id: bodyMemberId }, { userId: bodyMemberId }] },

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const CreatePaymentSchema = z.object({
   memberId: z.string().min(1),
-  subscriptionId: z.string().optional(),
+  classId: z.string().optional(), // ID của class member đang mua (thay thế subscriptionId)
   amount: z.number().positive(),
   method: z.enum(["CASH", "BANK_TRANSFER"]),
   status: z.enum(["PENDING", "SUCCESS", "FAILED"]).default("SUCCESS"),
@@ -15,9 +15,9 @@ export const UpdatePaymentStatusSchema = z.object({
 });
 
 // ── SePay online payment (VietQR + webhook) ──────────────────────────────────
-/** MEMBER tự tạo giao dịch mua gói qua chuyển khoản VietQR (chỉ nhận planId, không nhận memberId). */
+/** MEMBER tự tạo giao dịch mua khóa học qua chuyển khoản VietQR (nhận classId, không nhận memberId). */
 export const SepayCheckoutSchema = z.object({
-  planId: z.string().min(1),
+  classId: z.string().min(1),
 });
 
 /** DEV/DEMO: mô phỏng SePay gửi webhook "đã thu tiền" (chỉ khi SEPAY_MOCK_MODE=true). */

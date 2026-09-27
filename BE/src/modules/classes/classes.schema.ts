@@ -9,6 +9,8 @@ export const CreateClassSchema = z.object({
   capacity: z.number().int().positive().max(200),
   classType: z.enum(["REGULAR", "PREMIUM"]).default("REGULAR"),
   areaType: AreaTypeEnum,
+  // Coach bắt buộc set giá; Manager có thể để 0 nếu muốn lớp miễn phí
+  price: z.number().min(0).default(0),
 });
 
 export const UpdateClassSchema = z.object({
@@ -19,6 +21,12 @@ export const UpdateClassSchema = z.object({
   classType: z.enum(["REGULAR", "PREMIUM"]).optional(),
   areaType: AreaTypeEnum.optional(),
   isActive: z.boolean().optional(),
+  price: z.number().min(0).optional(),
+});
+
+export const ApproveClassSchema = z.object({
+  action: z.enum(["APPROVE", "REJECT"]),
+  reason: z.string().max(500).optional(),
 });
 
 export const AssignCoachSchema = z.object({
@@ -41,4 +49,7 @@ export const ClassQuerySchema = z.object({
   areaType: AreaTypeEnum.optional(),
   isActive: z.string().optional(),
   coachId: z.string().optional(),
+  status: z.enum(["PENDING", "APPROVED", "REJECTED", "COMPLETED"]).optional(),
+  createdByMe: z.string().optional(), // "true" → chỉ trả lớp Coach đã tạo
 });
+

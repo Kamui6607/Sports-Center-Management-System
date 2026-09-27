@@ -35,7 +35,7 @@ const router = Router();
 router.post(
   "/activity-plan",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER", "COACH"),
   validate(CreateActivityPlanSchema),
   schedulesController.createActivityPlan,
 );
@@ -208,7 +208,7 @@ router.get(
 router.post(
   "/",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER", "COACH"),
   validate(CreateScheduleSchema),
   schedulesController.createSchedule
 );
@@ -261,7 +261,7 @@ router.post(
 router.patch(
   "/:id",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER", "COACH"),
   validate(ScheduleIdSchema, "params"),
   validate(UpdateScheduleSchema),
   schedulesController.updateSchedule
@@ -291,7 +291,7 @@ router.patch(
 router.delete(
   "/:id",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER", "COACH"),
   validate(ScheduleIdSchema, "params"),
   schedulesController.deleteSchedule
 );
@@ -318,7 +318,7 @@ router.delete(
 router.patch(
   "/:id/complete",
   authenticate,
-  authorize("MANAGER", "STAFF"),
+  authorize("MANAGER", "COACH"),
   validate(ScheduleIdSchema, "params"),
   schedulesController.completeSchedule
 );

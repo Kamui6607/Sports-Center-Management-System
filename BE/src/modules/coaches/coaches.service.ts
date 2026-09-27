@@ -92,7 +92,7 @@ export async function getCoachById(id: string) {
   return user;
 }
 
-export async function updateCoach(id: string, data: UpdateCoachInput) {
+export async function updateCoach(id: string, data: UpdateCoachInput, actor?: { id: string; role: string }) {
   const coachProfile = await prisma.coachProfile.findFirst({
     where: { user: { id, role: "COACH" } },
   });
@@ -101,6 +101,10 @@ export async function updateCoach(id: string, data: UpdateCoachInput) {
     throw new AppError("Coach not found", 404);
   }
 
+  // COACH chỉ được sửa profile của chính mình
+  if (actor?.role === "COACH" && id !== actor.id) {
+    throw new AppError("Forbidden: You can only update your own profile", 403);
+  }
   const { fullName, phone, gender, dateOfBirth, ...profileData } = data;
   const userFields: any = {};
   if (fullName !== undefined) userFields.fullName = fullName;
@@ -144,4 +148,139 @@ export async function updateCoach(id: string, data: UpdateCoachInput) {
   });
 
   return updated;
+}
+
+// ── Coach nộp CV ──────────────────────────────────────────────────────────────
+
+/**
+ * Coach upload CV (PDF). CV được lưu vào uploads/cvs/ và đường dẫn ghi vào coachProfile.cvUrl.
+ * Coach không cần đăng nhập được vì isActive=false — endpoint này dùng token nhưng
+ * authenticate cho phép inactive user đi qua nếu dùng middleware `authenticateIncludingInactive`.
+ */
+export async function submitCV(coachUserId: string, cvFilePath: string) {
+  const coachProfile = await prisma.coachProfile.findUnique({
+    where: { userId: coachUserId },
+  });
+  if (!coachProfile) throw new AppError("Coach profile not found", 404);
+
+  await prisma.coachProfile.update({
+    where: { id: coachProfile.id },
+    data: {
+      cvUrl: cvFilePath,
+      approvalStatus: "PENDING",
+    },
+  });
+
+  // Thông báo cho tất cả Manager biết có CV mới cần duyệt
+  const { createNotification } = await import("../notifications/notifications.service.js");
+  const managers = await prisma.user.findMany({
+    where: { role: "MANAGER", isActive: true },
+    select: { id: true },
+  });
+  const coach = await prisma.user.findUnique({ where: { id: coachUserId }, select: { fullName: true } });
+  for (const manager of managers) {
+    createNotification(
+      manager.id,
+      "GENERAL",
+      "CV Coach mới cần duyệt",
+      `Coach ${coach?.fullName ?? coachUserId} vừa nộp CV. Vui lòng xem xét và duyệt tài khoản.`
+    ).catch(() => {});
+  }
+
+  return { message: "CV submitted successfully. Waiting for Manager review." };
+}
+
+// ── Manager duyệt hoặc từ chối CV ────────────────────────────────────────────
+
+export async function reviewCoachCV(
+  coachProfileId: string,
+  action: "APPROVE" | "REJECT",
+  reason?: string
+) {
+  const coachProfile = await prisma.coachProfile.findUnique({
+    where: { id: coachProfileId },
+    include: { user: { select: { id: true, fullName: true } } },
+  });
+  if (!coachProfile) throw new AppError("Coach profile not found", 404);
+  if (coachProfile.approvalStatus !== "PENDING") {
+    throw new AppError(`Coach CV has already been ${coachProfile.approvalStatus}`, 400);
+  }
+
+  const { createNotification } = await import("../notifications/notifications.service.js");
+
+  if (action === "APPROVE") {
+    await prisma.$transaction([
+      prisma.coachProfile.update({
+        where: { id: coachProfileId },
+        data: { approvalStatus: "APPROVED" },
+      }),
+      prisma.user.update({
+        where: { id: coachProfile.userId },
+        data: { isActive: true },
+      }),
+    ]);
+
+    createNotification(
+      coachProfile.userId,
+      "GENERAL",
+      "Tài khoản Coach đã được duyệt!",
+      `Xin chúc mừng ${coachProfile.user?.fullName ?? "bạn"}! Hồ sơ của bạn đã được Manager phê duyệt. Bạn có thể đăng nhập và bắt đầu tạo khóa học.`
+    ).catch(() => {});
+
+    return { message: "Coach account approved and activated.", approvalStatus: "APPROVED" };
+  } else {
+    await prisma.coachProfile.update({
+      where: { id: coachProfileId },
+      data: { approvalStatus: "REJECTED" },
+    });
+
+    const reasonText = reason ? ` Lý do: ${reason}` : "";
+    createNotification(
+      coachProfile.userId,
+      "GENERAL",
+      "Hồ sơ Coach bị từ chối",
+      `Rất tiếc, hồ sơ Coach của ${coachProfile.user?.fullName ?? "bạn"} đã bị từ chối.${reasonText} Vui lòng liên hệ trung tâm để biết thêm chi tiết.`
+    ).catch(() => {});
+
+    return { message: "Coach application rejected.", approvalStatus: "REJECTED" };
+  }
+}
+
+// ── Manager xem danh sách CV đang chờ duyệt ──────────────────────────────────
+
+export async function listPendingCoachCVs(query: { page?: string; limit?: string; status?: string }) {
+  const page = Math.max(1, parseInt(query.page ?? "1") || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
+  const skip = (page - 1) * limit;
+
+  const { buildPaginationMeta } = await import("../../utils/pagination.js");
+
+  const statusFilter = (query.status as any) ?? "PENDING";
+  const where = { approvalStatus: statusFilter };
+
+  const [total, profiles] = await Promise.all([
+    prisma.coachProfile.count({ where }),
+    prisma.coachProfile.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "asc" },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            phone: true,
+            gender: true,
+            dateOfBirth: true,
+            avatarUrl: true,
+            createdAt: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  return { coaches: profiles, pagination: buildPaginationMeta(total, page, limit) };
 }

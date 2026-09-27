@@ -11,10 +11,16 @@ datasource db {
 // ENUMS
 // ─────────────────────────────────────────
 
+enum ClassApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
 enum UserRole {
   MEMBER
   COACH
-  STAFF
   MANAGER
 }
 
@@ -22,19 +28,6 @@ enum Gender {
   MALE
   FEMALE
   OTHER
-}
-
-enum MemberTier {
-  FREE
-  MEMBERSHIP
-  PREMIUM
-}
-
-enum MembershipStatus {
-  ACTIVE
-  EXPIRED
-  CANCELLED
-  SUSPENDED
 }
 
 enum TrainingLevel {
@@ -132,6 +125,7 @@ model User {
   managerProfile             ManagerProfile?
   refreshTokens              RefreshToken[]
   createdPayments            Payment[]              @relation("PaymentCreatedBy")
+  createdClasses             Class[]                @relation("ClassCreatedBy")
   sentMessages               ChatMessage[]          @relation("SentMessages")
   receivedMessages           ChatMessage[]          @relation("ReceivedMessages")
   chatAttachmentsOwned       ChatAttachment[]       @relation("ChatAttachmentOwner")
@@ -139,6 +133,9 @@ model User {
   notifications              Notification[]
   decidedAttendancePenalties AttendancePenalty[]    @relation("AttendancePenaltyDecidedBy")
   createdManualCodes         AttendanceManualCode[] @relation("AttendanceManualCodeCreatedBy")
+  createdProducts            Product[]              @relation("ProductCreatedBy")
+  productReviews             ProductReview[]        @relation("ProductReviewUser")
+  productOrders              ProductOrder[]         @relation("ProductOrderUser")
 }
 
 model RefreshToken {
@@ -167,7 +164,6 @@ model MemberProfile {
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
-  subscriptions      MembershipSubscription[]
   enrollments        Enrollment[]
   payments           Payment[]
   invoices           Invoice[]
@@ -178,6 +174,12 @@ model MemberProfile {
   manualCodeAttempts AttendanceManualCodeAttempt[]
 }
 
+enum CoachApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model CoachProfile {
   id              String   @id @default(uuid())
   userId          String   @unique
@@ -185,10 +187,13 @@ model CoachProfile {
   specialization  String?
   experienceYears Int?
   bio             String?
+  cvUrl           String?
+  approvalStatus  CoachApprovalStatus @default(PENDING)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   classes       ClassMember[]
+  wallet        CoachWallet?
   trainingPlans TrainingPlan[]
   feedbacks     CoachFeedback[]
 }
@@ -204,54 +209,6 @@ model ManagerProfile {
 // ─────────────────────────────────────────
 // MEMBERSHIP
 // ─────────────────────────────────────────
-
-model MembershipPlan {
-  id                   String     @id @default(uuid())
-  name                 String
-  description          String?
-  price                Decimal    @db.Decimal(12, 2)
-  durationDays         Int
-  tier                 MemberTier // MEMBERSHIP or PREMIUM
-  /// Quota lớp học song song: số Class KHÁC NHAU tối đa mà hội viên được giữ đồng thời (>= 0).
-  /// Một Class = 1 quota dù hội viên có nhiều buổi BOOKED. Hệ thống đếm DISTINCT Class có
-  /// Enrollment BOOKED ở ClassSchedule SCHEDULED chưa bắt đầu. Do Manager cấu hình qua API.
-  maxConcurrentClasses Int
-  isActive             Boolean    @default(true)
-  createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
-
-  subscriptions MembershipSubscription[]
-  payments      Payment[]
-}
-
-model MembershipSubscription {
-  id            String           @id @default(uuid())
-  memberId      String
-  member        MemberProfile    @relation(fields: [memberId], references: [id])
-  planId        String
-  plan          MembershipPlan   @relation(fields: [planId], references: [id])
-  tier          MemberTier // copied from plan at time of subscription
-  startDate     DateTime
-  endDate       DateTime
-  status        MembershipStatus @default(ACTIVE)
-  // BR-15: Suspension tracking
-  suspendedAt   DateTime? // When suspension started
-  remainingDays Int? // Days remaining when suspended (for resume logic)
-  /// A10: mốc hủy gói — entitlement lịch sử chỉ kéo dài tới đây (lịch trước khi hủy vẫn được tính).
-  cancelledAt   DateTime?
-  /// A07: quota lớp học song song ĐÃ BÁN cho kỳ này (snapshot lúc cấp gói). NULL = dữ liệu cũ,
-  /// đọc theo plan hiện tại.
-  maxConcurrentClassesSnapshot Int?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-
-  payments Payment[]
-
-  @@index([memberId])
-  @@index([planId])
-  @@index([status])
-  @@index([endDate])
-}
 
 // ─────────────────────────────────────────
 // SPORTS & ROOMS
@@ -294,20 +251,26 @@ model Class {
   // Many-to-Many with Sport
   sports Sport[]
 
-  capacity  Int
-  classType ClassType @default(REGULAR)
+  price       Decimal             @default(0) @db.Decimal(12, 2)
+  status      ClassApprovalStatus @default(PENDING)
+  createdById String?
+  createdBy   User?               @relation("ClassCreatedBy", fields: [createdById], references: [id])
+  capacity    Int
+  classType   ClassType           @default(REGULAR)
   // Khu vực mà lớp học yêu cầu (POOL | INDOOR | OUTDOOR).
   // Khác với classType (REGULAR | PREMIUM là hạng lớp).
-  areaType  AreaType
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  areaType    AreaType
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
-  coaches     ClassMember[]
-  schedules   ClassSchedule[]
-  enrollments Enrollment[]
-  feedbacks   CoachFeedback[]
-  penalties   AttendancePenalty[]
+  coaches            ClassMember[]
+  schedules          ClassSchedule[]
+  enrollments        Enrollment[]
+  feedbacks          CoachFeedback[]
+  penalties          AttendancePenalty[]
+  walletTransactions WalletTransaction[]
+  payments           Payment[]
 }
 
 // Coach assignment to class (many-to-many)
@@ -375,52 +338,46 @@ model Enrollment {
 // ─────────────────────────────────────────
 
 model Payment {
-  id              String                  @id @default(uuid())
-  memberId        String
-  member          MemberProfile           @relation(fields: [memberId], references: [id])
-  subscriptionId  String?
-  subscription    MembershipSubscription? @relation(fields: [subscriptionId], references: [id])
+  id                String                   @id @default(uuid())
+  memberId          String
+  member            MemberProfile            @relation(fields: [memberId], references: [id])
   /// Gói hội viên mà giao dịch này muốn mua — cần cho giao dịch ONLINE: Payment PENDING
   /// được tạo TRƯỚC khi có subscription (chỉ tạo subscription khi cổng thanh toán xác nhận SUCCESS).
-  planId          String?
-  plan            MembershipPlan?         @relation(fields: [planId], references: [id], onDelete: SetNull)
-  amount          Decimal                 @db.Decimal(12, 2)
-  method          PaymentMethod
-  status          PaymentStatus           @default(PENDING)
+  amount            Decimal                  @db.Decimal(12, 2)
+  method            PaymentMethod
+  classId           String?
+  class             Class?                   @relation(fields: [classId], references: [id])
+  classNameSnapshot String?
+  status            PaymentStatus            @default(PENDING)
   /// Mã đơn/mã thanh toán duy nhất — với giao dịch SePay đây là mã SePay bóc tách từ nội dung CK.
-  transactionCode String?                 @unique
+  transactionCode   String?                  @unique
   /// Cổng thanh toán online (VD "SEPAY"). NULL cho giao dịch tại quầy (CASH/BANK_TRANSFER).
-  gateway         String?
+  gateway           String?
   /// Mã giao dịch phía ngân hàng/SePay (referenceCode) để đối soát.
-  gatewayTransId  String?
+  gatewayTransId    String?
   /// Metadata thô của webhook SePay (payload đầy đủ + thông tin QR) để audit & tra soát.
-  gatewayPayload  Json?
-  note            String?
-  paidAt          DateTime?
+  gatewayPayload    Json?
+  note              String?
+  paidAt            DateTime?
   /// A07 — snapshot điều khoản gói TẠI THỜI ĐIỂM TẠO ĐƠN: chốt tiền theo đúng offer đã bán,
   /// không đọc cấu hình plan hiện tại (giá/duration/tier/quota có thể bị sửa trong lúc chờ CK).
-  planNameSnapshot             String?
-  planTierSnapshot             MemberTier?
-  durationDaysSnapshot         Int?
-  maxConcurrentClassesSnapshot Int?
   /// A06 — trạng thái CẤP QUYỀN (tách khỏi `status` là trạng thái TIỀN). NULL = giao dịch
   /// chưa chốt/không cần theo dõi (dữ liệu cũ).
-  activationStatus PaymentActivationStatus?
+  activationStatus  PaymentActivationStatus?
   /// Lý do cần đối soát (VD: PLAN_MISSING / thông điệp chặn kích hoạt) — null khi đã xử lý.
-  reviewReason     String?
-  reviewedAt       DateTime?
-  reviewedById     String?
-  createdById     String?
-  createdBy       User?                   @relation("PaymentCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  reviewReason      String?
+  reviewedAt        DateTime?
+  reviewedById      String?
+  createdById       String?
+  createdBy         User?                    @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
 
   invoice            Invoice?
   sepayWebhookEvents SepayWebhookEvent[]
   bankTransactions   SepayBankTransaction[]
 
   @@index([memberId])
-  @@index([subscriptionId])
   @@index([status])
   @@index([createdAt])
   @@index([gateway, status])
@@ -508,8 +465,7 @@ model Invoice {
   issuedAt      DateTime      @default(now())
   // BR-25: Snapshot fields — immutable record of who paid for what
   memberName    String? // Copied from user.fullName at time of issue
-  planName      String? // Copied from plan.name at time of issue
-  planTier      String? // Copied from plan.tier at time of issue
+  className     String? // Copied from class.name at time of issue
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -729,9 +685,6 @@ enum NotificationType {
   // ── Chat ──
   CHAT_MESSAGE // Nhận tin nhắn mới
   // ── Gói tập ──
-  SUBSCRIPTION_EXPIRING // Gói sắp hết hạn (5 ngày trước)
-  SUBSCRIPTION_EXPIRED // Gói đã hết hạn
-  SUBSCRIPTION_CANCELLED // Gói bị hủy (kèm lý do)
   // ── Lịch học ──
   UPCOMING_CLASS // Nhắc lớp sắp học (24h trước)
   SCHEDULE_CANCELLED // Lịch học bị hủy
@@ -742,6 +695,10 @@ enum NotificationType {
   // ── Kế hoạch tập luyện ──
   TRAINING_PLAN_ASSIGNED // HLV giao kế hoạch tập mới
   // ── Lớp học ──
+  CLASS_APPROVED
+  CLASS_REJECTED
+  WITHDRAWAL_APPROVED
+  WITHDRAWAL_REJECTED
   NEW_CLASS // Lớp học mới được mở
   COACH_CHANGED // Đổi HLV cho lớp
   // ── Chuyên cần (Attendance) ──
@@ -772,4 +729,102 @@ model Notification {
   @@index([userId])
   @@index([isRead])
   @@index([createdAt])
+}
+
+// ─────────────────────────────────────────
+// COACH WALLET
+// ─────────────────────────────────────────
+
+model CoachWallet {
+  id        String       @id @default(uuid())
+  coachId   String       @unique
+  coach     CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  balance   Decimal      @default(0) @db.Decimal(12, 2)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  transactions WalletTransaction[]
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+model WalletTransaction {
+  id        String            @id @default(uuid())
+  walletId  String
+  wallet    CoachWallet       @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  amount    Decimal           @db.Decimal(12, 2)
+  type      TransactionType
+  status    TransactionStatus @default(PENDING)
+  classId   String?
+  class     Class?            @relation(fields: [classId], references: [id], onDelete: SetNull)
+  bankInfo  Json?
+  note      String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([walletId])
+  @@index([status])
+}
+
+// ?? S?n ph?m (Product) ????????????????????????????????????????????????????????
+
+model Product {
+  id            String          @id @default(uuid())
+  name          String
+  description   String
+  price         Decimal         @db.Decimal(12, 2)
+  stockQuantity Int             @default(0)
+  rating        Decimal         @default(0) @db.Decimal(3, 2)
+  reviewCount   Int             @default(0)
+  isActive      Boolean         @default(true)
+  createdById   String
+  createdBy     User            @relation("ProductCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  reviews       ProductReview[]
+  orders        ProductOrder[]
+}
+
+model ProductReview {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("ProductReviewUser", fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int      
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, userId])
+}
+
+model ProductOrder {
+  id          String             @id @default(uuid())
+  productId   String
+  product     Product            @relation(fields: [productId], references: [id])
+  userId      String
+  user        User               @relation("ProductOrderUser", fields: [userId], references: [id])
+  quantity    Int
+  totalPrice  Decimal            @db.Decimal(12, 2)
+  status      ProductOrderStatus @default(PENDING)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+enum ProductOrderStatus {
+  PENDING
+  SUCCESS
+  CANCELLED
 }

@@ -38,7 +38,7 @@ const router = Router();
  */
 router.post(
   "/",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate, authorize("MANAGER"),
   validate(CreatePaymentSchema),
   paymentsController.createPayment
 );
@@ -74,7 +74,7 @@ router.post(
  */
 router.get(
   "/",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate, authorize("MANAGER"),
   validate(PaymentQuerySchema, "query"),
   paymentsController.listPayments
 );
@@ -400,7 +400,7 @@ router.post(
  *       webhook vào localhost: tạo đơn bằng `POST /payments/sepay/checkout` rồi gọi endpoint này để chạy
  *       ĐÚNG luồng chốt giao dịch như webhook thật (kích hoạt gói + invoice + notification).
  *
- *       Quyền: MEMBER chỉ xác nhận giao dịch CỦA MÌNH; MANAGER/STAFF được xác nhận hộ (phục vụ demo).
+ *       Quyền: MEMBER chỉ xác nhận giao dịch CỦA MÌNH; MANAGER được xác nhận hộ (phục vụ demo).
  *       `SEPAY_MOCK_MODE != true` ⇒ 403 `SEPAY_MOCK_DISABLED`.
  *     tags: [Payments]
  *     security:
@@ -443,7 +443,7 @@ router.post(
 router.post(
   "/sepay/mock-confirm",
   authenticate,
-  authorize("MEMBER", "MANAGER", "STAFF"),
+  authorize("MEMBER", "MANAGER"),
   validate(SepayMockConfirmSchema),
   paymentsController.sepayMockConfirm
 );
@@ -458,7 +458,7 @@ router.post(
  *       mới nhất: `PENDING` (chưa nhận được tiền) → `SUCCESS` (webhook đã xác nhận, gói đã kích hoạt).
  *
  *       Khi `status = SUCCESS` response có thêm `paidAt` + `subscriptionId` (gói đã được kích hoạt tự động).
- *       Quyền: chủ giao dịch (MEMBER) hoặc MANAGER/STAFF; COACH bị chặn.
+ *       Quyền: chủ giao dịch (MEMBER) hoặc MANAGER; COACH bị chặn.
  *     tags: [Payments]
  *     security:
  *       - BearerAuth: []

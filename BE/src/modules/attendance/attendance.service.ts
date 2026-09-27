@@ -18,7 +18,7 @@ function assertCanSetExcused(status: unknown, user: any) {
 }
 
 async function verifyCoachAccess(scheduleId: string, user: any) {
-  if (user.role === "MANAGER" || user.role === "STAFF") return true;
+  if (user.role === "MANAGER") return true;
 
   const schedule = await prisma.classSchedule.findUnique({
     where: { id: scheduleId },
@@ -317,7 +317,7 @@ export const scanQr = async (input: { qrToken?: string; code?: string }, user: a
 
   // 3. Chốt chặn 2: Kiểm tra lại gói tập còn hạn tại thời điểm điểm danh
   const now = new Date();
-  const activeSub = await prisma.membershipSubscription.findFirst({
+  const activeSub = await (prisma as any).membershipSubscription.findFirst({
     where: {
       memberId: memberProfile.id,
       status: "ACTIVE",

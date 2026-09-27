@@ -143,6 +143,7 @@ export const CreateActivityPlanSchema = z.object({
     capacity: z.number().int().positive().max(200),
     classType: z.enum(["REGULAR", "PREMIUM"]),
     areaType: z.enum(["POOL", "INDOOR", "OUTDOOR"]),
+    price: z.number().min(0).default(0),
   }),
   primaryCoachId: z.string().min(1),
   supportCoachId: z.string().min(1).optional(),

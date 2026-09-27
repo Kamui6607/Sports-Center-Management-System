@@ -43,29 +43,29 @@ export function isCoveredAt(intervals: MembershipCoverageInterval[], at: Date): 
 /** A10 — Khoảng quyền lợi của nhiều member (1 query) — dùng lại ở A11 khi dời lịch. */
 export async function getMembershipCoverageIntervals(
   db: DbClient,
-  memberIds: string[]
+  ids: string[]
 ): Promise<Map<string, MembershipCoverageInterval[]>> {
-  if (memberIds.length === 0) return new Map();
-  const subs = await db.membershipSubscription.findMany({
-    where: { memberId: { in: memberIds } },
+  if (ids.length === 0) return new Map();
+  const subs = await db.class.findMany({
+    where: { id: { in: ids } },
     select: {
-      memberId: true,
+      id: true,
       status: true,
-      startDate: true,
-      endDate: true,
-      suspendedAt: true,
-      cancelledAt: true,
+      
+      
+      
+      
     },
   });
   const map = new Map<string, MembershipCoverageInterval[]>();
   for (const sub of subs) {
-    map.set(sub.memberId, [...(map.get(sub.memberId) ?? []), ...buildCoverageIntervals([sub])]);
+    map.set(sub.id, [...(map.get(sub.id) ?? []), ...buildCoverageIntervals([sub])]);
   }
   return map;
 }
 
 export type AttendanceBucket = {
-  memberId: string;
+  id: string;
   memberName: string;
   memberUserId: string;
   classId: string;
@@ -81,7 +81,7 @@ export type AttendanceBucket = {
 };
 
 /**
- * Chỉ số chuyên cần theo (memberId × classId) — KHÔNG theo schedule.
+ * Chỉ số chuyên cần theo (id × classId) — KHÔNG theo schedule.
  * Nhờ vậy member đổi buổi trong cùng Class (transfer) không reset lịch sử.
  *
  * Mẫu = tối đa ATTENDANCE.SAMPLE_WINDOW schedule ĐÃ KẾT THÚC gần nhất mà member thực sự giữ chỗ
@@ -101,19 +101,19 @@ export type AttendanceBucket = {
  */
 export async function computeAttendanceBuckets(
   db: DbClient,
-  options: { memberId?: string; classId?: string; now?: Date } = {}
+  options: { id?: string; classId?: string; now?: Date } = {}
 ): Promise<AttendanceBucket[]> {
   const now = options.now ?? new Date();
 
   const enrollments = await db.enrollment.findMany({
     where: {
       status: { in: ["BOOKED", "COMPLETED"] },
-      ...(options.memberId ? { memberId: options.memberId } : {}),
+      ...(options.id ? { id: options.id } : {}),
       ...(options.classId ? { classId: options.classId } : {}),
       schedule: { status: { not: "CANCELLED" }, endTime: { lte: now } },
     },
     select: {
-      memberId: true,
+      id: true,
       classId: true,
       schedule: { select: { id: true, startTime: true } },
     },
@@ -124,56 +124,56 @@ export async function computeAttendanceBuckets(
   // Gom theo (member × class), giữ tối đa SAMPLE_WINDOW buổi gần nhất.
   const grouped = new Map<
     string,
-    { memberId: string; classId: string; schedules: { id: string; startTime: Date }[] }
+    { id: string; classId: string; schedules: { id: string; startTime: Date }[] }
   >();
   for (const e of enrollments) {
-    const key = `${e.memberId}|${e.classId}`;
-    const entry = grouped.get(key) ?? { memberId: e.memberId, classId: e.classId, schedules: [] };
+    const key = `${e.id}|${e.classId}`;
+    const entry = grouped.get(key) ?? { id: e.id, classId: e.classId, schedules: [] };
     if (entry.schedules.length < ATTENDANCE.SAMPLE_WINDOW) entry.schedules.push(e.schedule);
     grouped.set(key, entry);
   }
 
-  const memberIds = [...new Set([...grouped.values()].map((g) => g.memberId))];
+  const ids = [...new Set([...grouped.values()].map((g) => g.id))];
   const classIds = [...new Set([...grouped.values()].map((g) => g.classId))];
   const scheduleIds = [...new Set([...grouped.values()].flatMap((g) => g.schedules.map((s) => s.id)))];
 
   const [members, classes, subscriptions, attendances] = await Promise.all([
     db.memberProfile.findMany({
-      where: { id: { in: memberIds } },
+      where: { id: { in: ids } },
       select: { id: true, user: { select: { id: true, fullName: true } } },
     }),
     db.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true } }),
-    db.membershipSubscription.findMany({
-      where: { memberId: { in: memberIds } },
+    db.class.findMany({
+      where: { id: { in: ids } },
       select: {
-        memberId: true,
+        id: true,
         status: true,
-        startDate: true,
-        endDate: true,
-        suspendedAt: true,
-        cancelledAt: true,
+        
+        
+        
+        
       },
     }),
     db.attendance.findMany({
-      where: { memberId: { in: memberIds }, scheduleId: { in: scheduleIds } },
-      select: { memberId: true, scheduleId: true, status: true, note: true },
+      where: { id: { in: ids }, scheduleId: { in: scheduleIds } },
+      select: { id: true, scheduleId: true, status: true, note: true },
     }),
   ]);
 
-  const memberMap = new Map(members.map((m) => [m.id, m]));
-  const classMap = new Map(classes.map((c) => [c.id, c]));
+  const memberMap = new Map(members.map((m: any) => [m.id, m]));
+  const classMap = new Map(classes.map((c: any) => [c.id, c]));
   const coverageByMember = new Map<string, MembershipCoverageInterval[]>();
   for (const sub of subscriptions) {
-    coverageByMember.set(sub.memberId, [
-      ...(coverageByMember.get(sub.memberId) ?? []),
+    coverageByMember.set(sub.id, [
+      ...(coverageByMember.get(sub.id) ?? []),
       ...buildCoverageIntervals([sub]),
     ]);
   }
-  const attendanceMap = new Map(attendances.map((a) => [`${a.memberId}|${a.scheduleId}`, a]));
+  const attendanceMap = new Map(attendances.map((a: any) => [`${a.id}|${a.scheduleId}`, a]));
 
   /** Buổi chỉ được tính khi thời điểm học nằm trong khoảng quyền lợi LỊCH SỬ (A10). */
-  const isCoveredByMembership = (memberId: string, at: Date) =>
-    isCoveredAt(coverageByMember.get(memberId) ?? [], at);
+  const isCoveredByMembership = (id: string, at: Date) =>
+    isCoveredAt(coverageByMember.get(id) ?? [], at);
 
   const buckets: AttendanceBucket[] = [];
   for (const entry of grouped.values()) {
@@ -184,8 +184,8 @@ export async function computeAttendanceBuckets(
     let excusedCount = 0;
 
     for (const schedule of entry.schedules) {
-      if (!isCoveredByMembership(entry.memberId, schedule.startTime)) continue;
-      const attendance = attendanceMap.get(`${entry.memberId}|${schedule.id}`);
+      if (!isCoveredByMembership(entry.id, schedule.startTime)) continue;
+      const attendance = attendanceMap.get(`${entry.id}|${schedule.id}`);
       if (!attendance) {
         noShowCount++; // buổi đã kết thúc nhưng chưa có bản ghi điểm danh
         continue;
@@ -202,9 +202,9 @@ export async function computeAttendanceBuckets(
       sampleSize === 0 ? 100 : Math.round(((presentCount + lateCount) / sampleSize) * 1000) / 10;
 
     buckets.push({
-      memberId: entry.memberId,
-      memberName: memberMap.get(entry.memberId)?.user.fullName ?? "Hội viên",
-      memberUserId: memberMap.get(entry.memberId)?.user.id ?? "",
+      id: entry.id,
+      memberName: memberMap.get(entry.id)?.user.fullName ?? "Hội viên",
+      memberUserId: memberMap.get(entry.id)?.user.id ?? "",
       classId: entry.classId,
       className: classMap.get(entry.classId)?.name ?? "Lớp học",
       sampleSize,

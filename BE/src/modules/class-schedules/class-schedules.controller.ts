@@ -16,10 +16,8 @@ export async function createSchedule(req: Request, res: Response, next: NextFunc
 }
 export async function createActivityPlan(req: Request, res: Response, next: NextFunction) {
   try {
-    const result = await schedulesService.createActivityPlan(
-      req.body,
-      req.user?.role === "MANAGER",
-    );
+    const actor = { id: req.user!.id, role: req.user!.role };
+    const result = await schedulesService.createActivityPlan(req.body, actor);
     sendCreated(res, result, "Activity plan created successfully");
   } catch (err) { next(err); }
 }

@@ -260,7 +260,7 @@ router.post(
  */
 router.get(
   "/schedule/:scheduleId",
-  authenticate, authorize("MANAGER", "COACH", "STAFF"),
+  authenticate, authorize("MANAGER", "COACH"),
   validate(EnrollmentQuerySchema, "query"),
   enrollmentsController.getScheduleEnrollments
 );

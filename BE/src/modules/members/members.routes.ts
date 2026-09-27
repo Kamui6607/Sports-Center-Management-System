@@ -35,7 +35,7 @@ const router = Router();
  */
 router.get(
   "/",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate, authorize("MANAGER"),
   validate(MemberQuerySchema, "query"),
   membersController.listMembers
 );
@@ -60,7 +60,7 @@ router.get(
  */
 router.get(
   "/:id",
-  authenticate, authorize("MANAGER", "STAFF", "COACH"),
+  authenticate, authorize("MANAGER", "COACH"),
   membersController.getMemberById
 );
 
@@ -99,7 +99,7 @@ router.get(
  */
 router.patch(
   "/:id",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate, authorize("MANAGER"),
   validate(UpdateMemberSchema),
   membersController.updateMember
 );
@@ -130,7 +130,7 @@ router.patch(
  */
 router.get(
   "/:id/membership-status",
-  authenticate, authorize("MANAGER", "STAFF"),
+  authenticate, authorize("MANAGER"),
   membersController.getMembershipStatus
 );
 

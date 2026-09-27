@@ -29,7 +29,7 @@ router.use(authenticate);
  * @swagger
  * /attendance:
  *   get:
- *     summary: "Get attendance roster of a schedule (MANAGER/STAFF: full roster; COACH: only own classes; MEMBER: only own records)"
+ *     summary: "Get attendance roster of a schedule (MANAGER: full roster; COACH: only own classes; MEMBER: only own records)"
  *     description: |
  *       **Authorization:**
  *       - MANAGER / STAFF: xem toàn bộ roster (STAFF read-only, mutations vẫn chỉ COACH/MANAGER).
@@ -53,7 +53,7 @@ router.use(authenticate);
  */
 router.get(
   "/",
-  authorize("MEMBER", "COACH", "MANAGER", "STAFF"),
+  authorize("MEMBER", "COACH", "MANAGER"),
   validate(AttendanceRosterQuerySchema, "query"),
   controller.getAttendances
 );

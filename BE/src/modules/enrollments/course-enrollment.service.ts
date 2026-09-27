@@ -1,4 +1,4 @@
-import { Prisma, EnrollmentStatus, MemberTier } from "@prisma/client";
+import { Prisma, EnrollmentStatus,  } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { lockMemberClass, lockMemberQuota, lockSchedules } from "../../utils/dbLocks.js";
@@ -64,9 +64,9 @@ export interface CourseEligibilitySession {
 export interface CourseEligibility {
   sessions: CourseEligibilitySession[];
   blockers: CourseEnrollmentBlocker[];
-  subscription: { tier: MemberTier; endDate: Date; planName: string | null } | null;
+  subscription: { tier: string; endDate: Date; planName: string | null } | null;
   quota: {
-    tier: MemberTier | null;
+    tier: string | null;
     limit: number;
     used: number;
     remaining: number;
@@ -207,7 +207,7 @@ export async function evaluateCourseEligibility(
     });
   }
 
-  const alreadyHoldingClass = quotaUsage.classes.some((c) => c.classId === cls.id);
+  const alreadyHoldingClass = quotaUsage.classes.some((c: any) => c.classId === cls.id);
   if (
     quotaUsage.hasActiveSubscription &&
     !alreadyHoldingClass &&
@@ -228,15 +228,15 @@ export async function evaluateCourseEligibility(
   }
 
   // ── Cấp BUỔI: sức chứa + trùng giờ ───────────────────────────────────────
-  const bookedBySchedule = new Map(bookedCounts.map((row) => [row.scheduleId, row._count._all]));
-  const myBySchedule = new Map(myEnrollments.map((row) => [row.scheduleId, row]));
+  const bookedBySchedule = new Map(bookedCounts.map((row: any) => [row.scheduleId, row._count._all]));
+  const myBySchedule = new Map(myEnrollments.map((row: any) => [row.scheduleId, row]));
 
   const eligibilitySessions: CourseEligibilitySession[] = sessions.map((session) => {
     const bookedCount = bookedBySchedule.get(session.id) ?? 0;
     const remainingSlots = Math.max(0, cls.capacity - bookedCount);
     const mine = myBySchedule.get(session.id) ?? null;
     const conflict = conflicts.find(
-      (row) => row.schedule.startTime < session.endTime && row.schedule.endTime > session.startTime
+      (row: any) => row.schedule.startTime < session.endTime && row.schedule.endTime > session.startTime
     );
 
     return {
@@ -248,7 +248,7 @@ export async function evaluateCourseEligibility(
       bookedCount,
       remainingSlots,
       isFull: remainingSlots === 0,
-      myEnrollment: mine ? { id: mine.id, status: mine.status } : null,
+      myEnrollment: mine ? { id: (mine as any).id, status: (mine as any).status } : null,
       ...(conflict
         ? {
             conflictWith: {

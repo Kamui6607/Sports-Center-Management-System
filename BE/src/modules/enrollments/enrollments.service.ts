@@ -6,10 +6,6 @@ import { createNotification } from "../notifications/notifications.service.js";
 import { enqueueNotification, flushNotificationOutbox } from "../notifications/outbox.service.js";
 import { lockMemberClass, lockMemberQuota, lockSchedule } from "../../utils/dbLocks.js";
 import { findActivePenalty } from "../attendance/attendance-penalties.service.js";
-import {
-  assertConcurrentClassQuota,
-  findActiveSubscription,
-} from "./enrollment-quota.service.js";
 
 type BookableSchedule = {
   id: string;
@@ -19,11 +15,14 @@ type BookableSchedule = {
 };
 
 /**
- * Bộ luật đặt chỗ dùng chung cho bookClass và transferEnrollment:
- * gói tập (ACTIVE, còn hạn tới lúc lớp bắt đầu, tier PREMIUM), quota lớp học song song,
- * sức chứa, trùng chỗ, trùng giờ.
+ * Bộ luật đặt chỗ dùng chung cho bookClass và transferEnrollment.
+ *
+ * Mô hình mới (không có Membership/Subscription):
+ * - Member phải có Payment SUCCESS cho classId của schedule này.
+ * - Không có subscription quota check — ai mua thì được học.
+ * - Vẫn kiểm tra: hình phạt chuyên cần, sức chứa, trùng chỗ, trùng giờ.
+ *
  * `excludeEnrollmentId`: dùng khi transfer — chỗ cũ sắp được nhả nên không tính là trùng giờ.
- * `quotaExemptClassId`: dùng khi transfer — vì BR-08 giữ nguyên Class nên không tiêu quota mới (§9).
  * Trả về enrollment cũ (đang CANCELLED) nếu có, để caller kích hoạt lại theo BR-07.
  */
 async function assertCanBook(
@@ -32,27 +31,22 @@ async function assertCanBook(
   schedule: BookableSchedule,
   options: { excludeEnrollmentId?: string; quotaExemptClassId?: string } = {}
 ) {
-  // Chốt chặn 1: subscription phải ACTIVE và còn hạn đến ngày lớp học diễn ra.
-  const activeSub = await findActiveSubscription(tx, memberProfileId);
+  // Chốt chặn 1: Member phải đã MUA khóa học này (Payment SUCCESS với classId này).
+  const hasPaid = await tx.payment.findFirst({
+    where: {
+      memberId: memberProfileId,
+      classId: schedule.class.id,
+      status: "SUCCESS",
+    },
+  });
 
-  if (!activeSub) {
+  if (!hasPaid) {
     throw new AppError(
-      "Bạn không có gói tập đang hoạt động. Vui lòng mua gói để đặt lịch.",
-      403
+      "Bạn chưa mua khóa học này. Vui lòng thanh toán để đặt lịch.",
+      403,
+      { code: "CLASS_NOT_PURCHASED", classId: schedule.class.id }
     );
   }
-
-  if (activeSub.endDate < schedule.startTime) {
-    const expiredDate = activeSub.endDate.toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-    const classDate = schedule.startTime.toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-    throw new AppError(
-      `Gói tập của bạn sẽ hết hạn ngày ${expiredDate}, trước khi lớp học diễn ra ngày ${classDate}. Vui lòng gia hạn gói để đặt lịch.`,
-      403
-    );
-  }
-
-  if (schedule.class.classType === "PREMIUM" && activeSub.tier !== "PREMIUM")
-    throw new AppError("Premium membership required to book this class.", 403);
 
   // §12: hình phạt chuyên cần đang hiệu lực chỉ chặn đúng Class đó (không chặn Class khác).
   const penalty = await findActivePenalty(tx, memberProfileId, schedule.class.id);
@@ -63,12 +57,6 @@ async function assertCanBook(
       403
     );
   }
-
-  // Quota lớp học song song: chỉ chặn khi Member THÊM một Class mới vượt maxConcurrentClasses.
-  // Class đã giữ (có buổi BOOKED tương lai) không tiêu thêm quota; ngược lại nếu đã đủ quota -> 403.
-  await assertConcurrentClassQuota(tx, memberProfileId, schedule.class.id, {
-    quotaExempt: options.quotaExemptClassId === schedule.class.id,
-  });
 
   // Capacity check (đếm BOOKED + COMPLETED, khớp _count ở schedule detail).
   const bookedCount = await tx.enrollment.count({
