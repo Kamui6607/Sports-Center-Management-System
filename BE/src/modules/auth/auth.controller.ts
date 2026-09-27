@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import * as authService from "./auth.service.js";
-import { sendSuccess, sendCreated } from "../../utils/response.js";
+import { sendSuccess, sendCreated, sendError } from "../../utils/response.js";
+import { storeAvatarImage } from "../../utils/avatarStorage.js";
 
 export async function register(req: Request, res: Response, next: NextFunction) {
   try {
@@ -58,6 +59,24 @@ export async function updateMe(req: Request, res: Response, next: NextFunction) 
   try {
     const user = await authService.updateMe(req.user!.id, req.body);
     sendSuccess(res, user, "Profile updated successfully");
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function uploadAvatar(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) {
+      sendError(res, "Avatar file is required (multipart field name: avatar)", 400);
+      return;
+    }
+    // Lưu ảnh theo driver đang cấu hình (local disk hoặc Cloudinary) rồi mới ghi URL vào DB.
+    const avatarUrl = await storeAvatarImage(req.file, {
+      ownerId: req.user!.id,
+      publicBaseUrl: `${req.protocol}://${req.get("host")}`,
+    });
+    const user = await authService.updateAvatar(req.user!.id, avatarUrl);
+    sendSuccess(res, user, "Avatar updated successfully");
   } catch (err) {
     next(err);
   }

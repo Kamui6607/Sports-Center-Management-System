@@ -11,6 +11,18 @@ let ioInstance: Server | null = null;
 export const getIo = () => {
   if (!ioInstance) throw new Error("Socket.io not initialized");
   return ioInstance;
+}
+
+/**
+ * Ngắt toàn bộ kết nối socket của một user (khóa tài khoản / đổi role / đổi mật khẩu).
+ * Socket chỉ xác thực Ở HANDSHAKE nên phải chủ động disconnect khi session/quyền bị thu hồi,
+ * nếu không socket cũ vẫn gửi/nhận tin và lộ presence.
+ */
+export function disconnectUserSockets(userId: string): void {
+  if (!ioInstance) return;
+  const wasOnline = socketsByUser.delete(userId);
+  ioInstance.in(userId).disconnectSockets(true);
+  if (wasOnline) announcePresence(ioInstance, userId, false);
 };
 
 function tokenFrom(socket: Socket) {
@@ -109,8 +121,10 @@ export const setupSocket = (io: Server) => {
 
     socket.on("disconnect", () => {
       const active = socketsByUser.get(user.id);
-      active?.delete(socket.id);
-      if (!active?.size) {
+      // Đã bị ngắt CHỦ ĐỘNG (disconnectUserSockets đã dọn map + announce) → không announce lần 2.
+      if (!active) return;
+      active.delete(socket.id);
+      if (active.size === 0) {
         socketsByUser.delete(user.id);
         announcePresence(io, user.id, false);
       }

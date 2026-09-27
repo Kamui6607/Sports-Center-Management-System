@@ -8,8 +8,10 @@ import {
   getRefreshTokenExpiryDate,
 } from "../../utils/jwt.js";
 import { hashToken } from "../../utils/hashToken.js";
+import { removeStoredAvatar } from "../../utils/avatarStorage.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { ensureActiveFreeSubscription } from "../subscriptions/free-subscription.service.js";
+import { disconnectUserSockets } from "../chat/chat.socket.js";
 import type { RegisterInput, UpdateProfileInput } from "./auth.schema.js";
 
 export async function register(data: RegisterInput) {
@@ -131,6 +133,7 @@ export async function getMe(userId: string) {
       phone: true,
       gender: true,
       dateOfBirth: true,
+      avatarUrl: true,
       role: true,
       isActive: true,
       createdAt: true,
@@ -149,23 +152,25 @@ export async function updateMe(userId: string, data: UpdateProfileInput) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new AppError("User not found", 404);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      ...userFields,
-      dateOfBirth: userFields.dateOfBirth ? new Date(userFields.dateOfBirth) : undefined,
-    },
-  });
+  const profileData: Record<string, unknown> = {};
+  if (fitnessGoal !== undefined) profileData.fitnessGoal = fitnessGoal;
+  if (trainingLevel !== undefined) profileData.trainingLevel = trainingLevel;
+  if (trainingPreference !== undefined) profileData.trainingPreference = trainingPreference;
 
-  if (user.role === "MEMBER") {
-    const profileData: Record<string, unknown> = {};
-    if (fitnessGoal !== undefined) profileData.fitnessGoal = fitnessGoal;
-    if (trainingLevel !== undefined) profileData.trainingLevel = trainingLevel;
-    if (trainingPreference !== undefined) profileData.trainingPreference = trainingPreference;
-    if (Object.keys(profileData).length > 0) {
-      await prisma.memberProfile.update({ where: { userId }, data: profileData });
+  // User + profile phải cập nhật ATOMIC: lỗi giữa chừng không để dữ liệu nửa vời (F02).
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        ...userFields,
+        dateOfBirth: userFields.dateOfBirth ? new Date(userFields.dateOfBirth) : undefined,
+      },
+    });
+
+    if (user.role === "MEMBER" && Object.keys(profileData).length > 0) {
+      await tx.memberProfile.update({ where: { userId }, data: profileData });
     }
-  }
+  });
 
   return getMe(userId);
 }
@@ -182,5 +187,33 @@ export async function changePassword(
   if (!valid) throw new AppError("Current password is incorrect", 400);
 
   const hashed = await hashPassword(newPassword);
-  await prisma.user.update({ where: { id: userId }, data: { password: hashed } });
+  // Đổi mật khẩu (đặc biệt khi nghi lộ tài khoản) phải thu hồi MỌI refresh token cũ —
+  // nếu không thiết bị khác vẫn refresh được access token mới.
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { password: hashed } }),
+    prisma.refreshToken.deleteMany({ where: { userId } }),
+  ]);
+
+  // Đồng thời ngắt socket đang mở (handshake chỉ xác thực một lần).
+  disconnectUserSockets(userId);
+}
+
+/**
+ * Cập nhật avatar cho user. `avatarUrl` do controller lấy từ utils/avatarStorage
+ * (local `uploads/avatars/...` hoặc Cloudinary), sau đó trả về profile đầy đủ như `GET /auth/me`.
+ */
+export async function updateAvatar(userId: string, avatarUrl: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { avatarUrl: true },
+  });
+  if (!user) throw new AppError("User not found", 404);
+
+  await prisma.user.update({ where: { id: userId }, data: { avatarUrl } });
+
+  // Dọn avatar cũ sau khi DB update thành công. Với Cloudinary, `public_id` cố định theo user
+  // nên upload mới đã ghi đè asset cũ — không cần (và không được) xoá (xem utils/avatarStorage.ts).
+  removeStoredAvatar(user.avatarUrl);
+
+  return getMe(userId);
 }

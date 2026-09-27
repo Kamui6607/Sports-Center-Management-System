@@ -385,6 +385,30 @@ export async function enrollWholeCourse(classId: string, memberProfileId: string
       await lockMemberClass(tx, memberProfileId, classId);
       await lockSchedules(tx, sessions.map((s) => s.id));
 
+      // A12: đọc LẠI các buổi SAU lock — buổi có thể vừa bị hủy/hoàn tất hoặc dời giờ.
+      const freshSessions = await tx.classSchedule.findMany({
+        where: { id: { in: sessions.map((s) => s.id) } },
+        select: { id: true, status: true, startTime: true },
+      });
+      const freshById = new Map(freshSessions.map((s) => [s.id, s]));
+      const staleNow = new Date();
+      const stale = sessions.some((s) => {
+        const f = freshById.get(s.id);
+        return (
+          !f ||
+          f.status !== "SCHEDULED" ||
+          f.startTime.getTime() !== new Date(s.startTime).getTime() ||
+          f.startTime <= staleNow
+        );
+      });
+      if (stale) {
+        throw new AppError(
+          "Một số buổi học của khóa vừa thay đổi hoặc không còn khả dụng. Vui lòng tải lại và đăng ký lại.",
+          409,
+          { code: COURSE_ENROLLMENT_FAILED_CODE, reason: "SESSIONS_CHANGED" }
+        );
+      }
+
       // Đọc lại sức chứa / điều kiện SAU lock (chống overbooking & vượt quota khi concurrent).
       const eligibility = await evaluateCourseEligibility(tx, memberProfileId, cls, sessions);
 

@@ -50,6 +50,9 @@ async function findOrCreateFreePlan(db: DbClient) {
  * - Chưa có                                    → tạo subscription ACTIVE với plan FREE
  *   (`tier = FREE`, `maxConcurrentClasses = 0`), startDate = now, endDate = now + plan.durationDays.
  *
+ * Thời hạn FREE (3650 ngày) chỉ để giữ subscription luôn ACTIVE — flow mua/nâng cấp gói trả phí
+ * KHÔNG cộng dồn ngày dư của gói FREE (`inspectPlanPurchase` trả `remainingDays = 0`).
+ *
  * Dùng cho MỌI flow provision Member (register, Manager tạo user MEMBER, seed).
  * KHÔNG gọi cho COACH/STAFF/MANAGER — họ không có memberProfile.
  *

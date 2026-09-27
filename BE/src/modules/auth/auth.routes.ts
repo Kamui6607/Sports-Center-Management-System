@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authenticate } from "../../middlewares/authenticate.js";
 import { validate } from "../../middlewares/validate.js";
+import { avatarUpload } from "../../middlewares/upload.js";
 import {
   RegisterSchema,
   LoginSchema,
@@ -161,6 +162,41 @@ router.get("/me", authenticate, authController.getMe);
  *       500: { $ref: "#/components/responses/ServerError" }
  */
 router.patch("/me", authenticate, validate(UpdateProfileSchema), authController.updateMe);
+
+/**
+ * @swagger
+ * /auth/me/avatar:
+ *   post:
+ *     summary: Upload avatar image for the current user profile
+ *     description: |
+ *       Upload ảnh đại diện (chọn từ file) dạng `multipart/form-data`, field name **avatar**.
+ *       Chấp nhận jpeg / jpg / png / webp / gif, dung lượng tối đa **5MB**.
+ *       Nơi lưu ảnh phụ thuộc env `AVATAR_STORAGE`:
+ *       - `local` (mặc định khi chưa có credentials): lưu `uploads/avatars/`, phục vụ tĩnh qua `GET /uploads/avatars/<filename>`;
+ *       - `cloudinary` (tự bật khi điền đủ `CLOUDINARY_*`): ảnh resize 512x512, nén q_auto/f_auto,
+ *         lưu 1 asset/user nên thay ảnh mới GHI ĐÈ ảnh cũ (không sinh rác).
+ *       URL được lưu vào `User.avatarUrl` và trả về trong `GET /auth/me`.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [avatar]
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image file (jpeg, jpg, png, webp, gif), max 5MB
+ *     responses:
+ *       200: { $ref: "#/components/responses/ProfileOk" }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *       500: { $ref: "#/components/responses/ServerError" }
+ */
+router.post("/me/avatar", authenticate, avatarUpload, authController.uploadAvatar);
 
 /**
  * @swagger

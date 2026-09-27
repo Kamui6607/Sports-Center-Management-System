@@ -94,6 +94,21 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+/// A06: trạng thái CẤP QUYỀN của giao dịch — tách khỏi `status` (trạng thái TIỀN).
+/// `REQUIRES_REVIEW` = tiền ĐÃ thu nhưng gói chưa được cấp (cần quản lý xử lý/đối soát).
+enum PaymentActivationStatus {
+  ACTIVATED
+  REQUIRES_REVIEW
+}
+
+/// F01: vòng đời bản ghi outbox notification.
+enum OutboxStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+}
+
 // ─────────────────────────────────────────
 // AUTH / USER
 // ─────────────────────────────────────────
@@ -106,6 +121,7 @@ model User {
   phone       String?   @unique
   gender      Gender?
   dateOfBirth DateTime?
+  avatarUrl   String?
   role        UserRole  @default(MEMBER)
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
@@ -118,6 +134,8 @@ model User {
   createdPayments            Payment[]              @relation("PaymentCreatedBy")
   sentMessages               ChatMessage[]          @relation("SentMessages")
   receivedMessages           ChatMessage[]          @relation("ReceivedMessages")
+  chatAttachmentsOwned       ChatAttachment[]       @relation("ChatAttachmentOwner")
+  chatAttachmentsReceived    ChatAttachment[]       @relation("ChatAttachmentReceiver")
   notifications              Notification[]
   decidedAttendancePenalties AttendancePenalty[]    @relation("AttendancePenaltyDecidedBy")
   createdManualCodes         AttendanceManualCode[] @relation("AttendanceManualCodeCreatedBy")
@@ -219,6 +237,11 @@ model MembershipSubscription {
   // BR-15: Suspension tracking
   suspendedAt   DateTime? // When suspension started
   remainingDays Int? // Days remaining when suspended (for resume logic)
+  /// A10: mốc hủy gói — entitlement lịch sử chỉ kéo dài tới đây (lịch trước khi hủy vẫn được tính).
+  cancelledAt   DateTime?
+  /// A07: quota lớp học song song ĐÃ BÁN cho kỳ này (snapshot lúc cấp gói). NULL = dữ liệu cũ,
+  /// đọc theo plan hiện tại.
+  maxConcurrentClassesSnapshot Int?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
@@ -374,6 +397,19 @@ model Payment {
   gatewayPayload  Json?
   note            String?
   paidAt          DateTime?
+  /// A07 — snapshot điều khoản gói TẠI THỜI ĐIỂM TẠO ĐƠN: chốt tiền theo đúng offer đã bán,
+  /// không đọc cấu hình plan hiện tại (giá/duration/tier/quota có thể bị sửa trong lúc chờ CK).
+  planNameSnapshot             String?
+  planTierSnapshot             MemberTier?
+  durationDaysSnapshot         Int?
+  maxConcurrentClassesSnapshot Int?
+  /// A06 — trạng thái CẤP QUYỀN (tách khỏi `status` là trạng thái TIỀN). NULL = giao dịch
+  /// chưa chốt/không cần theo dõi (dữ liệu cũ).
+  activationStatus PaymentActivationStatus?
+  /// Lý do cần đối soát (VD: PLAN_MISSING / thông điệp chặn kích hoạt) — null khi đã xử lý.
+  reviewReason     String?
+  reviewedAt       DateTime?
+  reviewedById     String?
   createdById     String?
   createdBy       User?                   @relation("PaymentCreatedBy", fields: [createdById], references: [id])
   createdAt       DateTime                @default(now())
@@ -381,12 +417,63 @@ model Payment {
 
   invoice            Invoice?
   sepayWebhookEvents SepayWebhookEvent[]
+  bankTransactions   SepayBankTransaction[]
 
   @@index([memberId])
   @@index([subscriptionId])
   @@index([status])
   @@index([createdAt])
   @@index([gateway, status])
+  @@index([activationStatus])
+}
+
+/// A14 — Ledger giao dịch ngân hàng (SePay): một movement chỉ được ghi nhận & phân bổ MỘT LẦN,
+/// dùng chung cho webhook và đối soát API ⇒ idempotency xuyên hai kênh.
+model SepayBankTransaction {
+  id               String    @id @default(uuid())
+  /// Danh tính chuẩn hoá của movement: `ref:<referenceCode>` khi có (chung cho webhook + API),
+  /// ngược lại `sepay:<payload.id>` (webhook/mock) hoặc `api:<uuid>` (đối soát API).
+  externalId       String    @unique
+  sepayId          Int?      @unique
+  apiTransactionId String?   @unique
+  referenceCode    String?
+  gateway          String?
+  accountNumber    String?
+  transferType     String
+  amount           Decimal   @db.Decimal(12, 2)
+  content          String?
+  /// Mã đơn bóc tách được tại thời điểm ghi ledger.
+  code             String?
+  payload          Json?
+  /// MỘT movement chỉ được cấp quyền cho ĐÚNG MỘT payment (UNIQUE) — chống cấp gói 2 lần.
+  paymentId        String?   @unique
+  payment          Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  allocatedAt      DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([referenceCode])
+}
+
+/// F01 — Transactional outbox cho notification: ghi TRONG transaction nghiệp vụ, gửi SAU commit,
+/// retry khi lỗi ⇒ không mất thông báo khi transaction rollback hoặc process chết giữa chừng.
+model NotificationOutbox {
+  id          String       @id @default(uuid())
+  userId      String
+  type        String
+  title       String
+  body        String
+  reason      String?
+  metadata    Json?
+  status      OutboxStatus @default(PENDING)
+  attempts    Int          @default(0)
+  lastError   String?
+  availableAt DateTime     @default(now())
+  sentAt      DateTime?
+  createdAt   DateTime     @default(now())
+
+  @@index([status, availableAt])
+  @@index([userId])
 }
 
 /// Log webhook nhận từ SePay — `sepayId` UNIQUE chống xử lý trùng khi SePay retry/replay webhook.
@@ -446,9 +533,33 @@ model ChatMessage {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  attachment ChatAttachment?
+
   @@index([senderId])
   @@index([receiverId])
   @@index([createdAt])
+}
+
+/// D03 — Metadata của file chat (KHÔNG phục vụ tĩnh công khai):
+/// quyết định AI được tải file (owner / receiver / MANAGER; phòng chung = mọi user đăng nhập)
+/// và cho phép dọn file khi request bị từ chối.
+model ChatAttachment {
+  id         String       @id @default(uuid())
+  ownerId    String
+  owner      User         @relation("ChatAttachmentOwner", fields: [ownerId], references: [id])
+  /// Người nhận (NULL = phòng chung).
+  receiverId String?
+  receiver   User?        @relation("ChatAttachmentReceiver", fields: [receiverId], references: [id])
+  messageId  String?      @unique
+  message    ChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  /// Tên file trên disk do SERVER sinh (không dùng tên gốc của client).
+  storedName String
+  mimeType   String
+  size       Int
+  createdAt  DateTime     @default(now())
+
+  @@index([ownerId])
+  @@index([receiverId])
 }
 
 // ─────────────────────────────────────────

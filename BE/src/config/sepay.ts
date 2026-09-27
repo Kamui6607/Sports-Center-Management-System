@@ -59,6 +59,17 @@ export function sepayConfig() {
     apiBaseUrl:
       (process.env.SEPAY_API_BASE_URL ?? "").trim().replace(/\/+$/, "") ||
       "https://userapi.sepay.vn/v2",
+    /**
+     * D07 — Cửa sổ "tươi" cho `X-SePay-Timestamp` (giây): chữ ký hợp lệ nhưng timestamp quá cũ
+     * (replay) sẽ bị từ chối. 0 = tắt kiểm tra (escape hatch).
+     * Mặc định 3600s (60 phút) — phủ toàn bộ retry window ~33 phút của SePay nhưng chặn replay cũ.
+     */
+    webhookMaxSkewSeconds: (() => {
+      const raw = (process.env.SEPAY_WEBHOOK_MAX_SKEW_SECONDS ?? "").trim();
+      if (!raw) return 3600;
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 0 ? Math.min(Math.floor(n), 86400) : 3600;
+    })(),
     /** Khoảng cách tối thiểu (giây) giữa 2 lần đối soát cho CÙNG một đơn — tránh spam API (SePay giới hạn 3 req/s). */
     reconcileMinSeconds: clamp(Number(process.env.SEPAY_RECONCILE_MIN_SECONDS ?? 5) || 5, 1, 300),
   };
@@ -162,14 +173,18 @@ export function verifySepayApiKey(authHeader: string | undefined, expected: stri
  * - HMAC-SHA256(secret, `{timestamp}.{rawBody}`) — ký trên **raw bytes** của body,
  *   KHÔNG phải JSON đã parse rồi stringify lại (key order/whitespace/unicode khác sẽ lệch).
  * - So khớp timing-safe.
+ * - D07: `maxSkewSeconds > 0` ⇒ timestamp phải nằm trong cửa sổ cho phép (chống replay webhook cũ);
+ *   `0`/bỏ trống ⇒ bỏ kiểm tra độ tươi (chỉ dùng cho môi trường đặc biệt).
  */
 export function verifySepayHmacSignature(params: {
   secret: string;
   rawBody: Buffer | string | undefined;
   signature: string | undefined;
   timestamp: string | undefined;
+  /** Cửa sổ tươi tối đa (giây). 0 = tắt. Caller truyền `sepayConfig().webhookMaxSkewSeconds`. */
+  maxSkewSeconds?: number;
 }): boolean {
-  const { secret, rawBody, signature, timestamp } = params;
+  const { secret, rawBody, signature, timestamp, maxSkewSeconds = 0 } = params;
   if (!secret || rawBody === undefined || !signature || !timestamp) return false;
   if (!/^\d+$/.test(timestamp.trim())) return false;
   const cleanSignature = signature.trim().replace(/^sha256=/i, "");
@@ -181,5 +196,14 @@ export function verifySepayHmacSignature(params: {
     .digest("hex");
   const a = Buffer.from(cleanSignature.toLowerCase(), "hex");
   const b = Buffer.from(expected, "hex");
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  const signatureOk = a.length === b.length && crypto.timingSafeEqual(a, b);
+  if (!signatureOk) return false;
+
+  // D07: chữ ký hợp lệ nhưng timestamp quá cũ ⇒ coi như không hợp lệ (replay).
+  if (maxSkewSeconds > 0) {
+    const signedAt = Number(timestamp.trim());
+    const skew = Math.abs(Math.floor(Date.now() / 1000) - signedAt);
+    if (skew > maxSkewSeconds) return false;
+  }
+  return true;
 }

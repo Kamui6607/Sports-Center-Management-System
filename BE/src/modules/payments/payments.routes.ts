@@ -108,7 +108,11 @@ router.get(
  * @swagger
  * /payments/{id}/status:
  *   patch:
- *     summary: Update payment status
+ *     summary: Update payment status (thanh toán tại quầy)
+ *     description: |
+ *       Chỉ áp dụng cho giao dịch ghi nhận TẠI QUẦY (CASH/BANK_TRANSFER — không có `gateway`).
+ *       Giao dịch ONLINE (SePay) bị từ chối **400**: trạng thái chỉ được chốt bởi
+ *       webhook / đối soát / mock-confirm để không lệch entitlement và hóa đơn.
  *     tags: [Payments]
  *     parameters:
  *       - in: path
@@ -137,6 +141,37 @@ router.patch(
   authenticate, authorize("MANAGER"),
   validate(UpdatePaymentStatusSchema),
   paymentsController.updatePaymentStatus
+);
+
+/**
+ * @swagger
+ * /payments/{id}/retry-activation:
+ *   post:
+ *     summary: Kích hoạt bù cho giao dịch online đã thu tiền nhưng chưa cấp gói (Manager only)
+ *     description: |
+ *       Dùng khi `activationStatus = REQUIRES_REVIEW` (tiền ĐÃ về nhưng gói không kích hoạt tự động,
+ *       VD bị chặn hạ hạng trong lúc chờ chuyển khoản). Cấp gói theo ĐÚNG snapshot điều khoản của đơn.
+ *       - 400: không phải giao dịch SePay / chưa thu tiền / đã có gói / không ở trạng thái cần xử lý.
+ *       - 409: vẫn không kích hoạt được (VD gói hiện tại vẫn chặn) — giữ nguyên review, cập nhật lý do.
+ *     tags: [Payments]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { $ref: "#/components/responses/PaymentOk" }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *       409: { $ref: "#/components/responses/Conflict" }
+ *       500: { $ref: "#/components/responses/ServerError" }
+ */
+router.post(
+  "/:id/retry-activation",
+  authenticate, authorize("MANAGER"),
+  paymentsController.retryPaymentActivation
 );
 
 /**
@@ -248,7 +283,9 @@ router.post(
  *
  *       1. **HMAC-SHA256** (khuyến nghị): header `X-SePay-Signature: sha256={hex}` +
  *          `X-SePay-Timestamp` (unix seconds) — ký trên `{timestamp}.{rawBody}` bằng
- *          `SEPAY_WEBHOOK_SECRET`.
+ *          `SEPAY_WEBHOOK_SECRET`. D07: timestamp phải nằm trong cửa sổ
+ *          `SEPAY_WEBHOOK_MAX_SKEW_SECONDS` (mặc định **3600s** — phủ retry window ~33 phút của SePay);
+ *          chữ ký đúng nhưng timestamp quá cũ ⇒ 401 chống replay (đặt `0` để tắt kiểm tra).
  *       2. **API Key**: header `Authorization: Apikey <SEPAY_WEBHOOK_API_KEY>`.
  *
  *       Request có header chữ ký ⇒ kiểm tra HMAC; không có ⇒ kiểm tra API Key.
@@ -263,8 +300,13 @@ router.post(
  *       5. Số tiền (`transferAmount`) phải khớp CHÍNH XÁC `Payment.amount` ⇒ lệch ghi nhận MISMATCH.
  *       6. Chống trùng: `payload.id` (sepayId) lưu UNIQUE ở bảng `SepayWebhookEvent` — SePay retry/replay
  *          không xử lý lại; giao dịch đã SUCCESS ⇒ DUPLICATE.
- *       7. Hợp lệ ⇒ Payment → `SUCCESS`, tạo `MembershipSubscription` ACTIVE (áp luật hạ hạng + cộng ngày dư),
+ *       7. Hợp lệ ⇒ Payment → `SUCCESS`, tạo `MembershipSubscription` ACTIVE
+ *          (áp luật hạ hạng + cộng ngày dư của gói trả phí; gói FREE hệ thống không cộng),
  *          tạo `Invoice` snapshot (BR-25), gửi notification `PAYMENT_SUCCESS` — TẤT CẢ trong cùng transaction.
+ *          A06: `Payment.activationStatus` tách khỏi trạng thái tiền — tiền đã thu nhưng không cấp được
+ *          gói (VD chặn hạ hạng, thiếu plan, tiền về muộn) ⇒ `REQUIRES_REVIEW` + `reviewReason` để
+ *          quản lý xử lý (`POST /payments/{id}/retry-activation`).
+ *          A07: gói cấp theo ĐÚNG snapshot điều khoản lưu trên Payment lúc tạo đơn (không đọc plan live).
  *
  *       Tiền về khi giao dịch đã đóng (hết hạn/thất bại) ⇒ ghi nhận LATE để đối soát, KHÔNG kích hoạt gói.
  *       Mọi trường hợp (trừ sai API key / chưa cấu hình) đều ACK để SePay không retry vô hạn.

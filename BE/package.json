@@ -18,11 +18,15 @@
     "test:e2e:attendance": "tsx tests/attendance-manual-code.e2e.ts",
     "test:e2e:course": "tsx tests/course-enrollment.e2e.ts",
     "test:e2e:sepay": "tsx tests/sepay-payment.e2e.ts",
+    "test:e2e:chat": "tsx tests/chat-attachments.e2e.ts",
+    "test:e2e:lifecycle": "tsx tests/subscription-lifecycle.e2e.ts",
     "test:sepay:smoke": "tsx tests/sepay-smoke.ts",
-    "test:e2e:all": "npm run test:e2e && npm run test:e2e:attendance && npm run test:e2e:course && npm run test:e2e:sepay"
+    "test:cloudinary:check": "tsx tests/cloudinary-check.ts",
+    "test:e2e:all": "npm run test:e2e && npm run test:e2e:attendance && npm run test:e2e:course && npm run test:e2e:sepay && npm run test:e2e:chat && npm run test:e2e:lifecycle"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "cloudinary": "^2.11.0",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",

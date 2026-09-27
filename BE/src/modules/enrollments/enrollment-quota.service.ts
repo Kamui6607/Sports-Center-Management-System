@@ -99,8 +99,9 @@ export async function getMemberConcurrentClassQuota(
   ]);
 
   const hasActiveSubscription = Boolean(activeSub);
+  // A07: ưu tiên quota ĐÃ BÁN cho kỳ này (snapshot trên subscription); dữ liệu cũ fallback plan live.
   const limit = activeSub
-    ? activeSub.plan.maxConcurrentClasses
+    ? activeSub.maxConcurrentClassesSnapshot ?? activeSub.plan.maxConcurrentClasses
     : NO_ACTIVE_SUBSCRIPTION_QUOTA;
   // Không có gói ACTIVE => tier = null. "FREE" là tier THẬT của một MembershipPlan/Subscription,
   // không được dùng để đại diện cho "không có subscription".

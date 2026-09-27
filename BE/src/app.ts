@@ -98,7 +98,9 @@ app.use(`${v1}/notifications`, notificationRoutes);
 app.use(`${v1}/feedbacks`, feedbackRoutes);
 
 // Static files for uploads
-app.use("/uploads", express.static("uploads"));
+// D03: CHỈ avatar là tài nguyên công khai (hiển thị qua <img src>). File chat riêng tư nằm ở
+// `uploads/chat` và phải tải qua `GET /api/v1/chat/attachments/:id` (auth + phân quyền).
+app.use("/uploads/avatars", express.static("uploads/avatars"));
 
 // 404
 app.use((_req, res) => {

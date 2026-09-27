@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { getMessages, sendMessage, markAsRead, getUnreadCount, getConversations, getContacts } from "./chat.controller.js";
+import { getMessages, sendMessage, markAsRead, getUnreadCount, getConversations, getContacts, downloadAttachment } from "./chat.controller.js";
 import { authenticate } from "../../middlewares/authenticate.js";
-import { upload } from "../../middlewares/upload.js";
+import { chatUploadSingle } from "../../middlewares/upload.js";
 
 const router = Router();
 
@@ -95,7 +95,34 @@ router.get("/messages", getMessages);
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       403: { $ref: "#/components/responses/Forbidden" }
  */
-router.post("/messages", upload.single("file"), sendMessage);
+router.post("/messages", chatUploadSingle("file"), sendMessage);
+
+/**
+ * @swagger
+ * /chat/attachments/{id}:
+ *   get:
+ *     summary: Tải file đính kèm của tin nhắn (yêu cầu đăng nhập + phân quyền)
+ *     description: |
+ *       D03 — file chat KHÔNG còn phục vụ tĩnh công khai. Quyền tải:
+ *       - chủ file (người gửi), người nhận, hoặc MANAGER;
+ *       - tin nhắn PHÒNG CHUNG (`receiverId = null`) → mọi user đã đăng nhập.
+ *       Sai quyền ⇒ 403; không tồn tại ⇒ 404. Response `Content-Type` theo MIME đã xác thực
+ *       lúc upload + `X-Content-Type-Options: nosniff`.
+ *     tags: [Chat]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200: { description: File stream }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.get("/attachments/:id", downloadAttachment);
 
 /**
  * @swagger

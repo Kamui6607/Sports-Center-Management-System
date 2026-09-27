@@ -165,12 +165,16 @@ async function setupRoom(): Promise<void> {
   created.roomIds.push(room.id);
 }
 
-/** Slot tương lai không chồng giờ giữa các buổi học của fixture. */
-const FUTURE_BASE = new Date(Date.now() + 3 * DAY);
+/**
+ * Slot nằm TRONG CỬA SỔ ĐIỂM DANH của suite: server chỉ cấp QR/tự điểm danh trong
+ * [startTime − 30 phút, endTime + 30 phút], nên mọi buổi của fixture phải bắt đầu gần thời điểm
+ * chạy test (cách nhau 5 phút) để generate-qr/scan hoạt động trong suốt suite.
+ */
+const FUTURE_BASE = new Date(Date.now() + 60 * 1000);
 let slotCursor = 0;
 
 function nextSlot(): { start: Date; end: Date } {
-  const start = new Date(FUTURE_BASE.getTime() + slotCursor++ * 90 * 60 * 1000);
+  const start = new Date(FUTURE_BASE.getTime() + slotCursor++ * 5 * 60 * 1000);
   return { start, end: new Date(start.getTime() + HOUR) };
 }
 
@@ -590,6 +594,402 @@ async function scenarioAuthorization(ctx: Ctx, member: FixtureUser): Promise<voi
   check("MEMBER ghi attendance qua POST /attendance → 403", memberWrites.status === 403, memberWrites.body);
 }
 
+/** Key nhạy cảm KHÔNG được xuất hiện trong bất kỳ response HTTP nào (quét đệ quy). */
+const SECRET_KEYS = ["password", "hash", "refreshtoken", "accesstoken", "secret"];
+
+function containsKeyDeep(value: unknown, keys: string[]): boolean {
+  if (Array.isArray(value)) return value.some((v) => containsKeyDeep(v, keys));
+  if (value && typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>).some(
+      ([k, v]) => keys.includes(k.toLowerCase()) || containsKeyDeep(v, keys)
+    );
+  }
+  return false;
+}
+
+/**
+ * 7) Privacy & scope (regression P0):
+ * - GET /attendance không được trả password/hash của user trong bất kỳ nested object nào.
+ * - MEMBER chỉ đọc được training plan của chính mình (đổi memberId → 403).
+ * - COACH chỉ thấy plan do mình phụ trách + chỉ xem enrollment của lớp mình dạy.
+ * - MANAGER/STAFF giữ nguyên quyền xem.
+ */
+async function scenarioPrivacyAndScope(
+  ctx: Ctx,
+  member: FixtureUser,
+  otherMember: FixtureUser
+): Promise<void> {
+  section("7) Privacy & scope: không lộ password; member/coach chỉ thấy dữ liệu của mình");
+
+  const planId = `plan-e2e-privacy-${RUN}`;
+  await prisma.trainingPlan.create({
+    data: {
+      id: planId,
+      memberId: member.memberProfileId,
+      coachId: ctx.coach.coachProfileId,
+      name: `E2E Privacy Plan ${RUN}`,
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 30 * DAY),
+    },
+  });
+
+  const sA1 = ctx.classA.scheduleIds[0];
+  const sB1 = ctx.classB.scheduleIds[0];
+
+  const coachRoster = await http("GET", `/attendance?scheduleId=${sA1}`, { token: ctx.coach.token });
+  check(
+    "COACH phụ trách GET /attendance → 200, không lộ password/hash",
+    coachRoster.status === 200 && !containsKeyDeep(coachRoster.body, SECRET_KEYS),
+    { status: coachRoster.status, leak: containsKeyDeep(coachRoster.body, SECRET_KEYS) }
+  );
+
+  const managerRoster = await http("GET", `/attendance?scheduleId=${sA1}`, { token: ctx.manager.token });
+  check(
+    "MANAGER GET /attendance → 200, không lộ password/hash",
+    managerRoster.status === 200 && !containsKeyDeep(managerRoster.body, SECRET_KEYS),
+    { status: managerRoster.status, leak: containsKeyDeep(managerRoster.body, SECRET_KEYS) }
+  );
+
+  const memberCross = await http(
+    "GET",
+    `/training-plans?memberId=${otherMember.memberProfileId}`,
+    { token: member.token }
+  );
+  check("MEMBER đổi memberId sang người khác → 403", memberCross.status === 403, memberCross.body);
+
+  const memberOwn = await http("GET", "/training-plans", { token: member.token });
+  const ownPlans: any[] = memberOwn.body?.data ?? [];
+  check(
+    "MEMBER GET /training-plans (không query) chỉ trả plan của chính mình, không lộ password",
+    memberOwn.status === 200 &&
+      ownPlans.length >= 1 &&
+      ownPlans.every((p) => p.memberId === member.memberProfileId) &&
+      !containsKeyDeep(memberOwn.body, SECRET_KEYS),
+    { status: memberOwn.status, count: ownPlans.length, leak: containsKeyDeep(memberOwn.body, SECRET_KEYS) }
+  );
+
+  const memberOwnQuery = await http(
+    "GET",
+    `/training-plans?memberId=${member.memberProfileId}`,
+    { token: member.token }
+  );
+  check(
+    "MEMBER truyền đúng memberId của mình → 200",
+    memberOwnQuery.status === 200 &&
+      (memberOwnQuery.body?.data ?? []).every((p: any) => p.memberId === member.memberProfileId),
+    memberOwnQuery.body
+  );
+
+  const coachPlans = await http("GET", "/training-plans", { token: ctx.coach.token });
+  const coachPlanRows: any[] = coachPlans.body?.data ?? [];
+  check(
+    "COACH GET /training-plans chỉ trả plan do mình phụ trách, không lộ password",
+    coachPlans.status === 200 &&
+      coachPlanRows.length >= 1 &&
+      coachPlanRows.every((p) => p.coachId === ctx.coach.coachProfileId) &&
+      !containsKeyDeep(coachPlans.body, SECRET_KEYS),
+    { status: coachPlans.status, count: coachPlanRows.length, leak: containsKeyDeep(coachPlans.body, SECRET_KEYS) }
+  );
+
+  const managerPlans = await http(
+    "GET",
+    `/training-plans?memberId=${member.memberProfileId}`,
+    { token: ctx.manager.token }
+  );
+  const managerRows: any[] = managerPlans.body?.data ?? [];
+  check(
+    "MANAGER GET /training-plans vẫn thấy plan của member, không lộ password",
+    managerPlans.status === 200 &&
+      managerRows.some((p) => p.id === planId) &&
+      !containsKeyDeep(managerPlans.body, SECRET_KEYS),
+    { status: managerPlans.status, hasPlan: managerRows.some((p) => p.id === planId) }
+  );
+
+  const coachOtherEnrollments = await http("GET", `/enrollments/schedule/${sB1}`, {
+    token: ctx.coach.token,
+  });
+  check(
+    "COACH không phụ trách lớp → GET /enrollments/schedule 403",
+    coachOtherEnrollments.status === 403,
+    coachOtherEnrollments.body
+  );
+
+  const coachOwnEnrollments = await http("GET", `/enrollments/schedule/${sA1}`, {
+    token: ctx.coach.token,
+  });
+  check(
+    "COACH phụ trách lớp → GET /enrollments/schedule 200, không lộ password",
+    coachOwnEnrollments.status === 200 && !containsKeyDeep(coachOwnEnrollments.body, SECRET_KEYS),
+    { status: coachOwnEnrollments.status, leak: containsKeyDeep(coachOwnEnrollments.body, SECRET_KEYS) }
+  );
+
+  const staffEnrollments = await http("GET", `/enrollments/schedule/${sA1}`, {
+    token: ctx.staff.token,
+  });
+  check("STAFF GET /enrollments/schedule → 200 (giữ nguyên quyền)", staffEnrollments.status === 200, staffEnrollments.body);
+}
+
+/**
+ * 8) Cửa sổ điểm danh (A09): QR/mã ngoài cửa sổ bị chặn + kết quả đã chốt không bị ghi đè.
+ */
+async function scenarioScanWindowAndFinalizedGuard(
+  ctx: Ctx,
+  member: FixtureUser,
+  finalizedMember: FixtureUser
+): Promise<void> {
+  section("8) Cửa sổ điểm danh + kết quả đã chốt không bị ghi đè");
+
+  // 8a) Buổi tương lai xa (ngoài cửa sổ): generate-qr bị chặn và scan cũng bị chặn.
+  const farSchedule = await prisma.classSchedule.create({
+    data: {
+      classId: ctx.classB.classId,
+      roomId,
+      startTime: new Date(Date.now() + 2 * DAY),
+      endTime: new Date(Date.now() + 2 * DAY + HOUR),
+      status: "SCHEDULED",
+    },
+  });
+  await enroll(member.memberProfileId, ctx.classB.classId, farSchedule.id);
+
+  const earlyGenerate = await generateQr(ctx.manager.token, farSchedule.id);
+  check("generate-qr cho buổi ngoài cửa sổ → 409", earlyGenerate.status === 409, earlyGenerate.body);
+
+  const earlyToken = jwt.sign(
+    { scheduleId: farSchedule.id, coachId: ctx.coach.id, type: "ATTENDANCE_QR" },
+    env.JWT_ACCESS_SECRET,
+    { expiresIn: ATTENDANCE.QR_TTL_SECONDS }
+  );
+  const earlyScan = await scanQr(member.token, { qrToken: earlyToken });
+  check(
+    "QR hợp lệ nhưng buổi ngoài cửa sổ → 409, KHÔNG tạo attendance",
+    earlyScan.status === 409 && (await attendanceCount(member.memberProfileId, farSchedule.id)) === 0,
+    earlyScan.body
+  );
+
+  // 8b) Manager chốt EXCUSED → member quét lại KHÔNG được ghi đè thành PRESENT.
+  const sA3 = ctx.classA.scheduleIds[2];
+  const mark = await http("POST", "/attendance", {
+    token: ctx.manager.token,
+    body: { scheduleId: sA3, memberId: finalizedMember.memberProfileId, status: "EXCUSED" },
+  });
+  check(
+    "MANAGER đánh dấu EXCUSED → 201",
+    mark.status === 201 && mark.body?.data?.status === "EXCUSED",
+    mark.body
+  );
+
+  const qr = await generateQr(ctx.manager.token, sA3);
+  const rescan = await scanQr(finalizedMember.token, { qrToken: qr.body?.data?.qrToken });
+  check(
+    "Member quét lại buổi đã chốt EXCUSED → 409 (không ghi đè)",
+    rescan.status === 409,
+    rescan.body
+  );
+  const row = await attendanceRow(finalizedMember.memberProfileId, sA3);
+  check("Attendance giữ nguyên EXCUSED sau khi quét lại", row?.status === "EXCUSED", row?.status);
+}
+
+/**
+ * 9) A10–A12: entitlement lịch sử (đổi status gói không sửa quá khứ), guard sức chứa/dời lịch (A11),
+ *    khoá lịch dùng chung + CAS khi hủy (A12).
+ */
+async function scenarioHistoricalEntitlementAndScheduleGuards(
+  ctx: Ctx,
+  historyMember: FixtureUser,
+  movedMember: FixtureUser
+): Promise<void> {
+  section("9) A10 entitlement lịch sử + A11 capacity/dời lịch + A12 lock lịch");
+
+  // ── A10: 6 buổi QUÁ KHỨ (đã học, ABSENT) + gói bao phủ quá khứ ──────────────────────
+  const cls = await prisma.class.create({
+    data: { name: `E2E Attendance Historical ${RUN}`, areaType: "INDOOR", capacity: 20 },
+  });
+  created.classIds.push(cls.id);
+
+  for (let i = 0; i < 6; i++) {
+    const end = new Date(Date.now() - (i * 2 + 1) * HOUR);
+    const start = new Date(end.getTime() - HOUR);
+    const s = await prisma.classSchedule.create({
+      data: { classId: cls.id, roomId, startTime: start, endTime: end, status: "SCHEDULED" },
+    });
+    await enroll(historyMember.memberProfileId, cls.id, s.id);
+    await prisma.attendance.create({
+      data: { scheduleId: s.id, memberId: historyMember.memberProfileId, status: "ABSENT" },
+    });
+    await prisma.enrollment.update({
+      where: { memberId_scheduleId: { memberId: historyMember.memberProfileId, scheduleId: s.id } },
+      data: { status: "COMPLETED" },
+    });
+  }
+
+  const historyPlan = await createPlan(ctx.manager.token, {
+    name: `E2E Attendance History Plan ${RUN}`,
+    price: 100000,
+    durationDays: 30,
+    tier: "MEMBERSHIP",
+    maxConcurrentClasses: 3,
+  });
+  const historySubId = await subscribe(ctx.manager.token, historyMember.memberProfileId, historyPlan.id);
+  await prisma.membershipSubscription.update({
+    where: { id: historySubId },
+    data: {
+      startDate: new Date(Date.now() - 20 * DAY),
+      endDate: new Date(Date.now() + 10 * DAY),
+    },
+  });
+
+  const bucketOf = async (token: string) => {
+    const res = await http("GET", "/attendance/my/summary", { token });
+    return (res.body?.data?.buckets ?? []).find((b: any) => b.classId === cls.id);
+  };
+
+  const baseline = await bucketOf(historyMember.token);
+  check(
+    "A10: baseline — 6 buổi quá khứ được tính, rate 0%",
+    baseline?.sampleSize === 6 && baseline?.attendanceRate === 0,
+    baseline
+  );
+
+  const expire = await http("PATCH", `/subscriptions/${historySubId}/status`, {
+    token: ctx.manager.token,
+    body: { status: "EXPIRED" },
+  });
+  const afterExpire = await bucketOf(historyMember.token);
+  check(
+    "A10: gói EXPIRED → lịch sử KHÔNG đổi (vẫn 6 buổi, 0%)",
+    expire.status === 200 && afterExpire?.sampleSize === 6 && afterExpire?.attendanceRate === 0,
+    { status: expire.status, bucket: afterExpire }
+  );
+
+  // Bảo lưu: quyền lợi dừng tại thời điểm suspend ⇒ chỉ các buổi TRƯỚC mốc đó còn được tính.
+  await prisma.membershipSubscription.update({
+    where: { id: historySubId },
+    data: { status: "SUSPENDED", suspendedAt: new Date(Date.now() - 5.5 * HOUR) },
+  });
+  const afterSuspend = await bucketOf(historyMember.token);
+  check(
+    "A10: gói SUSPENDED (freeze từ -5.5h) → buổi trong giai đoạn bảo lưu bị loại, lịch sử cũ giữ nguyên",
+    afterSuspend?.sampleSize === 4 && afterSuspend?.attendanceRate === 0,
+    afterSuspend
+  );
+
+  const cancelHistory = await http("PATCH", `/subscriptions/${historySubId}/status`, {
+    token: ctx.manager.token,
+    body: { status: "CANCELLED" },
+  });
+  const afterCancel = await bucketOf(historyMember.token);
+  check(
+    "A10: gói CANCELLED → buổi học TRƯỚC khi hủy vẫn được tính (6 buổi)",
+    cancelHistory.status === 200 && afterCancel?.sampleSize === 6,
+    { status: cancelHistory.status, bucket: afterCancel }
+  );
+
+  // ── A11: sức chứa không được giảm xuống dưới số chỗ đã giữ ─────────────────────────
+  const shrinkClass = await http("PATCH", `/classes/${ctx.classA.classId}`, {
+    token: ctx.manager.token,
+    body: { capacity: 1 },
+  });
+  check(
+    "A11: giảm sức chứa lớp dưới số chỗ đã giữ → 400",
+    shrinkClass.status === 400 && shrinkClass.body?.errors?.code === "CLASS_CAPACITY_BELOW_BOOKED",
+    shrinkClass.body
+  );
+  const okClass = await http("PATCH", `/classes/${ctx.classA.classId}`, {
+    token: ctx.manager.token,
+    body: { capacity: 10 },
+  });
+  check("A11: giảm sức chứa lớp xuống 10 (≥ chỗ đã giữ) → 200", okClass.status === 200, okClass.body);
+
+  const shrinkRoom = await http("PATCH", `/rooms/${roomId}`, {
+    token: ctx.manager.token,
+    body: { capacity: 5 },
+  });
+  check(
+    "A11: giảm sức chứa phòng dưới yêu cầu (chỗ giữ / sức chứa lớp) → 400",
+    shrinkRoom.status === 400 && shrinkRoom.body?.errors?.code === "ROOM_CAPACITY_TOO_SMALL",
+    shrinkRoom.body
+  );
+
+  // ── A11: dời lịch không được phá chỗ đã hợp lệ ─────────────────────────────────────
+  const room2 = await prisma.room.create({
+    data: { name: `E2E Attendance Room2 ${RUN}`, capacity: 50, areaType: "INDOOR", location: "E2E" },
+  });
+  created.roomIds.push(room2.id);
+  const clsD = await prisma.class.create({
+    data: { name: `E2E Attendance Move ${RUN}`, areaType: "INDOOR", capacity: 20 },
+  });
+  created.classIds.push(clsD.id);
+  const d1 = await prisma.classSchedule.create({
+    data: {
+      classId: clsD.id,
+      roomId: room2.id,
+      startTime: new Date(Date.now() + 3 * DAY),
+      endTime: new Date(Date.now() + 3 * DAY + HOUR),
+      status: "SCHEDULED",
+    },
+  });
+  const d2 = await prisma.classSchedule.create({
+    data: {
+      classId: clsD.id,
+      roomId: room2.id,
+      startTime: new Date(Date.now() + 3 * DAY + 2 * HOUR),
+      endTime: new Date(Date.now() + 3 * DAY + 3 * HOUR),
+      status: "SCHEDULED",
+    },
+  });
+  await enroll(movedMember.memberProfileId, clsD.id, d1.id);
+  await enroll(movedMember.memberProfileId, clsD.id, d2.id);
+
+  const a1 = await prisma.classSchedule.findUnique({ where: { id: ctx.classA.scheduleIds[0] } });
+  const conflictMove = await http("PATCH", `/class-schedules/${d1.id}`, {
+    token: ctx.manager.token,
+    body: { startTime: a1!.startTime.toISOString(), endTime: a1!.endTime.toISOString() },
+  });
+  check(
+    "A11: dời lịch làm member đang giữ chỗ trùng giờ → 409 SCHEDULE_MOVE_IMPACT",
+    conflictMove.status === 409 && conflictMove.body?.errors?.code === "SCHEDULE_MOVE_IMPACT",
+    conflictMove.body
+  );
+
+  const farStart = new Date(Date.now() + 40 * DAY);
+  const coverageMove = await http("PATCH", `/class-schedules/${d2.id}`, {
+    token: ctx.manager.token,
+    body: {
+      startTime: farStart.toISOString(),
+      endTime: new Date(farStart.getTime() + HOUR).toISOString(),
+    },
+  });
+  check(
+    "A11: dời lịch ra ngoài hạn gói của member giữ chỗ → 409 SCHEDULE_MOVE_IMPACT",
+    coverageMove.status === 409 && coverageMove.body?.errors?.code === "SCHEDULE_MOVE_IMPACT",
+    coverageMove.body
+  );
+
+  // ── A12: hủy lịch theo cùng khoá + CAS; sau hủy không thể đặt lại ──────────────────
+  const sB1 = ctx.classB.scheduleIds[0];
+  await enroll(movedMember.memberProfileId, ctx.classB.classId, sB1);
+  const cancel = await http("PATCH", `/class-schedules/${sB1}`, {
+    token: ctx.manager.token,
+    body: { status: "CANCELLED", reason: `E2E A12 ${RUN}` },
+  });
+  check(
+    "A12: hủy lịch → 200 và mọi booking BOOKED chuyển CANCELLED",
+    cancel.status === 200 &&
+      (await prisma.enrollment.count({ where: { scheduleId: sB1, status: "BOOKED" } })) === 0,
+    cancel.body
+  );
+  const rebook = await http("POST", "/enrollments", {
+    token: movedMember.token,
+    body: { scheduleId: sB1 },
+  });
+  check(
+    "A12: đặt lại lịch đã hủy → bị từ chối, không tạo BOOKED",
+    [400, 409].includes(rebook.status) &&
+      (await prisma.enrollment.count({ where: { scheduleId: sB1, status: "BOOKED" } })) === 0,
+    rebook.body
+  );
+}
+
 // ─── Cleanup + runner ─────────────────────────────────────────────────────
 async function cleanup(): Promise<void> {
   const memberIds = created.memberProfileIds;
@@ -663,6 +1063,9 @@ async function main(): Promise<void> {
     await scenarioMemberThrottle(ctx, members[3]);
     await scenarioSubscriptionGate(ctx, members[5]);
     await scenarioAuthorization(ctx, members[0]);
+    await scenarioPrivacyAndScope(ctx, members[0], members[1]);
+    await scenarioScanWindowAndFinalizedGuard(ctx, members[0], members[3]);
+    await scenarioHistoricalEntitlementAndScheduleGuards(ctx, members[5], members[0]);
   } catch (err) {
     failures.push(`Lỗi không mong đợi: ${(err as Error).message}`);
     console.error("\nUNEXPECTED ERROR:", err);

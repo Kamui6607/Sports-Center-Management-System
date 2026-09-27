@@ -25,6 +25,13 @@ export const ATTENDANCE = {
   QR_TTL_SECONDS: 600,
   /** TTL của mã dự phòng nhập tay (giây) — ngắn hơn QR để hạn chế chia sẻ. */
   MANUAL_CODE_TTL_SECONDS: 90,
+  /**
+   * Cửa sổ điểm danh do SERVER quyết định: member chỉ tự điểm danh được trong
+   * [startTime − SCAN_OPEN_MINUTES_BEFORE phút, endTime + SCAN_CLOSE_MINUTES_AFTER phút]
+   * và buổi học phải đang SCHEDULED. QR/mã sinh cho buổi ngoài cửa sổ cũng bị chặn.
+   */
+  SCAN_OPEN_MINUTES_BEFORE: 30,
+  SCAN_CLOSE_MINUTES_AFTER: 30,
   /** Độ dài mã dự phòng. */
   MANUAL_CODE_LENGTH: 6,
   /** Alphabet mã dự phòng — bỏ 0/O/1/I để gõ tay không nhầm. */

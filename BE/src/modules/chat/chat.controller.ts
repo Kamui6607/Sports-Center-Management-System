@@ -1,5 +1,10 @@
 import { Request, Response, NextFunction } from "express";
+import path from "path";
+import fs from "fs";
 import { chatService } from "./chat.service.js";
+import { AppError } from "../../middlewares/errorHandler.js";
+import { CHAT_UPLOAD_DIR } from "../../middlewares/upload.js";
+import { sniffMimeFromFile } from "../../utils/fileSignature.js";
 
 export const getMessages = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -15,28 +20,47 @@ export const getMessages = async (req: Request, res: Response, next: NextFunctio
 };
 
 export const sendMessage = async (req: Request, res: Response, next: NextFunction) => {
+  // D03: file đã ghi disk bởi multer TRƯỚC controller — mọi nhánh lỗi phải dọn file để không
+  // để lại rác (request bị từ chối, người nhận không hợp lệ, chữ ký sai, DB lỗi...).
+  const uploadedPath = req.file ? path.join(CHAT_UPLOAD_DIR, req.file.filename) : null;
+  const cleanupUploaded = async () => {
+    if (uploadedPath) await fs.promises.unlink(uploadedPath).catch(() => {});
+  };
+
   try {
     const { receiverId, content } = req.body;
-    const userId = (req as any).user.id;
+    const userId = req.user!.id;
 
-    // Handle file upload if any
-    let fileUrl = undefined;
+    let message;
     if (req.file) {
-      // Create a static path to the file
-      fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-    }
+      // Kiểm tra chữ ký THẬT (magic bytes) — không tin mimetype/đuôi client khai báo.
+      const sniffed = sniffMimeFromFile(uploadedPath!);
+      if (!sniffed || sniffed !== req.file.mimetype) {
+        await cleanupUploaded();
+        throw new AppError(
+          "Tệp đính kèm không hợp lệ (chỉ nhận jpeg/png/webp/gif/pdf và đúng định dạng thật).",
+          400
+        );
+      }
 
-    if (!content && !fileUrl) {
-      res.status(400).json({ success: false, message: "Message content or file is required" });
-      return;
+      const created = await chatService.createMessageWithAttachment({
+        senderId: userId,
+        receiverId,
+        content,
+        file: { storedName: req.file.filename, mimeType: sniffed, size: req.file.size },
+        // D03: URL tải CÓ AUTH thay vì link tĩnh công khai (kèm tên file để FE nhận biết loại ảnh).
+        fileUrlFor: (attachmentId) =>
+          `${req.protocol}://${req.get("host")}/api/v1/chat/attachments/${attachmentId}` +
+          `?name=${encodeURIComponent(req.file!.filename)}`,
+      });
+      message = created.message;
+    } else {
+      if (!content) {
+        res.status(400).json({ success: false, message: "Message content or file is required" });
+        return;
+      }
+      message = await chatService.createMessage({ senderId: userId, receiverId, content });
     }
-
-    const message = await chatService.createMessage({
-      senderId: userId,
-      receiverId,
-      content,
-      fileUrl,
-    });
 
     try {
       const { getIo } = await import("./chat.socket.js");
@@ -51,6 +75,30 @@ export const sendMessage = async (req: Request, res: Response, next: NextFunctio
     }
 
     res.status(201).json({ success: true, data: message });
+  } catch (error) {
+    await cleanupUploaded();
+    next(error);
+  }
+};
+
+/**
+ * D03 — Tải file chat có xác thực + phân quyền (chủ file / người nhận / MANAGER; phòng chung:
+ * mọi user đã đăng nhập). Không còn phục vụ tĩnh công khai nên URL không thể dò/tải nặc danh.
+ */
+export const downloadAttachment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const attachment = await chatService.getAuthorizedAttachment(
+      { id: req.user!.id, role: req.user!.role },
+      String(req.params.id)
+    );
+    res.setHeader("Content-Type", attachment.mimeType);
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${path.basename(attachment.storedName)}"`
+    );
+    // Chống browser "đoán" MIME khác với khai báo (XSS qua file giả ảnh).
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.sendFile(path.resolve(attachment.filePath));
   } catch (error) {
     next(error);
   }

@@ -42,6 +42,29 @@ export async function updateRoom(id: string, data: any) {
     if (scheduled > 0) throw new AppError("Cannot deactivate room with upcoming schedules", 400);
   }
 
+  // A11: KHÔNG cho giảm sức chứa phòng xuống dưới chỗ đã giữ hoặc sức chứa lớp đang xếp lịch ở phòng này.
+  if (data.capacity !== undefined && data.capacity < room.capacity) {
+    const upcoming = await prisma.classSchedule.findMany({
+      where: { roomId: id, status: "SCHEDULED", startTime: { gte: new Date() } },
+      select: {
+        class: { select: { capacity: true } },
+        _count: {
+          select: { enrollments: { where: { status: { in: ["BOOKED", "COMPLETED"] } } } },
+        },
+      },
+    });
+    const maxBooked = upcoming.reduce((m, s) => Math.max(m, s._count.enrollments), 0);
+    const maxClassCapacity = upcoming.reduce((m, s) => Math.max(m, s.class.capacity), 0);
+    const minCapacity = Math.max(maxBooked, maxClassCapacity);
+    if (data.capacity < minCapacity) {
+      throw new AppError(
+        `Không thể giảm sức chứa phòng xuống ${data.capacity}: cần tối thiểu ${minCapacity} (chỗ đã giữ / sức chứa lớp đang xếp lịch).`,
+        400,
+        { code: "ROOM_CAPACITY_TOO_SMALL", capacity: data.capacity, minCapacity }
+      );
+    }
+  }
+
   // Không được làm invalid các upcoming SCHEDULED khi đổi Room.areaType.
   if (data.areaType !== undefined && data.areaType !== room.areaType) {
     const mismatched = await prisma.classSchedule.count({

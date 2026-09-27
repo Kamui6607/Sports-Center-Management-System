@@ -636,9 +636,14 @@ async function scenarioDowngrade(ctx: Ctx, member: FixtureUser): Promise<void> {
   expectQuota("Quota trước downgrade", await quota(member.token), { tier: "PREMIUM", limit: 6, used: 6, remaining: 0 });
 
   // "Đổi gói" ở tầng dữ liệu (luồng mua gói hiện tại chặn downgrade): plan ACTIVE thành MEMBERSHIP limit 3.
+  // A07: entitlement đi kèm SNAPSHOT — đổi gói phải ghi lại quota snapshot, nếu không quota vẫn là 6.
   await prisma.membershipSubscription.update({
     where: { id: subscriptionId },
-    data: { planId: ctx.plans.membership3.id, tier: "MEMBERSHIP" },
+    data: {
+      planId: ctx.plans.membership3.id,
+      tier: "MEMBERSHIP",
+      maxConcurrentClassesSnapshot: ctx.plans.membership3.maxConcurrentClasses,
+    },
   });
 
   expectQuota("Quota sau downgrade (used > limit, không auto-cancel)", await quota(member.token), {
@@ -665,6 +670,25 @@ async function scenarioDowngrade(ctx: Ctx, member: FixtureUser): Promise<void> {
   const bookG7 = await book(member.token, classes[6].scheduleIds[0]);
   check("Book G7 khi used = 2 < limit → 201", bookG7.status === 201, bookG7.body);
   expectQuota("Quota sau khi book G7", await quota(member.token), { tier: "MEMBERSHIP", limit: 3, used: 3, remaining: 0 });
+
+  // A07 hồi quy: Manager sửa quota của PLAN không làm đổi quota gói member ĐÃ MUA (snapshot thắng).
+  const patchedPlan = await http("PATCH", `/membership-plans/${ctx.plans.membership3.id}`, {
+    token: ctx.manager.token,
+    body: { maxConcurrentClasses: 5 },
+  });
+  check("A07: PATCH quota plan membership3 → 200", patchedPlan.status === 200, patchedPlan.body);
+  expectQuota("A07: quota member KHÔNG đổi theo plan (vẫn snapshot = 3)", await quota(member.token), {
+    tier: "MEMBERSHIP",
+    limit: 3,
+    used: 3,
+    remaining: 0,
+  });
+  // Trả plan về quota 3 để các scenario sau giữ nguyên hành vi.
+  const restoredPlan = await http("PATCH", `/membership-plans/${ctx.plans.membership3.id}`, {
+    token: ctx.manager.token,
+    body: { maxConcurrentClasses: 3 },
+  });
+  check("A07: khôi phục quota plan membership3 = 3", restoredPlan.status === 200, restoredPlan.body);
 }
 
 /** 8) Concurrency: 2 request đồng thời của cùng member chỉ 1 request được dùng slot quota cuối. */

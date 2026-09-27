@@ -160,7 +160,7 @@ export async function sendUpcomingClassReminders() {
       class: { include: { sports: true } },
       enrollments: {
         where: { status: "BOOKED" },
-        include: { member: { include: { user: true } } },
+        include: { member: { select: { id: true, userId: true } } },
       },
     },
   });

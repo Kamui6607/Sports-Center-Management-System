@@ -18,6 +18,11 @@ import type { AddressInfo } from "node:net";
 import app from "../src/app.js";
 import { prisma } from "../src/config/prisma.js";
 import { hashPassword } from "../src/utils/bcrypt.js";
+import { ensureActiveFreeSubscription } from "../src/modules/subscriptions/free-subscription.service.js";
+import {
+  enqueueNotification,
+  flushNotificationOutbox,
+} from "../src/modules/notifications/outbox.service.js";
 
 const RUN = Date.now().toString(36);
 const PASSWORD = "E2eSepay!2026";
@@ -504,6 +509,17 @@ async function scenarioCheckoutAndWebhookCore(
       paid?.invoice?.planTier === plan.tier,
     paid?.invoice
   );
+
+  // Giao dịch online KHÔNG được đổi trạng thái thủ công: phải qua webhook/đối soát.
+  const manualOverride = await http("PATCH", `/payments/${paymentId}/status`, {
+    token: ctx.manager.token,
+    body: { status: "REFUNDED" },
+  });
+  check(
+    "MANAGER PATCH /payments/:id/status trên giao dịch SePay → 400 (không bypass settlement)",
+    manualOverride.status === 400,
+    manualOverride.body
+  );
   const sub = paid?.subscription;
   const days = sub ? Math.round((sub.endDate.getTime() - sub.startDate.getTime()) / DAY) : 0;
   check(
@@ -618,6 +634,20 @@ async function scenarioMockMode(
     again.body?.data?.processed === false && again.body?.data?.status === "DUPLICATE",
     again.body?.data
   );
+
+  // Chốt cứng: production KHÔNG bao giờ được mock, kể cả khi SEPAY_MOCK_MODE=true.
+  const prevNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  try {
+    const prodBlocked = await mockConfirm(member.token, paymentId);
+    check(
+      "mock-confirm khi NODE_ENV=production → 403 (chặn cứng, không phụ thuộc SEPAY_MOCK_MODE)",
+      prodBlocked.status === 403 && prodBlocked.body?.errors?.code === "SEPAY_MOCK_DISABLED",
+      prodBlocked.body
+    );
+  } finally {
+    process.env.NODE_ENV = prevNodeEnv;
+  }
   check(
     "DB: chỉ 1 subscription ACTIVE",
     (await activeSubscriptions(member.memberProfileId)).length === 1
@@ -766,6 +796,166 @@ async function scenarioGuardsAndUpgrade(
   check("Notification 'Nâng cấp gói thành công!' cho hội viên", Boolean(upgradeNotify), upgradeNotify?.body);
 }
 
+/**
+ * H) Hồi quy lỗi nghiệp vụ: tài khoản mới được cấp gói FREE 3650 ngày — khi mua gói trả phí
+ * TUYỆT ĐỐI không cộng 3650 ngày dư của FREE vào gói mới (trước đây mua 30 ngày nhận ~10 năm).
+ * Kiểm tra cả 2 kênh vào chung một luồng: SePay online (checkout → webhook) và tại quầy (POST /subscriptions).
+ */
+async function scenarioFreePlanNoCarryOver(
+  ctx: Ctx,
+  sepayMember: FixtureUser,
+  counterMember: FixtureUser,
+  renewMember: FixtureUser
+): Promise<void> {
+  section("H) Mua gói trả phí khi đang có gói FREE → KHÔNG cộng ngày dư FREE");
+  setSepayEnv({});
+
+  const spanDays = (start: Date, end: Date) =>
+    Math.round((end.getTime() - start.getTime()) / DAY);
+
+  // Mô phỏng provisioning lúc register: member mới nhận subscription FREE ACTIVE (~3650 ngày).
+  const provision = await prisma.$transaction((tx) =>
+    ensureActiveFreeSubscription(tx, sepayMember.memberProfileId)
+  );
+  check(
+    "Member mới được cấp subscription FREE ACTIVE ~3650 ngày",
+    provision.created &&
+      provision.subscription.tier === "FREE" &&
+      Math.abs(spanDays(provision.subscription.startDate, provision.subscription.endDate) - 3650) <= 1,
+    {
+      created: provision.created,
+      tier: provision.subscription.tier,
+      days: spanDays(provision.subscription.startDate, provision.subscription.endDate),
+    }
+  );
+
+  // ── Kênh 1: SePay online (checkout → webhook) ───────────────────────────
+  const co = await checkout(sepayMember.token, ctx.plans.membership30.id);
+  check("SePay: checkout MEMBERSHIP 30 ngày khi đang có FREE → 201", co.status === 201, co.body);
+  const body = webhookBody({
+    transactionCode: co.body?.data?.orderCode,
+    amount: co.body?.data?.amount,
+  });
+  const paid = await sepayWebhook(body);
+  check(
+    "SePay: webhook → 200 ack + PROCESSED",
+    paid.status === 200 &&
+      paid.body?.success === true &&
+      (await sepayEvent(body.id as number))?.status === "PROCESSED",
+    paid.body
+  );
+
+  const sepaySubs = await prisma.membershipSubscription.findMany({
+    where: { memberId: sepayMember.memberProfileId },
+    orderBy: { createdAt: "desc" },
+  });
+  const sepayActive = sepaySubs.filter((s) => s.status === "ACTIVE");
+  const sepayPaid = sepayActive.find((s) => s.tier === "MEMBERSHIP");
+  const sepayPaidDays = sepayPaid ? spanDays(sepayPaid.startDate, sepayPaid.endDate) : 0;
+  check(
+    `SePay: gói mới ~30 ngày, KHÔNG phải ~3680 ngày (${sepayPaidDays} ngày)`,
+    Boolean(sepayPaid) && sepayPaidDays >= 30 && sepayPaidDays <= 31,
+    { sepayPaidDays, endDate: sepayPaid?.endDate }
+  );
+  check(
+    "SePay: gói FREE cũ SUSPENDED, chỉ còn đúng 1 gói ACTIVE (MEMBERSHIP)",
+    sepayActive.length === 1 &&
+      sepayActive[0].tier === "MEMBERSHIP" &&
+      sepaySubs.some((s) => s.tier === "FREE" && s.status === "SUSPENDED"),
+    sepaySubs.map((s) => `${s.tier}:${s.status}`)
+  );
+
+  // ── Kênh 2: quầy (POST /subscriptions) ─────────────────────────────────
+  await prisma.$transaction((tx) =>
+    ensureActiveFreeSubscription(tx, counterMember.memberProfileId)
+  );
+  const counter = await http("POST", "/subscriptions", {
+    token: ctx.manager.token,
+    body: {
+      memberId: counterMember.memberProfileId,
+      planId: ctx.plans.membership30.id,
+      paymentMethod: "CASH",
+    },
+  });
+  check("Quầy: POST /subscriptions khi đang có FREE → 201", counter.status === 201, counter.body);
+  const counterSub = counter.body?.data?.subscription;
+  const counterDays = counterSub
+    ? spanDays(new Date(counterSub.startDate), new Date(counterSub.endDate))
+    : 0;
+  check(
+    `Quầy: gói mới ~30 ngày, KHÔNG phải ~3680 ngày (${counterDays} ngày)`,
+    counter.status === 201 && counterDays >= 30 && counterDays <= 31,
+    { counterDays, endDate: counterSub?.endDate }
+  );
+  const counterFree = await prisma.membershipSubscription.findFirst({
+    where: { memberId: counterMember.memberProfileId, tier: "FREE" },
+    orderBy: { createdAt: "desc" },
+  });
+  check("Quầy: gói FREE cũ SUSPENDED", counterFree?.status === "SUSPENDED", counterFree?.status);
+
+  // ── Kênh 3: GIA HẠN (renew) từ gói FREE đang ACTIVE ─────────────────────
+  const renewProvision = await prisma.$transaction((tx) =>
+    ensureActiveFreeSubscription(tx, renewMember.memberProfileId)
+  );
+  check(
+    "Renew: member có gói FREE ACTIVE trước khi gia hạn",
+    renewProvision.created && renewProvision.subscription.status === "ACTIVE",
+    renewProvision.subscription.status
+  );
+
+  const beforeRenew = Date.now();
+  const renew = await http("POST", `/subscriptions/${renewProvision.subscription.id}/renew`, {
+    token: ctx.manager.token,
+    body: { planId: ctx.plans.membership30.id, paymentMethod: "CASH" },
+  });
+  check("Renew từ gói FREE → 201", renew.status === 201, renew.body);
+  const renewedSub = renew.body?.data?.subscription;
+  const renewStart = renewedSub ? new Date(renewedSub.startDate).getTime() : 0;
+  const renewDays = renewedSub
+    ? spanDays(new Date(renewedSub.startDate), new Date(renewedSub.endDate))
+    : 0;
+  check(
+    `Renew từ FREE bắt đầu NGAY (không đợi ~3650 ngày), thời hạn ~30 ngày (${renewDays} ngày)`,
+    Boolean(renewedSub) &&
+      renewStart >= beforeRenew - 60_000 &&
+      renewStart <= Date.now() + 60_000 &&
+      renewDays >= 30 &&
+      renewDays <= 31,
+    { startDate: renewedSub?.startDate, renewDays }
+  );
+
+  const renewSubs = await prisma.membershipSubscription.findMany({
+    where: { memberId: renewMember.memberProfileId },
+  });
+  const renewActive = renewSubs.filter((s) => s.status === "ACTIVE");
+  const renewFree = renewSubs.find((s) => s.id === renewProvision.subscription.id);
+  check(
+    "Renew từ FREE: gói FREE cũ SUSPENDED, chỉ còn đúng 1 gói ACTIVE (MEMBERSHIP)",
+    renewActive.length === 1 &&
+      renewActive[0].tier === "MEMBERSHIP" &&
+      renewFree?.status === "SUSPENDED",
+    renewSubs.map((s) => `${s.tier}:${s.status}`)
+  );
+
+  // ── Kênh 4: đổi mật khẩu phải thu hồi refresh token cũ (D05) ─────────────
+  const relogin = await http("POST", "/auth/login", {
+    body: { email: renewMember.email, password: PASSWORD },
+  });
+  const oldRefresh = relogin.body?.data?.refreshToken as string | undefined;
+  const changed = await http("PATCH", "/auth/me/change-password", {
+    token: renewMember.token,
+    body: { currentPassword: PASSWORD, newPassword: "E2eSepay!2026-NEW" },
+  });
+  const refreshAfter = oldRefresh
+    ? await http("POST", "/auth/refresh-token", { body: { refreshToken: oldRefresh } })
+    : { status: 0, body: null };
+  check(
+    "Đổi mật khẩu → mọi refresh token cũ bị thu hồi (refresh 401)",
+    changed.status === 200 && Boolean(oldRefresh) && refreshAfter.status === 401,
+    { changed: changed.status, refresh: refreshAfter.status }
+  );
+}
+
 /** F) Phân quyền: chỉ MEMBER được checkout; endpoint webhook là công khai (API key); GET cần auth. */
 async function scenarioAuthorization(ctx: Ctx, staff: FixtureUser, coach: FixtureUser): Promise<void> {
   section("F) Phân quyền checkout / GET status");
@@ -826,6 +1016,36 @@ async function scenarioHmacAuth(member: FixtureUser, plan: any): Promise<void> {
     headers: { "X-SePay-Signature": sig, "X-SePay-Timestamp": String(Number(ts) + 1) },
   });
   check("Timestamp lệch giá trị đã ký → 401", tsMismatch.status === 401, tsMismatch.body);
+
+  // 4b) D07 — timestamp QUÁ CŨ (ngoài cửa sổ cho phép) → 401 dù chữ ký ĐÚNG (chống replay).
+  const staleTs = String(Math.floor(Date.now() / 1000) - 2 * 3600);
+  const staleRaw = JSON.stringify(unknown());
+  const staleSig =
+    "sha256=" + createHmac("sha256", secret).update(`${staleTs}.${staleRaw}`).digest("hex");
+  const stale = await http("POST", "/payments/sepay/webhook", {
+    raw: staleRaw,
+    headers: { "X-SePay-Signature": staleSig, "X-SePay-Timestamp": staleTs },
+  });
+  check(
+    "D07: chữ ký đúng nhưng timestamp quá cũ (2h) → 401",
+    stale.status === 401 && stale.body?.errors?.code === "SEPAY_INVALID_SIGNATURE",
+    stale.body
+  );
+
+  // 4c) D07 — trong cửa sổ retry của SePay (5 phút trước) vẫn được chấp nhận → 200 ack.
+  const freshTs = String(Math.floor(Date.now() / 1000) - 5 * 60);
+  const freshRaw = JSON.stringify(unknown());
+  const freshSig =
+    "sha256=" + createHmac("sha256", secret).update(`${freshTs}.${freshRaw}`).digest("hex");
+  const inWindow = await http("POST", "/payments/sepay/webhook", {
+    raw: freshRaw,
+    headers: { "X-SePay-Signature": freshSig, "X-SePay-Timestamp": freshTs },
+  });
+  check(
+    "D07: timestamp trong cửa sổ (5 phút trước) vẫn 200 ack",
+    inWindow.status === 200 && inWindow.body?.success === true,
+    inWindow.body
+  );
 
   // 5) Chữ ký sai định dạng (không phải sha256={64 hex}) → 401.
   const malformed = await http("POST", "/payments/sepay/webhook", {
@@ -1068,6 +1288,320 @@ async function scenarioReconcileViaApi(plan: any, upgradePlan: any): Promise<voi
 }
 
 
+/**
+ * K) A07 — snapshot offer tại thời điểm tạo đơn; A06 — tiền đã thu nhưng chưa cấp được gói
+ * (`activationStatus = REQUIRES_REVIEW`) + luồng manager kích hoạt bù.
+ */
+async function scenarioOfferSnapshotAndReview(
+  ctx: Ctx,
+  snapshotMember: FixtureUser,
+  reviewMember: FixtureUser
+): Promise<void> {
+  section("K) A07 snapshot offer + A06 REQUIRES_REVIEW & retry-activation");
+  setSepayEnv({});
+
+  // ── A07: Manager sửa giá/duration/quota khi QR đang chờ → chốt theo ĐÚNG offer lúc tạo đơn ──
+  const snapPlan = await createPlan(ctx.manager.token, {
+    name: `E2E SEPAY SNAP ${RUN}`,
+    price: 123000,
+    durationDays: 30,
+    tier: "MEMBERSHIP",
+    maxConcurrentClasses: 3,
+  });
+  const co = await checkout(snapshotMember.token, snapPlan.id);
+  check("A07: checkout plan snapshot → 201", co.status === 201, co.body);
+
+  const edited = await http("PATCH", `/membership-plans/${snapPlan.id}`, {
+    token: ctx.manager.token,
+    body: {
+      name: `E2E SEPAY SNAP EDITED ${RUN}`,
+      price: 999999,
+      durationDays: 60,
+      maxConcurrentClasses: 1,
+    },
+  });
+  check(
+    "A07: manager sửa plan (999999 / 60 ngày / quota 1) → 200",
+    edited.status === 200,
+    edited.body
+  );
+
+  const payBody = webhookBody({
+    transactionCode: co.body?.data?.orderCode,
+    amount: co.body?.data?.amount, // = 123000: số tiền đã báo cho member lúc checkout
+  });
+  const paid = await sepayWebhook(payBody);
+  check(
+    "A07: webhook thanh toán đúng số tiền của offer cũ → PROCESSED",
+    paid.status === 200 && (await sepayEvent(payBody.id as number))?.status === "PROCESSED",
+    paid.body
+  );
+
+  const snapSub = await prisma.membershipSubscription.findFirst({
+    where: { memberId: snapshotMember.memberProfileId, status: "ACTIVE" },
+    include: { payments: { include: { invoice: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  const snapDays = snapSub
+    ? Math.round((snapSub.endDate.getTime() - snapSub.startDate.getTime()) / DAY)
+    : 0;
+  check(
+    `A07: gói mới giữ đúng 30 ngày của offer cũ (${snapDays} ngày)`,
+    snapDays >= 30 && snapDays <= 31,
+    { start: snapSub?.startDate, end: snapSub?.endDate }
+  );
+  check(
+    "A07: subscription giữ quota snapshot = 3 (không theo quota mới = 1)",
+    snapSub?.maxConcurrentClassesSnapshot === 3,
+    snapSub?.maxConcurrentClassesSnapshot
+  );
+  const snapInvoice = snapSub?.payments?.[0]?.invoice;
+  check(
+    `A07: hóa đơn = 123000 (tiền đã thu) & tên gói snapshot (total=${String(snapInvoice?.total)})`,
+    Number(snapInvoice?.total) === 123000 && snapInvoice?.planName === `E2E SEPAY SNAP ${RUN}`,
+    { total: snapInvoice?.total, planName: snapInvoice?.planName }
+  );
+
+  // ── A06: tiền về nhưng không thể kích hoạt (bị chặn hạ hạng) → REQUIRES_REVIEW ──
+  const revCo = await checkout(reviewMember.token, ctx.plans.membership7.id);
+  check("A06: checkout membership 7 ngày → 201", revCo.status === 201, revCo.body);
+  const counterBuy = await http("POST", "/subscriptions", {
+    token: ctx.manager.token,
+    body: {
+      memberId: reviewMember.memberProfileId,
+      planId: ctx.plans.membership30.id,
+      paymentMethod: "CASH",
+    },
+  });
+  check("A06: manager bán gói MEMBERSHIP 30 ngày (quầy) → 201", counterBuy.status === 201, counterBuy.body);
+
+  const revBody = webhookBody({
+    transactionCode: revCo.body?.data?.orderCode,
+    amount: revCo.body?.data?.amount,
+  });
+  const revPaid = await sepayWebhook(revBody);
+  check(
+    "A06: webhook tiền về nhưng chặn hạ hạng → PROCESSED / ACTIVATION_REJECTED",
+    revPaid.status === 200 &&
+      (await sepayEvent(revBody.id as number))?.reason === "ACTIVATION_REJECTED",
+    revPaid.body
+  );
+  const revPayment = await prisma.payment.findFirst({
+    where: { transactionCode: revCo.body?.data?.orderCode as string },
+  });
+  check(
+    "A06: Payment = SUCCESS (tiền đã thu) + activationStatus = REQUIRES_REVIEW",
+    revPayment?.status === "SUCCESS" && revPayment?.activationStatus === "REQUIRES_REVIEW",
+    {
+      status: revPayment?.status,
+      activationStatus: revPayment?.activationStatus,
+      reason: revPayment?.reviewReason,
+    }
+  );
+
+  const revView = await getCheckout(reviewMember.token, revPayment!.id);
+  check(
+    "A06: FE thấy requiresReview = true (không báo 'đã kích hoạt')",
+    revView.body?.data?.status === "SUCCESS" && revView.body?.data?.requiresReview === true,
+    revView.body?.data
+  );
+
+  // Xử lý: manager suspend gói đang chặn hạ hạng → retry kích hoạt.
+  const counterSubId = counterBuy.body?.data?.subscription?.id as string | undefined;
+  const suspend = await http("PATCH", `/subscriptions/${counterSubId}/status`, {
+    token: ctx.manager.token,
+    body: { status: "SUSPENDED" },
+  });
+  check("A06: manager suspend gói chặn hạ hạng → 200", suspend.status === 200, suspend.body);
+
+  const retry = await http("POST", `/payments/${revPayment!.id}/retry-activation`, {
+    token: ctx.manager.token,
+  });
+  check("A06: retry-activation → 200", retry.status === 200, retry.body);
+
+  const afterRetry = await prisma.payment.findUnique({ where: { id: revPayment!.id } });
+  const retrySub = afterRetry?.subscriptionId
+    ? await prisma.membershipSubscription.findUnique({ where: { id: afterRetry.subscriptionId } })
+    : null;
+  const retryDays = retrySub
+    ? Math.round((retrySub.endDate.getTime() - retrySub.startDate.getTime()) / DAY)
+    : 0;
+  check(
+    `A06: retry cấp gói đúng offer 7 ngày (${retryDays} ngày) + ACTIVATED + có người duyệt`,
+    afterRetry?.activationStatus === "ACTIVATED" &&
+      afterRetry?.reviewReason === null &&
+      Boolean(afterRetry?.reviewedById) &&
+      retryDays >= 7 &&
+      retryDays <= 8,
+    {
+      activationStatus: afterRetry?.activationStatus,
+      reviewReason: afterRetry?.reviewReason,
+      retryDays,
+    }
+  );
+}
+
+/**
+ * L) A14 — ledger ngân hàng (1 movement = 1 lần cấp gói, nội dung mơ hồ bị từ chối)
+ *    + F01 — notification đi qua outbox (rollback không gửi, commit thì SENT).
+ */
+async function scenarioBankLedgerAndOutbox(
+  ctx: Ctx,
+  memberA: FixtureUser,
+  memberB: FixtureUser,
+  outboxMember: FixtureUser
+): Promise<void> {
+  section("L) A14 bank ledger + F01 notification outbox");
+  setSepayEnv({});
+
+  // ── L1) Cùng MỘT movement (referenceCode) không thể cấp gói cho hai payment ──────────
+  const coA = await checkout(memberA.token, ctx.plans.membership30.id);
+  const coB = await checkout(memberB.token, ctx.plans.membership30.id);
+  check(
+    "A14: 2 checkout PENDING khác member → 201",
+    coA.status === 201 && coB.status === 201,
+    { a: coA.status, b: coB.status }
+  );
+
+  const sharedRef = `FT-E2E-SHARED-${RUN}`;
+  const firstBody = webhookBody(
+    { transactionCode: coA.body?.data?.orderCode, amount: coA.body?.data?.amount },
+    { referenceCode: sharedRef }
+  );
+  const firstRes = await sepayWebhook(firstBody);
+  check(
+    "A14: webhook đầu (movement M) → PROCESSED, đơn A được cấp gói",
+    firstRes.status === 200 && (await sepayEvent(firstBody.id as number))?.status === "PROCESSED",
+    firstRes.body
+  );
+
+  const secondBody = webhookBody(
+    { transactionCode: coB.body?.data?.orderCode, amount: coB.body?.data?.amount },
+    { referenceCode: sharedRef }
+  );
+  const secondRes = await sepayWebhook(secondBody);
+  const secondEvent = await sepayEvent(secondBody.id as number);
+  check(
+    "A14: cùng movement M cho đơn B → MISMATCH / BANK_TX_ALREADY_ALLOCATED",
+    secondRes.status === 200 &&
+      secondEvent?.status === "MISMATCH" &&
+      secondEvent?.reason === "BANK_TX_ALREADY_ALLOCATED",
+    secondEvent
+  );
+
+  const payA = await prisma.payment.findFirst({
+    where: { transactionCode: coA.body?.data?.orderCode as string },
+  });
+  const payB = await prisma.payment.findFirst({
+    where: { transactionCode: coB.body?.data?.orderCode as string },
+  });
+  check(
+    "A14: đơn B vẫn PENDING & KHÔNG có subscription (không cấp gói lần hai)",
+    payB?.status === "PENDING" && payB?.subscriptionId === null,
+    { status: payB?.status, subscriptionId: payB?.subscriptionId }
+  );
+  const ledgerShared = await prisma.sepayBankTransaction.findMany({ where: { referenceCode: sharedRef } });
+  check(
+    "A14: ledger có ĐÚNG 1 movement cho reference đó và đã phân bổ cho đơn A",
+    ledgerShared.length === 1 && ledgerShared[0].paymentId === payA?.id,
+    { count: ledgerShared.length, paymentId: ledgerShared[0]?.paymentId }
+  );
+
+  // ── L2) Nội dung chứa HAI mã đơn khác nhau → từ chối, không đoán ────────────────────
+  const coC = await checkout(memberB.token, ctx.plans.membership7.id);
+  check("A14: checkout thứ hai (cùng member, plan khác) → 201", coC.status === 201, coC.body);
+
+  const ambBody = webhookBody(
+    { transactionCode: null, amount: coC.body?.data?.amount },
+    {
+      code: null,
+      referenceCode: `FT-E2E-AMB-${RUN}`,
+      content: `${coB.body?.data?.orderCode} va ${coC.body?.data?.orderCode} chuyen tien`,
+    }
+  );
+  const ambRes = await sepayWebhook(ambBody);
+  const ambEvent = await sepayEvent(ambBody.id as number);
+  check(
+    "A14: nội dung chứa 2 mã đơn → MISMATCH / CONTENT_AMBIGUOUS",
+    ambRes.status === 200 &&
+      ambEvent?.status === "MISMATCH" &&
+      ambEvent?.reason === "CONTENT_AMBIGUOUS",
+    ambEvent
+  );
+  const payBAfter = await prisma.payment.findUnique({ where: { id: payB!.id } });
+  const payC = await prisma.payment.findFirst({
+    where: { transactionCode: coC.body?.data?.orderCode as string },
+  });
+  check(
+    "A14: cả hai đơn trong nội dung mơ hồ vẫn PENDING",
+    payBAfter?.status === "PENDING" && payC?.status === "PENDING",
+    { b: payBAfter?.status, c: payC?.status }
+  );
+  const ledgerAmb = await prisma.sepayBankTransaction.findFirst({
+    where: { referenceCode: `FT-E2E-AMB-${RUN}` },
+  });
+  check(
+    "A14: movement mơ hồ được ghi ledger nhưng KHÔNG phân bổ",
+    ledgerAmb !== null && ledgerAmb.paymentId === null,
+    { paymentId: ledgerAmb?.paymentId }
+  );
+
+  // ── L3) F01 — outbox: rollback không gửi, commit thì SENT ───────────────────────────
+  const markerRollback = `F01-ROLLBACK-${RUN}`;
+  let rolledBack = false;
+  try {
+    await prisma.$transaction(async (tx) => {
+      await enqueueNotification(tx, {
+        userId: outboxMember.id,
+        type: "GENERAL",
+        title: markerRollback,
+        body: markerRollback,
+      });
+      throw new Error("force-rollback");
+    });
+  } catch {
+    rolledBack = true;
+  }
+  check(
+    "F01: transaction rollback → KHÔNG có outbox row & KHÔNG có notification",
+    rolledBack &&
+      (await prisma.notificationOutbox.count({ where: { title: markerRollback } })) === 0 &&
+      (await prisma.notification.count({
+        where: { userId: outboxMember.id, title: markerRollback },
+      })) === 0
+  );
+
+  const markerCommit = `F01-COMMIT-${RUN}`;
+  await prisma.$transaction(async (tx) => {
+    await enqueueNotification(tx, {
+      userId: outboxMember.id,
+      type: "GENERAL",
+      title: markerCommit,
+      body: markerCommit,
+    });
+  });
+  const flushed = await flushNotificationOutbox();
+  const outboxRow = await prisma.notificationOutbox.findFirst({ where: { title: markerCommit } });
+  const notifRow = await prisma.notification.findFirst({
+    where: { userId: outboxMember.id, title: markerCommit },
+  });
+  check(
+    "F01: commit + flush → outbox SENT và notification đã được gửi",
+    flushed >= 1 && outboxRow?.status === "SENT" && Boolean(notifRow),
+    { flushed, status: outboxRow?.status, hasNotification: Boolean(notifRow) }
+  );
+
+  // Notification của giao dịch SePay vừa chốt cũng đi qua outbox (đã SENT).
+  const paymentOutbox = await prisma.notificationOutbox.findFirst({
+    where: { userId: memberA.id, type: "PAYMENT_SUCCESS", status: "SENT" },
+  });
+  check(
+    "F01: PAYMENT_SUCCESS của activation đi qua outbox (SENT)",
+    Boolean(paymentOutbox),
+    paymentOutbox ? { status: paymentOutbox.status, attempts: paymentOutbox.attempts } : null
+  );
+}
+
 // ─── Cleanup + runner ─────────────────────────────────────────────────────
 async function cleanup(): Promise<void> {
   const memberIds = created.memberProfileIds;
@@ -1081,6 +1615,14 @@ async function cleanup(): Promise<void> {
 
   if (created.userIds.length > 0) {
     await prisma.notification.deleteMany({ where: { userId: { in: created.userIds } } });
+    // F01: outbox cũng dọn theo user fixture.
+    await prisma.notificationOutbox.deleteMany({ where: { userId: { in: created.userIds } } });
+  }
+  // A14: ledger ngân hàng (FK paymentId SetNull nên phải xoá trước Payment).
+  if (sentSepayIds.length > 0 || paymentIds.length > 0) {
+    await prisma.sepayBankTransaction.deleteMany({
+      where: { OR: [{ sepayId: { in: sentSepayIds } }, { paymentId: { in: paymentIds } }] },
+    });
   }
   // SepayWebhookEvent: xoá theo sepayId đã gửi (kể cả webhook mã đơn lạ không có paymentId)
   // và theo paymentId (webhook của fixture) — FK onDelete SetNull nên phải xoá tường minh.
@@ -1115,7 +1657,7 @@ async function main(): Promise<void> {
     const coach = await createUser("COACH", "coach", hashed);
     const staff = await createUser("STAFF", "staff", hashed);
     const members: FixtureUser[] = [];
-    for (let i = 1; i <= 4; i++) members.push(await createUser("MEMBER", `member${i}`, hashed));
+    for (let i = 1; i <= 12; i++) members.push(await createUser("MEMBER", `member${i}`, hashed));
 
     const membership30 = await createPlan(manager.token, {
       name: `E2E SEPAY M30 ${RUN}`,
@@ -1152,9 +1694,12 @@ async function main(): Promise<void> {
     await scenarioMockMode(ctx, members[1], members[0], coach, manager, membership30);
     await scenarioExpiredPendingAndLate(members[2], membership30);
     await scenarioGuardsAndUpgrade(ctx, members[0], freePlan.id);
+    await scenarioFreePlanNoCarryOver(ctx, members[4], members[5], members[6]);
     await scenarioAuthorization(ctx, staff, coach);
     await scenarioHmacAuth(members[3], membership30);
     await scenarioReconcileViaApi(membership30, premium90);
+    await scenarioOfferSnapshotAndReview(ctx, members[7], members[8]);
+    await scenarioBankLedgerAndOutbox(ctx, members[9], members[10], members[11]);
   } catch (err) {
     failures.push(`Lỗi không mong đợi: ${(err as Error).message}`);
     console.error("\nUNEXPECTED ERROR:", err);

@@ -97,3 +97,17 @@ export async function sepayGetCheckout(req: Request, res: Response, next: NextFu
     sendSuccess(res, result, "SePay checkout retrieved successfully");
   } catch (err) { next(err); }
 }
+
+/**
+ * POST /payments/:id/retry-activation — MANAGER kích hoạt bù cho giao dịch SePay đã thu tiền
+ * nhưng chưa cấp được gói (activationStatus = REQUIRES_REVIEW), dùng đúng snapshot của đơn.
+ */
+export async function retryPaymentActivation(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await sepayPaymentsService.retrySepayActivation(
+      req.user!.id,
+      req.params.id as string
+    );
+    sendSuccess(res, result, "Đã kích hoạt gói cho giao dịch đã thu tiền.");
+  } catch (err) { next(err); }
+}

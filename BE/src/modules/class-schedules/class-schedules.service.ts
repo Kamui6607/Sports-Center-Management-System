@@ -5,6 +5,11 @@ import { buildPaginationMeta } from "../../utils/pagination.js";
 import { broadcastNotification } from "../notifications/notifications.service.js";
 import { ATTENDANCE } from "../../config/attendance.js";
 import { scanAttendanceWarnings } from "../attendance/attendance.service.js";
+import { lockSchedule } from "../../utils/dbLocks.js";
+import {
+  getMembershipCoverageIntervals,
+  isCoveredAt,
+} from "../attendance/attendance-analytics.service.js";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
@@ -382,22 +387,96 @@ export async function getScheduleById(id: string) {
 }
 
 // Unified cancellation: SCHEDULED → CANCELLED + BOOKED enrollments → CANCELLED.
+// A12: lock theo schedule (cùng khoá với booking) + re-read + CAS trạng thái.
 // Idempotent: CANCELLED gọi lại không update, không notify. COMPLETED → 400.
 async function cancelScheduleTx(
   tx: Prisma.TransactionClient,
   schedule: { id: string; classId: string; class: { name: string } },
   reason?: string
 ) {
+  await lockSchedule(tx, schedule.id);
+  const fresh = await tx.classSchedule.findUnique({ where: { id: schedule.id } });
+  if (!fresh) throw new AppError("Schedule not found", 404);
+  if (fresh.status === "COMPLETED") {
+    throw new AppError("Cannot cancel a completed schedule", 400);
+  }
+  if (fresh.status === "CANCELLED") {
+    const current = await tx.classSchedule.findUnique({
+      where: { id: schedule.id },
+      include: { class: { include: { sports: true } }, room: true },
+    });
+    return { updated: current!, reason: reason ?? "Lịch học bị hủy" };
+  }
+
   await tx.enrollment.updateMany({
     where: { scheduleId: schedule.id, status: "BOOKED" },
     data: { status: "CANCELLED", cancelledAt: new Date() },
   });
-  const updated = await tx.classSchedule.update({
-    where: { id: schedule.id },
+  const cancelled = await tx.classSchedule.updateMany({
+    where: { id: schedule.id, status: "SCHEDULED" },
     data: { status: "CANCELLED" },
+  });
+  if (cancelled.count === 0) {
+    throw new AppError("Lịch học đã thay đổi trạng thái, vui lòng tải lại.", 409, {
+      code: "SCHEDULE_STATE_CHANGED",
+    });
+  }
+  const updated = await tx.classSchedule.findUnique({
+    where: { id: schedule.id },
     include: { class: { include: { sports: true } }, room: true },
   });
-  return { updated, reason: reason ?? "Lịch học bị hủy" };
+  return { updated: updated!, reason: reason ?? "Lịch học bị hủy" };
+}
+
+/**
+ * A11 — Dời giờ lịch có booking: mọi member đang giữ chỗ phải giữ được chỗ sau khi dời.
+ * - Không trùng giờ với booking khác của chính họ.
+ * - Vẫn nằm trong khoảng quyền lợi (A10) tại thời điểm học mới.
+ * Vi phạm ⇒ 409 kèm danh sách member để FE/CSKH xử lý (không tự ý phá chỗ đã đặt).
+ */
+async function assertScheduleMoveKeepsBookingsValid(
+  tx: Prisma.TransactionClient,
+  params: { scheduleId: string; startTime: Date; endTime: Date }
+) {
+  const booked = await tx.enrollment.findMany({
+    where: { scheduleId: params.scheduleId, status: "BOOKED" },
+    select: { memberId: true, member: { select: { user: { select: { fullName: true } } } } },
+  });
+  if (booked.length === 0) return;
+
+  const memberIds = booked.map((b) => b.memberId);
+  const [conflicts, coverage] = await Promise.all([
+    tx.enrollment.findMany({
+      where: {
+        memberId: { in: memberIds },
+        status: "BOOKED",
+        scheduleId: { not: params.scheduleId },
+        schedule: {
+          status: { not: "CANCELLED" },
+          startTime: { lt: params.endTime },
+          endTime: { gt: params.startTime },
+        },
+      },
+      select: { memberId: true },
+    }),
+    getMembershipCoverageIntervals(tx, memberIds),
+  ]);
+
+  const conflicted = new Set(conflicts.map((c) => c.memberId));
+  const uncovered = memberIds.filter((m) => !isCoveredAt(coverage.get(m) ?? [], params.startTime));
+  if (conflicted.size === 0 && uncovered.length === 0) return;
+
+  const nameOf = (memberId: string) =>
+    booked.find((b) => b.memberId === memberId)?.member.user.fullName ?? memberId;
+  throw new AppError(
+    "Không thể dời lịch: một số hội viên đã giữ chỗ sẽ bị trùng giờ hoặc ngoài hạn gói.",
+    409,
+    {
+      code: "SCHEDULE_MOVE_IMPACT",
+      conflicts: [...conflicted].map(nameOf),
+      uncovered: uncovered.map(nameOf),
+    }
+  );
 }
 
 export async function updateSchedule(id: string, data: any) {
@@ -455,9 +534,19 @@ export async function updateSchedule(id: string, data: any) {
     return result.updated;
   }
 
-  // Đổi room/time: lock old room + new room + coaches rồi re-check trong tx.
+  // Đổi room/time: lock theo SCHEDULE (cùng khoá với booking — A12) rồi tới room/coaches, re-check trong tx.
   if (timeOrRoomChanged) {
     const updated = await prisma.$transaction(async (tx) => {
+      // A12: mọi mutation lịch phải xếp hàng trên cùng advisory lock với booking.
+      await lockSchedule(tx, id);
+      const fresh = await tx.classSchedule.findUnique({ where: { id } });
+      if (!fresh) throw new AppError("Schedule not found", 404);
+      if (fresh.status !== "SCHEDULED") {
+        throw new AppError("Lịch học đã thay đổi trạng thái, vui lòng tải lại.", 409, {
+          code: "SCHEDULE_STATE_CHANGED",
+        });
+      }
+
       const room = await tx.room.findUnique({ where: { id: roomId } });
       if (!room || !room.isActive) throw new AppError("Room not found or inactive", 404);
       if (room.capacity < existing.class.capacity) {
@@ -466,15 +555,29 @@ export async function updateSchedule(id: string, data: any) {
       assertClassRoomAreaMatch(existing.class.areaType, room.areaType);
 
       const coachIds = await getCoachIdsOfClass(tx, existing.classId);
-      await lockScheduleResources(tx, [existing.roomId, roomId], coachIds);
+      await lockScheduleResources(tx, [fresh.roomId, roomId], coachIds);
       await checkConflicts(tx, roomId, existing.classId, startTime, endTime, id);
 
-      return tx.classSchedule.update({
-        where: { id },
+      // A11: không dời lịch nếu phá chỗ đã hợp lệ (trùng giờ / ngoài hạn gói của member đang giữ chỗ).
+      await assertScheduleMoveKeepsBookingsValid(tx, { scheduleId: id, startTime, endTime });
+
+      // A12: CAS trạng thái — lịch vừa bị hủy/hoàn tất trong lúc chờ lock thì không ghi.
+      const moved = await tx.classSchedule.updateMany({
+        where: { id, status: "SCHEDULED" },
         data: { startTime, endTime, roomId },
+      });
+      if (moved.count === 0) {
+        throw new AppError("Lịch học đã thay đổi trạng thái, vui lòng tải lại.", 409, {
+          code: "SCHEDULE_STATE_CHANGED",
+        });
+      }
+
+      return tx.classSchedule.findUnique({
+        where: { id },
         include: { class: { include: { sports: true } }, room: true },
       });
     });
+    if (!updated) throw new AppError("Schedule not found", 404);
 
     // Thông báo cho hội viên đã đặt chỗ khi lịch bị dời giờ/phòng.
     // (Enum đã có SCHEDULE_UPDATED nhưng trước đây chưa nơi nào phát.)
@@ -573,6 +676,19 @@ export async function completeSchedule(id: string) {
   }
 
   const completed = await prisma.$transaction(async (tx) => {
+    // A12: lock cùng khoá với booking + CAS trạng thái (không hoàn tất lịch vừa bị hủy).
+    await lockSchedule(tx, id);
+    const fresh = await tx.classSchedule.findUnique({ where: { id } });
+    if (!fresh) throw new AppError("Schedule not found", 404);
+    if (fresh.status === "CANCELLED") {
+      throw new AppError("Cannot complete a cancelled schedule", 400);
+    }
+    if (fresh.status === "COMPLETED") {
+      throw new AppError("Lịch học đã được hoàn tất bởi thao tác khác.", 409, {
+        code: "SCHEDULE_STATE_CHANGED",
+      });
+    }
+
     // §4: No-show — tạo ABSENT hệ thống cho member BOOKED chưa được điểm danh.
     // Unique (scheduleId, memberId) + skipDuplicates chống tạo trùng.
     const booked = await tx.enrollment.findMany({
@@ -605,12 +721,22 @@ export async function completeSchedule(id: string) {
       data: { status: "COMPLETED" },
     });
 
-    return tx.classSchedule.update({
-      where: { id },
+    const closed = await tx.classSchedule.updateMany({
+      where: { id, status: "SCHEDULED" },
       data: { status: "COMPLETED" },
+    });
+    if (closed.count === 0) {
+      throw new AppError("Lịch học đã thay đổi trạng thái, vui lòng tải lại.", 409, {
+        code: "SCHEDULE_STATE_CHANGED",
+      });
+    }
+
+    return tx.classSchedule.findUnique({
+      where: { id },
       include: { class: { include: { sports: true } }, room: true },
     });
   });
+  if (!completed) throw new AppError("Schedule not found", 404);
 
   // §7: quét lại chuyên cần của lớp và gửi warning cho các bucket WARN (dedupe theo rate).
   // Fire-and-forget để không chặn response; không ảnh hưởng kết quả complete.

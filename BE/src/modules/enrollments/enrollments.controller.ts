@@ -96,7 +96,8 @@ export async function getScheduleEnrollments(req: Request, res: Response, next: 
   try {
     const { enrollments, pagination } = await enrollmentsService.getScheduleEnrollments(
       req.params.scheduleId as string,
-      req.query
+      req.query,
+      req.user!
     );
     sendSuccess(res, enrollments, "Schedule enrollments retrieved successfully", 200, pagination);
   } catch (err) { next(err); }

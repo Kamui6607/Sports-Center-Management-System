@@ -2,6 +2,9 @@ import { prisma } from "../../config/prisma.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import type { UserRole } from "@prisma/client";
+import path from "path";
+import fs from "fs";
+import { CHAT_UPLOAD_DIR } from "../../middlewares/upload.js";
 
 const allowedContacts: Record<string, UserRole[]> = {
   MEMBER: ["COACH"],
@@ -43,18 +46,111 @@ export const chatService = {
       },
     });
 
-    // Gửi thông báo cho người nhận (chỉ tin 1-1, không broadcast)
-    if (data.receiverId) {
-      createNotification(
-        data.receiverId,
-        "CHAT_MESSAGE",
-        `Tin nhắn mới từ ${message.sender.fullName}`,
-        content ?? "[Tệp đính kèm]",
-        { metadata: { senderId: data.senderId, messageId: message.id } }
-      ).catch(() => {});
-    }
+    await chatService.notifyReceiver(message).catch(() => {});
 
     return message;
+  },
+
+  /** Gửi thông báo cho người nhận khi có tin 1-1 (phòng chung không broadcast notification). */
+  async notifyReceiver(message: {
+    id: string;
+    senderId: string;
+    receiverId: string | null;
+    content: string | null;
+    sender?: { fullName: string } | null;
+  }) {
+    if (!message.receiverId) return;
+    const senderName =
+      message.sender?.fullName ??
+      (
+        await prisma.user.findUnique({
+          where: { id: message.senderId },
+          select: { fullName: true },
+        })
+      )?.fullName ??
+      "Người dùng";
+    await createNotification(
+      message.receiverId,
+      "CHAT_MESSAGE",
+      `Tin nhắn mới từ ${senderName}`,
+      message.content ?? "[Tệp đính kèm]",
+      { metadata: { senderId: message.senderId, messageId: message.id } }
+    );
+  },
+
+  /**
+   * D03 — Tạo message kèm file đính kèm (đã ghi disk + xác thực chữ ký ở controller):
+   * metadata `ChatAttachment` (owner/receiver) + message trong CÙNG transaction.
+   * `fileUrl` trỏ về endpoint tải CÓ AUTH (`/chat/attachments/:id`) — không còn URL tĩnh công khai.
+   */
+  async createMessageWithAttachment(data: {
+    senderId: string;
+    receiverId?: string;
+    content?: string;
+    file: { storedName: string; mimeType: string; size: number };
+    fileUrlFor: (attachmentId: string) => string;
+  }) {
+    await assertCanContact(data.senderId, data.receiverId);
+    const content = data.content?.trim();
+    if (content && content.length > 5000) throw new AppError("Message content is too long", 400);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const attachment = await tx.chatAttachment.create({
+        data: {
+          ownerId: data.senderId,
+          receiverId: data.receiverId ?? null,
+          storedName: data.file.storedName,
+          mimeType: data.file.mimeType,
+          size: data.file.size,
+        },
+      });
+      const message = await tx.chatMessage.create({
+        data: {
+          senderId: data.senderId,
+          receiverId: data.receiverId,
+          content,
+          fileUrl: data.fileUrlFor(attachment.id),
+          isRead: false,
+        },
+        include: {
+          sender: { select: { id: true, fullName: true, role: true } },
+          receiver: { select: { id: true, fullName: true, role: true } },
+        },
+      });
+      await tx.chatAttachment.update({
+        where: { id: attachment.id },
+        data: { messageId: message.id },
+      });
+      return { message, attachment };
+    });
+
+    await chatService.notifyReceiver(result.message).catch(() => {});
+    return result;
+  },
+
+  /**
+   * D03 — Kiểm tra quyền tải file chat và trả đường dẫn disk an toàn.
+   * - Chủ file / người nhận / MANAGER được tải; message PHÒNG CHUNG (receiverId null) ⇒ mọi user
+   *   đã đăng nhập được tải (khớp phạm vi đọc phòng chung).
+   * - Tên file lấy từ DB và `basename()` ⇒ không thể path traversal.
+   */
+  async getAuthorizedAttachment(user: { id: string; role: string }, attachmentId: string) {
+    const attachment = await prisma.chatAttachment.findUnique({ where: { id: attachmentId } });
+    if (!attachment) throw new AppError("Attachment not found", 404);
+
+    const isOwner = user.id === attachment.ownerId;
+    const isReceiver = Boolean(attachment.receiverId) && user.id === attachment.receiverId;
+    const isPublicRoom = attachment.receiverId === null;
+    const isManager = user.role === "MANAGER";
+    if (!isOwner && !isReceiver && !isPublicRoom && !isManager) {
+      throw new AppError("Forbidden: bạn không có quyền tải tệp này", 403);
+    }
+
+    const filePath = path.join(CHAT_UPLOAD_DIR, path.basename(attachment.storedName));
+    if (!fs.existsSync(filePath)) {
+      throw new AppError("Attachment file not found on storage", 404);
+    }
+    return { ...attachment, filePath };
   },
 
   async getMessages(userId: string, targetId?: string) {

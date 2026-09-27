@@ -62,6 +62,19 @@ This project is built using modern Node.js tools and practices:
    JWT_ACCESS_EXPIRES_IN="15m"
    JWT_REFRESH_EXPIRES_IN="7d"
 
+   # ── Avatar upload storage (local | Cloudinary) ──
+   # Bỏ trống cả 3 biến CLOUDINARY_* => avatar lưu local trong uploads/avatars (dev không cần cloud).
+   # Điền đủ 3 biến => avatar tự động đẩy lên Cloudinary (resize 512x512, nén q_auto/f_auto, 1 asset/user).
+   # Ghi đè tường minh bằng AVATAR_STORAGE="local" | "cloudinary".
+   # Lấy cả 3 giá trị tại Cloudinary Console (console.cloudinary.com) → Settings (bánh răng) → API Keys
+   CLOUDINARY_CLOUD_NAME=""            # "Cloud name" — chuỗi chữ thường/số, KHÁC display name trên Console
+   CLOUDINARY_API_KEY=""
+   CLOUDINARY_API_SECRET=""
+   CLOUDINARY_FOLDER="sports-center/avatars"   # thư mục chứa avatar trên Cloudinary
+   # Cách nhanh (thay cho 3 biến rời): dán nguyên dòng "API environment variable" trên Console:
+   # CLOUDINARY_URL="cloudinary://<api_key>:<api_secret>@<cloud_name>"
+   # Ưu tiên: biến rời nào được set thì thắng phần tương ứng trong CLOUDINARY_URL (để trống/không khai báo thì lấy từ URL).
+
    # ── SePay online payment (chuyển khoản VietQR + webhook) ──
    # Hội viên tự mua gói: BE tạo đơn PENDING + mã thanh toán + ảnh VietQR;
    # SePay gọi webhook khi phát hiện giao dịch ⇒ BE kích hoạt gói + tạo hóa đơn + thông báo.
@@ -130,7 +143,11 @@ This project is built using modern Node.js tools and practices:
    tiền ⇒ `SepayWebhookEvent` với `DUPLICATE / PAYMENT_ALREADY_PAID` (cần hoàn tiền nếu là lần chuyển thứ 2).
    Muốn đối soát tay, xem docs SePay → Đối soát giao dịch (`GET https://userapi.sepay.vn/v2/transactions`).
 
-
+   *Avatar cloud (tùy chọn):* tạo tài khoản tại https://cloudinary.com (free 25GB) → mở Cloudinary Console
+   (console.cloudinary.com) → **Settings (bánh răng) → API Keys** → copy `Cloud name`, `API Key`, `API Secret`
+   → điền vào `.env` (hoặc Environment trên Render). Kiểm tra nhanh bằng `npm run test:cloudinary:check`.
+   Khi đã có đủ credentials, `POST /api/v1/auth/me/avatar` tự động lưu ảnh lên Cloudinary (không cần đổi code);
+   để trống thì ảnh vẫn lưu local trong `uploads/avatars/`. Xem `src/config/avatar-storage.ts`.
 
 3. **Database Setup:**
    Run Prisma migrations to set up your PostgreSQL database schema:

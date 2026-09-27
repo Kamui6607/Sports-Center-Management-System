@@ -129,6 +129,15 @@ export async function updatePaymentStatus(id: string, status: string) {
   const payment = await prisma.payment.findUnique({ where: { id }, include: { invoice: true } });
   if (!payment) throw new AppError("Payment not found", 404);
 
+  // Giao dịch online (SePay): trạng thái CHỈ được chốt bởi webhook/đối soát (settlement).
+  // Đổi enum thủ công có thể tạo invoice mà KHÔNG cấp gói, hoặc refund mà gói vẫn ACTIVE.
+  if (payment.gateway) {
+    throw new AppError(
+      "Không thể đổi trạng thái thanh toán online thủ công. Giao dịch SePay được chốt qua webhook/đối soát.",
+      400
+    );
+  }
+
   // BR-14: Strict state machine
   if (payment.status === status) return payment;
 

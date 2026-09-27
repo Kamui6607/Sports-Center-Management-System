@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { createNotification } from "../notifications/notifications.service.js";
+import { flushNotificationOutbox } from "../notifications/outbox.service.js";
 import { activateSubscriptionForPayment } from "./subscription-purchase.service.js";
 import type { CreateSubscriptionInput, RenewSubscriptionInput } from "./subscriptions.schema.js";
 
@@ -31,7 +32,7 @@ export async function createSubscription(
   // Resolve member (accept userId or profileId)
   const memberProfile = await prisma.memberProfile.findFirst({
     where: { OR: [{ id: data.memberId }, { userId: data.memberId }] },
-    include: { user: true },
+    include: { user: { select: { id: true, isActive: true, role: true } } },
   });
   if (!memberProfile) throw new AppError("Member not found", 404);
 
@@ -46,7 +47,7 @@ export async function createSubscription(
   const now = new Date();
   const startDate = data.startDate ? new Date(data.startDate) : now;
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // BR-25: tên hội viên cho snapshot trên Invoice.
     const memberUser = await tx.user.findUnique({
       where: { id: memberProfile.userId },
@@ -55,7 +56,8 @@ export async function createSubscription(
 
     // Payment được tạo ở PENDING rồi chốt SUCCESS cùng lúc với subscription — dùng CHUNG
     // luồng với thanh toán online (SePay) ở `subscription-purchase.service.ts`:
-    // áp luật hạ hạng + cộng ngày dư, tạo subscription ACTIVE, invoice snapshot, notification.
+    // áp luật hạ hạng + cộng ngày dư của gói trả phí (gói FREE hệ thống không cộng),
+    // tạo subscription ACTIVE, invoice snapshot, notification.
     const pendingPayment = await tx.payment.create({
       data: {
         memberId: memberProfile.id,
@@ -76,10 +78,21 @@ export async function createSubscription(
       paymentId: pendingPayment.id,
       startDate,
       now,
+      // A07: mua tại quầy — snapshot chính là điều khoản đang bán tại thời điểm thu tiền.
+      optionSnapshot: {
+        planName: plan.name,
+        tier: plan.tier,
+        durationDays: plan.durationDays,
+        maxConcurrentClasses: plan.maxConcurrentClasses,
+      },
     });
 
     return { subscription, payment, invoice };
   });
+
+  // F01: gửi notification trong outbox SAU khi transaction đã commit.
+  await flushNotificationOutbox().catch(() => {});
+  return result;
 }
 
 export async function renewSubscription(
@@ -89,7 +102,15 @@ export async function renewSubscription(
 ) {
   const existing = await prisma.membershipSubscription.findUnique({
     where: { id: subscriptionId },
-    include: { member: { include: { user: true } } },
+    include: {
+      member: {
+        select: {
+          id: true,
+          userId: true,
+          user: { select: { id: true, isActive: true, role: true } },
+        },
+      },
+    },
   });
   if (!existing) throw new AppError("Subscription not found", 404);
 
@@ -101,14 +122,24 @@ export async function renewSubscription(
   const plan = await prisma.membershipPlan.findUnique({ where: { id: data.planId } });
   if (!plan || !plan.isActive) throw new AppError("Membership plan not found or inactive", 404);
 
-  // New start: after existing endDate if still active, else now
+  // Kỳ mới bắt đầu sau endDate hiện tại nếu gói còn ACTIVE — TRỪ gói FREE hệ thống:
+  // FREE có durationDays = 3650 (chỉ để luôn ACTIVE khi provisioning); chờ hết nghĩa là
+  // gói trả phí mới bắt đầu gần 10 năm sau ⇒ kỳ mới của FREE phải bắt đầu NGAY.
   const now = new Date();
-  const startDate =
-    existing.status === "ACTIVE" && existing.endDate > now ? existing.endDate : now;
+  const startsAfterCurrent =
+    existing.tier !== "FREE" && existing.status === "ACTIVE" && existing.endDate > now;
+  const startDate = startsAfterCurrent ? existing.endDate : now;
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + plan.durationDays);
 
   return prisma.$transaction(async (tx) => {
+    // Gói FREE đang ACTIVE bị thay thế ⇒ SUSPEND (giống luồng mua gói) để không còn 2 ACTIVE.
+    if (existing.tier === "FREE" && existing.status === "ACTIVE") {
+      await tx.membershipSubscription.update({
+        where: { id: existing.id },
+        data: { status: "SUSPENDED", suspendedAt: now },
+      });
+    }
     // BR-25: Get member's name for snapshot
     const memberUser = await tx.user.findFirst({
       where: { memberProfile: { id: existing.memberId } },
@@ -123,6 +154,8 @@ export async function renewSubscription(
         startDate,
         endDate,
         status: "ACTIVE",
+        // A07: kỳ mới giữ quota đã bán tại thời điểm gia hạn.
+        maxConcurrentClassesSnapshot: plan.maxConcurrentClasses,
       },
       include: { plan: true },
     });
@@ -137,6 +170,12 @@ export async function renewSubscription(
         paidAt: new Date(),
         note: data.note,
         createdById,
+        // A06/A07: giao dịch tại quầy đã thu tiền + cấp gói ngay, kèm snapshot điều khoản.
+        activationStatus: "ACTIVATED",
+        planNameSnapshot: plan.name,
+        planTierSnapshot: plan.tier,
+        durationDaysSnapshot: plan.durationDays,
+        maxConcurrentClassesSnapshot: plan.maxConcurrentClasses,
       },
     });
 
@@ -216,7 +255,13 @@ export async function updateSubscriptionStatus(id: string, status: string) {
     where: { id },
     include: {
       plan: true,
-      member: { include: { user: true } },
+      member: {
+        select: {
+          id: true,
+          userId: true,
+          user: { select: { id: true, fullName: true } },
+        },
+      },
       payments: { where: { status: "SUCCESS" }, orderBy: { paidAt: "desc" }, take: 1 },
     },
   });
@@ -224,6 +269,8 @@ export async function updateSubscriptionStatus(id: string, status: string) {
 
   // BR-15: Suspension state machine
   const updateData: any = { status };
+  // A10: ghi mốc hủy để entitlement lịch sử biết quyền lợi kéo dài tới đâu.
+  if (status === "CANCELLED") updateData.cancelledAt = now;
 
   if (status === "SUSPENDED" && sub.status === "ACTIVE") {
     const msLeft = sub.endDate.getTime() - now.getTime();
@@ -252,7 +299,12 @@ export async function updateSubscriptionStatus(id: string, status: string) {
     const originalPayment = sub.payments[0];
     if (originalPayment && daysLeft > 0) {
       const dailyRate = Number(originalPayment.amount) / sub.plan.durationDays;
-      refundAmount = Math.round(dailyRate * daysLeft);
+      // Số ngày còn lại có thể gồm ngày carry-over/nâng hạng ⇒ công thức theo ngày có thể lớn
+      // hơn tiền THỰC THU. Hoàn tiền KHÔNG bao giờ vượt số tiền đã thu của payment gốc.
+      refundAmount = Math.min(
+        Math.round(dailyRate * daysLeft),
+        Math.round(Number(originalPayment.amount))
+      );
       willRefund = refundAmount > 0;
     }
 
@@ -305,7 +357,16 @@ export async function updateSubscriptionStatus(id: string, status: string) {
     // Trả về kết quả có thêm thông tin refund
     const result = await prisma.membershipSubscription.findUnique({
       where: { id },
-      include: { plan: true, member: { include: { user: true } } },
+      include: {
+        plan: true,
+        member: {
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { id: true, fullName: true } },
+          },
+        },
+      },
     });
     return { ...result, refundAmount, willRefund, daysLeft: msLeft > 0 ? Math.ceil(msLeft / (1000 * 60 * 60 * 24)) : 0 };
   }
@@ -317,7 +378,13 @@ export async function updateSubscriptionStatus(id: string, status: string) {
     data: updateData,
     include: {
       plan: true,
-      member: { include: { user: true } },
+      member: {
+        select: {
+          id: true,
+          userId: true,
+          user: { select: { id: true, fullName: true } },
+        },
+      },
     },
   });
 
@@ -345,7 +412,7 @@ export async function cancelSubscriptionBySelf(
     where: { id: subscriptionId },
     include: {
       plan: true,
-      member: { include: { user: true } },
+      member: { select: { id: true, userId: true } },
       payments: { where: { status: "SUCCESS" }, orderBy: { paidAt: "desc" }, take: 1 },
     },
   });
@@ -367,10 +434,10 @@ export async function cancelSubscriptionBySelf(
   const willRefund = refundAmount > 0;
 
   await prisma.$transaction(async (tx) => {
-    // 1. Hủy subscription
+    // 1. Hủy subscription (A10: lưu mốc hủy cho entitlement lịch sử)
     await tx.membershipSubscription.update({
       where: { id: subscriptionId },
-      data: { status: "CANCELLED" },
+      data: { status: "CANCELLED", cancelledAt: now },
     });
 
     // 2. Hủy tất cả booking tương lai

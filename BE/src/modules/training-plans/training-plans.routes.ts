@@ -19,12 +19,18 @@ router.use(authenticate);
  * /training-plans:
  *   get:
  *     tags: [Training]
+ *     description: |
+ *       Phạm vi theo NGƯỜI ĐĂNG NHẬP (không tin query từ client):
+ *       - MANAGER/STAFF: xem toàn bộ (lọc `memberId` nếu truyền).
+ *       - COACH: chỉ plan do chính mình phụ trách.
+ *       - MEMBER: chỉ plan của chính mình; truyền `memberId` của người khác ⇒ 403.
  *     parameters:
  *       - in: query
  *         name: memberId
  *         schema: { type: string }
  *     responses:
  *       200: { description: "Success" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
  */
 router.get("/", controller.getPlans);
 

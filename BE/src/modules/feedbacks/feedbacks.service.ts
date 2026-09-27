@@ -81,10 +81,12 @@ export async function createFeedback(data: CreateFeedbackInput, userId: string) 
 }
 
 /**
- * Lấy danh sách feedback của 1 Coach (ai cũng xem được).
- * Nếu isAnonymous = true → ẩn tên member.
+ * Lấy danh sách feedback của 1 Coach (công khai cho user đã đăng nhập).
+ * - `isAnonymous = true` → KHÔNG trả `memberId`/`member` cho bất kỳ ai (chống truy ngược tác giả);
+ *   chính tác giả xem bản của mình qua `GET /feedbacks/my`.
+ * - Mọi item kèm `isOwn` để FE biết có thể sửa/xóa.
  */
-export async function listFeedbacksForCoach(query: FeedbackQueryInput) {
+export async function listFeedbacksForCoach(query: FeedbackQueryInput, actorId?: string) {
   const { coachId, classId } = query;
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
   const limit = Math.min(50, Math.max(1, parseInt(query.limit ?? "10") || 10));
@@ -95,7 +97,7 @@ export async function listFeedbacksForCoach(query: FeedbackQueryInput) {
   const where: any = { coachId };
   if (classId) where.classId = classId;
 
-  const [total, feedbacks] = await Promise.all([
+  const [total, feedbacks, ownProfile] = await Promise.all([
     prisma.coachFeedback.count({ where }),
     prisma.coachFeedback.findMany({
       where,
@@ -104,15 +106,19 @@ export async function listFeedbacksForCoach(query: FeedbackQueryInput) {
       orderBy: { createdAt: "desc" },
       include: feedbackInclude,
     }),
+    actorId
+      ? prisma.memberProfile.findUnique({ where: { userId: actorId }, select: { id: true } })
+      : Promise.resolve(null),
   ]);
 
-  // Ẩn tên member nếu isAnonymous
-  const sanitized = feedbacks.map((f) => ({
-    ...f,
-    member: f.isAnonymous
-      ? { user: { fullName: "Ẩn danh" } }
-      : f.member,
-  }));
+  const ownMemberId = ownProfile?.id ?? null;
+  const sanitized = feedbacks.map(({ memberId, member, ...rest }) => {
+    const isOwn = Boolean(ownMemberId) && memberId === ownMemberId;
+    if (rest.isAnonymous) {
+      return { ...rest, isOwn };
+    }
+    return { ...rest, memberId, member, isOwn };
+  });
 
   // Tính điểm trung bình
   const avgResult = await prisma.coachFeedback.aggregate({

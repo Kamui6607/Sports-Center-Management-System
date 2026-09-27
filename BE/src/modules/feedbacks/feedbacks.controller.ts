@@ -11,12 +11,15 @@ export async function createFeedback(req: Request, res: Response, next: NextFunc
 
 export async function listFeedbacksForCoach(req: Request, res: Response, next: NextFunction) {
   try {
-    const { feedbacks, pagination, summary } = await feedbacksService.listFeedbacksForCoach({
-      coachId: req.query.coachId as string,
-      classId: req.query.classId as string | undefined,
-      page: req.query.page as string | undefined,
-      limit: req.query.limit as string | undefined,
-    });
+    const { feedbacks, pagination, summary } = await feedbacksService.listFeedbacksForCoach(
+      {
+        coachId: req.query.coachId as string,
+        classId: req.query.classId as string | undefined,
+        page: req.query.page as string | undefined,
+        limit: req.query.limit as string | undefined,
+      },
+      req.user!.id
+    );
     sendSuccess(res, { feedbacks, summary }, "Feedbacks retrieved", 200, pagination);
   } catch (err) { next(err); }
 }

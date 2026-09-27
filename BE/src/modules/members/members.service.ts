@@ -12,6 +12,7 @@ const memberInclude = {
       phone: true,
       gender: true,
       dateOfBirth: true,
+      avatarUrl: true,
       role: true,
       isActive: true,
       createdAt: true,
@@ -88,23 +89,27 @@ export async function updateMember(id: string, data: UpdateMemberInput) {
 
   const { fitnessGoal, trainingLevel, trainingPreference, ...userFields } = data;
 
-  if (Object.keys(userFields).length > 0) {
-    await prisma.user.update({
-      where: { id: memberProfile.userId },
-      data: {
-        ...userFields,
-        dateOfBirth: userFields.dateOfBirth ? new Date(userFields.dateOfBirth) : undefined,
-      },
-    });
-  }
-
   const profileData: any = {};
   if (fitnessGoal !== undefined) profileData.fitnessGoal = fitnessGoal;
   if (trainingLevel !== undefined) profileData.trainingLevel = trainingLevel;
   if (trainingPreference !== undefined) profileData.trainingPreference = trainingPreference;
-  if (Object.keys(profileData).length > 0) {
-    await prisma.memberProfile.update({ where: { id: memberProfile.id }, data: profileData });
-  }
+
+  // User + MemberProfile cập nhật ATOMIC (F02).
+  await prisma.$transaction(async (tx) => {
+    if (Object.keys(userFields).length > 0) {
+      await tx.user.update({
+        where: { id: memberProfile.userId },
+        data: {
+          ...userFields,
+          dateOfBirth: userFields.dateOfBirth ? new Date(userFields.dateOfBirth) : undefined,
+        },
+      });
+    }
+
+    if (Object.keys(profileData).length > 0) {
+      await tx.memberProfile.update({ where: { id: memberProfile.id }, data: profileData });
+    }
+  });
 
   return getMemberById(id);
 }

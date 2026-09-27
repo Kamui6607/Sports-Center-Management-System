@@ -114,6 +114,27 @@ export async function updateClass(id: string, data: any) {
     if (upcoming > 0) throw new AppError("Cannot deactivate class with upcoming schedules", 400);
   }
 
+  // A11: KHÔNG cho giảm sức chứa xuống dưới số chỗ đã giữ ở các buổi sắp tới.
+  if (data.capacity !== undefined && data.capacity < cls.capacity) {
+    const upcomingSchedules = await prisma.classSchedule.findMany({
+      where: { classId: id, status: "SCHEDULED", startTime: { gte: new Date() } },
+      select: {
+        id: true,
+        _count: {
+          select: { enrollments: { where: { status: { in: ["BOOKED", "COMPLETED"] } } } },
+        },
+      },
+    });
+    const maxBooked = upcomingSchedules.reduce((max, s) => Math.max(max, s._count.enrollments), 0);
+    if (data.capacity < maxBooked) {
+      throw new AppError(
+        `Không thể giảm sức chứa lớp xuống ${data.capacity}: ${maxBooked} chỗ đang được giữ ở các buổi sắp tới.`,
+        400,
+        { code: "CLASS_CAPACITY_BELOW_BOOKED", capacity: data.capacity, minCapacity: maxBooked }
+      );
+    }
+  }
+
   // Tính effectiveAreaType để xử lý partial update (chỉ đổi sportIds hoặc chỉ đổi areaType).
   const effectiveAreaType = data.areaType ?? cls.areaType;
 
@@ -202,7 +223,7 @@ async function notifyCoachChange(
 async function findAssignableCoach(coachId: string) {
   const coach = await prisma.coachProfile.findUnique({
     where: { id: coachId },
-    include: { user: true },
+    include: { user: { select: { id: true, fullName: true, isActive: true, role: true } } },
   });
   if (!coach || !coach.user.isActive || coach.user.role !== "COACH") {
     throw new AppError("Active coach not found", 404);
@@ -312,7 +333,7 @@ export async function assignSupportCoach(classId: string, coachId: string) {
 export async function removeCoach(classId: string, coachId: string) {
   const cm = await prisma.classMember.findUnique({
     where: { classId_coachId: { classId, coachId } },
-    include: { class: true, coach: { include: { user: true } } }
+    include: { class: true, coach: { include: { user: { select: { fullName: true } } } } }
   });
   if (!cm) throw new AppError("Coach assignment not found", 404);
   

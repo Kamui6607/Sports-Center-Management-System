@@ -21,7 +21,7 @@ export const createPlan = async (data: Prisma.TrainingPlanUncheckedCreateInput, 
   // Check if member is active and role is MEMBER
   const memberProfile = await prisma.memberProfile.findUnique({
     where: { id: data.memberId },
-    include: { user: true },
+    include: { user: { select: { id: true, isActive: true, role: true } } },
   });
   if (!memberProfile || !memberProfile.user.isActive || memberProfile.user.role !== "MEMBER") {
     throw new AppError("Cannot assign training plan: user is not an active MEMBER", 400);
@@ -49,11 +49,51 @@ export const createPlan = async (data: Prisma.TrainingPlanUncheckedCreateInput, 
 };
 
 
-export const getPlans = async (memberId?: string) => {
-  return prisma.trainingPlan.findMany({ 
-    where: memberId ? { memberId } : undefined,
-    include: { coach: { include: { user: true } }, results: true }
-  });
+/** Field an toàn trả về cho HTTP — TUYỆT ĐỐI không include password/secret của user. */
+const planInclude = {
+  coach: { include: { user: { select: { id: true, fullName: true } } } },
+  results: true,
+} satisfies Prisma.TrainingPlanInclude;
+
+/**
+ * GET /training-plans — PHẠM VI theo actor đăng nhập (KHÔNG tin query từ client):
+ * - MANAGER/STAFF: xem toàn bộ (lọc `memberId` nếu có).
+ * - COACH: chỉ plan do CHÍNH mình phụ trách (kết hợp `memberId` nếu có).
+ * - MEMBER: chỉ plan của chính mình; truyền `memberId` người khác ⇒ 403.
+ */
+export const getPlans = async (
+  memberId: string | undefined,
+  actor: { id: string; role: string }
+) => {
+  if (actor.role === "MANAGER" || actor.role === "STAFF") {
+    return prisma.trainingPlan.findMany({
+      where: memberId ? { memberId } : undefined,
+      include: planInclude,
+    });
+  }
+
+  if (actor.role === "COACH") {
+    const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: actor.id } });
+    if (!coachProfile) throw new AppError("Coach profile not found", 404);
+    return prisma.trainingPlan.findMany({
+      where: { coachId: coachProfile.id, ...(memberId ? { memberId } : {}) },
+      include: planInclude,
+    });
+  }
+
+  if (actor.role === "MEMBER") {
+    const memberProfile = await prisma.memberProfile.findUnique({ where: { userId: actor.id } });
+    if (!memberProfile) throw new AppError("Member profile not found", 404);
+    if (memberId && memberId !== memberProfile.id) {
+      throw new AppError("Forbidden: You can only view your own training plans", 403);
+    }
+    return prisma.trainingPlan.findMany({
+      where: { memberId: memberProfile.id },
+      include: planInclude,
+    });
+  }
+
+  throw new AppError("Forbidden: bạn không có quyền xem kế hoạch tập luyện", 403);
 };
 
 export const createResult = async (data: Prisma.TrainingResultUncheckedCreateInput, user: any) => {
@@ -97,7 +137,7 @@ export const updatePlanCoach = async (planId: string, coachId: string, user: any
   // HLV mới phải tồn tại, đang hoạt động và có role COACH.
   const newCoach = await prisma.coachProfile.findUnique({
     where: { id: coachId },
-    include: { user: true },
+    include: { user: { select: { id: true, isActive: true, role: true } } },
   });
   if (!newCoach || !newCoach.user.isActive || newCoach.user.role !== "COACH") {
     throw new AppError("Active coach not found", 404);

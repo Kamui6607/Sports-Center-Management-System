@@ -127,6 +127,9 @@ router.patch("/:id", authorize("COACH", "MANAGER"), validate(UpdateAttendanceSch
  *
  *       Mỗi lần gọi endpoint này sẽ THU HỒI mã dự phòng cũ còn hiệu lực của CÙNG buổi học —
  *       tại một thời điểm chỉ có đúng một mã hợp lệ trên mỗi schedule.
+ *
+ *       Chỉ cấp QR/mã khi buổi học đang `SCHEDULED` và nằm TRONG CỬA SỔ ĐIỂM DANH do server
+ *       quyết định ([startTime − 30 phút, endTime + 30 phút]); ngoài cửa sổ → **409**.
  *     tags: [Attendance]
  *     security:
  *       - BearerAuth: []
@@ -176,6 +179,13 @@ router.post("/generate-qr", authorize("COACH", "MANAGER"), validate(GenerateQrSc
  *       **Chốt chặn 2:** tại thời điểm điểm danh, hệ thống kiểm tra lại member có enrollment
  *       BOOKED/COMPLETED cho buổi học và gói tập còn hạn hay không. Dù đã đặt lịch thành công
  *       trước đó, nếu gói hết hạn trước khi đi học → bị từ chối điểm danh.
+ *
+ *       **Chốt chặn 3 — cửa sổ điểm danh (server-side, không tin thời gian client):** buổi học
+ *       phải đang `SCHEDULED` và thời điểm quét nằm trong [startTime − 30 phút, endTime + 30 phút];
+ *       quét trước/sau cửa sổ → **409** (không ghi attendance).
+ *
+ *       **Không ghi đè kết quả đã chốt:** nếu buổi đã được ghi `ABSENT/LATE/EXCUSED` (do HLV/quản lý),
+ *       quét lại → **409**; nếu đã `PRESENT` thì idempotent (chỉ cập nhật nguồn QR/mã dự phòng).
  *
  *       **Chống dò mã (chỉ áp dụng cho `code`):** sai/hết hạn/thu hồi/không tồn tại dùng chung
  *       một message; một mã bị dùng hỏng 5 lần → thu hồi; một member sai 10 lần trong 15 phút → 429.

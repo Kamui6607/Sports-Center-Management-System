@@ -98,7 +98,8 @@ router.post("/", authenticate, authorize("MEMBER"), validate(CreateFeedbackSchem
  *     summary: Xem danh sách đánh giá của một HLV (public)
  *     description: |
  *       Trả về danh sách feedback và điểm trung bình (averageRating) của HLV.
- *       Các feedback có `isAnonymous: true` sẽ hiển thị tên là **"Ẩn danh"**.
+ *       Feedback `isAnonymous: true` KHÔNG trả `memberId`/`member` cho bất kỳ ai (ẩn danh thật);
+ *       chính tác giả xem bản của mình qua `GET /feedbacks/my`. Mỗi item kèm `isOwn`.
  *     tags: [Feedbacks]
  *     security:
  *       - BearerAuth: []
@@ -140,7 +141,7 @@ router.post("/", authenticate, authorize("MEMBER"), validate(CreateFeedbackSchem
  *                     rating: 4
  *                     comment: "Tốt"
  *                     isAnonymous: true
- *                     member: { user: { fullName: "Ẩn danh" } }
+ *                     isOwn: false
  *                 summary:
  *                   averageRating: 4.5
  *                   totalFeedbacks: 12

@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { createNotification } from "../notifications/notifications.service.js";
+import { enqueueNotification, flushNotificationOutbox } from "../notifications/outbox.service.js";
 import { lockMemberClass, lockMemberQuota, lockSchedule } from "../../utils/dbLocks.js";
 import { findActivePenalty } from "../attendance/attendance-penalties.service.js";
 import {
@@ -114,7 +115,7 @@ export async function bookClass(
   // 0. Verify member profile and role
   const memberProfile = await prisma.memberProfile.findUnique({
     where: { id: memberProfileId },
-    include: { user: true },
+    include: { user: { select: { id: true, isActive: true, role: true } } },
   });
   if (!memberProfile || !memberProfile.user.isActive || memberProfile.user.role !== "MEMBER") {
     throw new AppError("Cannot book class: user is not an active MEMBER", 400);
@@ -132,7 +133,7 @@ export async function bookClass(
   if (schedule.startTime <= new Date())
     throw new AppError("Cannot book a past class", 400);
 
-  return prisma.$transaction(async (tx) => {
+  const booked = await prisma.$transaction(async (tx) => {
     // Serialize booking theo member + schedule để chống overbooking & vượt quota khi concurrent:
     // 2 request của cùng member phải xếp hàng, request sau thấy dữ liệu mới nhất.
     // Lock sống trong transaction, tự release khi commit/rollback.
@@ -142,8 +143,24 @@ export async function bookClass(
     await lockMemberClass(tx, memberProfileId, schedule.class.id);
     await lockSchedule(tx, scheduleId);
 
+    // A12: đọc LẠI lịch SAU lock — không dùng object đọc trước transaction (lịch có thể vừa bị
+    // hủy hoặc dời giờ bởi request khác; đặt chỗ trên dữ liệu cũ là lỗi nghiệp vụ nghiêm trọng).
+    const freshSchedule = await tx.classSchedule.findUnique({
+      where: { id: scheduleId },
+      include: { class: true },
+    });
+    if (!freshSchedule) throw new AppError("Schedule not found", 404);
+    if (freshSchedule.status !== "SCHEDULED") {
+      throw new AppError("Lịch học không còn khả dụng để đặt chỗ.", 409, {
+        code: "SCHEDULE_NOT_AVAILABLE",
+      });
+    }
+    if (freshSchedule.startTime <= new Date()) {
+      throw new AppError("Cannot book a past class", 400);
+    }
+
     // 2-5. Gói tập / sức chứa / trùng chỗ / trùng giờ — dùng chung với transferEnrollment.
-    const existing = await assertCanBook(tx, memberProfileId, schedule);
+    const existing = await assertCanBook(tx, memberProfileId, freshSchedule);
 
     // 6. Create or Reactivate enrollment
     let enrolled;
@@ -153,38 +170,42 @@ export async function bookClass(
         data: { status: "BOOKED", bookedAt: new Date(), cancelledAt: null },
         include: {
           schedule: { include: { class: { include: { sports: true } }, room: true } },
-          member: { include: { user: true } },
+          member: { select: { id: true, userId: true } },
         },
       });
     } else {
       enrolled = await tx.enrollment.create({
         data: {
           memberId: memberProfileId,
-          classId: schedule.classId,
+          classId: freshSchedule.classId,
           scheduleId,
           status: "BOOKED",
         },
         include: {
           schedule: { include: { class: { include: { sports: true } }, room: true } },
-          member: { include: { user: true } },
+          member: { select: { id: true, userId: true } },
         },
       });
     }
 
-    // Notify member — fire-and-forget
-    const startStr = schedule.startTime.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-    createNotification(
-      enrolled.member.userId,
-      "ENROLLMENT_CONFIRMED",
-      `Đặt lớp thành công: ${schedule.class.name}`,
-      `Bạn đã đặt lớp "${schedule.class.name}" thành công vào lúc ${startStr}. Chúc bạn tập luyện vui vẻ!`,
-      { metadata: { scheduleId, classId: schedule.classId, enrollmentId: enrolled.id } }
-    ).catch(() => {});
+    // F01: ghi outbox TRONG transaction — gửi SAU commit (booking rollback không tạo thông báo).
+    const startStr = freshSchedule.startTime.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+    await enqueueNotification(tx, {
+      userId: enrolled.member.userId,
+      type: "ENROLLMENT_CONFIRMED",
+      title: `Đặt lớp thành công: ${freshSchedule.class.name}`,
+      body: `Bạn đã đặt lớp "${freshSchedule.class.name}" thành công vào lúc ${startStr}. Chúc bạn tập luyện vui vẻ!`,
+      metadata: { scheduleId, classId: freshSchedule.classId, enrollmentId: enrolled.id },
+    });
 
     // Return without user for consistent shape
     const { member: _m, ...enrolledData } = enrolled as any;
     return enrolledData;
   });
+
+  // F01: gửi notification trong outbox SAU khi transaction đã commit.
+  await flushNotificationOutbox().catch(() => {});
+  return booked;
 }
 
 export async function cancelEnrollment(
@@ -214,7 +235,7 @@ export async function cancelEnrollment(
   const cancelled = await prisma.enrollment.update({
     where: { id: enrollmentId },
     data: { status: "CANCELLED", cancelledAt: new Date() },
-    include: { member: { include: { user: true } }, schedule: { include: { class: true } } },
+    include: { member: { select: { id: true, userId: true } }, schedule: { include: { class: true } } },
   });
 
   // Notify member — fire-and-forget
@@ -255,7 +276,24 @@ export async function getMyEnrollments(userId: string, query: any) {
   return { enrollments, pagination: buildPaginationMeta(total, page, limit) };
 }
 
-export async function getScheduleEnrollments(scheduleId: string, query: any) {
+export async function getScheduleEnrollments(
+  scheduleId: string,
+  query: any,
+  actor: { id: string; role: string }
+) {
+  // COACH chỉ được xem danh sách đăng ký của buổi thuộc lớp mình phụ trách.
+  if (actor.role === "COACH") {
+    const schedule = await prisma.classSchedule.findUnique({
+      where: { id: scheduleId },
+      include: { class: { include: { coaches: true } } },
+    });
+    if (!schedule) throw new AppError("Schedule not found", 404);
+    const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: actor.id } });
+    const isAssigned =
+      Boolean(coachProfile) && schedule.class.coaches.some((c) => c.coachId === coachProfile!.id);
+    if (!isAssigned) throw new AppError("Forbidden: You are not assigned to this class", 403);
+  }
+
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
   const skip = (page - 1) * limit;

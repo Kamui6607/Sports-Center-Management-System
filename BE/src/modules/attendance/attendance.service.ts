@@ -76,13 +76,17 @@ export const getAttendancesBySchedule = async (
     if (!memberProfile) throw new AppError("Member profile not found", 404);
     return prisma.attendance.findMany({
       where: { scheduleId, memberId: memberProfile.id },
-      include: { member: { include: { user: true } } },
+      include: { member: { include: { user: { select: { id: true, fullName: true } } } } },
     });
   } else if (actor.role !== "MANAGER" && actor.role !== "STAFF") {
     throw new AppError("Forbidden: bạn không có quyền xem điểm danh của buổi này", 403);
   }
 
-  return prisma.attendance.findMany({ where: { scheduleId }, include: { member: { include: { user: true } } } });
+  // DTO roster: CHỈ trường cần cho UI — không bao giờ trả password/token của user.
+  return prisma.attendance.findMany({
+    where: { scheduleId },
+    include: { member: { include: { user: { select: { id: true, fullName: true } } } } },
+  });
 };
 
 export const updateAttendance = async (id: string, data: Prisma.AttendanceUpdateInput, user: any) => {
@@ -171,6 +175,34 @@ function resolveScheduleIdFromQrToken(qrToken: string): string {
   return payload.scheduleId as string;
 }
 
+/**
+ * Cửa sổ điểm danh do SERVER quyết định (không tin thời gian client):
+ * - Buổi học phải đang SCHEDULED (CANCELLED/COMPLETED coi như đã đóng).
+ * - Chỉ tự điểm danh trong [startTime − SCAN_OPEN_MINUTES_BEFORE, endTime + SCAN_CLOSE_MINUTES_AFTER].
+ */
+function assertAttendanceWindow(
+  schedule: { status: string; startTime: Date; endTime: Date },
+  now: Date
+): void {
+  if (schedule.status !== "SCHEDULED") {
+    throw new AppError("Buổi học đã đóng (hủy hoặc đã hoàn tất) nên không thể điểm danh.", 409);
+  }
+  const opensAt = schedule.startTime.getTime() - ATTENDANCE.SCAN_OPEN_MINUTES_BEFORE * 60 * 1000;
+  const closesAt = schedule.endTime.getTime() + ATTENDANCE.SCAN_CLOSE_MINUTES_AFTER * 60 * 1000;
+  if (now.getTime() < opensAt) {
+    throw new AppError(
+      `Chưa đến thời gian điểm danh. Mã chỉ dùng được từ ${ATTENDANCE.SCAN_OPEN_MINUTES_BEFORE} phút trước khi buổi học bắt đầu.`,
+      409
+    );
+  }
+  if (now.getTime() > closesAt) {
+    throw new AppError(
+      "Buổi học đã kết thúc, không thể tự điểm danh nữa. Vui lòng liên hệ HLV hoặc quản lý để được ghi nhận.",
+      409
+    );
+  }
+}
+
 /** Rate-limit theo member: nhập sai đủ nhiều trong cửa sổ cấu hình → 429. */
 async function assertManualCodeAttemptsAllowed(memberId: string): Promise<void> {
   const since = new Date(Date.now() - ATTENDANCE.MEMBER_MANUAL_CODE_WINDOW_MINUTES * 60 * 1000);
@@ -219,7 +251,13 @@ export const generateQrToken = async (scheduleId: string, user: any) => {
   // 1. Check if the coach is authorized for this schedule
   await verifyCoachAccess(scheduleId, user);
 
-  // 2. QR là JWT sống 10 phút (ATTENDANCE.QR_TTL_SECONDS): hạn chế screenshot chia sẻ,
+  // 2. SERVER quyết định cửa sổ: không cấp QR/mã cho buổi đã hủy/hoàn tất hoặc ngoài cửa sổ
+  //    (chặn QR cho buổi tuần sau rồi member quét trước ngày học).
+  const schedule = await prisma.classSchedule.findUnique({ where: { id: scheduleId } });
+  if (!schedule) throw new AppError("Schedule not found", 404);
+  assertAttendanceWindow(schedule, new Date());
+
+  // 3. QR là JWT sống 10 phút (ATTENDANCE.QR_TTL_SECONDS): hạn chế screenshot chia sẻ,
   //    FE tự làm mới mã mỗi 55 giây. TTL nằm ở config, không hard-code.
   const payload = {
     scheduleId,
@@ -277,7 +315,7 @@ export const scanQr = async (input: { qrToken?: string; code?: string }, user: a
     throw new AppError("Bạn chưa đặt chỗ cho lớp học này nên không thể điểm danh.", 403);
   }
 
-  // Chốt chặn 2: Kiểm tra lại gói tập còn hạn tại thời điểm điểm danh
+  // 3. Chốt chặn 2: Kiểm tra lại gói tập còn hạn tại thời điểm điểm danh
   const now = new Date();
   const activeSub = await prisma.membershipSubscription.findFirst({
     where: {
@@ -295,23 +333,37 @@ export const scanQr = async (input: { qrToken?: string; code?: string }, user: a
     );
   }
 
-  // 4. Mark Attendance — note phân biệt nguồn điểm danh (QR vs mã dự phòng).
+  // Chốt chặn 3: SERVER quyết định cửa sổ điểm danh + trạng thái buổi học (A09).
+  const schedule = await prisma.classSchedule.findUnique({ where: { id: scheduleId } });
+  if (!schedule) throw new AppError("Buổi học không tồn tại.", 404);
+  assertAttendanceWindow(schedule, now);
+
+  // 4. Ghi nhận điểm danh — idempotent & KHÔNG ghi đè kết quả đã chốt.
+  //    - Đã PRESENT: giữ nguyên, chỉ cập nhật nguồn (QR ↔ mã dự phòng).
+  //    - ABSENT/LATE/EXCUSED (do HLV/quản lý chốt): trả 409, sửa phải qua kênh correction.
   const note = resolved.manualCodeId ? ATTENDANCE.MANUAL_CODE_NOTE : ATTENDANCE.QR_NOTE;
-  const attendance = await prisma.attendance.upsert({
+  const existing = await prisma.attendance.findUnique({
     where: { scheduleId_memberId: { memberId: memberProfile.id, scheduleId } },
-    create: {
+  });
+
+  if (existing) {
+    if (existing.status !== "PRESENT") {
+      throw new AppError(
+        `Buổi học đã được điểm danh với trạng thái ${existing.status}. Vui lòng liên hệ HLV/quản lý nếu cần điều chỉnh.`,
+        409
+      );
+    }
+    return prisma.attendance.update({ where: { id: existing.id }, data: { note } });
+  }
+
+  return prisma.attendance.create({
+    data: {
       scheduleId,
       memberId: memberProfile.id,
       status: "PRESENT",
-      note
+      note,
     },
-    update: {
-      status: "PRESENT",
-      note
-    }
   });
-
-  return attendance;
 };
 
 // ─── MEMBER SELF-SERVICE (§16) + WARNING (§7) ─────────────────────────────

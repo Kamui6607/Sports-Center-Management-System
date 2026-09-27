@@ -38,6 +38,7 @@ export async function listCoaches(query: CoachQueryInput) {
         phone: true,
         gender: true,
         dateOfBirth: true,
+        avatarUrl: true,
         role: true,
         isActive: true,
         coachProfile: true,
@@ -60,6 +61,7 @@ export async function getCoachById(id: string) {
       phone: true,
       gender: true,
       dateOfBirth: true,
+      avatarUrl: true,
       role: true,
       isActive: true,
       coachProfile: {
@@ -106,36 +108,39 @@ export async function updateCoach(id: string, data: UpdateCoachInput) {
   if (gender !== undefined) userFields.gender = gender;
   if (dateOfBirth !== undefined) userFields.dateOfBirth = dateOfBirth;
 
-  if (Object.keys(userFields).length > 0) {
-    await prisma.user.update({
-      where: { id },
-      data: {
-        ...userFields,
-        dateOfBirth: userFields.dateOfBirth ? new Date(userFields.dateOfBirth) : undefined,
-      },
-    });
-  }
+  // User + CoachProfile cập nhật ATOMIC (F02): không để hồ sơ nửa vời khi lệnh thứ 2 lỗi.
+  const updated = await prisma.$transaction(async (tx) => {
+    if (Object.keys(userFields).length > 0) {
+      await tx.user.update({
+        where: { id },
+        data: {
+          ...userFields,
+          dateOfBirth: userFields.dateOfBirth ? new Date(userFields.dateOfBirth) : undefined,
+        },
+      });
+    }
 
-  const updated = await prisma.coachProfile.update({
-    where: { id: coachProfile.id },
-    data: {
-      ...(profileData.specialization !== undefined && { specialization: profileData.specialization }),
-      ...(profileData.experienceYears !== undefined && { experienceYears: profileData.experienceYears }),
-      ...(profileData.bio !== undefined && { bio: profileData.bio }),
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          phone: true,
-          gender: true,
-          role: true,
-          isActive: true,
+    return tx.coachProfile.update({
+      where: { id: coachProfile.id },
+      data: {
+        ...(profileData.specialization !== undefined && { specialization: profileData.specialization }),
+        ...(profileData.experienceYears !== undefined && { experienceYears: profileData.experienceYears }),
+        ...(profileData.bio !== undefined && { bio: profileData.bio }),
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            phone: true,
+            gender: true,
+            role: true,
+            isActive: true,
+          },
         },
       },
-    },
+    });
   });
 
   return updated;

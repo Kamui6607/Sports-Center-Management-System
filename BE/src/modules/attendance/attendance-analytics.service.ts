@@ -9,6 +9,61 @@ import {
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
+/** A10: khoảng thời gian member thực sự có quyền lợi (dùng cho analytics + kiểm tra dời lịch A11). */
+export type MembershipCoverageInterval = { from: Date; to: Date };
+
+/**
+ * A10 — Dựng khoảng quyền lợi từ danh sách subscription (mọi trạng thái):
+ * - to = min(endDate, cancelledAt) — hủy sớm thì quyền lợi dừng ở mốc hủy.
+ * - Gói đang SUSPENDED: to = min(to, suspendedAt) — giai đoạn bảo lưu KHÔNG tính.
+ * Trạng thái hiện tại không bao giờ xóa lịch sử đã học trước đó.
+ */
+export function buildCoverageIntervals(
+  subs: Array<{
+    startDate: Date;
+    endDate: Date;
+    status: string;
+    suspendedAt?: Date | null;
+    cancelledAt?: Date | null;
+  }>
+): MembershipCoverageInterval[] {
+  return subs.map((sub) => {
+    let to = sub.endDate;
+    if (sub.cancelledAt && sub.cancelledAt < to) to = sub.cancelledAt;
+    if (sub.status === "SUSPENDED" && sub.suspendedAt && sub.suspendedAt < to) to = sub.suspendedAt;
+    return { from: sub.startDate, to };
+  });
+}
+
+/** Thời điểm `at` có nằm trong ít nhất một khoảng quyền lợi (bao gồm cả biên). */
+export function isCoveredAt(intervals: MembershipCoverageInterval[], at: Date): boolean {
+  return intervals.some((iv) => iv.from <= at && at <= iv.to);
+}
+
+/** A10 — Khoảng quyền lợi của nhiều member (1 query) — dùng lại ở A11 khi dời lịch. */
+export async function getMembershipCoverageIntervals(
+  db: DbClient,
+  memberIds: string[]
+): Promise<Map<string, MembershipCoverageInterval[]>> {
+  if (memberIds.length === 0) return new Map();
+  const subs = await db.membershipSubscription.findMany({
+    where: { memberId: { in: memberIds } },
+    select: {
+      memberId: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      suspendedAt: true,
+      cancelledAt: true,
+    },
+  });
+  const map = new Map<string, MembershipCoverageInterval[]>();
+  for (const sub of subs) {
+    map.set(sub.memberId, [...(map.get(sub.memberId) ?? []), ...buildCoverageIntervals([sub])]);
+  }
+  return map;
+}
+
 export type AttendanceBucket = {
   memberId: string;
   memberName: string;
@@ -33,7 +88,13 @@ export type AttendanceBucket = {
  * (Enrollment BOOKED/COMPLETED), loại trừ:
  * - schedule CANCELLED (trung tâm hủy)
  * - schedule chưa kết thúc
- * - schedule nằm ngoài giai đoạn member có gói tập (ACTIVE) hoặc đang trong giai đoạn SUSPENDED
+ * - schedule nằm NGOÀI khoảng quyền lợi thực tế của member (A10).
+ *
+ * A10 — quyền lợi tính theo LỊCH SỬ, không theo trạng thái hiện tại của gói:
+ * - Mọi subscription đều đóng góp khoảng [startDate, min(endDate, cancelledAt)] — gói đã hủy/hết hạn
+ *   vẫn giữ nguyên lịch sử trước đó; đổi status hôm nay KHÔNG làm thay đổi tỷ lệ của các buổi đã học.
+ * - Gói đang SUSPENDED: khoảng dừng tại `suspendedAt` (giai đoạn bảo lưu không tính chuyên cần;
+ *   các buổi TRƯỚC lúc bảo lưu vẫn được tính).
  *
  * rate = (PRESENT + LATE) / (PRESENT + LATE + ABSENT + NO_SHOW); EXCUSED không vào tử/mẫu.
  * ABSENT do hệ thống tự tạo (note = SYSTEM_NO_SHOW) được đếm riêng là noShow.
@@ -84,7 +145,14 @@ export async function computeAttendanceBuckets(
     db.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true } }),
     db.membershipSubscription.findMany({
       where: { memberId: { in: memberIds } },
-      select: { memberId: true, status: true, startDate: true, endDate: true, suspendedAt: true },
+      select: {
+        memberId: true,
+        status: true,
+        startDate: true,
+        endDate: true,
+        suspendedAt: true,
+        cancelledAt: true,
+      },
     }),
     db.attendance.findMany({
       where: { memberId: { in: memberIds }, scheduleId: { in: scheduleIds } },
@@ -94,23 +162,18 @@ export async function computeAttendanceBuckets(
 
   const memberMap = new Map(members.map((m) => [m.id, m]));
   const classMap = new Map(classes.map((c) => [c.id, c]));
-  const subsByMember = new Map<string, typeof subscriptions>();
+  const coverageByMember = new Map<string, MembershipCoverageInterval[]>();
   for (const sub of subscriptions) {
-    subsByMember.set(sub.memberId, [...(subsByMember.get(sub.memberId) ?? []), sub]);
+    coverageByMember.set(sub.memberId, [
+      ...(coverageByMember.get(sub.memberId) ?? []),
+      ...buildCoverageIntervals([sub]),
+    ]);
   }
   const attendanceMap = new Map(attendances.map((a) => [`${a.memberId}|${a.scheduleId}`, a]));
 
-  /** Buổi chỉ được tính khi member có gói bao phủ (ACTIVE) hoặc đang trong giai đoạn SUSPENDED. */
-  const isCoveredByMembership = (memberId: string, at: Date) => {
-    const subs = subsByMember.get(memberId) ?? [];
-    return subs.some((sub) => {
-      if (sub.status === "ACTIVE") return sub.startDate <= at && at <= sub.endDate;
-      if (sub.status === "SUSPENDED") {
-        return Boolean(sub.suspendedAt && sub.suspendedAt <= at && at <= sub.endDate);
-      }
-      return false;
-    });
-  };
+  /** Buổi chỉ được tính khi thời điểm học nằm trong khoảng quyền lợi LỊCH SỬ (A10). */
+  const isCoveredByMembership = (memberId: string, at: Date) =>
+    isCoveredAt(coverageByMember.get(memberId) ?? [], at);
 
   const buckets: AttendanceBucket[] = [];
   for (const entry of grouped.values()) {
