@@ -8,6 +8,8 @@ import {
   RefreshTokenSchema,
   UpdateProfileSchema,
   ChangePasswordSchema,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
 } from "./auth.schema.js";
 import * as authController from "./auth.controller.js";
 
@@ -119,6 +121,48 @@ router.post("/logout", authenticate, authController.logout);
  *       500: { $ref: "#/components/responses/ServerError" }
  */
 router.post("/refresh-token", validate(RefreshTokenSchema), authController.refreshToken);
+
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *     summary: Request a password reset link (Token is returned in response for testing)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email }
+ *     responses:
+ *       200: { $ref: "#/components/responses/MessageOk" }
+ */
+router.post("/forgot-password", validate(ForgotPasswordSchema), authController.forgotPassword);
+
+/**
+ * @swagger
+ * /auth/reset-password:
+ *   patch:
+ *     summary: Reset password using the token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, newPassword]
+ *             properties:
+ *               token: { type: string }
+ *               newPassword: { type: string, minLength: 6 }
+ *     responses:
+ *       200: { $ref: "#/components/responses/MessageOk" }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ */
+router.patch("/reset-password", validate(ResetPasswordSchema), authController.resetPassword);
 
 /**
  * @swagger

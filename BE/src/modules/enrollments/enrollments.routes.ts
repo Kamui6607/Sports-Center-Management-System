@@ -172,7 +172,7 @@ router.get("/my/quota", authenticate, authorize("MEMBER"), enrollmentsController
  *       **Idempotent**: buổi đã `BOOKED`/`COMPLETED` của chính hội viên trả về `status = ALREADY_BOOKED`
  *       (không lỗi, không tạo trùng); buổi từng `CANCELLED` được kích hoạt lại (`REACTIVATED`, BR-07).
  *       Chỉ gửi **1 notification** `ENROLLMENT_CONFIRMED` cho cả khóa thay vì N notification.
- *     tags: [Enrollments]
+ *     tags: [Courses]
  *     security:
  *       - BearerAuth: []
  *     requestBody:

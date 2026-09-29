@@ -55,3 +55,15 @@ export type LoginInput = z.infer<typeof LoginSchema>;
 export type RefreshTokenInput = z.infer<typeof RefreshTokenSchema>;
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
+
+export const ForgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address").transform(v => v.toLowerCase().trim()),
+});
+
+export const ResetPasswordSchema = z.object({
+  token: z.string().min(1, "Token is required"),
+  newPassword: z.string().min(6, "New password must be at least 6 characters"),
+});
+
+export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;

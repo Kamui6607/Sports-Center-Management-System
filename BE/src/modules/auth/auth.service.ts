@@ -11,7 +11,54 @@ import { hashToken } from "../../utils/hashToken.js";
 import { removeStoredAvatar } from "../../utils/avatarStorage.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { disconnectUserSockets } from "../chat/chat.socket.js";
-import type { RegisterInput, UpdateProfileInput } from "./auth.schema.js";
+import { env } from "../../config/env.js";
+import jwt from "jsonwebtoken";
+import { sendResetPasswordEmail } from "../../utils/mail.js";
+import type { RegisterInput, UpdateProfileInput, ForgotPasswordInput, ResetPasswordInput } from "./auth.schema.js";
+
+export async function forgotPassword(data: ForgotPasswordInput) {
+  const user = await prisma.user.findUnique({ where: { email: data.email } });
+  if (!user) throw new AppError("If email exists, a reset link was generated", 200);
+
+  // Secret is unique to the current password. If they change it, token becomes invalid.
+  const secret = env.JWT_ACCESS_SECRET + user.password;
+  const token = jwt.sign({ email: user.email, id: user.id }, secret, { expiresIn: "15m" });
+
+  const resetLink = `http://localhost:3000/reset-password?token=${token}`;
+  
+  // Gửi mail (sẽ tự skip nếu chưa có cấu hình SMTP)
+  await sendResetPasswordEmail(user.email, resetLink).catch(err => {
+    console.error("[MAIL ERROR] Failed to send reset email:", err);
+  });
+  
+  return { message: "Reset link generated (check email or response for testing)", resetLink, token };
+}
+
+export async function resetPassword(data: ResetPasswordInput) {
+  // We need the user to get their password hash to verify the token
+  const decoded = jwt.decode(data.token) as { id: string } | null;
+  if (!decoded || !decoded.id) throw new AppError("Invalid or expired token", 400);
+
+  const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+  if (!user) throw new AppError("Invalid or expired token", 400);
+
+  const secret = env.JWT_ACCESS_SECRET + user.password;
+  try {
+    jwt.verify(data.token, secret);
+  } catch {
+    throw new AppError("Invalid or expired token", 400);
+  }
+
+  const hashed = await hashPassword(data.newPassword);
+  
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: user.id }, data: { password: hashed } }),
+    prisma.refreshToken.deleteMany({ where: { userId: user.id } }),
+  ]);
+  
+  disconnectUserSockets(user.id);
+  return { message: "Password reset successfully" };
+}
 
 export async function register(data: RegisterInput) {
   const existing = await prisma.user.findUnique({ where: { email: data.email } });

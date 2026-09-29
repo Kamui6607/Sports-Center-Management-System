@@ -25,7 +25,7 @@ const router = Router();
  *     summary: List all coaches
  *     tags: [Coaches]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     parameters:
  *       - in: query
  *         name: page
@@ -197,6 +197,18 @@ router.patch(
 // ─── Coach profile routes ─────────────────────────────────────────────────────
 
 // NOTE: Đặt /cv/pending TRƯỚC /:id để không bị match sai sang /:id
+/**
+ * @swagger
+ * /coaches/cv/pending:
+ *   get:
+ *     summary: Manager lấy danh sách các HLV đang chờ duyệt CV
+ *     tags: [Coaches]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: OK
+ */
 router.get(
   "/cv/pending",
   authenticate,
@@ -211,7 +223,7 @@ router.get(
  *     summary: Get coach by ID
  *     tags: [Coaches]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -235,7 +247,7 @@ router.get("/:id", authenticate, coachController.getCoachById);
  *     summary: Update coach profile (Manager update any; Coach updates own profile)
  *     tags: [Coaches]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -277,6 +289,30 @@ router.patch(
 // Dùng authenticateIncludingInactive vì Coach vừa đăng ký có isActive=false
 // nhưng vẫn cần token để xác định danh tính khi nộp CV.
 
+/**
+ * @swagger
+ * /coaches/me/cv:
+ *   post:
+ *     summary: Coach nộp CV (PDF)
+ *     tags: [Coaches]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [cv]
+ *             properties:
+ *               cv:
+ *                 type: string
+ *                 format: binary
+ *                 description: File PDF CV
+ *     responses:
+ *       200:
+ *         description: OK
+ */
 router.post(
   "/me/cv",
   authenticateIncludingInactive,
@@ -287,6 +323,37 @@ router.post(
 
 // ── Manager: Duyệt hoặc từ chối CV Coach ─────────────────────────────────────
 
+/**
+ * @swagger
+ * /coaches/{profileId}/cv/review:
+ *   patch:
+ *     summary: Manager duyệt hoặc từ chối CV của Coach
+ *     tags: [Coaches]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: profileId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [action]
+ *             properties:
+ *               action:
+ *                 type: string
+ *                 enum: [APPROVE, REJECT]
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: OK
+ */
 router.patch(
   "/:profileId/cv/review",
   authenticate,

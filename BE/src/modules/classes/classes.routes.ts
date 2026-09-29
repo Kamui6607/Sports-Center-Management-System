@@ -124,7 +124,7 @@ router.get("/:id", authenticate, classesController.getClassById);
  *         `subscription`, `quota`, `penalty`, `registeredSessions`, `isFullyRegistered`.
  *
  *       Thứ/giờ được tính theo múi giờ **Asia/Ho_Chi_Minh**, không phụ thuộc timezone của server.
- *     tags: [Classes]
+ *     tags: [Courses]
  *     security:
  *       - BearerAuth: []
  *     parameters:

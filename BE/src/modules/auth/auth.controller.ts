@@ -3,6 +3,24 @@ import * as authService from "./auth.service.js";
 import { sendSuccess, sendCreated, sendError } from "../../utils/response.js";
 import { storeAvatarImage } from "../../utils/avatarStorage.js";
 
+export async function forgotPassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.forgotPassword(req.body);
+    sendSuccess(res, result, result.message);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.resetPassword(req.body);
+    sendSuccess(res, result, result.message);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function register(req: Request, res: Response, next: NextFunction) {
   try {
     const user = await authService.register(req.body);

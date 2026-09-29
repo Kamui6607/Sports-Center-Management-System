@@ -1310,6 +1310,7 @@ const options: swaggerJSDoc.Options = {
       { name: "Training", description: "Personalized training plans and results" },
       { name: "Notifications", description: "Manage user notifications" },
       { name: "Feedbacks", description: "Member đánh giá HLV sau buổi học" },
+      { name: "Courses", description: "Course Plan & Whole-Course Enrollment" },
     ],
   },
   apis: ["./src/modules/**/*.routes.ts", "./src/modules/**/*.routes.js"],

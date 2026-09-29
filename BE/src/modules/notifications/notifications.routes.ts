@@ -19,7 +19,7 @@ const router = Router();
  *     summary: Get my notifications
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     parameters:
  *       - in: query
  *         name: type
@@ -65,7 +65,7 @@ router.get("/", authenticate, notificationsController.getMyNotifications);
  *     summary: Get count of unread notifications
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Unread count retrieved successfully
@@ -81,7 +81,7 @@ router.get("/unread-count", authenticate, notificationsController.getUnreadCount
  *     summary: Mark all my notifications as read
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: All notifications marked as read
@@ -97,7 +97,7 @@ router.patch("/mark-all-read", authenticate, notificationsController.markAllRead
  *     summary: Mark a specific notification as read
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -122,7 +122,7 @@ router.patch("/:id/read", authenticate, notificationsController.markRead);
  *     summary: Manually trigger upcoming class reminders (within 24h)
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Reminders triggered successfully
