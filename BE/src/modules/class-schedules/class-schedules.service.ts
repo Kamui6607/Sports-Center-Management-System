@@ -7,8 +7,7 @@ import { ATTENDANCE } from "../../config/attendance.js";
 import { scanAttendanceWarnings } from "../attendance/attendance.service.js";
 import { lockSchedule } from "../../utils/dbLocks.js";
 import {
-  getMembershipCoverageIntervals,
-  isCoveredAt,
+  
 } from "../attendance/attendance-analytics.service.js";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
@@ -481,7 +480,7 @@ async function assertScheduleMoveKeepsBookingsValid(
   if (booked.length === 0) return;
 
   const memberIds = booked.map((b) => b.memberId);
-  const [conflicts, coverage] = await Promise.all([
+  const [conflicts] = await Promise.all([
     tx.enrollment.findMany({
       where: {
         memberId: { in: memberIds },
@@ -494,12 +493,11 @@ async function assertScheduleMoveKeepsBookingsValid(
         },
       },
       select: { memberId: true },
-    }),
-    getMembershipCoverageIntervals(tx, memberIds),
+    })
   ]);
 
-  const conflicted = new Set(conflicts.map((c) => c.memberId));
-  const uncovered = memberIds.filter((m) => !isCoveredAt(coverage.get(m) ?? [], params.startTime));
+  const conflicted = new Set(conflicts.map((c: any) => c.memberId));
+  const uncovered: string[] = [];
   if (conflicted.size === 0 && uncovered.length === 0) return;
 
   const nameOf = (memberId: string) =>
@@ -510,7 +508,7 @@ async function assertScheduleMoveKeepsBookingsValid(
     {
       code: "SCHEDULE_MOVE_IMPACT",
       conflicts: [...conflicted].map(nameOf),
-      uncovered: uncovered.map(nameOf),
+      uncovered: uncovered.map((u: any) => nameOf(u)),
     }
   );
 }

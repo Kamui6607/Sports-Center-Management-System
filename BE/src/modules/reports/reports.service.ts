@@ -274,7 +274,7 @@ export async function getSubscriptionLogs(startDate?: string, endDate?: string, 
     })
   ]);
 
-  const formattedLogs = subs.map(sub => ({
+  const formattedLogs = subs.map((sub: any) => ({
     id: sub.id,
     action: "Mua / Gia hạn gói", // Action description as requested
     username: sub.member.user.fullName,

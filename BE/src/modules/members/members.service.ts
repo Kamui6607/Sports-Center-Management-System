@@ -109,17 +109,8 @@ export async function getMembershipStatus(memberId: string) {
   if (!memberProfile) throw new AppError("Member not found", 404);
 
   const activeSub = null;
-
-  /**
-   * effectiveTier = tier của gói ACTIVE (FREE | MEMBERSHIP | PREMIUM).
-   * Không có subscription ACTIVE → `null`, KHÔNG dùng "FREE" để đại diện cho "không có gói"
-   * (FREE chỉ là tier THẬT khi member thực sự có subscription FREE ACTIVE).
-   * Nhất quán với semantics của GET /enrollments/my/quota.
-   */
-  const effectiveTier = activeSub ? activeSub.tier : null;
-  const daysRemaining = activeSub
-    ? Math.ceil((activeSub.endDate.getTime() - Date.now()) / 86400000)
-    : null;
+  const effectiveTier = null;
+  const daysRemaining = null;
 
   return { effectiveTier, activeSubscription: activeSub, daysRemaining };
 }
