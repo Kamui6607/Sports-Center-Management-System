@@ -7,7 +7,7 @@ import {
   avatarStorageDriver,
   cloudinaryConfig,
   type AvatarStorageDriver,
-} from "../config/avatar-storage.js";
+} from "../config/storage.js";
 
 /** Thư mục lưu avatar khi dùng driver `local` (phục vụ tĩnh qua app.ts: `/uploads/...`). */
 export const AVATAR_DIR = path.join("uploads", "avatars");
@@ -142,3 +142,4 @@ export function removeStoredAvatar(avatarUrl: string | null): void {
 
   fs.promises.unlink(path.join(AVATAR_DIR, filename)).catch(() => {});
 }
+

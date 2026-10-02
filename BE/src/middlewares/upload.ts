@@ -74,7 +74,7 @@ export function chatUploadSingle(field: string) {
 }
 
 // ── Avatar upload (profile) ────────────────────────────────
-// Giữ file trong RAM (<= 5MB) rồi để utils/avatarStorage quyết định đích:
+// Giữ file trong RAM (<= 5MB) rồi để utils/storage quyết định đích:
 //   - local      => ghi `uploads/avatars/`
 //   - cloudinary => đẩy thẳng buffer lên Cloudinary (không ghi disk)
 const AVATAR_MIME_TYPES = new Set([

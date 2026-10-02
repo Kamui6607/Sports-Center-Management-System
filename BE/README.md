@@ -27,11 +27,11 @@ REST API (Express 5 + TypeScript + Prisma/PostgreSQL) cho hệ thống quản l�
 │   ├── seed.ts
 │   └── backfill-free-subscription.ts
 ├── src/
-│   ├── config/               # env, prisma singleton, swagger, sepay, avatar-storage, attendance, membership
+│   ├── config/               # env, prisma singleton, swagger, sepay, storage, attendance, membership
 │   ├── middlewares/          # authenticate, authorize, validate, errorHandler, upload
 │   ├── modules/<tên>/        # Mỗi tính năng một thư mục (xem quy ước bên dưới)
 │   ├── types/                # express.d.ts (req.user)
-│   ├── utils/                # response, pagination, jwt, bcrypt, hashToken, dbLocks, mail, fileSignature, avatarStorage
+│   ├── utils/                # response, pagination, jwt, bcrypt, hashToken, dbLocks, mail, fileSignature, storage
 │   ├── app.ts                # Khởi tạo Express, mount routes
 │   └── server.ts             # Entry: connect DB, Socket.IO, worker outbox
 ├── tests/                    # Script e2e chạy bằng tsx (cần DB thật)
@@ -172,7 +172,7 @@ export async function getSportById(req: Request, res: Response, next: NextFuncti
 ### 11. Biến môi trường & cấu hình
 
 - Biến bắt buộc đọc qua `src/config/env.ts` (`required("KEY")` ném lỗi khi thiếu). Biến lõi: `PORT`, `DATABASE_URL`, `JWT_*`, `SMTP_*`. Thêm biến lõi ⇒ thêm vào `env.ts` **và** README mục Environment Variables.
-- Cấu hình theo tính năng nằm file riêng trong `src/config/` (`sepay.ts`, `avatar-storage.ts`, `attendance.ts`…), có giá trị mặc định tại đó. Không rải `process.env.X` khắp service.
+- Cấu hình theo tính năng nằm file riêng trong `src/config/` (`sepay.ts`, `storage.ts`, `attendance.ts`…), có giá trị mặc định tại đó. Không rải `process.env.X` khắp service.
 - **Không commit `.env`** (đã trong `.gitignore`), không in secret ra log, không hard-code secret/API key vào code hay README.
 - `SEPAY_MOCK_MODE=true` chỉ cho dev/demo/e2e; `server.ts` sẽ thoát (fail-fast) nếu bật ở `NODE_ENV=production`. Đừng gỡ chốt này.
 
@@ -198,7 +198,7 @@ export async function getSportById(req: Request, res: Response, next: NextFuncti
 - Dấu ngoặc kép `"..."`, có dấu chấm phẩy, thụt lề 2 space (đúng với code hiện có). Chưa có ESLint/Prettier trong repo ⇒ tự giữ đồng nhất với file đang sửa.
 - Comment giải thích **vì sao** (ràng buộc nghiệp vụ, race condition, mã BR/A/F/D trong code). Comment/thông báo hiện **trộn tiếng Việt và tiếng Anh**: theo ngôn ngữ của khu vực code đang sửa; message trả cho người dùng cuối trong một endpoint nên nhất quán với các message cạnh nó.
 - Không `console.log` dữ liệu nhạy cảm. Log lỗi dùng `console.error/warn` có tiền tố như code hiện có (`[ERROR]`, `[OUTBOX]`).
-- Dùng lại helper trong `src/utils/` (`response`, `pagination`, `jwt`, `bcrypt`, `hashToken`, `mail`, `dbLocks`, `fileSignature`, `avatarStorage`) thay vì viết lại.
+- Dùng lại helper trong `src/utils/` (`response`, `pagination`, `jwt`, `bcrypt`, `hashToken`, `mail`, `dbLocks`, `fileSignature`, `storage`) thay vì viết lại.
 
 ### 15. Checklist trước khi kết thúc một thay đổi
 
@@ -332,7 +332,7 @@ export async function getSportById(req: Request, res: Response, next: NextFuncti
    (console.cloudinary.com) → **Settings (bánh răng) → API Keys** → copy `Cloud name`, `API Key`, `API Secret`
    → điền vào `.env` (hoặc Environment trên Render). Kiểm tra nhanh bằng `npm run test:cloudinary:check`.
    Khi đã có đủ credentials, `POST /api/v1/auth/me/avatar` tự động lưu ảnh lên Cloudinary (không cần đổi code);
-   để trống thì ảnh vẫn lưu local trong `uploads/avatars/`. Xem `src/config/avatar-storage.ts`.
+   để trống thì ảnh vẫn lưu local trong `uploads/avatars/`. Xem `src/config/storage.ts`.
 
 3. **Database Setup:**
    Run Prisma migrations to set up your PostgreSQL database schema:

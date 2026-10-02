@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import * as authService from "./auth.service.js";
 import { sendSuccess, sendCreated, sendError } from "../../utils/response.js";
-import { storeAvatarImage } from "../../utils/avatarStorage.js";
+import { storeAvatarImage } from "../../utils/storage.js";
 
 export async function forgotPassword(req: Request, res: Response, next: NextFunction) {
   try {
@@ -109,3 +109,4 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     next(err);
   }
 }
+

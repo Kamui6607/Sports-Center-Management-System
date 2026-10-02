@@ -16,7 +16,7 @@ import app from "../src/app.js";
 import { prisma } from "../src/config/prisma.js";
 import { hashPassword } from "../src/utils/bcrypt.js";
 import { CHAT_UPLOAD_DIR } from "../src/middlewares/upload.js";
-import { avatarStorageDriver } from "../src/config/avatar-storage.js";
+import { avatarStorageDriver } from "../src/config/storage.js";
 
 const RUN = Date.now().toString(36);
 const PASSWORD = "E2eChat!2026";

@@ -10,8 +10,8 @@
  */
 import "dotenv/config";
 import { v2 as cloudinary } from "cloudinary";
-import { cloudinaryConfig, isCloudinaryConfigured } from "../src/config/avatar-storage.js";
-import { cloudinaryErrorDetail } from "../src/utils/avatarStorage.js";
+import { cloudinaryConfig, isCloudinaryConfigured } from "../src/config/storage.js";
+import { cloudinaryErrorDetail } from "../src/utils/storage.js";
 
 const PNG_1x1 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
