@@ -1,5 +1,19 @@
 node_modules
-# Keep environment variables out of version control
+
+# Environment variables (secrets) - keep out of version control
 .env
+.env.*
+!.env.example
+
+# Build output / generated
 dist/
 /src/generated/prisma
+
+# User-uploaded files (avatars, chat attachments, CVs) - runtime data, created by the app on start
+uploads/
+
+# Logs, backups, OS junk
+*.log
+*.bak
+.DS_Store
+Thumbs.db

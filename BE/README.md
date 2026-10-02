@@ -24,10 +24,9 @@ REST API (Express 5 + TypeScript + Prisma/PostgreSQL) cho hệ thống quản l�
 ├── prisma/
 │   ├── schema.prisma         # Nguồn sự thật của DB
 │   ├── migrations/           # Migration (timestamp_snake_case)
-│   ├── seed.ts
-│   └── backfill-free-subscription.ts
+│   └── seed.ts
 ├── src/
-│   ├── config/               # env, prisma singleton, swagger, sepay, storage, attendance, membership
+│   ├── config/               # env, prisma singleton, swagger, sepay, storage, attendance
 │   ├── middlewares/          # authenticate, authorize, validate, errorHandler, upload
 │   ├── modules/<tên>/        # Mỗi tính năng một thư mục (xem quy ước bên dưới)
 │   ├── types/                # express.d.ts (req.user)
@@ -165,7 +164,7 @@ export async function getSportById(req: Request, res: Response, next: NextFuncti
 
 ### 10. Test
 
-- Hiện **không có** unit test framework. Test là các script e2e thật (HTTP + PostgreSQL) trong `tests/*.e2e.ts`, chạy bằng `tsx` qua `npm run test:e2e*` (xem `package.json`). Chúng (VD `subscription-lifecycle.e2e.ts`) import `app` từ `src/app.js`, dùng `prisma` thật ⇒ **cần DB dev**, tuyệt đối không chạy trên DB production.
+- Hiện **không có** unit test framework. Test là các script e2e thật (HTTP + PostgreSQL) trong `tests/*.e2e.ts`, chạy bằng `tsx` qua `npm run test:e2e*` (xem `package.json`). Chúng import `app` từ `src/app.js`, dùng `prisma` thật ⇒ **cần DB dev**, tuyệt đối không chạy trên DB production.
 - Viết test mới: copy cấu trúc một file e2e (VD helper `http()`, `check()`, hậu tố `RUN = Date.now().toString(36)` để dữ liệu không đụng nhau), thêm script vào `package.json` và vào `test:e2e:all`.
 - Đổi hành vi luồng thanh toán SePay / đặt chỗ / quota / điểm danh / chat đính kèm ⇒ chạy e2e tương ứng (`test:e2e:sepay`, `test:e2e`, `test:e2e:course`, `test:e2e:attendance`, `test:e2e:chat`).
 
