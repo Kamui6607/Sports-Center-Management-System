@@ -1,43 +1,228 @@
 # Sports Center Management System - Backend
 
-Welcome to the **Sports Center Management System** backend repository. This backend provides a robust REST API for managing users, memberships, class scheduling, and payments for a multi-platform sports center application (Web & Mobile).
+REST API (Express 5 + TypeScript + Prisma/PostgreSQL) cho hệ thống quản lý trung tâm thể thao: người dùng, lớp học & lịch, đặt chỗ, điểm danh, thanh toán (SePay VietQR), hóa đơn, báo cáo, chat, thông báo.
+
+> **Dành cho AI agent / dev mới:** đọc mục [Quy ước code (BẮT BUỘC đọc trước khi sửa)](#-quy-ước-code-bắt-buộc-đọc-trước-khi-sửa) và [Nguồn sự thật & những thứ KHÔNG được giả định](#-nguồn-sự-thật--những-thứ-không-được-giả-định) TRƯỚC khi viết code. Các quy ước được rút ra từ code thật; nếu thấy code lệch README thì **code thắng** — hãy sửa README luôn trong cùng thay đổi.
 
 ## 🚀 Technologies
 
-This project is built using modern Node.js tools and practices:
-- **Runtime:** Node.js
-- **Framework:** Express.js (v5)
-- **Language:** TypeScript
-- **Database:** PostgreSQL
-- **ORM:** Prisma
-- **Validation:** Zod
-- **Authentication:** JWT (JSON Web Tokens) with Access & Refresh tokens
-- **API Documentation:** Swagger UI
-- **Tooling:** `tsx` for local execution, `helmet` & `cors` for security.
+- **Runtime:** Node.js (ESM, `module: NodeNext`)
+- **Framework:** Express.js v5
+- **Language:** TypeScript (`strict: true`)
+- **Database / ORM:** PostgreSQL + Prisma 5 (`@prisma/client` ^5.22)
+- **Validation:** Zod 3
+- **Auth:** JWT Access + Refresh token (`jsonwebtoken`), mật khẩu `bcryptjs`
+- **Realtime:** Socket.IO (chat)
+- **Upload:** Multer (+ Cloudinary tùy chọn cho avatar)
+- **Docs:** swagger-jsdoc + Swagger UI
+- **Tooling:** `tsx` chạy dev, `helmet`, `cors`, `morgan`
 
-## 📦 Project Structure
+## 📦 Cấu trúc thư mục
 
 ```
 .
-├── prisma/               # Prisma schema and migrations
+├── prisma/
+│   ├── schema.prisma         # Nguồn sự thật của DB
+│   ├── migrations/           # Migration (timestamp_snake_case)
+│   ├── seed.ts
+│   └── backfill-free-subscription.ts
 ├── src/
-│   ├── config/           # App configuration (Swagger, DB connections, etc.)
-│   ├── middlewares/      # Express middlewares (Auth, Error Handler, Zod Validation)
-│   ├── modules/          # Feature modules (Controllers, Routes, Services, Schemas)
-│   ├── types/            # TypeScript type definitions
-│   ├── utils/            # Helper utilities (Bcrypt, JWT, Pagination, Response)
-│   ├── app.ts            # Express app setup
-│   └── server.ts         # Server entry point
+│   ├── config/               # env, prisma singleton, swagger, sepay, avatar-storage, attendance, membership
+│   ├── middlewares/          # authenticate, authorize, validate, errorHandler, upload
+│   ├── modules/<tên>/        # Mỗi tính năng một thư mục (xem quy ước bên dưới)
+│   ├── types/                # express.d.ts (req.user)
+│   ├── utils/                # response, pagination, jwt, bcrypt, hashToken, dbLocks, mail, fileSignature, avatarStorage
+│   ├── app.ts                # Khởi tạo Express, mount routes
+│   └── server.ts             # Entry: connect DB, Socket.IO, worker outbox
+├── tests/                    # Script e2e chạy bằng tsx (cần DB thật)
+└── uploads/                  # File upload local (avatars công khai; chat/cvs riêng tư)
 ```
 
-### Core Modules (`src/modules/`)
-- **`auth/`**: Registration, Login, Token Management, Password changes.
-- **`users/` & `members/` & `coaches/`**: User lifecycle and role-specific profiles.
-- **`membership-plans/` & `subscriptions/`**: Subscription tiers (FREE, MEMBERSHIP, PREMIUM) and plan management.
-- **`sports/` & `rooms/` & `classes/` & `class-schedules/`**: Core catalog and timetabling.
-- **`enrollments/`**: Complex booking logic including capacity, tier, and time-conflict checks.
-- **`payments/` & `invoices/`**: Payment tracking and automated invoice generation.
-- **`reports/`**: Aggregation APIs for analytics (Revenue, Enrollments, Subscriptions).
+Các module đang được mount trong `src/app.ts` (prefix `/api/v1`): `auth`, `users`, `members`, `coaches`, `sports`, `rooms`, `classes`, `class-schedules`, `enrollments`, `payments`, `invoices`, `reports`, `products`, `chat`, `attendance`, `training-plans`, `notifications`, `feedbacks`.
+Logic ví HLV nằm ở `coaches/coach-wallet.*`.
+
+---
+
+## 📐 Quy ước code (BẮT BUỘC đọc trước khi sửa)
+
+### 0. Nguyên tắc chung
+
+1. **Bắt chước module sẵn có.** Trước khi thêm tính năng, mở một module tương tự (mẫu gọn nhất: `modules/sports/`; mẫu có transaction/lock/outbox: `modules/enrollments/enrollments.service.ts`) và làm đúng cùng khuôn.
+2. **Đọc trước, sửa sau.** Không đoán tên hàm/field/route. `grep` code hoặc đọc `prisma/schema.prisma` để xác nhận trước khi dùng. Không bịa model, enum, endpoint, biến môi trường.
+3. **Sửa tối thiểu, đúng chỗ.** Chỉ đụng file liên quan tới yêu cầu. Không refactor/format lại hàng loạt file khác.
+4. **Sửa trực tiếp file nguồn.** KHÔNG tạo script vá kiểu `fix_*.js`, `modify*.py`, regex find-and-replace chạy lên `src/` (xem [Nguồn sự thật](#-nguồn-sự-thật--những-thứ-không-được-giả-định)). Muốn đổi gì thì dùng công cụ sửa file/đọc diff.
+5. **Kiểm tra trước khi báo xong:** chạy `npx tsc --noEmit` (kết quả phải không có lỗi MỚI do thay đổi của bạn) và, nếu đụng luồng nghiệp vụ đã có e2e, chạy script e2e tương ứng (xem mục 10).
+6. **File mới luôn lưu UTF-8.**
+
+### 1. Cấu trúc một module
+
+Mỗi tính năng nằm ở `src/modules/<tên-kebab-case>/` với các file (tên file dạng `<tên>.<vai-trò>.ts`):
+
+| File | Vai trò |
+|---|---|
+| `<tên>.routes.ts` | Khai báo route + middleware + **Swagger JSDoc**. `export default router`. |
+| `<tên>.controller.ts` | Mỏng: nhận `req`, gọi service, trả response chuẩn. |
+| `<tên>.service.ts` | Toàn bộ nghiệp vụ + truy cập Prisma. |
+| `<tên>.schema.ts` | Zod schema + `export type ...Input = z.infer<...>`. |
+
+Module phức tạp được tách thêm service theo chủ đề (VD `attendance-penalties.service.ts`, `enrollment-quota.service.ts`, `sepay-payments.service.ts`, `sepay-api.client.ts`, `chat.socket.ts`) — vẫn giữ quy tắc đặt tên `<chủ-đề>.<vai-trò>.ts`.
+
+Thêm module mới ⇒ (a) tạo 4 file trên, (b) `import` + `app.use("/api/v1/<tên>", <tên>Routes)` (theo kiểu hiện có trong `app.ts`, biến `v1`) trong `src/app.ts`, (c) thêm `tags` (và response `$ref` dùng chung nếu cần) trong `src/config/swagger.ts`.
+
+### 2. Import
+
+- Dự án chạy ESM `NodeNext` ⇒ **mọi import tương đối phải có đuôi `.js`** dù file nguồn là `.ts`:
+  `import { prisma } from "../../config/prisma.js";`
+- Import kiểu thuần: `import type { ... }`.
+- Dùng namespace import cho service trong controller: `import * as sportsService from "./sports.service.js";`
+- Chỉ dùng **một** Prisma client: `import { prisma } from "<…>/config/prisma.js"`. **Không** `new PrismaClient()` ở nơi khác.
+
+### 3. Routes (`*.routes.ts`)
+
+Thứ tự middleware cố định: `authenticate` → `authorize(...roles)` → `validate(Schema[, "body"|"query"|"params"])` → controller.
+
+```ts
+router.post(
+  "/",
+  authenticate,
+  authorize("MANAGER"),
+  validate(CreateSportSchema),
+  sportsController.createSport
+);
+router.get("/", validate(SportQuerySchema, "query"), sportsController.listSports); // route công khai
+```
+
+- Role hợp lệ (enum `UserRole`): `MEMBER`, `COACH`, `MANAGER`. Mặc định mọi route cần Bearer token; route công khai khai báo `security: []` trong Swagger **và** không gắn `authenticate`.
+- `authenticate` kiểm tra lại DB mỗi request (user tồn tại, `isActive`, role không đổi) rồi gán `req.user = { id, role }`. `authenticateIncludingInactive` chỉ dành cho luồng Coach nộp CV (tài khoản chưa duyệt) — đừng dùng bừa.
+- Phân quyền theo **dữ liệu** (VD "member chỉ hủy được đặt chỗ của chính mình") phải kiểm tra trong service bằng `req.user.id` truyền xuống — `authorize` chỉ lo role.
+- Mỗi route **phải có comment `@swagger`** ngay phía trên (tag, summary, parameters/requestBody, responses). Response lỗi/ok dùng `$ref: "#/components/responses/<Tên>"` đã định nghĩa trong `src/config/swagger.ts`; thiếu thì thêm vào đó. Swagger quét `./src/modules/**/*.routes.ts`. Path trong Swagger **không** có prefix `/api/v1` (đã nằm trong `servers`).
+- Route tĩnh (`/me`, `/generate-qr`…) phải khai báo **trước** route động `/:id`.
+
+### 4. Controllers (`*.controller.ts`)
+
+Mẫu duy nhất đang dùng — mỗi handler `async`, bọc `try/catch`, lỗi chuyển `next(err)`, không chứa nghiệp vụ:
+
+```ts
+export async function getSportById(req: Request, res: Response, next: NextFunction) {
+  try {
+    const sport = await sportsService.getSportById(req.params.id as string); // Express 5: params là string | string[]
+    sendSuccess(res, sport, "Sport retrieved successfully");
+  } catch (err) { next(err); }
+}
+```
+
+- Trả response **chỉ** qua `sendSuccess` / `sendCreated` / `sendError` (`src/utils/response.ts`). Không `res.json({...})` thủ công (ngoại lệ duy nhất hiện có: health check và 404 trong `app.ts`).
+- Danh sách có phân trang: `sendSuccess(res, items, msg, 200, pagination)`.
+- Tạo mới trả `201` qua `sendCreated`. Xóa mềm trả `200` kèm bản ghi đã cập nhật.
+- Lấy user hiện tại từ `req.user!.id` / `req.user!.role` (kiểu khai báo ở `src/types/express.d.ts`).
+
+### 5. Validation (Zod)
+
+- Mọi input từ client (`body`, `query`, `params`) đi qua `validate()`; schema đặt trong `<tên>.schema.ts`.
+- Query string luôn là chuỗi ⇒ khai báo `z.string().optional()` rồi parse trong service (`page`, `limit`, `isActive: "true"|"false"`). Enum thì dùng `z.enum([...])`.
+- Lỗi validate trả `400` dạng `{ success:false, message:"Validation failed", errors:[{field, message}] }`. `validate` ghi đè `req.body/params/query` bằng dữ liệu đã parse (key lạ bị loại) và gán `req.validated`.
+- Export type bằng `z.infer` và dùng cho tham số service (xem `members.schema.ts` + `members.service.ts`) — **ưu tiên cách này, tránh `data: any`**. (Một số service cũ như `sports.service.ts` đang dùng `any`; đừng nhân rộng.)
+- Muốn Zod giữ chặt dữ liệu vào DB thì thêm ràng buộc thực sự (min/max/regex) — ví dụ `phone` trong `members.schema.ts`.
+
+### 6. Services & Prisma
+
+- **Lỗi nghiệp vụ**: `throw new AppError(message, statusCode, errors?)` (từ `middlewares/errorHandler.js`). Không `res.status(...)` trong service. Mã thường dùng trong code: `400` input/nghiệp vụ sai, `401`, `403`, `404` không thấy, `409` trùng/xung đột trạng thái.
+- `errorHandler` đã tự map: Prisma `P2002`→409, `P2025`→404, `P2003`→400, `P2014`→400, JSON hỏng→400, còn lại→500 `"Internal server error"`. Đừng bắt lại những lỗi này nếu không cần thông điệp riêng.
+- **Phân trang**: chuẩn hiện có — `page` mặc định 1, `limit` mặc định 10, kẹp trong `[1, 100]`, chạy song song `Promise.all([count, findMany])`, trả `buildPaginationMeta(total, page, limit)` từ `utils/pagination.js`.
+  ```ts
+  const page = Math.max(1, parseInt(query.page ?? "1") || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
+  ```
+- **Xóa mềm** là mặc định cho thực thể có `isActive` (VD `deleteSport` đặt `isActive=false` và chặn nếu còn Class active). Không `delete` cứng bản ghi có liên kết nghiệp vụ.
+- Cập nhật **nhiều bảng phải atomic** ⇒ `prisma.$transaction(async (tx) => { ... })` và truyền `tx` xuống các hàm con (helper nhận `db: typeof prisma | Prisma.TransactionClient`).
+- Dùng `select`/`include` có chủ đích; **không bao giờ trả `password`** hoặc token hash ra response (xem `memberInclude` trong `members.service.ts` — chỉ select các cột an toàn của `user`).
+- Tiền dùng `Decimal(12,2)` trong schema; ID là `String @default(uuid())`.
+- Thời gian lưu UTC (`DateTime`); khi format cho người dùng VN dùng `toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })` như code hiện có.
+
+### 7. Đồng thời (concurrency) — luồng đặt chỗ / thanh toán
+
+Đây là phần dễ làm hỏng nhất; đọc `src/utils/dbLocks.ts` trước khi sửa:
+
+- Mọi luồng đặt chỗ / đổi chỗ / hình phạt chuyên cần phải lock theo **thứ tự cố định**: `lockMemberQuota` → `lockMemberClass` → `lockSchedule` (nhiều buổi: `lockSchedules`, đã tự sort). **Không bao giờ đảo thứ tự** (deadlock).
+- Lock là advisory lock theo transaction (`pg_advisory_xact_lock`) ⇒ **chỉ hợp lệ bên trong `$transaction`**, tự nhả khi commit/rollback.
+- **Đọc lại dữ liệu SAU khi lock** (xem comment A12 trong `bookClass`): đừng dùng object đã đọc trước transaction để quyết định.
+- Webhook thanh toán dùng `lockPaymentWebhook(paymentId)` — lock riêng, KHÔNG nằm trong chuỗi lock enrollment.
+- Thêm kiểu lock mới ⇒ ghi thứ tự vào comment đầu `dbLocks.ts`.
+
+### 8. Thông báo (Notification) — dùng Outbox khi gắn với transaction
+
+- Thông báo phải đi cùng một thay đổi dữ liệu trong transaction ⇒ `enqueueNotification(tx, {...})` **bên trong** transaction, rồi `await flushNotificationOutbox().catch(() => {})` **sau khi commit** (xem `bookClass`). Worker trong `server.ts` flush định kỳ làm lưới an toàn.
+- Thông báo không quan trọng/không liên quan transaction: `createNotification(...).catch(() => {})` (fire-and-forget, không `await` để khỏi chặn response; luôn `.catch`).
+- Loại thông báo mới ⇒ thêm vào **cả** `enum NotificationType` (schema.prisma, cần migration) **và** union `NotificationTypeEnum` trong `notifications.service.ts`.
+
+### 9. Prisma schema & migration
+
+- Sửa `prisma/schema.prisma` rồi tạo migration bằng `npm run db:migrate` (tức `prisma migrate dev`); tên migration `snake_case` mô tả thay đổi, thư mục tự có timestamp. Commit cả `migration.sql`.
+- **Không sửa migration đã tồn tại/đã áp dụng**; muốn đổi thì tạo migration mới. Đổi cột `NOT NULL` trên bảng có dữ liệu: làm 2 bước (thêm nullable → backfill → ép bắt buộc), như cặp migration `add_area_type_nullable` / `enforce_area_type_required`.
+- Thêm `@@index` cho cột dùng để lọc/join thường xuyên; đặt `@@unique` để chặn trùng ở tầng DB thay vì chỉ kiểm tra trong code (bài học từ `SepayWebhookEvent.sepayId`, `Enrollment[memberId, scheduleId]`).
+- Sau khi đổi schema: `npm run db:generate`, rồi `npx tsc --noEmit` để bắt chỗ code còn dùng model/enum đã đổi.
+- `prisma.config.ts` đọc `DATABASE_URL` từ `.env`; không hard-code connection string.
+
+### 10. Test
+
+- Hiện **không có** unit test framework. Test là các script e2e thật (HTTP + PostgreSQL) trong `tests/*.e2e.ts`, chạy bằng `tsx` qua `npm run test:e2e*` (xem `package.json`). Chúng (VD `subscription-lifecycle.e2e.ts`) import `app` từ `src/app.js`, dùng `prisma` thật ⇒ **cần DB dev**, tuyệt đối không chạy trên DB production.
+- Viết test mới: copy cấu trúc một file e2e (VD helper `http()`, `check()`, hậu tố `RUN = Date.now().toString(36)` để dữ liệu không đụng nhau), thêm script vào `package.json` và vào `test:e2e:all`.
+- Đổi hành vi luồng thanh toán SePay / đặt chỗ / quota / điểm danh / chat đính kèm ⇒ chạy e2e tương ứng (`test:e2e:sepay`, `test:e2e`, `test:e2e:course`, `test:e2e:attendance`, `test:e2e:chat`).
+
+### 11. Biến môi trường & cấu hình
+
+- Biến bắt buộc đọc qua `src/config/env.ts` (`required("KEY")` ném lỗi khi thiếu). Biến lõi: `PORT`, `DATABASE_URL`, `JWT_*`, `SMTP_*`. Thêm biến lõi ⇒ thêm vào `env.ts` **và** README mục Environment Variables.
+- Cấu hình theo tính năng nằm file riêng trong `src/config/` (`sepay.ts`, `avatar-storage.ts`, `attendance.ts`…), có giá trị mặc định tại đó. Không rải `process.env.X` khắp service.
+- **Không commit `.env`** (đã trong `.gitignore`), không in secret ra log, không hard-code secret/API key vào code hay README.
+- `SEPAY_MOCK_MODE=true` chỉ cho dev/demo/e2e; `server.ts` sẽ thoát (fail-fast) nếu bật ở `NODE_ENV=production`. Đừng gỡ chốt này.
+
+### 12. Upload file & bảo mật
+
+- Dùng các wrapper trong `middlewares/upload.ts` (`avatarUpload`, `chatUploadSingle`, `cvUpload`); chúng dịch lỗi Multer thành `AppError 400` để response vẫn thống nhất. Không dùng `multer` trực tiếp trong route.
+- Tên file lưu trên disk do **server sinh** (UUID + đuôi theo MIME), không dùng tên client. Avatar còn kiểm **chữ ký thật** của ảnh (`utils/fileSignature.ts`) chứ không tin `mimetype`.
+- Chỉ `uploads/avatars` được serve tĩnh công khai (`app.ts`). File chat/CV là riêng tư: phải tải qua API có xác thực + phân quyền, **không** thêm `express.static` cho các thư mục đó.
+- Giới hạn kích thước: avatar 5MB; chat/CV 10MB.
+- Mọi API dưới `/api/v1` gửi `Cache-Control: no-store`; giữ nguyên.
+
+### 13. Thanh toán SePay — đừng đụng nếu chưa đọc
+
+- Idempotent theo thiết kế: `SepayWebhookEvent.sepayId` UNIQUE, `SepayBankTransaction` là ledger chống cấp quyền 2 lần, `Payment.activationStatus` tách khỏi `Payment.status` (tiền ≠ quyền).
+- `app.ts` giữ `req.rawBody` (qua `express.json({ verify })`) để verify chữ ký HMAC trên **raw body**. Đừng đổi thứ tự/cấu hình `express.json` hay re-serialize body.
+- Tiền về mà không kích hoạt được (lệch tiền, về muộn, trùng) ⇒ **ghi vết để đối soát tay, cố ý KHÔNG activate lần hai** (xem phần Troubleshooting bên dưới). Giữ nguyên hành vi này.
+- Đọc `config/sepay.ts` và `tests/sepay-payment.e2e.ts` trước khi sửa `payments/sepay-*`.
+
+### 14. Phong cách code
+
+- TypeScript `strict`: không thêm `any`/`as any` mới nếu có thể suy kiểu hoặc dùng `z.infer`/Prisma types. Nếu buộc phải dùng, ghi comment lý do.
+- Tên: file `kebab-case` (+ hậu tố vai trò), hàm/biến `camelCase`, type/schema `PascalCase` (schema Zod kết thúc bằng `Schema`, type suy ra kết thúc bằng `Input`), enum DB `PascalCase` với giá trị `UPPER_SNAKE_CASE`, hằng số `UPPER_SNAKE_CASE`.
+- Dấu ngoặc kép `"..."`, có dấu chấm phẩy, thụt lề 2 space (đúng với code hiện có). Chưa có ESLint/Prettier trong repo ⇒ tự giữ đồng nhất với file đang sửa.
+- Comment giải thích **vì sao** (ràng buộc nghiệp vụ, race condition, mã BR/A/F/D trong code). Comment/thông báo hiện **trộn tiếng Việt và tiếng Anh**: theo ngôn ngữ của khu vực code đang sửa; message trả cho người dùng cuối trong một endpoint nên nhất quán với các message cạnh nó.
+- Không `console.log` dữ liệu nhạy cảm. Log lỗi dùng `console.error/warn` có tiền tố như code hiện có (`[ERROR]`, `[OUTBOX]`).
+- Dùng lại helper trong `src/utils/` (`response`, `pagination`, `jwt`, `bcrypt`, `hashToken`, `mail`, `dbLocks`, `fileSignature`, `avatarStorage`) thay vì viết lại.
+
+### 15. Checklist trước khi kết thúc một thay đổi
+
+- [ ] Import tương đối có đuôi `.js`; dùng đúng `prisma` singleton.
+- [ ] Route: đúng thứ tự `authenticate → authorize → validate → controller`, có `@swagger`.
+- [ ] Input đi qua Zod; service nhận type suy ra, không để `any` mới.
+- [ ] Lỗi nghiệp vụ dùng `AppError`; response dùng `sendSuccess/sendCreated/sendError`.
+- [ ] Nhiều bước ghi DB ⇒ `$transaction`; luồng đặt chỗ ⇒ đúng thứ tự lock; notification ⇒ outbox nếu cùng transaction.
+- [ ] Không rò `password`/token/secret; không commit `.env`.
+- [ ] Đổi `schema.prisma` ⇒ có migration mới + `db:generate`.
+- [ ] `npx tsc --noEmit` không phát sinh lỗi mới; e2e liên quan (nếu có) pass.
+- [ ] README/Swagger được cập nhật nếu đổi API, biến môi trường hoặc quy ước.
+
+---
+
+## 🧭 Nguồn sự thật & những thứ KHÔNG được giả định
+
+- **`prisma/schema.prisma` là nguồn sự thật về dữ liệu.** Chỉ dùng model/enum/field có trong đó. Hệ thống hiện tính tiền theo lớp (`Class` / `Enrollment` / `Payment`); **không có** `MembershipPlan`, `MembershipSubscription`, `MemberTier` — đừng viết code dùng chúng và đừng tự tạo lại. Nếu đoạn code/Swagger/seed cũ nào còn nhắc tới chúng thì coi là lỗi thời, không bắt chước.
+- **Chỉ module được `app.use(...)` trong `src/app.ts` mới là API đang chạy.** Thư mục trong `src/modules/` chưa được mount (VD `wallets/`) không phải khuôn mẫu.
+- **Không viết script vá/thay thế hàng loạt** (`fix_*.js`, `modify*.py`, regex chạy lên `src/`) và không để file tạm/backup (`.bak`, `*_errors.txt`) trong repo. Sửa trực tiếp file nguồn.
+- **Không thêm `(prisma as any)`, `as any` để "lách" lỗi biên dịch.** Lỗi kiểu do schema/model không khớp thì sửa đúng nguồn (schema, import, kiểu), không ép kiểu cho qua.
+- Hãy xác minh bằng `grep`/đọc file trước khi dựa vào bất kỳ tên hàm, route, biến môi trường nào; không có thì không bịa.
+
+---
 
 ## 🛠️ Getting Started
 
@@ -185,9 +370,8 @@ Once the server is running, you can view the interactive Swagger API documentati
 - `npm run db:studio` - Open Prisma Studio to view and edit data visually via browser.
 - `npm run db:reset` - Reset the database and re-apply all migrations.
 
-## 🤝 Project Flows (Implemented)
-- **Flow 1: User & Membership Management:** Fully functional with tier-based validations.
-- **Flow 2: Class Booking & Schedule:** Built with robust logic for conflict handling and capacity limits.
-- **Flow 3: Payment & Reports:** End-to-end payment lifecycle and dashboard analytics.
+## 🤝 Project Flows
 
-*(Note: AI Workouts, AI Assistant, and advanced Attendance features are planned for future phases).*
+Các luồng đang có code trong repo: quản lý người dùng/hồ sơ (member, coach, manager), catalog (sports, rooms), lớp học & lịch, đặt chỗ/hủy/đổi chỗ kèm quota lớp song song, điểm danh (QR + mã dự phòng) và hình phạt chuyên cần, thanh toán SePay (VietQR + webhook + đối soát API) kèm hóa đơn, báo cáo, chat (REST + Socket.IO, file đính kèm riêng tư), thông báo (outbox), kế hoạch tập luyện, phản hồi HLV, sản phẩm.
+
+*(AI Workouts / AI Assistant là kế hoạch tương lai.)*
