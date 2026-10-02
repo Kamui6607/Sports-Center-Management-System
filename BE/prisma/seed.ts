@@ -1,8 +1,6 @@
 import "dotenv/config";
-import { PrismaClient, UserRole, MemberTier, ClassType, AreaType, PaymentMethod, PaymentStatus } from "@prisma/client";
+import { PrismaClient, UserRole, ClassType, AreaType, PaymentMethod, PaymentStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { FREE_PLAN } from "../src/config/membership.js";
-import { ensureActiveFreeSubscription } from "../src/modules/subscriptions/free-subscription.service.js";
 
 const prisma = new PrismaClient();
 
@@ -42,7 +40,7 @@ async function main() {
       password: staffPwd,
       fullName: "Lê Thị Lễ Tân",
       phone: "0900000002",
-      role: UserRole.STAFF,
+      role: UserRole.MANAGER,
       isActive: true,
     },
   });
@@ -181,85 +179,6 @@ async function main() {
     include: { memberProfile: true },
   });
   console.log("Member SePay test:", memberSepay.email);
-
-  // ─── MEMBERSHIP PLANS ────────────────────────────────
-  const planBasic = await prisma.membershipPlan.upsert({
-    where: { id: "plan-basic-001" },
-    update: {},
-    create: {
-      id: "plan-basic-001",
-      name: "Membership Monthly",
-      description: "Gói thành viên cơ bản 1 tháng. Được đăng ký các lớp thông thường.",
-      price: 300000,
-      durationDays: 30,
-      tier: MemberTier.MEMBERSHIP,
-      maxConcurrentClasses: 3,
-      isActive: true,
-    },
-  });
-
-  const planQuarterly = await prisma.membershipPlan.upsert({
-    where: { id: "plan-quarterly-001" },
-    update: {},
-    create: {
-      id: "plan-quarterly-001",
-      name: "Membership Quarterly",
-      description: "Gói thành viên cơ bản 3 tháng. Tiết kiệm hơn so với gói tháng.",
-      price: 800000,
-      durationDays: 90,
-      tier: MemberTier.MEMBERSHIP,
-      maxConcurrentClasses: 3,
-      isActive: true,
-    },
-  });
-
-  const planPremium = await prisma.membershipPlan.upsert({
-    where: { id: "plan-premium-001" },
-    update: {},
-    create: {
-      id: "plan-premium-001",
-      name: "Premium Monthly",
-      description: "Gói Premium 1 tháng. Đăng ký lớp Premium, AI workout recommendation, ưu tiên booking.",
-      price: 600000,
-      durationDays: 30,
-      tier: MemberTier.PREMIUM,
-      maxConcurrentClasses: 6,
-      isActive: true,
-    },
-  });
-
-  // Gói FREE hệ thống — Member mới được auto-provision subscription ACTIVE với plan này (quota 0).
-  // Chỉ MỘT plan FREE duy nhất: upsert theo id cố định, provisioning runtime cũng reuse plan FREE active.
-  await prisma.membershipPlan.upsert({
-    where: { id: "plan-free-001" },
-    update: {},
-    create: {
-      id: "plan-free-001",
-      name: FREE_PLAN.name,
-      description: FREE_PLAN.description,
-      price: FREE_PLAN.price,
-      durationDays: FREE_PLAN.durationDays,
-      tier: MemberTier.FREE,
-      maxConcurrentClasses: 0,
-      isActive: true,
-    },
-  });
-  // Gói giá thấp để kiểm thử thanh toán SePay (webhook/mock-confirm) với số tiền thật nhỏ.
-  await prisma.membershipPlan.upsert({
-    where: { id: "plan-sepay-test-001" },
-    update: {},
-    create: {
-      id: "plan-sepay-test-001",
-      name: "SePay Test 5K",
-      description: "Gói thử nghiệm thanh toán SePay 5.000đ (7 ngày) — chỉ dùng để kiểm thử luồng VietQR.",
-      price: 5000,
-      durationDays: 7,
-      tier: MemberTier.MEMBERSHIP,
-      maxConcurrentClasses: 3,
-      isActive: true,
-    },
-  });
-  console.log("Membership Plans created");
 
   // ─── SPORTS ──────────────────────────────────────────
   const yoga = await prisma.sport.upsert({
@@ -464,131 +383,7 @@ async function main() {
   });
   console.log("Class Schedules created");
 
-  // ─── SUBSCRIPTIONS (for member1 and member2) ─────────
-  const member1Profile = member1.memberProfile;
-  const member2Profile = member2.memberProfile;
-
-  // Seed chạy lại KHÔNG được tạo subscription trùng: chỉ seed gói trả phí khi member chưa có gói ACTIVE.
-  const hasActiveSubscription = async (memberProfileId: string) =>
-    (await prisma.membershipSubscription.count({
-      where: { memberId: memberProfileId, status: "ACTIVE" },
-    })) > 0;
-
-  if (member1Profile && !(await hasActiveSubscription(member1Profile.id))) {
-    const subStartDate = new Date();
-    const subEndDate = new Date();
-    subEndDate.setDate(subEndDate.getDate() + planBasic.durationDays);
-
-    const sub1 = await prisma.membershipSubscription.create({
-      data: {
-        memberId: member1Profile.id,
-        planId: planBasic.id,
-        tier: MemberTier.MEMBERSHIP,
-        startDate: subStartDate,
-        endDate: subEndDate,
-        status: "ACTIVE",
-      },
-    });
-
-    // Payment + Invoice for subscription
-    const payment1 = await prisma.payment.create({
-      data: {
-        memberId: member1Profile.id,
-        subscriptionId: sub1.id,
-        amount: planBasic.price,
-        method: PaymentMethod.CASH,
-        status: PaymentStatus.SUCCESS,
-        paidAt: new Date(),
-        createdById: staff.id,
-        note: "Thanh toán tại quầy",
-      },
-    });
-
-    await prisma.invoice.create({
-      data: {
-        invoiceNumber: `INV-${Date.now()}-001`,
-        memberId: member1Profile.id,
-        paymentId: payment1.id,
-        subtotal: planBasic.price,
-        discount: 0,
-        total: planBasic.price,
-        status: "ISSUED",
-        issuedAt: new Date(),
-      },
-    });
-
-    console.log("Subscription for member1 created");
-  }
-
-  if (member2Profile && !(await hasActiveSubscription(member2Profile.id))) {
-    const subStartDate = new Date();
-    const subEndDate = new Date();
-    subEndDate.setDate(subEndDate.getDate() + planPremium.durationDays);
-
-    const sub2 = await prisma.membershipSubscription.create({
-      data: {
-        memberId: member2Profile.id,
-        planId: planPremium.id,
-        tier: MemberTier.PREMIUM,
-        startDate: subStartDate,
-        endDate: subEndDate,
-        status: "ACTIVE",
-      },
-    });
-
-    const payment2 = await prisma.payment.create({
-      data: {
-        memberId: member2Profile.id,
-        subscriptionId: sub2.id,
-        amount: planPremium.price,
-        method: PaymentMethod.BANK_TRANSFER,
-        status: PaymentStatus.SUCCESS,
-        paidAt: new Date(),
-        createdById: staff.id,
-        note: "Chuyển khoản online",
-      },
-    });
-
-    await prisma.invoice.create({
-      data: {
-        invoiceNumber: `INV-${Date.now()}-002`,
-        memberId: member2Profile.id,
-        paymentId: payment2.id,
-        subtotal: planPremium.price,
-        discount: 0,
-        total: planPremium.price,
-        status: "ISSUED",
-        issuedAt: new Date(),
-      },
-    });
-
-    console.log("Subscription for member2 created");
-  }
-
-  // ─── AUTO FREE SUBSCRIPTION cho MEMBER chưa có gói ACTIVE ────────────
-  // Member mới luôn phải có subscription ACTIVE (tier FREE, quota 0). Idempotent:
-  // member đã có ACTIVE subscription (member1/member2) sẽ không bị tạo thêm.
-  const memberProfiles = [member1.memberProfile, member2.memberProfile, member3.memberProfile, memberSepay.memberProfile];
-  for (const profile of memberProfiles) {
-    if (!profile) continue;
-    const result = await prisma.$transaction((tx) =>
-      ensureActiveFreeSubscription(tx, profile.id)
-    );
-    console.log(
-      `Member ${profile.id}: ${result.created ? "created ACTIVE FREE subscription" : "already has ACTIVE subscription"}`
-    );
-  }
-
-  console.log("\nSeeding completed!");
-  console.log("\nTest Accounts:");
-  console.log("  Manager:  manager@sportscenter.com / Manager@123");
-  console.log("  Staff:    staff@sportscenter.com   / Staff@123");
-  console.log("  Coach 1:  coach1@sportscenter.com  / Coach@123");
-  console.log("  Coach 2:  coach2@sportscenter.com  / Coach@123");
-  console.log("  Member 1: member1@example.com      / Member@123  [MEMBERSHIP tier]");
-  console.log("  Member 2: member2@example.com      / Member@123  [PREMIUM tier]");
-  console.log("  Member 3: member3@example.com      / Member@123  [FREE tier]");
-  console.log("  SePay:    sepay.test@example.com   / Member@123  [FREE tier — kiểm thử thanh toán SePay, gói SePay Test 5K]");
+  console.log("  SePay:    sepay.test@example.com   / Member@123");
 }
 
 main()

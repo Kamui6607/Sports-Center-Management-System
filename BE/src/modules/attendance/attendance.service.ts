@@ -315,23 +315,8 @@ export const scanQr = async (input: { qrToken?: string; code?: string }, user: a
     throw new AppError("Bạn chưa đặt chỗ cho lớp học này nên không thể điểm danh.", 403);
   }
 
-  // 3. Chốt chặn 2: Kiểm tra lại gói tập còn hạn tại thời điểm điểm danh
+  // 3. (Đã gỡ bỏ check gói tập)
   const now = new Date();
-  const activeSub = await (prisma as any).membershipSubscription.findFirst({
-    where: {
-      memberId: memberProfile.id,
-      status: "ACTIVE",
-      startDate: { lte: now },
-      endDate: { gte: now },
-    },
-  });
-
-  if (!activeSub) {
-    throw new AppError(
-      "Gói tập của bạn đã hết hạn. Vui lòng gia hạn để có thể vào lớp học.",
-      403
-    );
-  }
 
   // Chốt chặn 3: SERVER quyết định cửa sổ điểm danh + trạng thái buổi học (A09).
   const schedule = await prisma.classSchedule.findUnique({ where: { id: scheduleId } });

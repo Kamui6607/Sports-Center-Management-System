@@ -270,8 +270,8 @@ export async function getSportById(req: Request, res: Response, next: NextFuncti
    SEPAY_CODE_PREFIX="SEVQR"           # khớp "Cấu trúc mã thanh toán" trên my.sepay.vn (tiền tố 2-5 ký tự)
    SEPAY_CODE_SUFFIX_LENGTH="8"        # hậu tố số, SePay khuyến nghị 6-8
    VIETQR_BANK_ID="Sacombank"          # short_name/alias/code/BIN trong banks.json của SePay
-   VIETQR_ACCOUNT_NO="0703339186"      # số tài khoản (hoặc VA) nhận tiền
-   VIETQR_ACCOUNT_NAME="NGUYEN TRAN TU"
+   VIETQR_ACCOUNT_NO="123456789"       # số tài khoản (hoặc VA) nhận tiền
+   VIETQR_ACCOUNT_NAME="NGUYEN VAN A"
    VIETQR_PAYMENT_TTL_MINUTES="15"
    SEPAY_MOCK_MODE="true"              # BẮT BUỘC false ở production
    # Đối soát chủ động qua SePay API v2 (tùy chọn — dùng khi webhook không tới được BE)

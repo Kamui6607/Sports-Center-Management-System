@@ -1228,65 +1228,7 @@ const options: swaggerJSDoc.Options = {
             },
           },
         },
-        MembershipReportOk: {
-          description: "Membership report",
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                example: {
-                  success: true,
-                  message: "Membership report retrieved successfully",
-                  data: {
-                    totalSubscriptions: 2,
-                    newSubscriptions: 1,
-                    activeSubscriptions: 2,
-                    expiredSubscriptions: 0,
-                    cancelledSubscriptions: 0,
-                    suspendedSubscriptions: 0,
-                    subscriptionsByTier: { MEMBERSHIP: 1, PREMIUM: 1 },
-                    totalRevenue: 900000,
-                  },
-                },
-              },
-            },
-          },
-        },
-        SubscriptionLogListOk: {
-          description: "Paginated list of subscription logs",
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                example: {
-                  success: true,
-                  message: "Subscription logs retrieved successfully",
-                  data: [
-                    {
-                      id: "9643ec65-bacb-4b1b-9442-239bb60bd8fa",
-                      action: "Mua / Gia hạn gói",
-                      username: "Nguyễn Văn A",
-                      email: "nguyenvana@gmail.com",
-                      planName: "Gói Hội viên 1 tháng",
-                      planTier: "MEMBERSHIP",
-                      price: 500000,
-                      paymentStatus: "SUCCESS",
-                      startDate: "2026-09-18T00:00:00.000Z",
-                      endDate: "2026-10-18T00:00:00.000Z",
-                      purchasedAt: "2026-09-18T08:05:00.123Z"
-                    }
-                  ],
-                  pagination: {
-                    page: 1,
-                    limit: 20,
-                    total: 1,
-                    totalPages: 1
-                  }
-                },
-              },
-            },
-          },
-        },
+
         },
     },
     security: [{ BearerAuth: [] }],
@@ -1295,8 +1237,6 @@ const options: swaggerJSDoc.Options = {
       { name: "Users", description: "User management (Manager)" },
       { name: "Members", description: "Member profiles" },
       { name: "Coaches", description: "Coach profiles" },
-      { name: "Membership Plans", description: "Plan CRUD" },
-      { name: "Subscriptions", description: "Member subscriptions" },
       { name: "Sports", description: "Sport / discipline management" },
       { name: "Rooms", description: "Room management" },
       { name: "Classes", description: "Class management" },
