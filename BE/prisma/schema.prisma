@@ -214,6 +214,8 @@ model ManagerProfile {
 // SPORTS & ROOMS
 // ─────────────────────────────────────────
 
+/// Bộ môn tập (Yoga, HIIT, Bơi...). Tên bảng dưới DB là "Fitness" (@@map);
+/// model Prisma, code BE và API vẫn giữ tên Sport / sports để không ảnh hưởng FE.
 model Sport {
   id          String     @id @default(uuid())
   name        String     @unique
@@ -223,7 +225,9 @@ model Sport {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  classes Class[]
+  classes Class[] @relation("ClassToFitness")
+
+  @@map("Fitness")
 }
 
 model Room {
@@ -248,8 +252,8 @@ model Class {
   name        String
   description String?
 
-  // Many-to-Many with Sport
-  sports Sport[]
+  // Many-to-Many with Sport (bảng nối dưới DB: "_ClassToFitness")
+  sports Sport[] @relation("ClassToFitness")
 
   price       Decimal             @default(0) @db.Decimal(12, 2)
   status      ClassApprovalStatus @default(PENDING)
