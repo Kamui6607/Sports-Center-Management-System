@@ -177,16 +177,16 @@ function buildSepayCheckoutView(payment: Payment, cls: any): SepayCheckoutView {
 }
 
 /**
- * MEMBER tự tạo giao dịch mua gói bằng chuyển khoản VietQR (SePay).
+ * MEMBER tự tạo giao dịch mua khóa học bằng chuyển khoản VietQR (SePay).
  *
- * Luồng: kiểm tra gói + luật đổi gói (fail fast) → tạo `Payment` PENDING (method SEPAY,
- * gateway SEPAY, `planId` = gói muốn mua, `transactionCode` = mã thanh toán riêng) →
+ * Luồng: kiểm tra lớp (đang mở, đã APPROVED, có giá) → tạo `Payment` PENDING (method SEPAY,
+ * gateway SEPAY, `classId`, `transactionCode` = mã thanh toán riêng) →
  * trả ảnh QR + số tài khoản + số tiền + nội dung CK cho FE hiển thị.
- * Gói CHỈ được kích hoạt khi SePay gửi webhook xác nhận ĐÃ THU TIỀN.
+ * Khóa học CHỈ được kích hoạt khi SePay gửi webhook xác nhận ĐÃ THU TIỀN.
  *
- * - 400: gói FREE / hội viên không hợp lệ / hạ hạng hoặc giảm số ngày cùng hạng.
- * - 403/404: không phải MEMBER đang hoạt động / không thấy gói.
- * - 409 `SEPAY_PAYMENT_PENDING`: còn giao dịch PENDING cùng gói chưa quá TTL (trả kèm QR để FE tiếp tục).
+ * - 400: lớp chưa APPROVED / lớp miễn phí / user không phải MEMBER đang hoạt động.
+ * - 404: không thấy lớp hoặc lớp đã ngừng.
+ * - 409 `SEPAY_PAYMENT_PENDING`: còn giao dịch PENDING cùng lớp chưa quá TTL (trả kèm QR để FE tiếp tục).
  * - 503: chưa cấu hình tài khoản nhận tiền (VIETQR_BANK_ID / VIETQR_ACCOUNT_NO).
  */
 export async function createSepayCheckout(userId: string, classId: string) {
@@ -210,19 +210,14 @@ export async function createSepayCheckout(userId: string, classId: string) {
 
   const cls = await prisma.class.findUnique({ where: { id: classId } });
   if (!cls || !cls.isActive) throw new AppError("Class not found or inactive", 404);
+  if (cls.status !== "APPROVED") throw new AppError("Class is not yet approved", 400);
   if (Number(cls.price) <= 0) {
-    throw new AppError(
-      "Gói FREE không cần thanh toán. Vui lòng chọn gói MEMBERSHIP hoặc PREMIUM.",
-      400
-    );
+    throw new AppError("Khóa học miễn phí, không cần thanh toán.", 400);
   }
-
-  // Fail fast: chặn hạ hạng / cùng hạng ít ngày hơn TRƯỚC khi tạo giao dịch.
-  
 
   const now = new Date();
 
-  // Mỗi (member, gói) chỉ có 1 giao dịch SePay đang chờ → tránh chuyển tiền 2 lần cho cùng mục đích.
+  // Mỗi (member, lớp) chỉ có 1 giao dịch SePay đang chờ → tránh chuyển tiền 2 lần cho cùng mục đích.
   const pending = await prisma.payment.findFirst({
     where: {
       memberId: memberProfile.id,
@@ -237,7 +232,7 @@ export async function createSepayCheckout(userId: string, classId: string) {
     const expiresAt = sepayExpiresAt(pending, cfg.ttlMinutes);
     if (expiresAt.getTime() > now.getTime()) {
       throw new AppError(
-        `Bạn đang có giao dịch chuyển khoản chờ thanh toán cho gói "${cls.name}". ` +
+        `Bạn đang có giao dịch chuyển khoản chờ thanh toán cho khóa học "${cls.name}". ` +
           `Vui lòng hoàn tất hoặc thử lại sau ${Math.max(1, Math.ceil((expiresAt.getTime() - now.getTime()) / 60000))} phút.`,
         409,
         {
@@ -273,7 +268,7 @@ export async function createSepayCheckout(userId: string, classId: string) {
           status: "PENDING",
           transactionCode: orderCode,
           gateway: SEPAY_GATEWAY,
-          note: `Thanh toán online gói ${cls.name} (chuyển khoản VietQR qua SePay)`,
+          note: `Thanh toán online khóa học ${cls.name} (chuyển khoản VietQR qua SePay)`,
           // A07: chốt offer ngay lúc tạo QR — giá/duration/tier/quota không bị đổi khi plan sửa sau.
           classNameSnapshot: cls.name,
           // 

@@ -29,8 +29,8 @@ export async function updatePaymentStatus(req: Request, res: Response, next: Nex
 }
 
 /**
- * POST /payments/sepay/checkout — MEMBER tạo giao dịch chuyển khoản VietQR để tự mua gói.
- * Chỉ trả ảnh QR + số tài khoản + số tiền + nội dung CK; gói CHỈ được kích hoạt khi SePay
+ * POST /payments/sepay/checkout — MEMBER tạo giao dịch chuyển khoản VietQR để tự mua khóa học.
+ * Chỉ trả ảnh QR + số tài khoản + số tiền + nội dung CK; khóa học CHỈ được kích hoạt khi SePay
  * gửi webhook xác nhận (hoặc mock-confirm ở môi trường dev).
  */
 export async function sepayCheckout(req: Request, res: Response, next: NextFunction) {
@@ -84,8 +84,8 @@ export async function sepayMockConfirm(req: Request, res: Response, next: NextFu
 }
 
 /**
- * GET /payments/sepay/:id — FE polling trạng thái giao dịch (QR + status + subscriptionId).
- * Dùng sau khi hội viên chuyển khoản để biết gói đã được kích hoạt hay chưa.
+ * GET /payments/sepay/:id — FE polling trạng thái giao dịch (QR + status + paidAt).
+ * Dùng sau khi chuyển khoản để biết giao dịch đã được xác nhận hay chưa.
  */
 export async function sepayGetCheckout(req: Request, res: Response, next: NextFunction) {
   try {
@@ -100,7 +100,7 @@ export async function sepayGetCheckout(req: Request, res: Response, next: NextFu
 
 /**
  * POST /payments/:id/retry-activation — MANAGER kích hoạt bù cho giao dịch SePay đã thu tiền
- * nhưng chưa cấp được gói (activationStatus = REQUIRES_REVIEW), dùng đúng snapshot của đơn.
+ * nhưng chưa ghi danh được (activationStatus = REQUIRES_REVIEW), dùng đúng snapshot của đơn.
  */
 export async function retryPaymentActivation(req: Request, res: Response, next: NextFunction) {
   try {
@@ -108,6 +108,6 @@ export async function retryPaymentActivation(req: Request, res: Response, next: 
       req.user!.id,
       req.params.id as string
     );
-    sendSuccess(res, result, "Đã kích hoạt gói cho giao dịch đã thu tiền.");
+    sendSuccess(res, result, "Đã kích hoạt khóa học cho giao dịch đã thu tiền.");
   } catch (err) { next(err); }
 }

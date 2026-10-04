@@ -19,7 +19,7 @@ export async function creditCoachWallet(
   // Tìm primary coach của class
   const primaryCoachMember = await tx.classMember.findFirst({
     where: { classId, isPrimary: true },
-    select: { coachId: true },
+    select: { coachId: true, coach: { select: { userId: true } }, class: { select: { name: true } } },
   });
   if (!primaryCoachMember) return; // Không có primary coach → không credit
 
@@ -41,45 +41,39 @@ export async function creditCoachWallet(
       type: "DEPOSIT",
       status: "COMPLETED",
       classId,
+      // Gắn giao dịch gốc: khi hoàn tiền sẽ trừ ví đúng tỷ lệ số tiền HLV đã nhận từ giao dịch này.
+      paymentId,
       note: `Thu nhập từ khóa học (${COACH_REVENUE_SHARE * 100}% của ${paymentAmount.toLocaleString("vi-VN")}đ) — payment ${paymentId}`,
     },
   });
 
-  // Lấy userId để gửi notification (không ném lỗi nếu thất bại)
-  try {
-    const coach = await tx.coachProfile.findUnique({
-      where: { id: primaryCoachMember.coachId },
-      select: { userId: true, user: { select: { id: true } } },
-    });
-    if (coach?.userId) {
-      const cls = await tx.class.findUnique({ where: { id: classId }, select: { name: true } });
-      createNotification(
-        coach.userId,
-        "PAYMENT_SUCCESS",
-        "Bạn vừa nhận được thu nhập!",
-        `${coachAmount.toLocaleString("vi-VN")}đ đã được ghi vào ví từ khóa học "${cls?.name ?? classId}".`
-      ).catch(() => {});
-    }
-  } catch {
-    // Không để lỗi notification phá vỡ transaction
+  // Gửi notification (userId + tên lớp đã lấy sẵn ở query đầu — không tốn thêm query trong transaction)
+  const coachUserId = primaryCoachMember.coach?.userId;
+  if (coachUserId) {
+    createNotification(
+      coachUserId,
+      "PAYMENT_SUCCESS",
+      "Bạn vừa nhận được thu nhập!",
+      `${coachAmount.toLocaleString("vi-VN")}đ đã được ghi vào ví từ khóa học "${primaryCoachMember.class?.name ?? classId}".`
+    ).catch(() => {});
   }
 }
 
 /**
- * Auto-enroll member vào tất cả buổi SCHEDULED của class sau khi payment SUCCESS.
- * Chạy TRONG transaction.
+ * Auto-enroll member vào các buổi SCHEDULED CHƯA DIỄN RA của class sau khi payment SUCCESS
+ * (buổi đã qua giờ bắt đầu thì không ghi danh). Chạy TRONG transaction.
  */
 export async function autoEnrollAfterPayment(tx: any, classId: string, memberProfileId: string) {
-  const schedules = await tx.classSchedule.findMany({
-    where: { classId, status: "SCHEDULED" },
+  const schedules: { id: string }[] = await tx.classSchedule.findMany({
+    where: { classId, status: "SCHEDULED", startTime: { gt: new Date() } },
+    select: { id: true },
   });
-  for (const schedule of schedules) {
-    await tx.enrollment.upsert({
-      where: { memberId_scheduleId: { memberId: memberProfileId, scheduleId: schedule.id } },
-      create: { memberId: memberProfileId, classId, scheduleId: schedule.id, status: "BOOKED" },
-      update: {}, // Đã có enrollment → giữ nguyên (idempotent)
-    });
-  }
+  if (schedules.length === 0) return 0;
+  // 1 query cho mọi buổi; skipDuplicates giữ nguyên enrollment đã có (idempotent như upsert cũ).
+  await tx.enrollment.createMany({
+    data: schedules.map((s) => ({ memberId: memberProfileId, classId, scheduleId: s.id, status: "BOOKED" })),
+    skipDuplicates: true,
+  });
   return schedules.length;
 }
 
@@ -87,6 +81,7 @@ export async function createPayment(data: any, createdById: string) {
   // Resolve member
   const memberProfile = await prisma.memberProfile.findFirst({
     where: { OR: [{ id: data.memberId }, { userId: data.memberId }] },
+    include: { user: { select: { fullName: true } } },
   });
   if (!memberProfile) throw new AppError("Member not found", 404);
 
@@ -96,6 +91,18 @@ export async function createPayment(data: any, createdById: string) {
     cls = await prisma.class.findUnique({ where: { id: data.classId } });
     if (!cls) throw new AppError("Class not found", 404);
     if (cls.status !== "APPROVED") throw new AppError("Class is not yet approved", 400);
+    const price = Number(cls.price);
+    if (price <= 0) {
+      throw new AppError("Khóa học miễn phí, không cần ghi nhận thanh toán.", 400);
+    }
+    // Số tiền là căn cứ cho hóa đơn, 85% ví HLV và tiền hoàn ⇒ phải đúng giá khóa học.
+    if (Number(data.amount) !== price) {
+      throw new AppError(
+        `Số tiền phải bằng giá khóa học (${price.toLocaleString("vi-VN")}đ).`,
+        400,
+        { code: "AMOUNT_MISMATCH", expectedAmount: price }
+      );
+    }
   }
 
   return prisma.$transaction(async (tx) => {
@@ -130,6 +137,9 @@ export async function createPayment(data: any, createdById: string) {
           total: data.amount,
           status: "ISSUED",
           issuedAt: new Date(),
+          // BR-25: snapshot tên người trả + lớp tại thời điểm xuất hóa đơn
+          memberName: memberProfile.user.fullName,
+          className: cls?.name ?? null,
         },
       });
 
@@ -227,6 +237,12 @@ export async function updatePaymentStatus(id: string, status: string) {
 
     // Auto create invoice if SUCCESS and no invoice
     if (status === "SUCCESS" && !payment.invoice) {
+      const memberUser = payment.memberId
+        ? await tx.memberProfile.findUnique({
+            where: { id: payment.memberId },
+            select: { user: { select: { fullName: true } } },
+          })
+        : null;
       await tx.invoice.create({
         data: {
           invoiceNumber: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
@@ -237,6 +253,8 @@ export async function updatePaymentStatus(id: string, status: string) {
           total: Number(payment.amount),
           status: "ISSUED",
           issuedAt: new Date(),
+          memberName: memberUser?.user.fullName ?? null,
+          className: payment.classNameSnapshot ?? null,
         },
       });
 

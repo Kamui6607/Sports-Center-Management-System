@@ -39,6 +39,13 @@ export async function deleteSchedule(req: Request, res: Response, next: NextFunc
     sendSuccess(res, schedule, "Schedule cancelled successfully");
   } catch (err) { next(err); }
 }
+export async function cancelSchedule(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = { id: req.user!.id, role: req.user!.role };
+    const result = await schedulesService.cancelScheduleWithResolution(req.params.id as string, req.body, actor);
+    sendSuccess(res, result, "Schedule cancelled successfully");
+  } catch (err) { next(err); }
+}
 export async function completeSchedule(req: Request, res: Response, next: NextFunction) {
   try {
     const schedule = await schedulesService.completeSchedule(req.params.id as string);

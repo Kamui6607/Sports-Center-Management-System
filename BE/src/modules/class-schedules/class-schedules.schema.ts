@@ -192,6 +192,32 @@ export const UpdateScheduleSchema = z.object({
   { message: "endTime must be after startTime", path: ["endTime"] }
 );
 
+/** Hủy buổi kèm xử lý quyền lợi hội viên: dạy bù (giờ/phòng mới) hoặc hoàn tiền 1 buổi. */
+export const CancelScheduleSchema = z.object({
+  reason: z.string().trim().max(500).optional(),
+  resolution: z
+    .discriminatedUnion("mode", [
+      z.object({
+        mode: z.literal("MAKEUP"),
+        startTime: z.string().datetime({ offset: true }),
+        endTime: z.string().datetime({ offset: true }),
+        roomId: z.string().min(1).optional(),
+      }),
+      z.object({ mode: z.literal("REFUND") }),
+    ])
+    .optional(),
+}).superRefine((d, ctx) => {
+  if (d.resolution?.mode === "MAKEUP" && new Date(d.resolution.endTime) <= new Date(d.resolution.startTime)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["resolution", "endTime"],
+      message: "endTime must be after startTime",
+    });
+  }
+});
+
+export type CancelScheduleInput = z.infer<typeof CancelScheduleSchema>;
+
 export const ScheduleQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),

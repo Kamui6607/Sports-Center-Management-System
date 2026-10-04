@@ -6,6 +6,7 @@ import { broadcastNotification } from "../notifications/notifications.service.js
 import { ATTENDANCE } from "../../config/attendance.js";
 import { scanAttendanceWarnings } from "../attendance/attendance.service.js";
 import { lockSchedule } from "../../utils/dbLocks.js";
+import { createSessionRefundsTx, notifyManagersNewRefunds } from "../refunds/refunds.service.js";
 import {
   
 } from "../attendance/attendance-analytics.service.js";
@@ -424,10 +425,13 @@ export async function getScheduleById(id: string) {
 // Unified cancellation: SCHEDULED → CANCELLED + BOOKED enrollments → CANCELLED.
 // A12: lock theo schedule (cùng khoá với booking) + re-read + CAS trạng thái.
 // Idempotent: CANCELLED gọi lại không update, không notify. COMPLETED → 400.
+// Buổi đã có hội viên giữ chỗ ⇒ chỉ được hủy qua `cancelScheduleWithResolution` (dạy bù / hoàn tiền):
+// các đường hủy cũ (PATCH status=CANCELLED, DELETE) bị chặn 400 SCHEDULE_CANCEL_RESOLUTION_REQUIRED.
 async function cancelScheduleTx(
   tx: Prisma.TransactionClient,
   schedule: { id: string; classId: string; class: { name: string } },
-  reason?: string
+  reason?: string,
+  opts?: { allowBooked?: boolean }
 ) {
   await lockSchedule(tx, schedule.id);
   const fresh = await tx.classSchedule.findUnique({ where: { id: schedule.id } });
@@ -441,6 +445,17 @@ async function cancelScheduleTx(
       include: { class: { include: { sports: true } }, room: true },
     });
     return { updated: current!, reason: reason ?? "Lịch học bị hủy" };
+  }
+
+  if (!opts?.allowBooked) {
+    const bookedCount = await tx.enrollment.count({ where: { scheduleId: schedule.id, status: "BOOKED" } });
+    if (bookedCount > 0) {
+      throw new AppError(
+        "Buổi học đã có hội viên đặt chỗ — phải chọn DẠY BÙ hoặc HOÀN TIỀN qua POST /class-schedules/:id/cancel.",
+        400,
+        { code: "SCHEDULE_CANCEL_RESOLUTION_REQUIRED", bookedCount }
+      );
+    }
   }
 
   await tx.enrollment.updateMany({
@@ -511,6 +526,158 @@ async function assertScheduleMoveKeepsBookingsValid(
       uncovered: uncovered.map((u: any) => nameOf(u)),
     }
   );
+}
+
+export type ScheduleCancelResolution =
+  | { mode: "MAKEUP"; startTime: string; endTime: string; roomId?: string }
+  | { mode: "REFUND" };
+
+/**
+ * Hủy MỘT buổi học kèm xử lý quyền lợi hội viên (COACH của lớp hoặc MANAGER).
+ *
+ * - Buổi đã có hội viên giữ chỗ ⇒ BẮT BUỘC chọn `resolution`, thiếu ⇒ 400 SCHEDULE_CANCEL_RESOLUTION_REQUIRED:
+ *   - `MAKEUP`: tạo buổi DẠY BÙ (giờ + phòng mới; kiểm tra trùng phòng/HLV và trùng lịch của hội viên),
+ *     tự chuyển toàn bộ hội viên đã đặt sang buổi bù.
+ *   - `REFUND`: mỗi hội viên đã thanh toán lớp nhận 1 yêu cầu hoàn tiền 1 buổi (PENDING, chờ Manager duyệt).
+ * - Buổi chưa ai đặt ⇒ hủy tự do; gửi `MAKEUP` vẫn tạo buổi bù như dời lịch.
+ * Toàn bộ chạy trong MỘT transaction dưới `lockSchedule` (cùng khoá với booking).
+ */
+export async function cancelScheduleWithResolution(
+  id: string,
+  data: { reason?: string; resolution?: ScheduleCancelResolution },
+  actor: { id: string; role: string }
+) {
+  const schedule = await prisma.classSchedule.findUnique({
+    where: { id },
+    include: { class: true, room: true },
+  });
+  if (!schedule) throw new AppError("Schedule not found", 404);
+
+  if (actor.role === "COACH") {
+    const assigned = await prisma.classMember.findFirst({
+      where: { classId: schedule.classId, coach: { userId: actor.id } },
+      select: { id: true },
+    });
+    if (!assigned) throw new AppError("Forbidden: you are not a coach of this class", 403);
+  }
+
+  const reason = data.reason?.trim() || "Lịch học bị hủy";
+  const resolution = data.resolution;
+
+  const result = await prisma.$transaction(async (tx) => {
+    await lockSchedule(tx, id);
+    const fresh = await tx.classSchedule.findUnique({ where: { id } });
+    if (!fresh) throw new AppError("Schedule not found", 404);
+    if (fresh.status === "COMPLETED") throw new AppError("Cannot cancel a completed schedule", 400);
+    if (fresh.status === "CANCELLED") {
+      throw new AppError("Schedule is already cancelled", 400, { code: "SCHEDULE_ALREADY_CANCELLED" });
+    }
+
+    const booked = await tx.enrollment.findMany({
+      where: { scheduleId: id, status: "BOOKED" },
+      select: { memberId: true, member: { select: { userId: true } } },
+    });
+    if (booked.length > 0 && !resolution) {
+      throw new AppError(
+        "Buổi học đã có hội viên đặt chỗ — phải chọn DẠY BÙ (MAKEUP) hoặc HOÀN TIỀN (REFUND).",
+        400,
+        { code: "SCHEDULE_CANCEL_RESOLUTION_REQUIRED", bookedCount: booked.length }
+      );
+    }
+    const memberIds = booked.map((b) => b.memberId);
+    const cancelTarget = { id, classId: fresh.classId, class: schedule.class };
+
+    let makeup: { id: string; startTime: Date; endTime: Date; room: { name: string } } | null = null;
+    let refunds: { id: string; memberId: string; amount: number }[] = [];
+
+    if (resolution?.mode === "MAKEUP") {
+      const startTime = new Date(resolution.startTime);
+      const endTime = new Date(resolution.endTime);
+      if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+        throw new AppError("Invalid startTime or endTime", 400);
+      }
+      if (endTime <= startTime) throw new AppError("endTime must be strictly greater than startTime", 400);
+      if (startTime <= new Date()) throw new AppError("Buổi dạy bù phải ở thời điểm trong tương lai", 400);
+
+      const roomId = resolution.roomId ?? fresh.roomId;
+      const room = await tx.room.findUnique({ where: { id: roomId } });
+      if (!room || !room.isActive) throw new AppError("Room not found or inactive", 404);
+      if (room.capacity < schedule.class.capacity) {
+        throw new AppError("Room capacity is too small for this class", 400);
+      }
+      assertClassRoomAreaMatch(schedule.class.areaType, room.areaType);
+
+      // Lock Room + Coaches (thứ tự cố định) rồi kiểm tra trùng — loại trừ chính buổi sắp hủy.
+      const coachIds = await getCoachIdsOfClass(tx, fresh.classId);
+      await lockScheduleResources(tx, [roomId], coachIds);
+      await checkConflicts(tx, roomId, fresh.classId, startTime, endTime, id);
+      // Hội viên đang giữ chỗ không được bị trùng giờ với lịch khác của họ ở giờ dạy bù.
+      await assertScheduleMoveKeepsBookingsValid(tx, { scheduleId: id, startTime, endTime });
+
+      await cancelScheduleTx(tx, cancelTarget, reason, { allowBooked: true });
+      makeup = await tx.classSchedule.create({
+        data: { classId: fresh.classId, roomId, startTime, endTime, status: "SCHEDULED", makeupForId: id },
+        include: { class: { include: { sports: true } }, room: true },
+      });
+      if (memberIds.length > 0) {
+        await tx.enrollment.createMany({
+          data: memberIds.map((memberId) => ({
+            memberId,
+            classId: fresh.classId,
+            scheduleId: makeup!.id,
+            status: "BOOKED" as const,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    } else if (resolution?.mode === "REFUND") {
+      // Tạo yêu cầu hoàn TRƯỚC khi hủy chỗ: giữ thứ tự lock schedule → payment → enrollment (refunds.service).
+      refunds = await createSessionRefundsTx(tx, {
+        scheduleId: id,
+        classId: fresh.classId,
+        memberIds,
+        requestedById: actor.id,
+        note: reason,
+      });
+      await cancelScheduleTx(tx, cancelTarget, reason, { allowBooked: true });
+    } else {
+      await cancelScheduleTx(tx, cancelTarget, reason, { allowBooked: true });
+    }
+
+    const cancelled = await tx.classSchedule.findUnique({
+      where: { id },
+      include: { class: { include: { sports: true } }, room: true },
+    });
+    return { cancelled, makeup, refunds, userIds: [...new Set(booked.map((b) => b.member.userId))] };
+  });
+
+  // Thông báo sau commit — fire-and-forget.
+  const fmt = (d: Date) => d.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+  const className = schedule.class.name;
+  if (result.userIds.length > 0) {
+    let body = `Lịch học "${className}" vào lúc ${fmt(schedule.startTime)} đã bị hủy.`;
+    if (result.makeup) {
+      body +=
+        ` Buổi dạy bù: ${fmt(result.makeup.startTime)} – ${fmt(result.makeup.endTime)} tại ${result.makeup.room.name}.` +
+        " Bạn đã được tự động giữ chỗ ở buổi bù.";
+    } else if (resolution?.mode === "REFUND") {
+      body += " Nếu bạn đã thanh toán khóa học, tiền của buổi này sẽ được hoàn sau khi quản lý xác nhận.";
+    }
+    broadcastNotification(result.userIds, "SCHEDULE_CANCELLED", `Lịch học đã bị hủy: ${className}`, body, {
+      reason,
+      metadata: { scheduleId: id, classId: schedule.classId, makeupScheduleId: result.makeup?.id ?? null },
+    }).catch(() => {});
+  }
+  if (result.refunds.length > 0) {
+    const total = result.refunds.reduce((sum, r) => sum + r.amount, 0);
+    void notifyManagersNewRefunds(
+      `Buổi học lớp "${className}" lúc ${fmt(schedule.startTime)} bị hủy (không dạy bù) — ` +
+        `${result.refunds.length} hội viên cần hoàn tổng ${total.toLocaleString("vi-VN")}đ.`,
+      { scheduleId: id, classId: schedule.classId, refundIds: result.refunds.map((r) => r.id) }
+    );
+  }
+
+  return { schedule: result.cancelled, makeup: result.makeup, refunds: result.refunds };
 }
 
 export async function updateSchedule(id: string, data: any) {

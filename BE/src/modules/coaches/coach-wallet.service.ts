@@ -112,6 +112,22 @@ export async function requestWithdrawal(coachUserId: string, data: {
     );
   }
 
+  // Tiền đang bị giữ cho các yêu cầu hoàn tiền chờ duyệt (sẽ bị trừ khỏi ví khi Manager duyệt).
+  const held = await prisma.refund.aggregate({
+    where: { coachWalletId: wallet.id, status: "PENDING" },
+    _sum: { coachDebitAmount: true },
+  });
+  const pendingRefundDebit = Number(held._sum.coachDebitAmount ?? 0);
+  const available = Number(wallet.balance) - pendingRefundDebit;
+  if (data.amount > available) {
+    throw new AppError(
+      `Số dư khả dụng chỉ còn ${Math.max(0, available).toLocaleString("vi-VN")}đ ` +
+        `(đang giữ ${pendingRefundDebit.toLocaleString("vi-VN")}đ cho các yêu cầu hoàn tiền chờ duyệt).`,
+      400,
+      { code: "BALANCE_HELD_FOR_REFUND", balance: Number(wallet.balance), pendingRefundDebit, available }
+    );
+  }
+
   // Kiểm tra: tất cả class mà coach nhận thu nhập đã COMPLETED chưa?
   const pendingClasses = await prisma.class.count({
     where: {

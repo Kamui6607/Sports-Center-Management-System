@@ -62,6 +62,7 @@ async function main() {
           specialization: "Yoga, Pilates",
           experienceYears: 5,
           bio: "Chuyên gia Yoga với 5 năm kinh nghiệm giảng dạy.",
+          approvalStatus: "APPROVED",
         },
       },
     },
@@ -84,6 +85,7 @@ async function main() {
           specialization: "HIIT, Strength Training",
           experienceYears: 7,
           bio: "HLV HIIT và Strength Training với 7 năm kinh nghiệm.",
+          approvalStatus: "APPROVED",
         },
       },
     },
@@ -271,6 +273,8 @@ async function main() {
       classType: ClassType.REGULAR,
       areaType: AreaType.INDOOR,
       isActive: true,
+      status: "APPROVED",
+      price: 400000,
     },
   });
 
@@ -286,6 +290,8 @@ async function main() {
       classType: ClassType.REGULAR,
       areaType: AreaType.INDOOR,
       isActive: true,
+      status: "APPROVED",
+      price: 450000,
     },
   });
 
@@ -301,6 +307,8 @@ async function main() {
       classType: ClassType.PREMIUM,
       areaType: AreaType.INDOOR,
       isActive: true,
+      status: "APPROVED",
+      price: 1200000,
     },
   });
   console.log("Classes created");

@@ -14,7 +14,7 @@ export async function getRevenueReport(startDate: string, endDate: string) {
   const cashFilter = { paidAt: { gte: start, lte: end } };
   const orderFilter = { createdAt: { gte: start, lte: end } };
 
-  const [collectedAgg, refundedAgg, pendingCount, failedCount, ordersCreated, byMethod, recentPayments] =
+  const [collectedAgg, refundedAgg, pendingCount, failedCount, ordersCreated, byMethod, recentPayments, partialRefundAgg] =
     await Promise.all([
       prisma.payment.aggregate({
         where: { ...cashFilter, status: "SUCCESS" },
@@ -46,19 +46,30 @@ export async function getRevenueReport(startDate: string, endDate: string) {
         orderBy: { paidAt: "desc" },
         take: 10,
       }),
+      // Hoàn tiền TỪNG PHẦN đã duyệt trong kỳ (hủy buổi không dạy bù) — giao dịch gốc vẫn SUCCESS
+      // nên chưa nằm trong refundedAgg. Hoàn cả khóa đã đổi giao dịch sang REFUNDED (tính ở refundedAgg).
+      prisma.refund.aggregate({
+        where: { status: "COMPLETED", processedAt: { gte: start, lte: end }, payment: { status: "SUCCESS" } },
+        _sum: { amount: true },
+        _count: true,
+      }),
     ]);
 
   const methodMap: Record<string, number> = {};
   for (const m of byMethod) methodMap[m.method] = Number(m._sum.amount ?? 0);
 
   const totalRevenue = Number(collectedAgg._sum.amount ?? 0);
-  const refundedAmount = Number(refundedAgg._sum.amount ?? 0);
+  const partialRefundedAmount = Number(partialRefundAgg._sum.amount ?? 0);
+  const refundedAmount = Number(refundedAgg._sum.amount ?? 0) + partialRefundedAmount;
 
   return {
     /** Tiền THỰC THU trong kỳ (tổng payment SUCCESS theo `paidAt`). */
     totalRevenue,
-    /** Tiền ĐÃ HOÀN trong kỳ (tổng payment REFUNDED theo `paidAt`). */
+    /** Tiền ĐÃ HOÀN trong kỳ (payment REFUNDED theo `paidAt` + hoàn từng phần đã duyệt theo `processedAt`). */
     refundedAmount,
+    /** Riêng phần hoàn TỪNG PHẦN (hủy buổi không dạy bù) đã duyệt trong kỳ. */
+    partialRefundedAmount,
+    partialRefunds: partialRefundAgg._count,
     /** Thực nhận = totalRevenue − refundedAmount (không âm). */
     netRevenue: Math.max(0, totalRevenue - refundedAmount),
     /** Tổng số ĐƠN được tạo trong kỳ (mọi trạng thái, theo `createdAt`). */
@@ -80,8 +91,8 @@ export async function getRevenueReport(startDate: string, endDate: string) {
     note:
       "totalRevenue = tiền THỰC THU trong kỳ (SUCCESS theo paidAt); refundedAmount = tiền ĐÃ HOÀN " +
       "(REFUNDED theo paidAt); netRevenue = thực nhận (gross − refunded). pendingPayments/failedPayments/" +
-      "totalPayments đếm theo ĐƠN tạo trong kỳ (createdAt). Lưu ý: chưa có refund ledger chi tiết — " +
-      "payment bị đánh REFUNDED được tính hoàn TOÀN BỘ số tiền gốc (kể cả chính sách hoàn một phần).",
+      "totalPayments đếm theo ĐƠN tạo trong kỳ (createdAt). refundedAmount gồm cả hoàn TỪNG PHẦN " +
+      "(bảng Refund, hủy buổi không dạy bù) đã duyệt trong kỳ theo processedAt.",
   };
 }
 

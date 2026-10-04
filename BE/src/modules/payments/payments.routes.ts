@@ -11,7 +11,19 @@ const router = Router();
  * @swagger
  * /payments:
  *   post:
- *     summary: Record a payment (auto-creates invoice on SUCCESS)
+ *     summary: Ghi nhận thanh toán khóa học tại quầy (Manager only)
+ *     description: |
+ *       Manager ghi nhận tiền mặt / chuyển khoản tại quầy cho 1 hội viên mua 1 lớp.
+ *       Thanh toán online qua VietQR dùng `POST /payments/sepay/checkout`, không dùng endpoint này.
+ *
+ *       - `memberId`: nhận `MemberProfile.id` hoặc `User.id` của hội viên.
+ *       - `classId`: lớp phải ở trạng thái `APPROVED`, nếu không trả 400 `Class is not yet approved`.
+ *       - `status` mặc định `SUCCESS`. Khi `SUCCESS`, trong cùng transaction:
+ *         tạo `Invoice` (ISSUED), ghi danh hội viên vào mọi buổi `SCHEDULED` của lớp,
+ *         cộng 85% số tiền vào ví HLV chính của lớp.
+ *       - `status = PENDING`: chỉ tạo Payment; chốt sau bằng `PATCH /payments/{id}/status`.
+ *       - `amount` phải bằng đúng `Class.price` (lệch ⇒ 400 `AMOUNT_MISMATCH`); lớp giá 0đ ⇒ 400.
+ *       - Chỉ ghi danh vào các buổi chưa diễn ra; hóa đơn lưu snapshot `memberName` + `className`.
  *     tags: [Payments]
  *     requestBody:
  *       required: true
@@ -21,19 +33,25 @@ const router = Router();
  *             type: object
  *             required: [memberId, amount, method]
  *             properties:
- *               memberId: { type: string }
- *               subscriptionId: { type: string }
- *               amount: { type: number }
+ *               memberId: { type: string, description: "MemberProfile.id hoặc User.id" }
+ *               classId: { type: string, description: "Class.id (lớp APPROVED)" }
+ *               amount: { type: number, description: "Bằng đúng giá khóa học (VND)" }
  *               method: { type: string, enum: [CASH, BANK_TRANSFER] }
- *               status: { type: string, enum: [PENDING, SUCCESS, FAILED] }
+ *               status: { type: string, enum: [PENDING, SUCCESS, FAILED], default: SUCCESS }
  *               note: { type: string }
  *               transactionCode: { type: string }
+ *           example:
+ *             memberId: "f2a35b9c-ef22-4656-b77a-14d6731793e0"
+ *             classId: "class-hiit-001"
+ *             amount: 450000
+ *             method: CASH
+ *             note: "Thu tiền mặt tại quầy"
  *     responses:
  *       201: { $ref: "#/components/responses/PaymentCreated" }
- *       400: { $ref: "#/components/responses/BadRequest" }
+ *       400: { description: "Body không hợp lệ / lớp chưa APPROVED / lớp miễn phí / sai số tiền (AMOUNT_MISMATCH)" }
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       403: { $ref: "#/components/responses/Forbidden" }
- *       404: { $ref: "#/components/responses/NotFound" }
+ *       404: { description: "Không tìm thấy hội viên hoặc lớp" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
 router.post(
@@ -147,12 +165,12 @@ router.patch(
  * @swagger
  * /payments/{id}/retry-activation:
  *   post:
- *     summary: Kích hoạt bù cho giao dịch online đã thu tiền nhưng chưa cấp gói (Manager only)
+ *     summary: Kích hoạt bù khóa học cho giao dịch SePay đã thu tiền nhưng chưa ghi danh (Manager only)
  *     description: |
- *       Dùng khi `activationStatus = REQUIRES_REVIEW` (tiền ĐÃ về nhưng gói không kích hoạt tự động,
- *       VD bị chặn hạ hạng trong lúc chờ chuyển khoản). Cấp gói theo ĐÚNG snapshot điều khoản của đơn.
- *       - 400: không phải giao dịch SePay / chưa thu tiền / đã có gói / không ở trạng thái cần xử lý.
- *       - 409: vẫn không kích hoạt được (VD gói hiện tại vẫn chặn) — giữ nguyên review, cập nhật lý do.
+ *       Dùng khi `activationStatus = REQUIRES_REVIEW` (tiền ĐÃ về nhưng không ghi danh / cộng ví HLV
+ *       tự động được). Chạy lại ghi danh vào các buổi sắp tới + cộng 85% ví HLV chính của lớp.
+ *       - 400: không phải giao dịch SePay / chưa thu tiền / không ở trạng thái REQUIRES_REVIEW / đơn sản phẩm.
+ *       - 409: vẫn không kích hoạt được (VD lớp đã bị xóa) — giữ nguyên review, cập nhật lý do.
  *     tags: [Payments]
  *     parameters:
  *       - in: path
@@ -178,20 +196,21 @@ router.post(
  * @swagger
  * /payments/sepay/checkout:
  *   post:
- *     summary: Member tạo đơn chuyển khoản VietQR (SePay) để tự mua gói hội viên
+ *     summary: Member tạo đơn chuyển khoản VietQR (SePay) để tự mua khóa học
  *     description: |
- *       **Thanh toán online qua SePay (chuyển khoản ngân hàng + ảnh VietQR) — Member tự mua gói, không cần quầy.**
+ *       **Thanh toán online qua SePay (chuyển khoản ngân hàng + ảnh VietQR) — Member tự mua khóa học, không cần quầy.**
+ *       Mua sản phẩm dùng `POST /products/orders`, không dùng endpoint này.
  *
  *       Luồng:
- *       1. BE kiểm tra gói + luật đổi gói (chặn hạ hạng / cùng hạng ít ngày hơn) — fail fast.
- *       2. Tạo `Payment` PENDING (`method = SEPAY`, `gateway = SEPAY`, `planId` = gói muốn mua,
+ *       1. BE kiểm tra lớp: đang mở (`isActive`), đã `APPROVED`, giá > 0 — fail fast.
+ *       2. Tạo `Payment` PENDING (`method = SEPAY`, `gateway = SEPAY`, `classId`, số tiền = `Class.price`,
  *          `transactionCode` = mã thanh toán riêng, VD `SEVQR12345678` — cũng là nội dung chuyển khoản).
  *       3. Trả ảnh QR động (`qrUrl`) + số tài khoản + số tiền + nội dung CK cho FE hiển thị.
- *       4. Hội viên quét QR / chuyển khoản đúng nội dung → SePay phát hiện giao dịch và gọi
- *          `POST /payments/sepay/webhook` → BE kích hoạt `MembershipSubscription` + `Invoice` + notification.
+ *       4. Hội viên quét QR / chuyển khoản đúng nội dung → SePay gọi `POST /payments/sepay/webhook`
+ *          → BE ghi danh hội viên vào các buổi sắp tới + cộng 85% vào ví HLV chính.
  *
- *       **Gói CHỈ được kích hoạt khi SePay xác nhận ĐÃ THU TIỀN** — không activate ở bước này.
- *       FE polling `GET /payments/sepay/{id}` để biết trạng thái (PENDING → SUCCESS).
+ *       **Chỉ kích hoạt khi SePay xác nhận ĐÃ THU TIỀN** — không kích hoạt ở bước này.
+ *       FE polling `GET /payments/sepay/{id}` để biết trạng thái.
  *       Chỉ MEMBER đang hoạt động gọi được (không nhận `memberId` ⇒ không mua hộ người khác).
  *     tags: [Payments]
  *     security:
@@ -202,11 +221,11 @@ router.post(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [planId]
+ *             required: [classId]
  *             properties:
- *               planId: { type: string, format: uuid, description: "MembershipPlan.id (tier MEMBERSHIP/PREMIUM)" }
+ *               classId: { type: string, description: "Class.id (lớp APPROVED, giá > 0)" }
  *           example:
- *             planId: "b7f1c0d2-0000-0000-0000-000000000001"
+ *             classId: "class-hiit-001"
  *     responses:
  *       201:
  *         description: Đơn đã tạo — trả ảnh VietQR + thông tin chuyển khoản
@@ -220,46 +239,46 @@ router.post(
  *               data:
  *                 paymentId: "c1a2b3c4-0000-0000-0000-000000000001"
  *                 orderCode: "SEVQR12345678"
- *                 amount: 300000
+ *                 amount: 450000
  *                 currency: VND
  *                 status: PENDING
  *                 gateway: SEPAY
- *                 expiresAt: "2026-09-25T15:30:00.000Z"
- *                 qrUrl: "https://qr.sepay.vn/img?acc=0703339186&bank=SACOMBANK&amount=300000&des=SEVQR12345678&template=compact"
+ *                 expiresAt: "2026-10-04T15:30:00.000Z"
+ *                 qrUrl: "https://qr.sepay.vn/img?acc=0703339186&bank=SACOMBANK&amount=450000&des=SEVQR12345678&template=compact"
  *                 transferContent: "SEVQR12345678"
  *                 bank: { id: "SACOMBANK", accountNumber: "0703339186", accountHolder: "NGUYEN TRAN TU" }
- *                 plan: { id: "b7f1c0d2-...", name: "Gói Membership 1 tháng", tier: MEMBERSHIP, durationDays: 30 }
+ *                 classInfo: { id: "class-hiit-001", name: "HIIT Cardio" }
  *       400:
- *         description: Gói FREE / user không phải MEMBER đang hoạt động / hạ hạng hoặc giảm số ngày cùng hạng
+ *         description: Lớp chưa APPROVED / lớp miễn phí / user không phải MEMBER đang hoạt động
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *             examples:
- *               free_plan:
- *                 value: { success: false, message: "Gói FREE không cần thanh toán. Vui lòng chọn gói MEMBERSHIP hoặc PREMIUM." }
- *               downgrade:
- *                 value: { success: false, message: "Không thể mua gói thấp hơn hạng hiện tại. Bạn chỉ có thể nâng cấp." }
+ *               not_approved:
+ *                 value: { success: false, message: "Class is not yet approved" }
+ *               free_class:
+ *                 value: { success: false, message: "Khóa học miễn phí, không cần thanh toán." }
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       403: { $ref: "#/components/responses/Forbidden" }
- *       404: { $ref: "#/components/responses/NotFound" }
+ *       404: { description: "Không thấy lớp hoặc lớp đã ngừng (isActive = false)" }
  *       409:
- *         description: Còn giao dịch chuyển khoản PENDING cho cùng gói (chưa quá TTL) — trả kèm QR để FE tiếp tục
+ *         description: Còn giao dịch chuyển khoản PENDING cho cùng lớp (chưa quá TTL) — trả kèm QR để FE tiếp tục
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *             example:
  *               success: false
- *               message: 'Bạn đang có giao dịch chuyển khoản chờ thanh toán cho gói "Gói Membership 1 tháng". Vui lòng hoàn tất hoặc thử lại sau 14 phút.'
+ *               message: 'Bạn đang có giao dịch chuyển khoản chờ thanh toán cho khóa học "HIIT Cardio". Vui lòng hoàn tất hoặc thử lại sau 14 phút.'
  *               errors:
  *                 code: SEPAY_PAYMENT_PENDING
  *                 gateway: SEPAY
  *                 paymentId: "c1a2b3c4-0000-0000-0000-000000000001"
  *                 orderCode: "SEVQR12345678"
- *                 amount: 300000
- *                 expiresAt: "2026-09-25T15:30:00.000Z"
- *                 qrUrl: "https://qr.sepay.vn/img?acc=0703339186&bank=SACOMBANK&amount=300000&des=SEVQR12345678"
+ *                 amount: 450000
+ *                 expiresAt: "2026-10-04T15:30:00.000Z"
+ *                 qrUrl: "https://qr.sepay.vn/img?acc=0703339186&bank=SACOMBANK&amount=450000&des=SEVQR12345678"
  *                 transferContent: "SEVQR12345678"
  *       503: { description: "Chưa cấu hình tài khoản nhận tiền (VIETQR_BANK_ID / VIETQR_ACCOUNT_NO)" }
  *       500: { $ref: "#/components/responses/ServerError" }
@@ -300,15 +319,14 @@ router.post(
  *       5. Số tiền (`transferAmount`) phải khớp CHÍNH XÁC `Payment.amount` ⇒ lệch ghi nhận MISMATCH.
  *       6. Chống trùng: `payload.id` (sepayId) lưu UNIQUE ở bảng `SepayWebhookEvent` — SePay retry/replay
  *          không xử lý lại; giao dịch đã SUCCESS ⇒ DUPLICATE.
- *       7. Hợp lệ ⇒ Payment → `SUCCESS`, tạo `MembershipSubscription` ACTIVE
- *          (áp luật hạ hạng + cộng ngày dư của gói trả phí; gói FREE hệ thống không cộng),
- *          tạo `Invoice` snapshot (BR-25), gửi notification `PAYMENT_SUCCESS` — TẤT CẢ trong cùng transaction.
- *          A06: `Payment.activationStatus` tách khỏi trạng thái tiền — tiền đã thu nhưng không cấp được
- *          gói (VD chặn hạ hạng, thiếu plan, tiền về muộn) ⇒ `REQUIRES_REVIEW` + `reviewReason` để
- *          quản lý xử lý (`POST /payments/{id}/retry-activation`).
- *          A07: gói cấp theo ĐÚNG snapshot điều khoản lưu trên Payment lúc tạo đơn (không đọc plan live).
+ *       7. Hợp lệ ⇒ chốt giao dịch trong cùng transaction:
+ *          - **Lớp học**: ghi danh hội viên vào các buổi sắp tới + cộng 85% vào ví HLV chính.
+ *          - **Đơn sản phẩm**: Payment `SUCCESS`, `ProductOrder` `SUCCESS`, tạo `Invoice` snapshot, notification `PAYMENT_SUCCESS`.
+ *          A06: `Payment.activationStatus` tách khỏi trạng thái tiền — tiền đã thu nhưng không kích hoạt được
+ *          (VD lớp đã bị xóa, đơn sản phẩm không còn PENDING) ⇒ `REQUIRES_REVIEW` + `reviewReason` để
+ *          quản lý xử lý (`POST /payments/{id}/retry-activation` với lớp học).
  *
- *       Tiền về khi giao dịch đã đóng (hết hạn/thất bại) ⇒ ghi nhận LATE để đối soát, KHÔNG kích hoạt gói.
+ *       Tiền về khi giao dịch đã đóng (hết hạn/thất bại) ⇒ ghi nhận LATE để đối soát, KHÔNG kích hoạt.
  *       Mọi trường hợp (trừ sai API key / chưa cấu hình) đều ACK để SePay không retry vô hạn.
  *
  *       Trả **200** kèm đúng body `{ "success": true }` khi đã ghi nhận xong.
@@ -398,7 +416,7 @@ router.post(
  *     description: |
  *       Dùng cho môi trường dev/demo/e2e khi KHÔNG có giao dịch ngân hàng thật / SePay không gọi được
  *       webhook vào localhost: tạo đơn bằng `POST /payments/sepay/checkout` rồi gọi endpoint này để chạy
- *       ĐÚNG luồng chốt giao dịch như webhook thật (kích hoạt gói + invoice + notification).
+ *       ĐÚNG luồng chốt giao dịch như webhook thật (lớp học: ghi danh + ví HLV; sản phẩm: chốt đơn + invoice + notification).
  *
  *       Quyền: MEMBER chỉ xác nhận giao dịch CỦA MÌNH; COACH chỉ xác nhận đơn sản phẩm CỦA MÌNH;
  *       MANAGER được xác nhận hộ (phục vụ demo).
@@ -433,7 +451,6 @@ router.post(
  *                 processed: true
  *                 status: PROCESSED
  *                 paymentStatus: SUCCESS
- *                 subscriptionId: "d2b3c4d5-0000-0000-0000-000000000001"
  *                 mock: true
  *       400: { $ref: "#/components/responses/BadRequest" }
  *       401: { $ref: "#/components/responses/Unauthorized" }
@@ -456,10 +473,13 @@ router.post(
  *     summary: Xem trạng thái giao dịch chuyển khoản SePay (FE polling sau khi hội viên CK)
  *     description: |
  *       Trả lại đầy đủ thông tin đơn để FE hiển thị lại QR (kể cả sau khi reload trang) và trạng thái
- *       mới nhất: `PENDING` (chưa nhận được tiền) → `SUCCESS` (webhook đã xác nhận, gói đã kích hoạt).
+ *       mới nhất: `PENDING` (chưa nhận được tiền) → `SUCCESS` (đã xác nhận thu tiền).
+ *       Đơn còn PENDING và server có cấu hình API SePay ⇒ BE tự đối soát trước khi trả.
  *
- *       Khi `status = SUCCESS` response có thêm `paidAt` + `subscriptionId` (gói đã được kích hoạt tự động).
- *       Quyền: chủ giao dịch (MEMBER) hoặc MANAGER; COACH bị chặn.
+ *       Response luôn có `classId` (giao dịch lớp học) hoặc `productOrderId` (đơn sản phẩm) và `paidAt`.
+ *       `activationStatus = REQUIRES_REVIEW` + `requiresReview: true` ⇒ tiền đã về nhưng chưa kích hoạt được,
+ *       FE hiển thị "đang đối soát".
+ *       Quyền: chủ giao dịch (MEMBER mua lớp; MEMBER/COACH đặt đơn sản phẩm) hoặc MANAGER.
  *     tags: [Payments]
  *     security:
  *       - BearerAuth: []
@@ -468,7 +488,7 @@ router.post(
  *         name: id
  *         required: true
  *         schema: { type: string }
- *         description: Payment.id nhận được từ `POST /payments/sepay/checkout`
+ *         description: Payment.id nhận được từ `POST /payments/sepay/checkout` hoặc `POST /products/orders`
  *     responses:
  *       200:
  *         description: Thông tin đơn + trạng thái hiện tại
@@ -485,30 +505,34 @@ router.post(
  *                   data:
  *                     paymentId: "c1a2b3c4-0000-0000-0000-000000000001"
  *                     orderCode: "SEVQR12345678"
- *                     amount: 300000
+ *                     amount: 450000
  *                     currency: VND
  *                     status: PENDING
  *                     gateway: SEPAY
- *                     expiresAt: "2026-09-25T15:30:00.000Z"
- *                     qrUrl: "https://qr.sepay.vn/img?acc=0703339186&bank=SACOMBANK&amount=300000&des=SEVQR12345678&template=compact"
+ *                     expiresAt: "2026-10-04T15:30:00.000Z"
+ *                     qrUrl: "https://qr.sepay.vn/img?acc=0703339186&bank=SACOMBANK&amount=450000&des=SEVQR12345678&template=compact"
  *                     transferContent: "SEVQR12345678"
  *                     bank: { id: "SACOMBANK", accountNumber: "0703339186", accountHolder: "NGUYEN TRAN TU" }
+ *                     classInfo: { id: "class-hiit-001", name: "HIIT Cardio" }
+ *                     classId: "class-hiit-001"
+ *                     productOrderId: null
  *                     paidAt: null
- *                     subscriptionId: null
  *               paid:
- *                 summary: Webhook đã xác nhận — gói được kích hoạt
+ *                 summary: Đơn sản phẩm — webhook đã xác nhận thu tiền
  *                 value:
  *                   success: true
  *                   message: SePay checkout retrieved successfully
  *                   data:
- *                     paymentId: "c1a2b3c4-0000-0000-0000-000000000001"
- *                     orderCode: "SEVQR12345678"
- *                     amount: 300000
+ *                     paymentId: "c1a2b3c4-0000-0000-0000-000000000002"
+ *                     orderCode: "SEVQR87654321"
+ *                     amount: 850000
  *                     status: SUCCESS
- *                     paidAt: "2026-09-25T11:08:35.000Z"
- *                     subscriptionId: "d2b3c4d5-0000-0000-0000-000000000001"
+ *                     activationStatus: ACTIVATED
+ *                     classId: null
+ *                     productOrderId: "d2b3c4d5-0000-0000-0000-000000000001"
+ *                     paidAt: "2026-10-04T11:08:35.000Z"
  *       401: { $ref: "#/components/responses/Unauthorized" }
- *       403: { description: "Không phải chủ giao dịch / COACH bị chặn" }
+ *       403: { description: "Không phải chủ giao dịch" }
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */

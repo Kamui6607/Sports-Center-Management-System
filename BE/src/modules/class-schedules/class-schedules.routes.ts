@@ -8,6 +8,7 @@ import {
   UpdateScheduleSchema,
   ScheduleQuerySchema,
   ScheduleIdSchema,
+  CancelScheduleSchema,
 } from "./class-schedules.schema.js";
 import * as schedulesController from "./class-schedules.controller.js";
 
@@ -244,7 +245,7 @@ router.post(
  *               status:
  *                 type: string
  *                 enum: [SCHEDULED, CANCELLED]
- *                 description: "If set to CANCELLED, all BOOKED enrollments are cancelled automatically. COMPLETED must use /complete."
+ *                 description: "CANCELLED chỉ dùng được khi buổi CHƯA có ai đặt chỗ; buổi đã có người đặt phải hủy qua POST /class-schedules/{id}/cancel (dạy bù / hoàn tiền), nếu không ⇒ 400 SCHEDULE_CANCEL_RESOLUTION_REQUIRED. COMPLETED must use /complete."
  *               reason:
  *                 type: string
  *                 maxLength: 500
@@ -271,8 +272,8 @@ router.patch(
  * @swagger
  * /class-schedules/{id}:
  *   delete:
- *     summary: Cancel schedule (automatically cancels all BOOKED enrollments)
- *     description: "Idempotent for already-CANCELLED schedules (no duplicate notification). Rejects COMPLETED schedules."
+ *     summary: Cancel a schedule that has NO bookings
+ *     description: "Chỉ hủy được buổi CHƯA có ai đặt chỗ; buổi đã có người đặt ⇒ 400 SCHEDULE_CANCEL_RESOLUTION_REQUIRED, dùng POST /class-schedules/{id}/cancel. Idempotent for already-CANCELLED schedules. Rejects COMPLETED schedules."
  *     tags: [Class Schedules]
  *     parameters:
  *       - in: path
@@ -294,6 +295,66 @@ router.delete(
   authorize("MANAGER", "COACH"),
   validate(ScheduleIdSchema, "params"),
   schedulesController.deleteSchedule
+);
+
+/**
+ * @swagger
+ * /class-schedules/{id}/cancel:
+ *   post:
+ *     summary: Hủy buổi học kèm DẠY BÙ hoặc HOÀN TIỀN cho hội viên đã đặt chỗ
+ *     description: |
+ *       COACH của lớp hoặc MANAGER. Buổi đã có hội viên giữ chỗ ⇒ BẮT BUỘC gửi `resolution`
+ *       (thiếu ⇒ 400 `SCHEDULE_CANCEL_RESOLUTION_REQUIRED`):
+ *       - `MAKEUP`: tạo buổi dạy bù ở giờ/phòng mới (kiểm tra trùng phòng, trùng HLV, trùng lịch của hội viên),
+ *         chuyển toàn bộ hội viên đã đặt sang buổi bù. Không gửi `roomId` ⇒ dùng phòng cũ.
+ *       - `REFUND`: mỗi hội viên đã thanh toán lớp nhận 1 yêu cầu hoàn tiền = tiền đã trả ÷ số buổi chính
+ *         của lớp (không tính buổi bù), chờ Manager duyệt tại `/refunds`. Duyệt ⇒ trừ ví HLV 85% khoản đó.
+ *       Buổi chưa ai đặt ⇒ hủy tự do (resolution tuỳ chọn).
+ *     tags: [Class Schedules]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason: { type: string, maxLength: 500 }
+ *               resolution:
+ *                 type: object
+ *                 required: [mode]
+ *                 properties:
+ *                   mode: { type: string, enum: [MAKEUP, REFUND] }
+ *                   startTime: { type: string, format: date-time, description: "Bắt buộc với MAKEUP" }
+ *                   endTime: { type: string, format: date-time, description: "Bắt buộc với MAKEUP" }
+ *                   roomId: { type: string, description: "Tuỳ chọn với MAKEUP" }
+ *           examples:
+ *             makeup:
+ *               summary: Dạy bù
+ *               value: { reason: "HLV ốm", resolution: { mode: MAKEUP, startTime: "2026-10-10T07:00:00+07:00", endTime: "2026-10-10T08:00:00+07:00" } }
+ *             refund:
+ *               summary: Hoàn tiền 1 buổi
+ *               value: { reason: "HLV bận đột xuất", resolution: { mode: REFUND } }
+ *     responses:
+ *       200: { description: "Đã hủy — trả về { schedule, makeup, refunds }" }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *       409: { $ref: "#/components/responses/Conflict" }
+ *       500: { $ref: "#/components/responses/ServerError" }
+ */
+router.post(
+  "/:id/cancel",
+  authenticate,
+  authorize("MANAGER", "COACH"),
+  validate(ScheduleIdSchema, "params"),
+  validate(CancelScheduleSchema),
+  schedulesController.cancelSchedule
 );
 
 /**
