@@ -1,6 +1,8 @@
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
+import { lockPaymentWebhook } from "../../utils/dbLocks.js";
+import { sepayConfig } from "../../config/sepay.js";
 
 export async function createProduct(data: any, createdById: string) {
   return prisma.product.create({
@@ -20,8 +22,10 @@ export async function listProducts(query: any) {
   if (query.search) {
     where.name = { contains: query.search, mode: "insensitive" };
   }
-  if (query.isActive !== undefined) {
-    where.isActive = query.isActive === "true";
+  // Mặc định chỉ trả sản phẩm đang bán (màn mua hàng của Member/Coach).
+  // ?isActive=false: chỉ sản phẩm đã ngừng bán; ?isActive=all: tất cả (màn quản lý của Manager).
+  if (query.isActive !== "all") {
+    where.isActive = query.isActive !== "false";
   }
 
   const [total, products] = await Promise.all([
@@ -70,37 +74,8 @@ export async function deleteProduct(id: string) {
 
 // ── Mua sản phẩm ─────────────────────────────────────────────────────────────
 
-export async function createProductOrder(userId: string, productId: string, quantity: number) {
-  return prisma.$transaction(async (tx) => {
-    const product = await tx.product.findUnique({ where: { id: productId } });
-    if (!product) throw new AppError("Product not found", 404);
-    if (!product.isActive) throw new AppError("Product is no longer active", 400);
-
-    if (product.stockQuantity < quantity) {
-      throw new AppError(`Not enough stock. Only ${product.stockQuantity} items left.`, 400);
-    }
-
-    const totalPrice = Number(product.price) * quantity;
-
-    // Giảm số lượng trong kho
-    await tx.product.update({
-      where: { id: productId },
-      data: { stockQuantity: { decrement: quantity } },
-    });
-
-    const order = await tx.productOrder.create({
-      data: {
-        productId,
-        userId,
-        quantity,
-        totalPrice,
-        status: "SUCCESS", // Mặc định SUCCESS (có thể mở rộng tích hợp thanh toán online sau)
-      },
-    });
-
-    return order;
-  });
-}
+// Tạo đơn + giao dịch SePay: xem `createProductSepayCheckout` (payments/sepay-payments.service.ts).
+// Đơn chỉ thành SUCCESS khi SePay báo đã thu tiền; hủy / hết hạn ⇒ CANCELLED + hoàn kho (bên dưới).
 
 export async function listMyProductOrders(userId: string, query: any) {
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
@@ -111,7 +86,11 @@ export async function listMyProductOrders(userId: string, query: any) {
     prisma.productOrder.count({ where: { userId } }),
     prisma.productOrder.findMany({
       where: { userId },
-      include: { product: true },
+      include: {
+        product: true,
+        // FE cần mã đơn + trạng thái tiền để mở lại màn QR khi đơn còn PENDING.
+        payment: { select: { id: true, status: true, transactionCode: true, paidAt: true } },
+      },
       skip,
       take: limit,
       orderBy: { createdAt: "desc" },
@@ -119,6 +98,95 @@ export async function listMyProductOrders(userId: string, query: any) {
   ]);
 
   return { orders, pagination: buildPaginationMeta(total, page, limit) };
+}
+
+// ── Hủy / hết hạn đơn chờ thanh toán: hoàn kho ───────────────────────────────
+
+/**
+ * Đóng MỘT đơn sản phẩm đang PENDING: payment PENDING → FAILED, đơn → CANCELLED, cộng trả kho.
+ * Chạy dưới `lockPaymentWebhook` (cùng lock với luồng chốt tiền SePay) và đọc lại trạng thái SAU lock:
+ * nếu tiền vừa về trước đó thì KHÔNG hủy. Tiền về SAU khi hủy ⇒ luồng SePay ghi LATE để hoàn tiền.
+ * @returns `true` nếu đơn đã được hủy trong lần gọi này.
+ */
+export async function closePendingProductOrder(orderId: string, note: string): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.productOrder.findUnique({
+      where: { id: orderId },
+      select: { payment: { select: { id: true } } },
+    });
+    if (!current) return false;
+    if (current.payment) await lockPaymentWebhook(tx, current.payment.id);
+
+    const order = await tx.productOrder.findUnique({
+      where: { id: orderId },
+      include: { payment: { select: { id: true, status: true } } },
+    });
+    if (!order || order.status !== "PENDING") return false;
+    if (order.payment && order.payment.status !== "PENDING") return false;
+
+    if (order.payment) {
+      await tx.payment.update({ where: { id: order.payment.id }, data: { status: "FAILED", note } });
+    }
+    await tx.productOrder.update({ where: { id: order.id }, data: { status: "CANCELLED" } });
+    await tx.product.update({
+      where: { id: order.productId },
+      data: { stockQuantity: { increment: order.quantity } },
+    });
+    return true;
+  });
+}
+
+/** Người đặt đơn (hoặc MANAGER) hủy đơn còn chờ chuyển khoản ⇒ hoàn kho. */
+export async function cancelProductOrder(orderId: string, actor: { id: string; role: string }) {
+  const order = await prisma.productOrder.findUnique({ where: { id: orderId } });
+  if (!order) throw new AppError("Product order not found", 404);
+  if (actor.role !== "MANAGER" && order.userId !== actor.id) {
+    throw new AppError("Forbidden: You can only cancel your own orders", 403);
+  }
+  if (order.status !== "PENDING") {
+    throw new AppError("Only PENDING orders can be cancelled", 400);
+  }
+
+  const closed = await closePendingProductOrder(
+    orderId,
+    "Đơn sản phẩm bị hủy trước khi thanh toán — đã hoàn kho."
+  );
+  if (!closed) {
+    throw new AppError("Đơn đã được thanh toán hoặc không còn ở trạng thái chờ — không thể hủy.", 409);
+  }
+
+  return prisma.productOrder.findUnique({
+    where: { id: orderId },
+    include: {
+      product: true,
+      payment: { select: { id: true, status: true, transactionCode: true, paidAt: true } },
+    },
+  });
+}
+
+/**
+ * Worker (server.ts): hủy các đơn PENDING quá thời hạn chờ chuyển khoản (`VIETQR_PAYMENT_TTL_MINUTES`)
+ * và hoàn kho. An toàn khi chạy song song với webhook nhờ `closePendingProductOrder`.
+ * @returns số đơn đã hủy trong lượt này.
+ */
+export async function expireStaleProductOrders(limit = 50): Promise<number> {
+  const ttlMs = sepayConfig().ttlMinutes * 60 * 1000;
+  const stale = await prisma.productOrder.findMany({
+    where: { status: "PENDING", createdAt: { lt: new Date(Date.now() - ttlMs) } },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+    take: limit,
+  });
+
+  let closed = 0;
+  for (const { id } of stale) {
+    const ok = await closePendingProductOrder(
+      id,
+      "Hết hạn chờ thanh toán chuyển khoản — đơn sản phẩm bị hủy, đã hoàn kho."
+    );
+    if (ok) closed += 1;
+  }
+  return closed;
 }
 
 // ── Đánh giá ─────────────────────────────────────────────────────────────────

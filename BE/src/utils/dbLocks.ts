@@ -56,3 +56,14 @@ export async function lockSchedules(db: DbClient, scheduleIds: string[]) {
 export async function lockPaymentWebhook(db: DbClient, paymentId: string) {
   await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('payment:webhook:' || ${paymentId}::text))`;
 }
+
+/**
+ * Serialize việc TẠO đơn mua sản phẩm của MỘT người cho MỘT sản phẩm.
+ *
+ * Luật: mỗi (user × product) chỉ có tối đa 1 đơn PENDING. Hai request tạo đơn song song phải xếp hàng,
+ * nếu không cả hai cùng thấy "chưa có đơn chờ" rồi cùng tạo ⇒ giữ hàng 2 lần.
+ * Lock này độc lập với chuỗi lock enrollment và với `lockPaymentWebhook` (không lấy lồng nhau).
+ */
+export async function lockUserProductOrder(db: DbClient, userId: string, productId: string) {
+  await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('product-order:' || ${userId}::text || ':' || ${productId}::text))`;
+}

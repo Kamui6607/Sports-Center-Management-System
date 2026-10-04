@@ -343,8 +343,9 @@ model Enrollment {
 
 model Payment {
   id                String                   @id @default(uuid())
-  memberId          String
-  member            MemberProfile            @relation(fields: [memberId], references: [id])
+  /// NULL khi người mua không phải hội viên (HLV mua sản phẩm) — người mua lấy từ ProductOrder.userId.
+  memberId          String?
+  member            MemberProfile?           @relation(fields: [memberId], references: [id], onDelete: Restrict)
   /// Gói hội viên mà giao dịch này muốn mua — cần cho giao dịch ONLINE: Payment PENDING
   /// được tạo TRƯỚC khi có subscription (chỉ tạo subscription khi cổng thanh toán xác nhận SUCCESS).
   amount            Decimal                  @db.Decimal(12, 2)
@@ -352,6 +353,9 @@ model Payment {
   classId           String?
   class             Class?                   @relation(fields: [classId], references: [id])
   classNameSnapshot String?
+  /// Đơn mua sản phẩm mà giao dịch này thanh toán. Một giao dịch chỉ trỏ tới classId HOẶC productOrderId.
+  productOrderId    String?                  @unique
+  productOrder      ProductOrder?            @relation(fields: [productOrderId], references: [id], onDelete: SetNull)
   status            PaymentStatus            @default(PENDING)
   /// Mã đơn/mã thanh toán duy nhất — với giao dịch SePay đây là mã SePay bóc tách từ nội dung CK.
   transactionCode   String?                  @unique
@@ -458,8 +462,9 @@ model SepayWebhookEvent {
 model Invoice {
   id            String        @id @default(uuid())
   invoiceNumber String        @unique
-  memberId      String
-  member        MemberProfile @relation(fields: [memberId], references: [id])
+  /// NULL với hóa đơn mua sản phẩm của người không phải hội viên (HLV).
+  memberId      String?
+  member        MemberProfile? @relation(fields: [memberId], references: [id], onDelete: Restrict)
   paymentId     String        @unique
   payment       Payment       @relation(fields: [paymentId], references: [id])
   subtotal      Decimal       @db.Decimal(12, 2)
@@ -470,6 +475,7 @@ model Invoice {
   // BR-25: Snapshot fields — immutable record of who paid for what
   memberName    String? // Copied from user.fullName at time of issue
   className     String? // Copied from class.name at time of issue
+  productName   String? // Copied from product.name at time of issue (hóa đơn mua sản phẩm)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -825,6 +831,9 @@ model ProductOrder {
   status      ProductOrderStatus @default(PENDING)
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+
+  /// Giao dịch thanh toán của đơn (SePay). PENDING = đang giữ hàng chờ chuyển khoản.
+  payment     Payment?
 }
 
 enum ProductOrderStatus {

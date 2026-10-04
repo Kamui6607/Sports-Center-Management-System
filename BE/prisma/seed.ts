@@ -383,6 +383,27 @@ async function main() {
   });
   console.log("Class Schedules created");
 
+  // ─── PRODUCTS (cửa hàng trong gym) ───────────────────
+  // id cố định + update rỗng ⇒ chạy seed lại không tạo trùng và không ghi đè tồn kho đã thay đổi khi test mua.
+  const products = [
+    { id: "prd-water-001", name: "Nước suối Aquafina 500ml", description: "Nước uống đóng chai, ướp lạnh tại quầy.", price: 10000, stockQuantity: 100, isActive: true },
+    { id: "prd-whey-001", name: "Whey Protein Isolate 1kg", description: "Bột protein hỗ trợ phục hồi và tăng cơ sau buổi tập.", price: 850000, stockQuantity: 20, isActive: true },
+    { id: "prd-towel-001", name: "Khăn tập thể thao", description: "Khăn cotton thấm hút mồ hôi, kích thước 30x90cm.", price: 60000, stockQuantity: 40, isActive: true },
+    { id: "prd-bottle-001", name: "Bình nước thể thao 750ml", description: "Bình nhựa không BPA, có nắp chống tràn.", price: 120000, stockQuantity: 30, isActive: true },
+    { id: "prd-gloves-001", name: "Găng tay tập gym", description: "Găng tay hở ngón, chống chai tay khi tập tạ.", price: 150000, stockQuantity: 25, isActive: true },
+    { id: "prd-yogamat-001", name: "Thảm Yoga TPE 6mm", description: "Thảm chống trượt, nhẹ, dễ cuộn mang theo.", price: 250000, stockQuantity: 15, isActive: true },
+    // Sản phẩm đã ngừng bán — để test: không hiện ở GET /products mặc định, mua thì bị từ chối.
+    { id: "prd-energy-001", name: "Nước tăng lực (ngừng bán)", description: "Sản phẩm đã ngừng kinh doanh.", price: 15000, stockQuantity: 0, isActive: false },
+  ];
+  for (const p of products) {
+    await prisma.product.upsert({
+      where: { id: p.id },
+      update: {},
+      create: { ...p, createdById: manager.id },
+    });
+  }
+  console.log("Products created");
+
   console.log("  SePay:    sepay.test@example.com   / Member@123");
 }
 

@@ -26,9 +26,15 @@ const router = Router();
  * @swagger
  * /products:
  *   get:
- *     summary: List all active products
+ *     summary: List products (default — only products on sale)
  *     tags: [Products]
  *     parameters:
+ *       - in: query
+ *         name: isActive
+ *         schema:
+ *           type: string
+ *           enum: ["true", "false", "all"]
+ *         description: "Mặc định true (đang bán). false = đã ngừng bán, all = tất cả (cho Manager)."
  *       - in: query
  *         name: page
  *         schema:
@@ -69,7 +75,13 @@ router.get("/:id", productsController.getProductById);
  * @swagger
  * /products/orders:
  *   post:
- *     summary: Create a product order
+ *     summary: Create a product order and its SePay (VietQR) payment
+ *     description: |
+ *       Chỉ MEMBER hoặc COACH. Giữ hàng (trừ kho) ngay khi tạo đơn; đơn ở trạng thái PENDING và trả về
+ *       thông tin QR chuyển khoản (giống `POST /payments/sepay/checkout`). FE polling
+ *       `GET /payments/sepay/{paymentId}` để biết khi nào đơn được thanh toán.
+ *       - SePay báo đã thu tiền ⇒ đơn SUCCESS + hóa đơn + thông báo.
+ *       - Hủy (`POST /products/orders/{id}/cancel`) hoặc quá hạn chờ chuyển khoản ⇒ đơn CANCELLED, hoàn kho.
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
@@ -85,13 +97,52 @@ router.get("/:id", productsController.getProductById);
  *               quantity: { type: integer, minimum: 1 }
  *     responses:
  *       201:
- *         description: Created
+ *         description: Đơn PENDING + thông tin QR (paymentId, orderCode, amount, qrUrl, expiresAt, productOrder)
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *       503: { description: "Chưa cấu hình tài khoản nhận tiền SePay" }
+ *       500: { $ref: "#/components/responses/ServerError" }
  */
 router.post(
   "/orders",
   authenticate,
+  authorize("MEMBER", "COACH"),
   validate(CreateProductOrderSchema),
   productsController.createProductOrder
+);
+
+/**
+ * @swagger
+ * /products/orders/{id}/cancel:
+ *   post:
+ *     summary: Cancel a PENDING product order (restores stock)
+ *     description: Người đặt đơn hoặc MANAGER. Chỉ hủy được đơn chưa thanh toán; đơn đã thu tiền ⇒ 409.
+ *     tags: [Products]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Đơn đã hủy, kho đã được hoàn lại
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *       409: { $ref: "#/components/responses/Conflict" }
+ *       500: { $ref: "#/components/responses/ServerError" }
+ */
+router.post(
+  "/orders/:id/cancel",
+  authenticate,
+  authorize("MEMBER", "COACH", "MANAGER"),
+  productsController.cancelProductOrder
 );
 
 /**

@@ -400,7 +400,8 @@ router.post(
  *       webhook vào localhost: tạo đơn bằng `POST /payments/sepay/checkout` rồi gọi endpoint này để chạy
  *       ĐÚNG luồng chốt giao dịch như webhook thật (kích hoạt gói + invoice + notification).
  *
- *       Quyền: MEMBER chỉ xác nhận giao dịch CỦA MÌNH; MANAGER được xác nhận hộ (phục vụ demo).
+ *       Quyền: MEMBER chỉ xác nhận giao dịch CỦA MÌNH; COACH chỉ xác nhận đơn sản phẩm CỦA MÌNH;
+ *       MANAGER được xác nhận hộ (phục vụ demo).
  *       `SEPAY_MOCK_MODE != true` ⇒ 403 `SEPAY_MOCK_DISABLED`.
  *     tags: [Payments]
  *     security:
@@ -443,7 +444,7 @@ router.post(
 router.post(
   "/sepay/mock-confirm",
   authenticate,
-  authorize("MEMBER", "MANAGER"),
+  authorize("MEMBER", "COACH", "MANAGER"),
   validate(SepayMockConfirmSchema),
   paymentsController.sepayMockConfirm
 );

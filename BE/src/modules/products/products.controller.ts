@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as productsService from "./products.service.js";
+import { createProductSepayCheckout } from "../payments/sepay-payments.service.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
 
 export async function createProduct(req: Request, res: Response, next: NextFunction) {
@@ -52,8 +53,17 @@ export async function deleteProduct(req: Request, res: Response, next: NextFunct
 export async function createProductOrder(req: Request, res: Response, next: NextFunction) {
   try {
     const { productId, quantity } = req.body;
-    const order = await productsService.createProductOrder(req.user!.id, productId, quantity);
-    sendCreated(res, order, "Product ordered successfully");
+    const checkout = await createProductSepayCheckout(req.user!.id, req.user!.role, productId, quantity);
+    sendCreated(res, checkout, "Product order created — waiting for SePay transfer");
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function cancelProductOrder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const order = await productsService.cancelProductOrder(req.params.id as string, req.user!);
+    sendSuccess(res, order, "Product order cancelled");
   } catch (err) {
     next(err);
   }

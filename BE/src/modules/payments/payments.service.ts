@@ -240,8 +240,8 @@ export async function updatePaymentStatus(id: string, status: string) {
         },
       });
 
-      // Auto-enroll + credit wallet nếu là payment cho class
-      if (payment.classId) {
+      // Auto-enroll + credit wallet nếu là payment cho class (payment lớp học luôn có memberId)
+      if (payment.classId && payment.memberId) {
         await autoEnrollAfterPayment(tx, payment.classId, payment.memberId);
         await creditCoachWallet(tx, payment.classId, payment.id, Number(payment.amount));
       }

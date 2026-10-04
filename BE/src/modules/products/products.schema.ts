@@ -14,7 +14,7 @@ export const ProductQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
   search: z.string().optional(),
-  isActive: z.enum(["true", "false"]).optional(),
+  isActive: z.enum(["true", "false", "all"]).optional(),
 });
 
 export const CreateProductOrderSchema = z.object({

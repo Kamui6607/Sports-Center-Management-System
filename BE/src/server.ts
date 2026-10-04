@@ -11,6 +11,10 @@ import {
   flushNotificationOutbox,
   OUTBOX_FLUSH_INTERVAL_MS,
 } from "./modules/notifications/outbox.service.js";
+import { expireStaleProductOrders } from "./modules/products/products.service.js";
+
+/** Nhịp quét đơn sản phẩm quá hạn chờ chuyển khoản (ms). */
+const PRODUCT_ORDER_EXPIRY_INTERVAL_MS = 60_000;
 
 async function main() {
   // Fail-fast: `SEPAY_MOCK_MODE` chỉ dành cho dev/demo/e2e — bật nhầm ở production là lỗ hổng
@@ -43,6 +47,14 @@ async function main() {
     );
   }, OUTBOX_FLUSH_INTERVAL_MS);
   outboxTimer.unref();
+
+  // Đơn sản phẩm PENDING quá hạn chờ chuyển khoản ⇒ hủy + hoàn kho (giữ hàng không bị treo mãi).
+  const productOrderTimer = setInterval(() => {
+    void expireStaleProductOrders().catch((err: any) =>
+      console.warn("[PRODUCT ORDER] quét đơn hết hạn lỗi:", (err as Error).message)
+    );
+  }, PRODUCT_ORDER_EXPIRY_INTERVAL_MS);
+  productOrderTimer.unref();
 
   server.listen(env.PORT, () => {
     console.log(`Server health running at http://localhost:${env.PORT}/api/v1/health`);
