@@ -10,7 +10,7 @@ export async function listSchedules(req: Request, res: Response, next: NextFunct
 }
 export async function createSchedule(req: Request, res: Response, next: NextFunction) {
   try {
-    const schedule = await schedulesService.createSchedule(req.body);
+    const schedule = await schedulesService.createSchedule(req.body, { id: req.user!.id, role: req.user!.role });
     sendCreated(res, schedule, "Schedule created successfully");
   } catch (err) { next(err); }
 }
@@ -29,13 +29,13 @@ export async function getScheduleById(req: Request, res: Response, next: NextFun
 }
 export async function updateSchedule(req: Request, res: Response, next: NextFunction) {
   try {
-    const schedule = await schedulesService.updateSchedule(req.params.id as string, req.body);
+    const schedule = await schedulesService.updateSchedule(req.params.id as string, req.body, { id: req.user!.id, role: req.user!.role });
     sendSuccess(res, schedule, "Schedule updated successfully");
   } catch (err) { next(err); }
 }
 export async function deleteSchedule(req: Request, res: Response, next: NextFunction) {
   try {
-    const schedule = await schedulesService.deleteSchedule(req.params.id as string);
+    const schedule = await schedulesService.deleteSchedule(req.params.id as string, { id: req.user!.id, role: req.user!.role });
     sendSuccess(res, schedule, "Schedule cancelled successfully");
   } catch (err) { next(err); }
 }
@@ -48,7 +48,7 @@ export async function cancelSchedule(req: Request, res: Response, next: NextFunc
 }
 export async function completeSchedule(req: Request, res: Response, next: NextFunction) {
   try {
-    const schedule = await schedulesService.completeSchedule(req.params.id as string);
+    const schedule = await schedulesService.completeSchedule(req.params.id as string, { id: req.user!.id, role: req.user!.role });
     sendSuccess(res, schedule, "Schedule marked as completed");
   } catch (err) { next(err); }
 }

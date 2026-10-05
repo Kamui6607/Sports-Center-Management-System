@@ -34,6 +34,52 @@ async function getCoachIdsOfClass(db: DbClient, classId: string): Promise<string
   return rows.map((r) => r.coachId);
 }
 
+/** Người gọi API lịch học (lấy từ JWT ở controller). */
+export type ScheduleActor = { id: string; role: string };
+
+/** Giờ Việt Nam dễ đọc cho thông báo lỗi / notification. */
+function fmtVn(d: Date): string {
+  return d.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+}
+
+/**
+ * Quyền thao tác lịch của MỘT lớp: MANAGER mọi lớp; COACH chỉ lớp mình được phân công (ClassMember).
+ * Chặn Coach A tạo/dời/hủy/hoàn tất buổi học (và giữ phòng) dưới tên lớp của Coach B.
+ */
+async function assertCanManageClassSchedule(db: DbClient, actor: ScheduleActor, classId: string) {
+  if (actor.role === "MANAGER") return;
+  if (actor.role !== "COACH") throw new AppError("Forbidden", 403);
+  const assigned = await db.classMember.findFirst({
+    where: { classId, coach: { userId: actor.id } },
+    select: { id: true },
+  });
+  if (!assigned) {
+    throw new AppError("Bạn không phải HLV của lớp này nên không được thao tác lịch học của lớp.", 403, {
+      code: "NOT_CLASS_COACH",
+    });
+  }
+}
+
+/** Chỉ lớp đã được duyệt mới được xếp lịch / giữ phòng (lớp PENDING, REJECTED, COMPLETED thì không). */
+function assertClassApprovedForScheduling(cls: { status: string }) {
+  if (cls.status !== "APPROVED") {
+    throw new AppError(
+      `Lớp đang ở trạng thái ${cls.status} — chỉ lớp đã được duyệt (APPROVED) mới được xếp lịch và giữ phòng.`,
+      400,
+      { code: "CLASS_NOT_APPROVED", classStatus: cls.status }
+    );
+  }
+}
+
+/** Không cho tạo / dời buổi học vào thời điểm đã qua. */
+function assertStartsInFuture(startTime: Date) {
+  if (startTime.getTime() <= Date.now()) {
+    throw new AppError(`Giờ bắt đầu (${fmtVn(startTime)}) đã qua — chỉ được xếp lịch trong tương lai.`, 400, {
+      code: "SCHEDULE_IN_PAST",
+    });
+  }
+}
+
 async function checkConflicts(
   db: DbClient,
   roomId: string,
@@ -51,13 +97,27 @@ async function checkConflicts(
       startTime: { lt: endTime },
       endTime: { gt: startTime },
     },
-    include: { class: true },
+    include: { class: { select: { id: true, name: true } }, room: { select: { id: true, name: true } } },
+    orderBy: { startTime: "asc" },
   });
 
   if (roomConflict) {
     throw new AppError(
-      `Room is already booked for "${roomConflict.class.name}" from ${roomConflict.startTime.toISOString()} to ${roomConflict.endTime.toISOString()}`,
-      409
+      `Phòng "${roomConflict.room.name}" đã được lớp "${roomConflict.class.name}" đặt từ ` +
+        `${fmtVn(roomConflict.startTime)} đến ${fmtVn(roomConflict.endTime)}.`,
+      409,
+      {
+        code: "ROOM_CONFLICT",
+        conflict: {
+          scheduleId: roomConflict.id,
+          classId: roomConflict.class.id,
+          className: roomConflict.class.name,
+          roomId: roomConflict.room.id,
+          roomName: roomConflict.room.name,
+          startTime: roomConflict.startTime,
+          endTime: roomConflict.endTime,
+        },
+      }
     );
   }
 
@@ -86,10 +146,24 @@ async function checkConflicts(
 
     if (coachConflict) {
       const coachName =
-        coachConflict.class.coaches[0]?.coach?.user?.fullName ?? "Coach";
+        coachConflict.class.coaches[0]?.coach?.user?.fullName ?? "HLV";
       throw new AppError(
-        `Coach "${coachName}" already has a class at this time: ${coachConflict.startTime.toISOString()} – ${coachConflict.endTime.toISOString()}`,
-        409
+        `HLV "${coachName}" đã có lịch dạy lớp "${coachConflict.class.name}" từ ` +
+          `${fmtVn(coachConflict.startTime)} đến ${fmtVn(coachConflict.endTime)}.`,
+        409,
+        {
+          code: "COACH_CONFLICT",
+          conflict: {
+            scheduleId: coachConflict.id,
+            classId: coachConflict.classId,
+            className: coachConflict.class.name,
+            coachId: cm.coachId,
+            coachName,
+            roomId: coachConflict.roomId,
+            startTime: coachConflict.startTime,
+            endTime: coachConflict.endTime,
+          },
+        }
       );
     }
   }
@@ -232,10 +306,12 @@ function assertClassRoomAreaMatch(classAreaType: string, roomAreaType: string) {
   }
 }
 
-export async function createSchedule(data: any) {
+export async function createSchedule(data: any, actor: ScheduleActor) {
   return prisma.$transaction(async (tx) => {
     const cls = await tx.class.findUnique({ where: { id: data.classId } });
     if (!cls || !cls.isActive) throw new AppError("Class not found or inactive", 404);
+    await assertCanManageClassSchedule(tx, actor, cls.id);
+    assertClassApprovedForScheduling(cls);
 
     const room = await tx.room.findUnique({ where: { id: data.roomId } });
     if (!room || !room.isActive) throw new AppError("Room not found or inactive", 404);
@@ -248,6 +324,7 @@ export async function createSchedule(data: any) {
     if (endTime <= startTime) {
       throw new AppError("endTime must be strictly greater than startTime", 400);
     }
+    assertStartsInFuture(startTime);
 
     // Lock Room + toàn bộ Coach của Class theo thứ tự cố định trước khi check.
     const coachIds = await getCoachIdsOfClass(tx, data.classId);
@@ -383,6 +460,7 @@ export async function createActivityPlan(data: any, actor: { id: string; role: s
       for (const schedule of data.schedules) {
         const startTime = new Date(schedule.startTime);
         const endTime = new Date(schedule.endTime);
+        assertStartsInFuture(startTime);
         await checkConflicts(tx, room.id, cls.id, startTime, endTime);
         createdSchedules.push(await tx.classSchedule.create({
           data: {
@@ -553,13 +631,7 @@ export async function cancelScheduleWithResolution(
   });
   if (!schedule) throw new AppError("Schedule not found", 404);
 
-  if (actor.role === "COACH") {
-    const assigned = await prisma.classMember.findFirst({
-      where: { classId: schedule.classId, coach: { userId: actor.id } },
-      select: { id: true },
-    });
-    if (!assigned) throw new AppError("Forbidden: you are not a coach of this class", 403);
-  }
+  await assertCanManageClassSchedule(prisma, actor, schedule.classId);
 
   const reason = data.reason?.trim() || "Lịch học bị hủy";
   const resolution = data.resolution;
@@ -598,6 +670,8 @@ export async function cancelScheduleWithResolution(
       }
       if (endTime <= startTime) throw new AppError("endTime must be strictly greater than startTime", 400);
       if (startTime <= new Date()) throw new AppError("Buổi dạy bù phải ở thời điểm trong tương lai", 400);
+      // Buổi bù là một buổi mới giữ phòng ⇒ cùng luật với tạo lịch: lớp phải APPROVED.
+      assertClassApprovedForScheduling(schedule.class);
 
       const roomId = resolution.roomId ?? fresh.roomId;
       const room = await tx.room.findUnique({ where: { id: roomId } });
@@ -680,12 +754,13 @@ export async function cancelScheduleWithResolution(
   return { schedule: result.cancelled, makeup: result.makeup, refunds: result.refunds };
 }
 
-export async function updateSchedule(id: string, data: any) {
+export async function updateSchedule(id: string, data: any, actor: ScheduleActor) {
   const existing = await prisma.classSchedule.findUnique({
     where: { id },
     include: { class: true, room: true },
   });
   if (!existing) throw new AppError("Schedule not found", 404);
+  await assertCanManageClassSchedule(prisma, actor, existing.classId);
 
   // P0-2: CLOSED immutable qua PATCH thông thường.
   if (existing.status === "COMPLETED") throw new AppError("Schedule is already completed", 400);
@@ -737,6 +812,8 @@ export async function updateSchedule(id: string, data: any) {
 
   // Đổi room/time: lock theo SCHEDULE (cùng khoá với booking — A12) rồi tới room/coaches, re-check trong tx.
   if (timeOrRoomChanged) {
+    assertClassApprovedForScheduling(existing.class);
+    assertStartsInFuture(startTime);
     const updated = await prisma.$transaction(async (tx) => {
       // A12: mọi mutation lịch phải xếp hàng trên cùng advisory lock với booking.
       await lockSchedule(tx, id);
@@ -822,12 +899,13 @@ export async function updateSchedule(id: string, data: any) {
   });
 }
 
-export async function deleteSchedule(id: string) {
+export async function deleteSchedule(id: string, actor: ScheduleActor) {
   const schedule = await prisma.classSchedule.findUnique({
     where: { id },
     include: { class: true },
   });
   if (!schedule) throw new AppError("Schedule not found", 404);
+  await assertCanManageClassSchedule(prisma, actor, schedule.classId);
   if (schedule.status === "COMPLETED") throw new AppError("Schedule is already completed", 400);
   if (schedule.status === "CANCELLED") {
     // Idempotent: không update, không notify lại.
@@ -864,12 +942,13 @@ export async function deleteSchedule(id: string) {
  * Only allowed after endTime has passed.
  * Auto-transitions all remaining BOOKED enrollments to COMPLETED.
  */
-export async function completeSchedule(id: string) {
+export async function completeSchedule(id: string, actor: ScheduleActor) {
   const schedule = await prisma.classSchedule.findUnique({
     where: { id },
     include: { class: { include: { sports: true } }, room: true },
   });
   if (!schedule) throw new AppError("Schedule not found", 404);
+  await assertCanManageClassSchedule(prisma, actor, schedule.classId);
   if (schedule.status === "COMPLETED") return schedule; // idempotent
   if (schedule.status === "CANCELLED") throw new AppError("Cannot complete a cancelled schedule", 400);
   if (schedule.endTime > new Date()) {

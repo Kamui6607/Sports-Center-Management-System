@@ -171,7 +171,14 @@ router.get(
  * /class-schedules:
  *   post:
  *     summary: Create a new schedule (checks area type, room & coach conflicts)
- *     description: "Business rule: Class.areaType must equal Room.areaType. Checked before capacity and conflict checks."
+ *     description: |
+ *       - COACH chỉ tạo được lịch cho lớp mình được phân công (khác ⇒ 403 `NOT_CLASS_COACH`); MANAGER mọi lớp.
+ *       - Lớp phải `APPROVED` (khác ⇒ 400 `CLASS_NOT_APPROVED`); `startTime` phải ở tương lai (⇒ 400 `SCHEDULE_IN_PAST`).
+ *       - Class.areaType phải bằng Room.areaType; phòng đủ sức chứa.
+ *       - Không trùng giờ với buổi `SCHEDULED` khác cùng phòng (409 `ROOM_CONFLICT`) hoặc cùng HLV (409 `COACH_CONFLICT`).
+ *         Chạm biên (buổi trước kết thúc 9:00, buổi sau bắt đầu 9:00) không tính trùng.
+ *         Request đồng thời cùng phòng/HLV được xếp hàng bằng advisory lock ⇒ không thể cùng lọt.
+ *         `errors.conflict` chứa buổi bị trùng (scheduleId, className, phòng/HLV, startTime, endTime).
  *     tags: [Class Schedules]
  *     requestBody:
  *       required: true
@@ -219,7 +226,11 @@ router.post(
  * /class-schedules/{id}:
  *   patch:
  *     summary: Update schedule (re-checks conflicts if room/time changed)
- *     description: "Closed schedules (CANCELLED/COMPLETED) are immutable. status=COMPLETED is rejected here — use PATCH /class-schedules/{id}/complete."
+ *     description: |
+ *       Closed schedules (CANCELLED/COMPLETED) are immutable. status=COMPLETED is rejected here — use PATCH /class-schedules/{id}/complete.
+ *       COACH chỉ sửa lịch lớp mình được phân công (403 `NOT_CLASS_COACH`).
+ *       Đổi phòng/giờ: lớp phải `APPROVED`, giờ bắt đầu mới ở tương lai, và kiểm tra lại
+ *       409 `ROOM_CONFLICT` / `COACH_CONFLICT` như khi tạo.
  *     tags: [Class Schedules]
  *     parameters:
  *       - in: path
@@ -273,7 +284,7 @@ router.patch(
  * /class-schedules/{id}:
  *   delete:
  *     summary: Cancel a schedule that has NO bookings
- *     description: "Chỉ hủy được buổi CHƯA có ai đặt chỗ; buổi đã có người đặt ⇒ 400 SCHEDULE_CANCEL_RESOLUTION_REQUIRED, dùng POST /class-schedules/{id}/cancel. Idempotent for already-CANCELLED schedules. Rejects COMPLETED schedules."
+ *     description: "COACH chỉ hủy lịch lớp mình được phân công (403 NOT_CLASS_COACH). Chỉ hủy được buổi CHƯA có ai đặt chỗ; buổi đã có người đặt ⇒ 400 SCHEDULE_CANCEL_RESOLUTION_REQUIRED, dùng POST /class-schedules/{id}/cancel. Idempotent for already-CANCELLED schedules. Rejects COMPLETED schedules."
  *     tags: [Class Schedules]
  *     parameters:
  *       - in: path
@@ -362,6 +373,7 @@ router.post(
  * /class-schedules/{id}/complete:
  *   patch:
  *     summary: Mark a schedule as COMPLETED (only after endTime)
+ *     description: "COACH chỉ hoàn tất lịch lớp mình được phân công (403 NOT_CLASS_COACH)."
  *     tags: [Class Schedules]
  *     parameters:
  *       - in: path
