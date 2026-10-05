@@ -762,11 +762,18 @@ export async function retrySepayActivation(managerUserId: string, paymentId: str
   }
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await lockPaymentWebhook(tx, payment.id);
       const fresh = await tx.payment.findUnique({ where: { id: payment.id } });
       if (!fresh) {
         throw new AppError("Giao dịch không tồn tại.", 409);
+      }
+      // Đọc lại sau lock: 2 Manager bấm cùng lúc ⇒ người sau không ghi danh / cộng ví lần nữa.
+      if (fresh.status !== "SUCCESS" || fresh.activationStatus !== "REQUIRES_REVIEW") {
+        throw new AppError("Giao dịch đã được xử lý bởi thao tác khác, vui lòng tải lại.", 409, {
+          code: "SEPAY_ALREADY_HANDLED",
+          gateway: SEPAY_GATEWAY,
+        });
       }
 
       const member = fresh.memberId
@@ -780,22 +787,30 @@ export async function retrySepayActivation(managerUserId: string, paymentId: str
       await autoEnrollAfterPayment(tx, fresh.classId!, member.id);
       await creditCoachWallet(tx, fresh.classId!, fresh.id, Number(fresh.amount));
 
-      // Đánh dấu đã xử lý: ai/khi nào + xoá lý do review.
-      const updated = await tx.payment.update({
-        where: { id: fresh.id },
-        data: { reviewReason: null, reviewedAt: new Date(), reviewedById: managerUserId },
+      // Chốt ACTIVATED + hóa đơn + thông báo; ghi ai/khi nào xử lý + xoá lý do review.
+      const now = new Date();
+      const updated = await finalizeClassPaymentTx(tx, fresh, member, fresh.classNameSnapshot ?? cls.name, now, {
+        reviewReason: null,
+        reviewedAt: now,
+        reviewedById: managerUserId,
       });
 
       return { payment: updated };
     });
+    await flushNotificationOutbox().catch(() => {});
+    return result;
   } catch (err) {
+    // Đã có thao tác khác xử lý xong ⇒ trả nguyên lỗi, KHÔNG ghi đè reviewReason của giao dịch đã chốt.
+    if (err instanceof AppError && (err.errors as { code?: string } | undefined)?.code === "SEPAY_ALREADY_HANDLED") {
+      throw err;
+    }
     if (err instanceof AppError) {
       // Vẫn bị chặn ⇒ giữ nguyên REQUIRES_REVIEW, ghi lý do mới nhất để lần xử lý sau biết.
       await prisma.payment.update({
         where: { id: payment.id },
         data: { reviewReason: err.message },
       });
-      throw new AppError(`Không kích hoạt được gói: ${err.message}`, 409, {
+      throw new AppError(`Không kích hoạt được khóa học: ${err.message}`, 409, {
         code: "SEPAY_ACTIVATION_REJECTED",
         gateway: SEPAY_GATEWAY,
       });
@@ -908,6 +923,58 @@ async function runSepayReconcile(paymentId: string): Promise<SepayWebhookOutcome
   );
 }
 
+
+/**
+ * Hoàn tất giao dịch KHÓA HỌC đã thu tiền (gọi SAU khi đã ghi danh + cộng ví HLV, trong cùng transaction):
+ * Payment → SUCCESS + `paidAt` + `activationStatus = ACTIVATED`, xuất hóa đơn snapshot (BR-25),
+ * ghi outbox thông báo cho hội viên (caller tự `flushNotificationOutbox()` sau commit).
+ *
+ * Payment SUCCESS là chốt chống chốt lặp: webhook/mock/đối soát sau đó dừng ở bước "đã thanh toán"
+ * ⇒ không ghi danh / cộng ví HLV thêm lần nữa.
+ */
+async function finalizeClassPaymentTx(
+  tx: Prisma.TransactionClient,
+  payment: Payment,
+  member: { id: string; user: { id: string; fullName: string } },
+  className: string,
+  now: Date,
+  extra: Prisma.PaymentUpdateInput = {}
+): Promise<Payment> {
+  const updated = await tx.payment.update({
+    where: { id: payment.id },
+    data: {
+      ...extra,
+      status: "SUCCESS",
+      paidAt: payment.paidAt ?? now,
+      activationStatus: "ACTIVATED",
+    },
+  });
+  // paymentId UNIQUE trên Invoice ⇒ upsert để không lỗi nếu hóa đơn đã có từ trước.
+  await tx.invoice.upsert({
+    where: { paymentId: payment.id },
+    update: {},
+    create: {
+      invoiceNumber: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+      memberId: member.id,
+      paymentId: payment.id,
+      subtotal: money(payment.amount),
+      discount: 0,
+      total: money(payment.amount),
+      status: "ISSUED",
+      issuedAt: now,
+      memberName: member.user.fullName,
+      className,
+    },
+  });
+  await enqueueNotification(tx, {
+    userId: member.user.id,
+    type: "PAYMENT_SUCCESS",
+    title: "Thanh toán khóa học thành công",
+    body: `Bạn đã thanh toán ${money(payment.amount).toLocaleString("vi-VN")}đ cho khóa học "${className}". Lịch học đã được thêm vào tài khoản.`,
+    metadata: { paymentId: payment.id, classId: payment.classId },
+  });
+  return updated;
+}
 
 /**
  * Chốt một giao dịch chuyển khoản đã được SePay xác nhận (webhook thật, mock, hoặc đối soát API).
@@ -1134,7 +1201,7 @@ async function settleSepayTransfer(
       });
     }
 
-    // (8) Đã thu tiền: lưu dấu vết cổng rồi kích hoạt gói qua luồng chung (sub + invoice + notification).
+    // (8) Đã thu tiền: lưu dấu vết cổng rồi chốt theo loại giao dịch (sản phẩm / khóa học).
     await tx.payment.update({
       where: { id: payment.id },
       data: {
@@ -1252,9 +1319,9 @@ async function settleSepayTransfer(
     if (!member) throw new AppError("Member not found", 500);
 
     try {
-      // Auto-enroll member v�o t?t c? bu?i SCHEDULED c?a class
+      // Ghi danh hội viên vào các buổi SCHEDULED sắp tới của lớp
       await autoEnrollAfterPayment(tx, payment.classId!, member.id);
-      // Credit 85% doanh thu v�o v� primary coach
+      // Cộng 85% doanh thu vào ví HLV chính
       await creditCoachWallet(tx, payment.classId!, payment.id, Number(payment.amount));
     } catch (err) {
       // VD: gói khác đã được kích hoạt trong lúc chờ chuyển khoản ⇒ hạ hạng. Tiền ĐÃ về:
@@ -1281,6 +1348,9 @@ async function settleSepayTransfer(
       }
       throw err;
     }
+
+    // Lớp học: chốt tiền + hóa đơn + thông báo hội viên (trước đây thiếu bước này ⇒ payment kẹt PENDING).
+    await finalizeClassPaymentTx(tx, payment, member, payment.classNameSnapshot ?? cls.name, now);
 
     return finish({
       status: "PROCESSED",

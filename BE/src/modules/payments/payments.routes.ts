@@ -168,7 +168,9 @@ router.patch(
  *     summary: Kích hoạt bù khóa học cho giao dịch SePay đã thu tiền nhưng chưa ghi danh (Manager only)
  *     description: |
  *       Dùng khi `activationStatus = REQUIRES_REVIEW` (tiền ĐÃ về nhưng không ghi danh / cộng ví HLV
- *       tự động được). Chạy lại ghi danh vào các buổi sắp tới + cộng 85% ví HLV chính của lớp.
+ *       tự động được). Chạy lại ghi danh vào các buổi sắp tới + cộng 85% ví HLV chính của lớp,
+ *       chuyển `activationStatus = ACTIVATED`, xuất hóa đơn (nếu chưa có) và thông báo hội viên.
+ *       Đã xử lý rồi (VD 2 Manager bấm cùng lúc) ⇒ 409 `SEPAY_ALREADY_HANDLED`.
  *       - 400: không phải giao dịch SePay / chưa thu tiền / không ở trạng thái REQUIRES_REVIEW / đơn sản phẩm.
  *       - 409: vẫn không kích hoạt được (VD lớp đã bị xóa) — giữ nguyên review, cập nhật lý do.
  *     tags: [Payments]
@@ -320,7 +322,8 @@ router.post(
  *       6. Chống trùng: `payload.id` (sepayId) lưu UNIQUE ở bảng `SepayWebhookEvent` — SePay retry/replay
  *          không xử lý lại; giao dịch đã SUCCESS ⇒ DUPLICATE.
  *       7. Hợp lệ ⇒ chốt giao dịch trong cùng transaction:
- *          - **Lớp học**: ghi danh hội viên vào các buổi sắp tới + cộng 85% vào ví HLV chính.
+ *          - **Lớp học**: ghi danh hội viên vào các buổi sắp tới + cộng 85% vào ví HLV chính, Payment `SUCCESS`
+ *            (`activationStatus = ACTIVATED`), tạo `Invoice` snapshot, notification `PAYMENT_SUCCESS` cho hội viên.
  *          - **Đơn sản phẩm**: Payment `SUCCESS`, `ProductOrder` `SUCCESS`, tạo `Invoice` snapshot, notification `PAYMENT_SUCCESS`.
  *          A06: `Payment.activationStatus` tách khỏi trạng thái tiền — tiền đã thu nhưng không kích hoạt được
  *          (VD lớp đã bị xóa, đơn sản phẩm không còn PENDING) ⇒ `REQUIRES_REVIEW` + `reviewReason` để
