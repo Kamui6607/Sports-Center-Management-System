@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import { UserRole } from "@prisma/client";
+import type { RoleName } from "../utils/roles.js";
 import { sendError } from "../utils/response.js";
 
-export function authorize(...roles: UserRole[]) {
+export function authorize(...roles: RoleName[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       sendError(res, "Unauthorized", 401);

@@ -15,6 +15,7 @@ import { env } from "../../config/env.js";
 import jwt from "jsonwebtoken";
 import { sendResetPasswordEmail } from "../../utils/mail.js";
 import type { RegisterInput, UpdateProfileInput, ForgotPasswordInput, ResetPasswordInput } from "./auth.schema.js";
+import { ROLE_NAME_SELECT, connectRole, flattenRole } from "../../utils/roles.js";
 
 export async function forgotPassword(data: ForgotPasswordInput) {
   const user = await prisma.user.findUnique({ where: { email: data.email } });
@@ -83,7 +84,7 @@ export async function register(data: RegisterInput) {
         phone: data.phone,
         gender: data.gender,
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-        role,
+        role: connectRole(role),
         isActive: role === "COACH" ? false : true,
         ...profileCreate,
       },
@@ -94,14 +95,14 @@ export async function register(data: RegisterInput) {
         phone: true,
         gender: true,
         dateOfBirth: true,
-        role: true,
+        role: ROLE_NAME_SELECT,
         isActive: true,
         memberProfile: true,
         coachProfile: true,
       },
     });
 
-    return created;
+    return flattenRole(created);
   });
 
   // Gửi thông báo chào mừng (fire-and-forget, không block response)
@@ -130,14 +131,14 @@ export async function register(data: RegisterInput) {
 
 
 export async function login(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email }, include: { role: true } });
   if (!user) throw new AppError("Invalid email or password", 401);
   if (!user.isActive) throw new AppError("Your account has been deactivated", 403);
 
   const valid = await comparePassword(password, user.password);
   if (!valid) throw new AppError("Invalid email or password", 401);
 
-  const payload = { id: user.id, role: user.role };
+  const payload = { id: user.id, role: user.role.name };
   const accessToken = signAccessToken(payload);
   const refreshToken = signRefreshToken(payload);
 
@@ -178,10 +179,10 @@ export async function refreshAccessToken(token: string) {
   if (stored.revokedAt) throw new AppError("Refresh token has been revoked", 401);
   if (stored.expiresAt < new Date()) throw new AppError("Refresh token has expired", 401);
 
-  const user = await prisma.user.findUnique({ where: { id: payload.id } });
+  const user = await prisma.user.findUnique({ where: { id: payload.id }, include: { role: true } });
   if (!user || !user.isActive) throw new AppError("User not found or inactive", 401);
 
-  const accessToken = signAccessToken({ id: user.id, role: user.role });
+  const accessToken = signAccessToken({ id: user.id, role: user.role.name });
   return { accessToken };
 }
 
@@ -196,7 +197,7 @@ export async function getMe(userId: string) {
       gender: true,
       dateOfBirth: true,
       avatarUrl: true,
-      role: true,
+      role: ROLE_NAME_SELECT,
       isActive: true,
       createdAt: true,
       memberProfile: true,
@@ -205,13 +206,13 @@ export async function getMe(userId: string) {
     },
   });
   if (!user) throw new AppError("User not found", 404);
-  return user;
+  return flattenRole(user);
 }
 
 export async function updateMe(userId: string, data: UpdateProfileInput) {
   const { fitnessGoal, trainingLevel, trainingPreference, ...userFields } = data;
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({ where: { id: userId }, include: { role: true } });
   if (!user) throw new AppError("User not found", 404);
 
   const profileData: Record<string, unknown> = {};
@@ -229,7 +230,7 @@ export async function updateMe(userId: string, data: UpdateProfileInput) {
       },
     });
 
-    if (user.role === "MEMBER" && Object.keys(profileData).length > 0) {
+    if (user.role.name === "MEMBER" && Object.keys(profileData).length > 0) {
       await tx.memberProfile.update({ where: { userId }, data: profileData });
     }
   });

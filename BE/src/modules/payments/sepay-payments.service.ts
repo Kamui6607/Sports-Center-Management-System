@@ -22,6 +22,7 @@ import { enqueueNotification, flushNotificationOutbox } from "../notifications/o
 import { creditCoachWallet, autoEnrollAfterPayment } from "./payments.service.js";
 
 import type { SepayWebhookBody } from "./payments.schema.js";
+import { ROLE_NAME_SELECT } from "../../utils/roles.js";
 
 export const SEPAY_GATEWAY = "SEPAY";
 /** Error code 409 khi hội viên còn giao dịch SePay đang chờ cho cùng gói. */
@@ -202,9 +203,9 @@ export async function createSepayCheckout(userId: string, classId: string) {
 
   const memberProfile = await prisma.memberProfile.findUnique({
     where: { userId },
-    include: { user: { select: { id: true, fullName: true, isActive: true, role: true } } },
+    include: { user: { select: { id: true, fullName: true, isActive: true, role: ROLE_NAME_SELECT } } },
   });
-  if (!memberProfile || !memberProfile.user.isActive || memberProfile.user.role !== "MEMBER") {
+  if (!memberProfile || !memberProfile.user.isActive || memberProfile.user.role.name !== "MEMBER") {
     throw new AppError("Cannot checkout: user is not an active MEMBER", 400);
   }
 

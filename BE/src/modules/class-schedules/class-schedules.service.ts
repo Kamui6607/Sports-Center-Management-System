@@ -389,7 +389,7 @@ export async function createActivityPlan(data: any, actor: { id: string; role: s
     const coaches = await tx.coachProfile.findMany({
       where: {
         id: { in: coachIds },
-        user: { isActive: true, role: "COACH" },
+        user: { isActive: true, role: { name: "COACH" } },
       },
       select: { id: true },
     });

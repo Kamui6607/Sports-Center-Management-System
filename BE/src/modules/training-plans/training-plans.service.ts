@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { Prisma } from "@prisma/client";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { createNotification } from "../notifications/notifications.service.js";
+import { ROLE_NAME_SELECT } from "../../utils/roles.js";
 
 async function verifyCoachOwnership(coachId: string, user: any) {
   if (user.role === "MANAGER") return true;
@@ -21,9 +22,9 @@ export const createPlan = async (data: Prisma.TrainingPlanUncheckedCreateInput, 
   // Check if member is active and role is MEMBER
   const memberProfile = await prisma.memberProfile.findUnique({
     where: { id: data.memberId },
-    include: { user: { select: { id: true, isActive: true, role: true } } },
+    include: { user: { select: { id: true, isActive: true, role: ROLE_NAME_SELECT } } },
   });
-  if (!memberProfile || !memberProfile.user.isActive || memberProfile.user.role !== "MEMBER") {
+  if (!memberProfile || !memberProfile.user.isActive || memberProfile.user.role.name !== "MEMBER") {
     throw new AppError("Cannot assign training plan: user is not an active MEMBER", 400);
   }
 
@@ -137,9 +138,9 @@ export const updatePlanCoach = async (planId: string, coachId: string, user: any
   // HLV mới phải tồn tại, đang hoạt động và có role COACH.
   const newCoach = await prisma.coachProfile.findUnique({
     where: { id: coachId },
-    include: { user: { select: { id: true, isActive: true, role: true } } },
+    include: { user: { select: { id: true, isActive: true, role: ROLE_NAME_SELECT } } },
   });
-  if (!newCoach || !newCoach.user.isActive || newCoach.user.role !== "COACH") {
+  if (!newCoach || !newCoach.user.isActive || newCoach.user.role.name !== "COACH") {
     throw new AppError("Active coach not found", 404);
   }
 

@@ -3,6 +3,7 @@ import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { broadcastNotification, createNotification } from "../notifications/notifications.service.js";
 import { evaluateCourseEligibility } from "../enrollments/course-enrollment.service.js";
+import { ROLE_NAME_SELECT } from "../../utils/roles.js";
 
 const classInclude = {
   sports: true,
@@ -115,7 +116,7 @@ export async function createClass(data: any, actor: { id: string; role: string }
   if (isCoach) {
     // Thông báo cho tất cả Manager rằng có class mới chờ duyệt
     const managers = await prisma.user.findMany({
-      where: { role: "MANAGER", isActive: true },
+      where: { role: { name: "MANAGER" }, isActive: true },
       select: { id: true },
     });
     broadcastNotification(
@@ -128,7 +129,7 @@ export async function createClass(data: any, actor: { id: string; role: string }
   } else {
     // Manager tạo → APPROVED ngay, broadcast cho Members
     prisma.memberProfile.findMany({
-      where: { user: { isActive: true, role: "MEMBER" } },
+      where: { user: { isActive: true, role: { name: "MEMBER" } } },
       select: { userId: true },
     }).then((members) => {
       const userIds = members.map((m) => m.userId);
@@ -182,7 +183,7 @@ export async function reviewClass(classId: string, action: "APPROVE" | "REJECT",
     // Nếu APPROVED: broadcast cho Members
     if (action === "APPROVE") {
       prisma.memberProfile
-        .findMany({ where: { user: { isActive: true, role: "MEMBER" } }, select: { userId: true } })
+        .findMany({ where: { user: { isActive: true, role: { name: "MEMBER" } } }, select: { userId: true } })
         .then((members) =>
           broadcastNotification(
             members.map((m) => m.userId),
@@ -347,9 +348,9 @@ async function notifyCoachChange(
 async function findAssignableCoach(coachId: string) {
   const coach = await prisma.coachProfile.findUnique({
     where: { id: coachId },
-    include: { user: { select: { id: true, fullName: true, isActive: true, role: true } } },
+    include: { user: { select: { id: true, fullName: true, isActive: true, role: ROLE_NAME_SELECT } } },
   });
-  if (!coach || !coach.user.isActive || coach.user.role !== "COACH") {
+  if (!coach || !coach.user.isActive || coach.user.role.name !== "COACH") {
     throw new AppError("Active coach not found", 404);
   }
   return coach;

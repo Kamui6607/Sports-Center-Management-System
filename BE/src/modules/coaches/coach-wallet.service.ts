@@ -169,7 +169,7 @@ export async function requestWithdrawal(coachUserId: string, data: {
 
   // Thông báo Manager có yêu cầu rút tiền mới
   const managers = await prisma.user.findMany({
-    where: { role: "MANAGER", isActive: true },
+    where: { role: { name: "MANAGER" }, isActive: true },
     select: { id: true },
   });
   const coachName = coachProfile.user?.fullName ?? "Coach";

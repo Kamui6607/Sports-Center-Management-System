@@ -5,6 +5,7 @@ import { buildPaginationMeta } from "../../utils/pagination.js";
 
 import { disconnectUserSockets } from "../chat/chat.socket.js";
 import type { CreateUserInput, UpdateUserInput, UserQueryInput } from "./users.schema.js";
+import { ROLE_NAME_SELECT, connectRole, flattenRole } from "../../utils/roles.js";
 
 const userSelect = {
   id: true,
@@ -14,7 +15,7 @@ const userSelect = {
   gender: true,
   dateOfBirth: true,
   avatarUrl: true,
-  role: true,
+  role: ROLE_NAME_SELECT,
   isActive: true,
   createdAt: true,
   memberProfile: true,
@@ -28,7 +29,7 @@ export async function listUsers(query: UserQueryInput) {
   const skipVal = (currentPage - 1) * pageSize;
 
   const where: any = {};
-  if (query.role) where.role = query.role;
+  if (query.role) where.role = { name: query.role };
   if (query.isActive !== undefined) where.isActive = query.isActive === "true";
   if (query.search) {
     where.OR = [
@@ -48,7 +49,7 @@ export async function listUsers(query: UserQueryInput) {
     }),
   ]);
 
-  return { users, pagination: buildPaginationMeta(total, currentPage, pageSize) };
+  return { users: users.map(flattenRole), pagination: buildPaginationMeta(total, currentPage, pageSize) };
 }
 
 export async function createUser(data: CreateUserInput) {
@@ -85,7 +86,7 @@ export async function createUser(data: CreateUserInput) {
         phone: data.phone,
         gender: data.gender,
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-        role: data.role,
+        role: connectRole(data.role),
         ...profileCreate,
       },
       select: userSelect,
@@ -94,19 +95,22 @@ export async function createUser(data: CreateUserInput) {
     if (created.memberProfile) {
       }
 
-    return created;
+    return flattenRole(created);
   });
 }
 
 export async function getUserById(id: string) {
   const user = await prisma.user.findUnique({ where: { id }, select: userSelect });
   if (!user) throw new AppError("User not found", 404);
-  return user;
+  return flattenRole(user);
 }
 
 export async function updateUser(id: string, data: UpdateUserInput, requesterId: string) {
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) throw new AppError("User not found", 404);
+  const found = await prisma.user.findUnique({ where: { id }, include: { role: true } });
+  if (!found) throw new AppError("User not found", 404);
+  const user = flattenRole(found);
+  // Vai trò mới (nếu có) gán qua quan hệ Role, không ghi thẳng vào User.
+  const { role: newRole, ...fields } = data;
 
   if (id === requesterId) {
     if (data.isActive === false) throw new AppError("Cannot deactivate your own account", 400);
@@ -115,7 +119,7 @@ export async function updateUser(id: string, data: UpdateUserInput, requesterId:
 
   if (user.role === "MANAGER" && (data.isActive === false || (data.role && data.role !== "MANAGER"))) {
     const activeManagers = await prisma.user.count({
-      where: { role: "MANAGER", isActive: true }
+      where: { role: { name: "MANAGER" }, isActive: true }
     });
     if (activeManagers <= 1) {
       throw new AppError("Cannot deactivate or demote the last active MANAGER", 400);
@@ -159,9 +163,9 @@ export async function updateUser(id: string, data: UpdateUserInput, requesterId:
   const updated = await prisma.user.update({
     where: { id },
     data: {
-      ...data,
-      dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-      ...(data.role && data.role !== user.role ? profileUpdate : {}),
+      ...fields,
+      dateOfBirth: fields.dateOfBirth ? new Date(fields.dateOfBirth) : undefined,
+      ...(newRole && newRole !== user.role ? { role: connectRole(newRole), ...profileUpdate } : {}),
     },
     select: userSelect,
   });
@@ -171,18 +175,18 @@ export async function updateUser(id: string, data: UpdateUserInput, requesterId:
     disconnectUserSockets(id);
   }
 
-  return updated;
+  return flattenRole(updated);
 }
 
 export async function deactivateUser(id: string, requesterId: string) {
   if (id === requesterId) throw new AppError("Cannot deactivate your own account", 400);
 
-  const user = await prisma.user.findUnique({ where: { id } });
+  const user = await prisma.user.findUnique({ where: { id }, include: { role: true } });
   if (!user) throw new AppError("User not found", 404);
 
-  if (user.role === "MANAGER") {
+  if (user.role.name === "MANAGER") {
     const activeManagers = await prisma.user.count({
-      where: { role: "MANAGER", isActive: true }
+      where: { role: { name: "MANAGER" }, isActive: true }
     });
     if (activeManagers <= 1) {
       throw new AppError("Cannot deactivate the last active MANAGER", 400);
@@ -192,11 +196,11 @@ export async function deactivateUser(id: string, requesterId: string) {
   const deactivated = await prisma.user.update({
     where: { id },
     data: { isActive: false },
-    select: { id: true, email: true, fullName: true, role: true, isActive: true },
+    select: { id: true, email: true, fullName: true, role: ROLE_NAME_SELECT, isActive: true },
   });
 
   // Tài khoản bị khóa phải ngừng ngay mọi phiên socket đang mở (D04).
   disconnectUserSockets(id);
 
-  return deactivated;
+  return flattenRole(deactivated);
 }

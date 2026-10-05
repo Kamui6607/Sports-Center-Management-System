@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import type { CoachQueryInput, UpdateCoachInput } from "./coaches.schema.js";
+import { ROLE_NAME_SELECT, flattenRole } from "../../utils/roles.js";
 
 export async function listCoaches(query: CoachQueryInput) {
   const { search, specialization } = query;
@@ -10,7 +11,7 @@ export async function listCoaches(query: CoachQueryInput) {
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {
-    role: "COACH",
+    role: { name: "COACH" },
     isActive: true,
     ...(search && {
       OR: [
@@ -39,7 +40,7 @@ export async function listCoaches(query: CoachQueryInput) {
         gender: true,
         dateOfBirth: true,
         avatarUrl: true,
-        role: true,
+        role: ROLE_NAME_SELECT,
         isActive: true,
         coachProfile: true,
       },
@@ -48,12 +49,12 @@ export async function listCoaches(query: CoachQueryInput) {
   ]);
 
   const pagination = buildPaginationMeta(total, page, limit);
-  return { coaches: users, pagination };
+  return { coaches: users.map(flattenRole), pagination };
 }
 
 export async function getCoachById(id: string) {
   const user = await prisma.user.findFirst({
-    where: { id, role: "COACH" },
+    where: { id, role: { name: "COACH" } },
     select: {
       id: true,
       email: true,
@@ -62,7 +63,7 @@ export async function getCoachById(id: string) {
       gender: true,
       dateOfBirth: true,
       avatarUrl: true,
-      role: true,
+      role: ROLE_NAME_SELECT,
       isActive: true,
       coachProfile: {
         include: {
@@ -89,12 +90,12 @@ export async function getCoachById(id: string) {
     throw new AppError("Coach not found", 404);
   }
 
-  return user;
+  return flattenRole(user);
 }
 
 export async function updateCoach(id: string, data: UpdateCoachInput, actor?: { id: string; role: string }) {
   const coachProfile = await prisma.coachProfile.findFirst({
-    where: { user: { id, role: "COACH" } },
+    where: { user: { id, role: { name: "COACH" } } },
   });
 
   if (!coachProfile) {
@@ -139,7 +140,7 @@ export async function updateCoach(id: string, data: UpdateCoachInput, actor?: { 
             fullName: true,
             phone: true,
             gender: true,
-            role: true,
+            role: ROLE_NAME_SELECT,
             isActive: true,
           },
         },
@@ -147,7 +148,7 @@ export async function updateCoach(id: string, data: UpdateCoachInput, actor?: { 
     });
   });
 
-  return updated;
+  return { ...updated, user: flattenRole(updated.user) };
 }
 
 // ── Coach nộp CV ──────────────────────────────────────────────────────────────
@@ -174,7 +175,7 @@ export async function submitCV(coachUserId: string, cvFilePath: string) {
   // Thông báo cho tất cả Manager biết có CV mới cần duyệt
   const { createNotification } = await import("../notifications/notifications.service.js");
   const managers = await prisma.user.findMany({
-    where: { role: "MANAGER", isActive: true },
+    where: { role: { name: "MANAGER" }, isActive: true },
     select: { id: true },
   });
   const coach = await prisma.user.findUnique({ where: { id: coachUserId }, select: { fullName: true } });

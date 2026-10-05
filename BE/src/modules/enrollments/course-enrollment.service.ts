@@ -9,6 +9,7 @@ import {
   findActiveSubscription,
   getMemberConcurrentClassQuota,
 } from "./enrollment-quota.service.js";
+import { ROLE_NAME_SELECT } from "../../utils/roles.js";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
@@ -350,9 +351,9 @@ export async function enrollWholeCourse(classId: string, memberProfileId: string
   // 0. Member phải tồn tại, đang hoạt động và đúng role MEMBER (giống bookClass).
   const memberProfile = await prisma.memberProfile.findUnique({
     where: { id: memberProfileId },
-    include: { user: { select: { id: true, isActive: true, role: true } } },
+    include: { user: { select: { id: true, isActive: true, role: ROLE_NAME_SELECT } } },
   });
-  if (!memberProfile || !memberProfile.user.isActive || memberProfile.user.role !== "MEMBER") {
+  if (!memberProfile || !memberProfile.user.isActive || memberProfile.user.role.name !== "MEMBER") {
     throw new AppError("Cannot enroll: user is not an active MEMBER", 400);
   }
 

@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import type { UpdateMemberInput, MemberQueryInput } from "./members.schema.js";
+import { ROLE_NAME_SELECT, flattenRole } from "../../utils/roles.js";
 
 const memberInclude = {
   user: {
@@ -13,7 +14,7 @@ const memberInclude = {
       gender: true,
       dateOfBirth: true,
       avatarUrl: true,
-      role: true,
+      role: ROLE_NAME_SELECT,
       isActive: true,
       createdAt: true,
     },
@@ -29,14 +30,14 @@ export async function listMembers(query: MemberQueryInput) {
   if (query.trainingLevel) where.trainingLevel = query.trainingLevel;
   if (query.search) {
     where.user = {
-      role: "MEMBER",
+      role: { name: "MEMBER" },
       OR: [
         { fullName: { contains: query.search, mode: "insensitive" } },
         { email: { contains: query.search, mode: "insensitive" } },
       ],
     };
   } else {
-    where.user = { role: "MEMBER" };
+    where.user = { role: { name: "MEMBER" } };
   }
 
   const [total, members] = await Promise.all([
@@ -52,26 +53,29 @@ export async function listMembers(query: MemberQueryInput) {
     }),
   ]);
 
-  return { members, pagination: buildPaginationMeta(total, page, limit) };
+  return {
+    members: members.map((m) => ({ ...m, user: flattenRole(m.user) })),
+    pagination: buildPaginationMeta(total, page, limit),
+  };
 }
 
 export async function getMemberById(id: string) {
   const memberProfile = await prisma.memberProfile.findFirst({
     where: {
       OR: [{ id }, { userId: id }],
-      user: { role: "MEMBER" },
+      user: { role: { name: "MEMBER" } },
     },
     include: {
       ...memberInclude,
       },
   });
   if (!memberProfile) throw new AppError("Member not found", 404);
-  return memberProfile;
+  return { ...memberProfile, user: flattenRole(memberProfile.user) };
 }
 
 export async function updateMember(id: string, data: UpdateMemberInput) {
   const memberProfile = await prisma.memberProfile.findFirst({
-    where: { OR: [{ id }, { userId: id }], user: { role: "MEMBER" } },
+    where: { OR: [{ id }, { userId: id }], user: { role: { name: "MEMBER" } } },
   });
   if (!memberProfile) throw new AppError("Member not found", 404);
 

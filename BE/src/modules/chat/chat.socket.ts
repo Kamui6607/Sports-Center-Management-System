@@ -2,6 +2,7 @@ import { Server, Socket } from "socket.io";
 import { prisma } from "../../config/prisma.js";
 import { verifyAccessToken } from "../../utils/jwt.js";
 import { chatService } from "./chat.service.js";
+import { ROLE_NAME_SELECT } from "../../utils/roles.js";
 
 type SocketUser = { id: string; role: string };
 type Ack = (result: { ok: boolean; message?: unknown; error?: string }) => void;
@@ -43,11 +44,11 @@ export const setupSocket = (io: Server) => {
       const payload = verifyAccessToken(tokenFrom(socket));
       const user = await prisma.user.findUnique({
         where: { id: payload.id },
-        select: { id: true, role: true, isActive: true },
+        select: { id: true, role: ROLE_NAME_SELECT, isActive: true },
       });
-      if (!user?.isActive || user.role !== payload.role)
+      if (!user?.isActive || user.role.name !== payload.role)
         return next(new Error("Unauthorized"));
-      socket.data.user = { id: user.id, role: user.role } satisfies SocketUser;
+      socket.data.user = { id: user.id, role: user.role.name } satisfies SocketUser;
       next();
     } catch {
       next(new Error("Unauthorized"));

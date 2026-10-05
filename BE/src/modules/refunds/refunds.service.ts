@@ -88,7 +88,7 @@ async function computeCoachDebit(
 export async function notifyManagersNewRefunds(body: string, metadata: Record<string, unknown>) {
   try {
     const managers = await prisma.user.findMany({
-      where: { role: "MANAGER", isActive: true },
+      where: { role: { name: "MANAGER" }, isActive: true },
       select: { id: true },
     });
     for (const manager of managers) {

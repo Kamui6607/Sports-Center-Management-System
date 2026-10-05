@@ -106,12 +106,12 @@ export async function getMemberReport(startDate: string, endDate: string) {
   const [totalMembers, newMembers, activeSubs] = await Promise.all([
     // Count members whose user is still MEMBER role and active
     prisma.memberProfile.count({
-      where: { user: { role: "MEMBER", isActive: true } },
+      where: { user: { role: { name: "MEMBER" }, isActive: true } },
     }),
     prisma.memberProfile.count({
       where: {
         createdAt: { gte: start, lte: end },
-        user: { role: "MEMBER", isActive: true },
+        user: { role: { name: "MEMBER" }, isActive: true },
       },
     }),
     (prisma as any).membershipSubscription.findMany({

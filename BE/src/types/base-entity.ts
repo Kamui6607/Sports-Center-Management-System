@@ -31,6 +31,7 @@ export type EntityData<T extends BaseEntity> = Omit<T, BaseEntityKeys>;
  * Key phải trùng tên model trong schema (VD `Sport`, dù bảng dưới DB tên `Fitness`).
  */
 type BaseEntityModels = {
+  Role: Models.Role;
   User: Models.User;
   RefreshToken: Models.RefreshToken;
   MemberProfile: Models.MemberProfile;

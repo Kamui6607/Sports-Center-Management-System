@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { PrismaClient, UserRole, ClassType, AreaType, PaymentMethod, PaymentStatus } from "@prisma/client";
+import { PrismaClient, ClassType, AreaType, PaymentMethod, PaymentStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -8,6 +8,17 @@ async function main() {
   console.log("Seeding database...");
 
   const SALT = 12;
+
+  // ─── ROLES (bảng tra cứu vai trò) ───────────────────
+  const ROLE_SEED = [
+    { name: "MEMBER", description: "Hội viên — mua khóa học, đặt lịch, điểm danh" },
+    { name: "COACH", description: "Huấn luyện viên — mở lớp, dạy, nhận 85% doanh thu" },
+    { name: "MANAGER", description: "Quản lý trung tâm — toàn quyền quản trị" },
+  ];
+  for (const r of ROLE_SEED) {
+    await prisma.role.upsert({ where: { name: r.name }, update: {}, create: r });
+  }
+  console.log("Roles ready");
 
   // ─── USERS ───────────────────────────────────────────
   const managerPwd = await bcrypt.hash("Manager@123", SALT);
@@ -24,7 +35,7 @@ async function main() {
       password: managerPwd,
       fullName: "Center Manager",
       phone: "0900000001",
-      role: UserRole.MANAGER,
+      role: { connect: { name: "MANAGER" } },
       isActive: true,
       managerProfile: { create: {} },
     },
@@ -40,7 +51,7 @@ async function main() {
       password: staffPwd,
       fullName: "Lê Thị Lễ Tân",
       phone: "0900000002",
-      role: UserRole.MANAGER,
+      role: { connect: { name: "MANAGER" } },
       isActive: true,
     },
   });
@@ -55,7 +66,7 @@ async function main() {
       password: coachPwd,
       fullName: "Nguyễn Văn Cường",
       phone: "0900000003",
-      role: UserRole.COACH,
+      role: { connect: { name: "COACH" } },
       isActive: true,
       coachProfile: {
         create: {
@@ -78,7 +89,7 @@ async function main() {
       password: coachPwd,
       fullName: "Trần Thị Mai",
       phone: "0900000004",
-      role: UserRole.COACH,
+      role: { connect: { name: "COACH" } },
       isActive: true,
       coachProfile: {
         create: {
@@ -101,7 +112,7 @@ async function main() {
       password: memberPwd,
       fullName: "Phạm Văn An",
       phone: "0900000005",
-      role: UserRole.MEMBER,
+      role: { connect: { name: "MEMBER" } },
       isActive: true,
       memberProfile: {
         create: {
@@ -123,7 +134,7 @@ async function main() {
       password: memberPwd,
       fullName: "Hoàng Thị Bình",
       phone: "0900000006",
-      role: UserRole.MEMBER,
+      role: { connect: { name: "MEMBER" } },
       isActive: true,
       memberProfile: {
         create: {
@@ -145,7 +156,7 @@ async function main() {
       password: memberPwd,
       fullName: "Đỗ Minh Chiến",
       phone: "0900000007",
-      role: UserRole.MEMBER,
+      role: { connect: { name: "MEMBER" } },
       isActive: true,
       memberProfile: {
         create: {
@@ -168,7 +179,7 @@ async function main() {
       password: memberPwd,
       fullName: "SePay Test Member",
       phone: "0900000008",
-      role: UserRole.MEMBER,
+      role: { connect: { name: "MEMBER" } },
       isActive: true,
       memberProfile: {
         create: {

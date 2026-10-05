@@ -1,12 +1,17 @@
 import { prisma } from "../../config/prisma.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { AppError } from "../../middlewares/errorHandler.js";
-import type { UserRole } from "@prisma/client";
 import path from "path";
 import fs from "fs";
 import { CHAT_UPLOAD_DIR } from "../../middlewares/upload.js";
+import { ROLE_NAME_SELECT, flattenRole, type RoleName } from "../../utils/roles.js";
 
-const allowedContacts: Record<string, UserRole[]> = {
+/** Người gửi/nhận kèm tên vai trò (Role.name); trả cho FE dạng `role: "COACH"` như cũ. */
+const CHAT_USER_SELECT = { select: { id: true, fullName: true, role: ROLE_NAME_SELECT } };
+type ChatUserRow = { id: string; fullName: string; role: { name: string } };
+const flatChatUserOrNull = (u: ChatUserRow | null) => (u ? flattenRole(u) : null);
+
+const allowedContacts: Record<string, RoleName[]> = {
   MEMBER: ["COACH"],
   COACH: ["MEMBER", "MANAGER"],
   MANAGER: [ "COACH"],
@@ -16,12 +21,12 @@ async function assertCanContact(senderId: string, receiverId?: string) {
   if (!receiverId) return;
   if (senderId === receiverId) throw new AppError("Cannot send messages to yourself", 400);
   const [sender, receiver] = await Promise.all([
-    prisma.user.findUnique({ where: { id: senderId }, select: { role: true, isActive: true } }),
-    prisma.user.findUnique({ where: { id: receiverId }, select: { role: true, isActive: true } }),
+    prisma.user.findUnique({ where: { id: senderId }, select: { role: ROLE_NAME_SELECT, isActive: true } }),
+    prisma.user.findUnique({ where: { id: receiverId }, select: { role: ROLE_NAME_SELECT, isActive: true } }),
   ]);
   if (!sender?.isActive || !receiver?.isActive)
     throw new AppError("Chat user not found or inactive", 404);
-  if (!allowedContacts[sender.role]?.includes(receiver.role))
+  if (!allowedContacts[sender.role.name]?.includes(receiver.role.name as RoleName))
     throw new AppError("You cannot message this user", 403);
 }
 
@@ -40,14 +45,14 @@ export const chatService = {
         isRead: false,
       },
       include: {
-        sender: { select: { id: true, fullName: true, role: true } },
-        receiver: { select: { id: true, fullName: true, role: true } },
+        sender: CHAT_USER_SELECT,
+        receiver: CHAT_USER_SELECT,
       },
     });
 
     await chatService.notifyReceiver(message).catch(() => {});
 
-    return message;
+    return { ...message, sender: flattenRole(message.sender), receiver: flatChatUserOrNull(message.receiver) };
   },
 
   /** Gửi thông báo cho người nhận khi có tin 1-1 (phòng chung không broadcast notification). */
@@ -112,8 +117,8 @@ export const chatService = {
           isRead: false,
         },
         include: {
-          sender: { select: { id: true, fullName: true, role: true } },
-          receiver: { select: { id: true, fullName: true, role: true } },
+          sender: CHAT_USER_SELECT,
+          receiver: CHAT_USER_SELECT,
         },
       });
       await tx.chatAttachment.update({
@@ -124,7 +129,8 @@ export const chatService = {
     });
 
     await chatService.notifyReceiver(result.message).catch(() => {});
-    return result;
+    const m = result.message;
+    return { ...result, message: { ...m, sender: flattenRole(m.sender), receiver: flatChatUserOrNull(m.receiver) } };
   },
 
   /**
@@ -155,7 +161,7 @@ export const chatService = {
   async getMessages(userId: string, targetId?: string) {
     // If targetId is provided, get 1-to-1 chat. Otherwise get general chat where receiverId is null
     if (targetId) {
-      return prisma.chatMessage.findMany({
+      const rows = await prisma.chatMessage.findMany({
         where: {
           OR: [
             { senderId: userId, receiverId: targetId },
@@ -164,20 +170,22 @@ export const chatService = {
         },
         orderBy: { createdAt: "asc" },
         include: {
-          sender: { select: { id: true, fullName: true, role: true } },
+          sender: CHAT_USER_SELECT,
         },
       });
+      return rows.map((m) => ({ ...m, sender: flattenRole(m.sender) }));
     }
 
-    return prisma.chatMessage.findMany({
+    const rows = await prisma.chatMessage.findMany({
       where: {
         receiverId: null, // Broadcast/General group messages
       },
       orderBy: { createdAt: "asc" },
       include: {
-        sender: { select: { id: true, fullName: true, role: true } },
+        sender: CHAT_USER_SELECT,
       },
     });
+    return rows.map((m) => ({ ...m, sender: flattenRole(m.sender) }));
   },
 
   async markAsRead(userId: string, targetId?: string) {
@@ -214,7 +222,7 @@ export const chatService = {
       select: {
         id: true,
         fullName: true,
-        role: true,
+        role: ROLE_NAME_SELECT,
       },
     });
 
@@ -240,7 +248,7 @@ export const chatService = {
         });
 
         return {
-          user: partner,
+          user: flattenRole(partner),
           latestMessage,
           unreadCount,
         };
@@ -263,18 +271,19 @@ export const chatService = {
     // MANAGER -> STAFF, COACH
     const allowedRoles = allowedContacts[role] ?? [];
 
-    return prisma.user.findMany({
+    const contacts = await prisma.user.findMany({
       where: {
-        role: { in: allowedRoles },
+        role: { name: { in: allowedRoles } },
         isActive: true,
       },
       select: {
         id: true,
         fullName: true,
-        role: true,
+        role: ROLE_NAME_SELECT,
         email: true,
       },
       orderBy: { fullName: "asc" }
     });
+    return contacts.map(flattenRole);
   }
 };

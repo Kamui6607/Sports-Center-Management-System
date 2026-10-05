@@ -30,7 +30,7 @@ REST API (Express 5 + TypeScript + Prisma/PostgreSQL) cho hệ thống quản l�
 │   ├── middlewares/          # authenticate, authorize, validate, errorHandler, upload
 │   ├── modules/<tên>/        # Mỗi tính năng một thư mục (xem quy ước bên dưới)
 │   ├── types/                # express.d.ts (req.user), base-entity.ts (BaseEntity)
-│   ├── utils/                # response, pagination, jwt, bcrypt, hashToken, dbLocks, mail, fileSignature, storage
+│   ├── utils/                # response, pagination, jwt, bcrypt, hashToken, dbLocks, mail, fileSignature, storage, roles
 │   ├── app.ts                # Khởi tạo Express, mount routes
 │   └── server.ts             # Entry: connect DB, Socket.IO, worker outbox
 ├── tests/                    # Script e2e chạy bằng tsx (cần DB thật)
@@ -159,6 +159,7 @@ export async function getSportById(req: Request, res: Response, next: NextFuncti
 - **BaseEntity**: MỌI model phải có đủ 3 field, đúng định nghĩa:
   `id String @id @default(uuid())`, `createdAt DateTime @default(now())`, `updatedAt DateTime @default(now()) @updatedAt`.
   Prisma không có kế thừa model nên tự khai báo trong từng model; thêm model mới thì thêm luôn vào `BaseEntityModels` trong `src/types/base-entity.ts` — thiếu là `npx tsc --noEmit` báo lỗi. SQL thô (`$executeRaw`) cập nhật bảng thì tự set `"updatedAt" = NOW()` (Prisma chỉ tự cập nhật khi đi qua client).
+- **Vai trò (Role)**: vai trò nằm ở bảng `Role` (`User.roleId` → `Role.id`), KHÔNG có enum/cột `role` dạng chuỗi trên `User`. Dùng helper trong `src/utils/roles.ts`: lọc `where: { role: { name: "COACH" } }`, lấy tên `select: { role: ROLE_NAME_SELECT }` ⇒ `user.role.name`, gán `role: connectRole("MEMBER")`, trả cho FE `flattenRole(user)` (API vẫn trả `role: "COACH"`). `req.user.role` (từ JWT) đã là chuỗi `RoleName`.
 - Sửa `prisma/schema.prisma` rồi tạo migration bằng `npm run db:migrate` (tức `prisma migrate dev`); tên migration `snake_case` mô tả thay đổi, thư mục tự có timestamp. Commit cả `migration.sql`.
 - **Không sửa migration đã tồn tại/đã áp dụng**; muốn đổi thì tạo migration mới. Đổi cột `NOT NULL` trên bảng có dữ liệu: làm 2 bước (thêm nullable → backfill → ép bắt buộc), như cặp migration `add_area_type_nullable` / `enforce_area_type_required`.
 - Thêm `@@index` cho cột dùng để lọc/join thường xuyên; đặt `@@unique` để chặn trùng ở tầng DB thay vì chỉ kiểm tra trong code (bài học từ `SepayWebhookEvent.sepayId`, `Enrollment[memberId, scheduleId]`).

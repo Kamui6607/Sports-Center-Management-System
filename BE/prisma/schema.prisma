@@ -31,12 +31,6 @@ enum ClassApprovalStatus {
   COMPLETED
 }
 
-enum UserRole {
-  MEMBER
-  COACH
-  MANAGER
-}
-
 enum Gender {
   MALE
   FEMALE
@@ -119,6 +113,19 @@ enum OutboxStatus {
 // AUTH / USER
 // ─────────────────────────────────────────
 
+/// Vai trò người dùng (bảng tra cứu). Hệ thống dùng 3 dòng: MEMBER, COACH, MANAGER
+/// (tạo sẵn bởi migration `20261005010000_role_table` và `prisma/seed.ts`).
+/// Code tra vai trò theo `name` (UNIQUE) — xem `src/utils/roles.ts`.
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  users User[]
+}
+
 model User {
   id          String    @id @default(uuid())
   email       String    @unique
@@ -128,7 +135,8 @@ model User {
   gender      Gender?
   dateOfBirth DateTime?
   avatarUrl   String?
-  role        UserRole  @default(MEMBER)
+  roleId      String
+  role        Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @default(now()) @updatedAt
@@ -151,6 +159,8 @@ model User {
   productOrders              ProductOrder[]         @relation("ProductOrderUser")
   refundsRequested           Refund[]               @relation("RefundRequestedBy")
   refundsProcessed           Refund[]               @relation("RefundProcessedBy")
+
+  @@index([roleId])
 }
 
 model RefreshToken {
