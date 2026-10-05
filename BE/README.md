@@ -29,7 +29,7 @@ REST API (Express 5 + TypeScript + Prisma/PostgreSQL) cho hệ thống quản l�
 │   ├── config/               # env, prisma singleton, swagger, sepay, storage, attendance
 │   ├── middlewares/          # authenticate, authorize, validate, errorHandler, upload
 │   ├── modules/<tên>/        # Mỗi tính năng một thư mục (xem quy ước bên dưới)
-│   ├── types/                # express.d.ts (req.user)
+│   ├── types/                # express.d.ts (req.user), base-entity.ts (BaseEntity)
 │   ├── utils/                # response, pagination, jwt, bcrypt, hashToken, dbLocks, mail, fileSignature, storage
 │   ├── app.ts                # Khởi tạo Express, mount routes
 │   └── server.ts             # Entry: connect DB, Socket.IO, worker outbox
@@ -156,6 +156,9 @@ export async function getSportById(req: Request, res: Response, next: NextFuncti
 
 ### 9. Prisma schema & migration
 
+- **BaseEntity**: MỌI model phải có đủ 3 field, đúng định nghĩa:
+  `id String @id @default(uuid())`, `createdAt DateTime @default(now())`, `updatedAt DateTime @default(now()) @updatedAt`.
+  Prisma không có kế thừa model nên tự khai báo trong từng model; thêm model mới thì thêm luôn vào `BaseEntityModels` trong `src/types/base-entity.ts` — thiếu là `npx tsc --noEmit` báo lỗi. SQL thô (`$executeRaw`) cập nhật bảng thì tự set `"updatedAt" = NOW()` (Prisma chỉ tự cập nhật khi đi qua client).
 - Sửa `prisma/schema.prisma` rồi tạo migration bằng `npm run db:migrate` (tức `prisma migrate dev`); tên migration `snake_case` mô tả thay đổi, thư mục tự có timestamp. Commit cả `migration.sql`.
 - **Không sửa migration đã tồn tại/đã áp dụng**; muốn đổi thì tạo migration mới. Đổi cột `NOT NULL` trên bảng có dữ liệu: làm 2 bước (thêm nullable → backfill → ép bắt buộc), như cặp migration `add_area_type_nullable` / `enforce_area_type_required`.
 - Thêm `@@index` cho cột dùng để lọc/join thường xuyên; đặt `@@unique` để chặn trùng ở tầng DB thay vì chỉ kiểm tra trong code (bài học từ `SepayWebhookEvent.sepayId`, `Enrollment[memberId, scheduleId]`).

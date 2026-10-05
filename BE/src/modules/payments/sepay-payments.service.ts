@@ -108,7 +108,7 @@ async function allocateBankTransaction(
 
   const updated = await tx.$executeRaw`
     UPDATE "SepayBankTransaction"
-    SET "paymentId" = ${paymentId}, "allocatedAt" = NOW()
+    SET "paymentId" = ${paymentId}, "allocatedAt" = NOW(), "updatedAt" = NOW()
     WHERE "externalId" = ${externalId} AND ("paymentId" IS NULL OR "paymentId" = ${paymentId})
   `;
   return updated > 0;

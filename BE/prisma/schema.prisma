@@ -8,6 +8,19 @@ datasource db {
 }
 
 // ─────────────────────────────────────────
+// BaseEntity — field chung của MỌI model (Prisma không hỗ trợ kế thừa model,
+// nên mỗi model tự khai báo đủ 3 field dưới đây, ĐÚNG định nghĩa này):
+//
+//   id        String   @id @default(uuid())
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @default(now()) @updatedAt
+//
+// `@default(now())` của updatedAt giúp INSERT bằng SQL thô ($executeRaw) không lỗi NOT NULL.
+// Thêm model mới ⇒ khai báo đủ 3 field + thêm model vào `src/types/base-entity.ts`
+// (tsc sẽ báo lỗi nếu thiếu).
+// ─────────────────────────────────────────
+
+// ─────────────────────────────────────────
 // ENUMS
 // ─────────────────────────────────────────
 
@@ -118,7 +131,7 @@ model User {
   role        UserRole  @default(MEMBER)
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  updatedAt   DateTime  @default(now()) @updatedAt
 
   memberProfile              MemberProfile?
   coachProfile               CoachProfile?
@@ -148,6 +161,7 @@ model RefreshToken {
   expiresAt DateTime
   revokedAt DateTime?
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
 
   @@index([userId])
 }
@@ -164,7 +178,7 @@ model MemberProfile {
   trainingLevel      TrainingLevel?
   trainingPreference String?
   createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  updatedAt          DateTime       @default(now()) @updatedAt
 
   enrollments        Enrollment[]
   payments           Payment[]
@@ -193,7 +207,7 @@ model CoachProfile {
   cvUrl           String?
   approvalStatus  CoachApprovalStatus @default(PENDING)
   createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime @default(now()) @updatedAt
 
   classes       ClassMember[]
   wallet        CoachWallet?
@@ -206,7 +220,7 @@ model ManagerProfile {
   userId    String   @unique
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 // ─────────────────────────────────────────
@@ -226,7 +240,7 @@ model Sport {
   areaTypes   AreaType[]
   isActive    Boolean    @default(true)
   createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  updatedAt   DateTime   @default(now()) @updatedAt
 
   classes Class[] @relation("ClassToFitness")
 
@@ -241,7 +255,7 @@ model Room {
   areaType  AreaType
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   schedules ClassSchedule[]
 }
@@ -269,7 +283,7 @@ model Class {
   areaType    AreaType
   isActive    Boolean             @default(true)
   createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  updatedAt   DateTime            @default(now()) @updatedAt
 
   coaches            ClassMember[]
   schedules          ClassSchedule[]
@@ -290,6 +304,7 @@ model ClassMember {
   coach     CoachProfile @relation(fields: [coachId], references: [id])
   isPrimary Boolean      @default(false)
   createdAt DateTime     @default(now())
+  updatedAt DateTime     @default(now()) @updatedAt
 
   @@unique([classId, coachId])
   @@index([classId])
@@ -311,7 +326,7 @@ model ClassSchedule {
   makeupFor   ClassSchedule? @relation("ScheduleMakeup", fields: [makeupForId], references: [id], onDelete: SetNull)
   makeup      ClassSchedule? @relation("ScheduleMakeup")
   createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  updatedAt DateTime       @default(now()) @updatedAt
 
   enrollments Enrollment[]
   attendances Attendance[]
@@ -339,7 +354,7 @@ model Enrollment {
   bookedAt    DateTime         @default(now())
   cancelledAt DateTime?
   createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  updatedAt   DateTime         @default(now()) @updatedAt
 
   @@unique([memberId, scheduleId])
   @@index([memberId])
@@ -389,7 +404,7 @@ model Payment {
   createdById       String?
   createdBy         User?                    @relation("PaymentCreatedBy", fields: [createdById], references: [id])
   createdAt         DateTime                 @default(now())
-  updatedAt         DateTime                 @updatedAt
+  updatedAt         DateTime                 @default(now()) @updatedAt
 
   invoice            Invoice?
   sepayWebhookEvents SepayWebhookEvent[]
@@ -427,6 +442,7 @@ model SepayBankTransaction {
   payment          Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   allocatedAt      DateTime?
   createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
 
   @@index([createdAt])
   @@index([referenceCode])
@@ -448,6 +464,7 @@ model NotificationOutbox {
   availableAt DateTime     @default(now())
   sentAt      DateTime?
   createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @default(now()) @updatedAt
 
   @@index([status, availableAt])
   @@index([userId])
@@ -466,6 +483,7 @@ model SepayWebhookEvent {
   reason    String?
   payload   Json
   createdAt DateTime           @default(now())
+  updatedAt DateTime           @default(now()) @updatedAt
 
   @@index([paymentId])
   @@index([createdAt])
@@ -489,7 +507,7 @@ model Invoice {
   className     String? // Copied from class.name at time of issue
   productName   String? // Copied from product.name at time of issue (hóa đơn mua sản phẩm)
   createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  updatedAt     DateTime      @default(now()) @updatedAt
 
   @@index([memberId])
   @@index([issuedAt])
@@ -509,7 +527,7 @@ model ChatMessage {
   fileUrl    String?
   isRead     Boolean  @default(false)
   createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  updatedAt  DateTime @default(now()) @updatedAt
 
   attachment ChatAttachment?
 
@@ -535,6 +553,7 @@ model ChatAttachment {
   mimeType   String
   size       Int
   createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @default(now()) @updatedAt
 
   @@index([ownerId])
   @@index([receiverId])
@@ -560,7 +579,7 @@ model Attendance {
   status     AttendanceStatus @default(PRESENT)
   note       String?
   createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  updatedAt  DateTime         @default(now()) @updatedAt
 
   @@unique([scheduleId, memberId])
   @@index([scheduleId])
@@ -583,6 +602,7 @@ model AttendanceManualCode {
   attempts   Int           @default(0)
   revokedAt  DateTime?
   createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @default(now()) @updatedAt
 
   attemptLogs AttendanceManualCodeAttempt[]
 
@@ -599,6 +619,7 @@ model AttendanceManualCodeAttempt {
   code      AttendanceManualCode? @relation(fields: [codeId], references: [id], onDelete: SetNull)
   success   Boolean
   createdAt DateTime              @default(now())
+  updatedAt DateTime              @default(now()) @updatedAt
 
   @@index([memberId, createdAt])
 }
@@ -635,7 +656,7 @@ model AttendancePenalty {
   revokedAt             DateTime?
   revokedReason         String?
   createdAt             DateTime                @default(now())
-  updatedAt             DateTime                @updatedAt
+  updatedAt             DateTime                @default(now()) @updatedAt
 
   @@index([memberId, classId])
   @@index([status, blockedUntil])
@@ -653,7 +674,7 @@ model TrainingPlan {
   endDate     DateTime
   isActive    Boolean       @default(true)
   createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  updatedAt   DateTime      @default(now()) @updatedAt
 
   results TrainingResult[]
 
@@ -669,7 +690,7 @@ model TrainingResult {
   metrics   Json? // Custom metrics like weight, body fat
   coachNote String?
   createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  updatedAt DateTime     @default(now()) @updatedAt
 
   @@index([planId])
 }
@@ -690,7 +711,7 @@ model CoachFeedback {
   comment     String?
   isAnonymous Boolean       @default(false)
   createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  updatedAt   DateTime      @default(now()) @updatedAt
 
   @@unique([coachId, memberId, classId])
   @@index([coachId])
@@ -747,6 +768,7 @@ model Notification {
   readAt    DateTime?
   metadata  Json? // e.g. { scheduleId, classId, subscriptionId, senderId }
   createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
 
   @@index([userId])
   @@index([isRead])
@@ -763,7 +785,7 @@ model CoachWallet {
   coach     CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
   balance   Decimal      @default(0) @db.Decimal(12, 2)
   createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  updatedAt DateTime     @default(now()) @updatedAt
 
   transactions WalletTransaction[]
   refunds      Refund[]
@@ -798,7 +820,7 @@ model WalletTransaction {
   bankInfo  Json?
   note      String?
   createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  updatedAt DateTime          @default(now()) @updatedAt
 
   @@index([walletId])
   @@index([status])
@@ -849,7 +871,7 @@ model Refund {
   processedAt      DateTime?
   rejectReason     String?
   createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  updatedAt        DateTime      @default(now()) @updatedAt
 
   /// Một buổi bị hủy chỉ hoàn MỘT lần cho mỗi giao dịch.
   @@unique([paymentId, scheduleId])
@@ -872,7 +894,7 @@ model Product {
   createdById   String
   createdBy     User            @relation("ProductCreatedBy", fields: [createdById], references: [id])
   createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  updatedAt     DateTime        @default(now()) @updatedAt
 
   reviews       ProductReview[]
   orders        ProductOrder[]
@@ -887,7 +909,7 @@ model ProductReview {
   rating    Int      
   comment   String?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@unique([productId, userId])
 }
@@ -902,7 +924,7 @@ model ProductOrder {
   totalPrice  Decimal            @db.Decimal(12, 2)
   status      ProductOrderStatus @default(PENDING)
   createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  updatedAt   DateTime           @default(now()) @updatedAt
 
   /// Giao dịch thanh toán của đơn (SePay). PENDING = đang giữ hàng chờ chuyển khoản.
   payment     Payment?
