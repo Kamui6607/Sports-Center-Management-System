@@ -99,7 +99,25 @@ Hệ thống xoay quanh 3 Role chính (và Guest):
 ## 4. Công nghệ sử dụng (Backend)
 - **Framework:** Node.js (Express), TypeScript.
 - **Database:** PostgreSQL quản lý qua **Prisma ORM** (bảng bộ môn đặt tên `Fitness` dưới DB — model Prisma/API vẫn giữ tên `Sport`/`sports` để tương thích).
-- **Real-time:** Socket.io cho Chat và Notification.
+- **Real-time:** Socket.io cho Chat (tin nhắn, đang gõ, trạng thái online, đã đọc); Notification hiện lưu DB và đọc qua REST API (`TODO`: phát sự kiện Socket.io).
 - **Payment Gateway:** Sepay Webhook (chuyển khoản VietQR) đối soát giao dịch ngân hàng tự động cho cả giao dịch mua khóa học lẫn đơn sản phẩm.
 - **File Storage:** Multer lưu file cục bộ (hoặc tích hợp Cloudinary cho Avatar/Image).
 - **Architecture:** Tổ chức theo module-based (Mỗi domain như auth, coaches, products... có router, controller, service, schema riêng biệt). Validate dữ liệu chặt chẽ bằng Zod.
+
+---
+
+## 5. Công nghệ sử dụng (Mobile Frontend)
+App Mobile là một client gọi cùng Backend với Web (REST API + Socket.io), dành chủ yếu cho Member và Coach. Chi tiết: [`Mobile/README.md`](../Mobile/README.md).
+
+- **Framework:** Flutter (Dart), build Android & iOS từ một codebase.
+- **Architecture:** Feature-first + Clean Architecture (`presentation` / `domain` / `data`), tương ứng module-based ở Backend (mỗi feature ứng với một module).
+- **State Management:** Riverpod (kiêm Dependency Injection).
+- **Networking:** Dio gọi REST API (HTTP/JSON); Interceptor gắn JWT, refresh token và xử lý lỗi tập trung.
+- **Data Model:** `freezed` + `json_serializable` (sinh code bằng `build_runner`).
+- **Real-time:** `socket_io_client` kết nối Socket.io (v4) của Backend cho Chat; Notification hiện tải qua REST API, chuyển sang Socket.io khi Backend phát sự kiện (`TODO`).
+- **Payment:** Hiển thị VietQR (Sepay) do Backend sinh; webhook Sepay gọi thẳng Backend, App polling `GET /payments/sepay/{id}` để nhận kết quả (`TODO`: chuyển sang Socket.io khi Backend bổ sung sự kiện).
+- **File Upload:** `image_picker` + multipart qua Dio tới endpoint Multer; `cached_network_image` hiển thị ảnh.
+- **Local Storage:** `flutter_secure_storage` (token), `shared_preferences`/Hive (cache).
+- **Navigation:** `go_router`.
+- **Cấu hình môi trường:** `--dart-define` (VD `API_BASE_URL`).
+- **Push Notification (FCM):** Tùy chọn (`TODO`) — Backend chưa tích hợp.
