@@ -6,6 +6,7 @@ import { buildPaginationMeta } from "../../utils/pagination.js";
 import { disconnectUserSockets } from "../chat/chat.socket.js";
 import type { CreateUserInput, UpdateUserInput, UserQueryInput } from "./users.schema.js";
 import { ROLE_NAME_SELECT, connectRole, flattenRole } from "../../utils/roles.js";
+import { COACH_PROFILE_WITH_CERT, withUserCvFields } from "../../utils/certification.js";
 
 const userSelect = {
   id: true,
@@ -19,7 +20,7 @@ const userSelect = {
   isActive: true,
   createdAt: true,
   memberProfile: true,
-  coachProfile: true,
+  coachProfile: COACH_PROFILE_WITH_CERT,
   managerProfile: true,
 };
 
@@ -49,7 +50,7 @@ export async function listUsers(query: UserQueryInput) {
     }),
   ]);
 
-  return { users: users.map(flattenRole), pagination: buildPaginationMeta(total, currentPage, pageSize) };
+  return { users: users.map((u) => withUserCvFields(flattenRole(u))), pagination: buildPaginationMeta(total, currentPage, pageSize) };
 }
 
 export async function createUser(data: CreateUserInput) {
@@ -95,14 +96,14 @@ export async function createUser(data: CreateUserInput) {
     if (created.memberProfile) {
       }
 
-    return flattenRole(created);
+    return withUserCvFields(flattenRole(created));
   });
 }
 
 export async function getUserById(id: string) {
   const user = await prisma.user.findUnique({ where: { id }, select: userSelect });
   if (!user) throw new AppError("User not found", 404);
-  return flattenRole(user);
+  return withUserCvFields(flattenRole(user));
 }
 
 export async function updateUser(id: string, data: UpdateUserInput, requesterId: string) {
@@ -175,7 +176,7 @@ export async function updateUser(id: string, data: UpdateUserInput, requesterId:
     disconnectUserSockets(id);
   }
 
-  return flattenRole(updated);
+  return withUserCvFields(flattenRole(updated));
 }
 
 export async function deactivateUser(id: string, requesterId: string) {

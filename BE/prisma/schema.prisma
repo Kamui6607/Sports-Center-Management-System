@@ -159,6 +159,7 @@ model User {
   productOrders              ProductOrder[]         @relation("ProductOrderUser")
   refundsRequested           Refund[]               @relation("RefundRequestedBy")
   refundsProcessed           Refund[]               @relation("RefundProcessedBy")
+  certificationsReviewed     Certification[]        @relation("CertificationReviewedBy")
 
   @@index([roleId])
 }
@@ -214,15 +215,38 @@ model CoachProfile {
   specialization  String?
   experienceYears Int?
   bio             String?
-  cvUrl           String?
-  approvalStatus  CoachApprovalStatus @default(PENDING)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @default(now()) @updatedAt
 
+  /// Hồ sơ chứng nhận HLV (CV) — xem model Certification.
+  certification Certification?
   classes       ClassMember[]
   wallet        CoachWallet?
   trainingPlans TrainingPlan[]
   feedbacks     CoachFeedback[]
+}
+
+/// Hồ sơ chứng nhận HLV (CV) để Manager xét duyệt — 1–1 với CoachProfile.
+/// Nộp lại CV ⇒ GHI ĐÈ fileUrl, status về PENDING, xóa kết quả duyệt cũ.
+/// Duyệt APPROVED ⇒ tài khoản Coach được kích hoạt (User.isActive = true).
+model Certification {
+  id           String              @id @default(uuid())
+  coachId      String              @unique
+  coach        CoachProfile        @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  /// Đường dẫn file CV (PDF). NULL = hồ sơ được duyệt khi chưa có luồng nộp CV (dữ liệu cũ / seed).
+  fileUrl      String?
+  status       CoachApprovalStatus @default(PENDING)
+  /// Thời điểm nộp CV lần gần nhất.
+  submittedAt  DateTime            @default(now())
+  reviewedById String?
+  reviewedBy   User?               @relation("CertificationReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  rejectReason String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @default(now()) @updatedAt
+
+  @@index([status])
+  @@index([reviewedById])
 }
 
 model ManagerProfile {

@@ -36,6 +36,7 @@ type BaseEntityModels = {
   RefreshToken: Models.RefreshToken;
   MemberProfile: Models.MemberProfile;
   CoachProfile: Models.CoachProfile;
+  Certification: Models.Certification;
   ManagerProfile: Models.ManagerProfile;
   Sport: Models.Sport;
   Room: Models.Room;

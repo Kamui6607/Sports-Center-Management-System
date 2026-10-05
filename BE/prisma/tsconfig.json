@@ -1,0 +1,10 @@
+{
+  "//": "Chỉ để VS Code/tsc kiểm tra kiểu cho prisma/seed.ts (nằm ngoài include của tsconfig gốc). Không build ra dist.",
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["seed.ts"]
+}

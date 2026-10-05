@@ -73,7 +73,8 @@ async function main() {
           specialization: "Yoga, Pilates",
           experienceYears: 5,
           bio: "Chuyên gia Yoga với 5 năm kinh nghiệm giảng dạy.",
-          approvalStatus: "APPROVED",
+          // Hồ sơ chứng nhận đã duyệt sẵn (seed không có file CV ⇒ fileUrl NULL)
+          certification: { create: { status: "APPROVED" } },
         },
       },
     },
@@ -96,7 +97,8 @@ async function main() {
           specialization: "HIIT, Strength Training",
           experienceYears: 7,
           bio: "HLV HIIT và Strength Training với 7 năm kinh nghiệm.",
-          approvalStatus: "APPROVED",
+          // Hồ sơ chứng nhận đã duyệt sẵn (seed không có file CV ⇒ fileUrl NULL)
+          certification: { create: { status: "APPROVED" } },
         },
       },
     },

@@ -16,6 +16,7 @@ import jwt from "jsonwebtoken";
 import { sendResetPasswordEmail } from "../../utils/mail.js";
 import type { RegisterInput, UpdateProfileInput, ForgotPasswordInput, ResetPasswordInput } from "./auth.schema.js";
 import { ROLE_NAME_SELECT, connectRole, flattenRole } from "../../utils/roles.js";
+import { COACH_PROFILE_WITH_CERT, withUserCvFields } from "../../utils/certification.js";
 
 export async function forgotPassword(data: ForgotPasswordInput) {
   const user = await prisma.user.findUnique({ where: { email: data.email } });
@@ -98,11 +99,11 @@ export async function register(data: RegisterInput) {
         role: ROLE_NAME_SELECT,
         isActive: true,
         memberProfile: true,
-        coachProfile: true,
+        coachProfile: COACH_PROFILE_WITH_CERT,
       },
     });
 
-    return flattenRole(created);
+    return withUserCvFields(flattenRole(created));
   });
 
   // Gửi thông báo chào mừng (fire-and-forget, không block response)
@@ -201,12 +202,12 @@ export async function getMe(userId: string) {
       isActive: true,
       createdAt: true,
       memberProfile: true,
-      coachProfile: true,
+      coachProfile: COACH_PROFILE_WITH_CERT,
       managerProfile: true,
     },
   });
   if (!user) throw new AppError("User not found", 404);
-  return flattenRole(user);
+  return withUserCvFields(flattenRole(user));
 }
 
 export async function updateMe(userId: string, data: UpdateProfileInput) {

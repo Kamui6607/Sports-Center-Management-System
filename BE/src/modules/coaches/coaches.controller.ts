@@ -54,7 +54,7 @@ export async function submitCV(req: Request, res: Response, next: NextFunction) 
 export async function reviewCoachCV(req: Request, res: Response, next: NextFunction) {
   try {
     const { action, reason } = req.body as { action: "APPROVE" | "REJECT"; reason?: string };
-    const result = await coachService.reviewCoachCV(req.params.profileId as string, action, reason);
+    const result = await coachService.reviewCoachCV(req.params.profileId as string, action, reason, req.user!.id);
     sendSuccess(res, result, result.message);
   } catch (err) {
     next(err);
