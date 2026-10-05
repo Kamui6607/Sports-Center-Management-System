@@ -175,8 +175,6 @@ export async function submitCV(coachUserId: string, cvFilePath: string) {
       fileUrl: cvFilePath,
       status: "PENDING",
       submittedAt: now,
-      reviewedById: null,
-      reviewedAt: null,
       rejectReason: null,
     },
   });
@@ -205,8 +203,7 @@ export async function submitCV(coachUserId: string, cvFilePath: string) {
 export async function reviewCoachCV(
   coachProfileId: string,
   action: "APPROVE" | "REJECT",
-  reason: string | undefined,
-  reviewerId: string
+  reason?: string
 ) {
   const coachProfile = await prisma.coachProfile.findUnique({
     where: { id: coachProfileId },
@@ -220,14 +217,13 @@ export async function reviewCoachCV(
   }
 
   const { createNotification } = await import("../notifications/notifications.service.js");
-  const now = new Date();
 
   if (action === "APPROVE") {
     await prisma.$transaction(async (tx) => {
       // CAS theo status: 2 Manager bấm cùng lúc ⇒ người sau nhận 409, không duyệt 2 lần.
       const done = await tx.certification.updateMany({
         where: { id: cert.id, status: "PENDING" },
-        data: { status: "APPROVED", reviewedById: reviewerId, reviewedAt: now, rejectReason: null },
+        data: { status: "APPROVED", rejectReason: null },
       });
       if (done.count === 0) throw new AppError("Hồ sơ đã được xử lý bởi thao tác khác, vui lòng tải lại.", 409);
       await tx.user.update({ where: { id: coachProfile.userId }, data: { isActive: true } });
@@ -244,7 +240,7 @@ export async function reviewCoachCV(
   } else {
     const done = await prisma.certification.updateMany({
       where: { id: cert.id, status: "PENDING" },
-      data: { status: "REJECTED", reviewedById: reviewerId, reviewedAt: now, rejectReason: reason ?? null },
+      data: { status: "REJECTED", rejectReason: reason ?? null },
     });
     if (done.count === 0) throw new AppError("Hồ sơ đã được xử lý bởi thao tác khác, vui lòng tải lại.", 409);
 

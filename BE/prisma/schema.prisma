@@ -159,7 +159,6 @@ model User {
   productOrders              ProductOrder[]         @relation("ProductOrderUser")
   refundsRequested           Refund[]               @relation("RefundRequestedBy")
   refundsProcessed           Refund[]               @relation("RefundProcessedBy")
-  certificationsReviewed     Certification[]        @relation("CertificationReviewedBy")
 
   @@index([roleId])
 }
@@ -238,15 +237,12 @@ model Certification {
   status       CoachApprovalStatus @default(PENDING)
   /// Thời điểm nộp CV lần gần nhất.
   submittedAt  DateTime            @default(now())
-  reviewedById String?
-  reviewedBy   User?               @relation("CertificationReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
-  reviewedAt   DateTime?
+  /// Lý do Manager từ chối (chỉ có khi status = REJECTED; nộp lại CV thì xóa).
   rejectReason String?
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @default(now()) @updatedAt
 
   @@index([status])
-  @@index([reviewedById])
 }
 
 model ManagerProfile {
