@@ -3,19 +3,40 @@ import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { broadcastNotification, createNotification } from "../notifications/notifications.service.js";
 import { evaluateCourseEligibility } from "../enrollments/course-enrollment.service.js";
-import { ROLE_NAME_SELECT } from "../../utils/roles.js";
+
+/** HLV phụ trách lớp (mỗi lớp đúng 1 HLV — Class.coachId). */
+const CLASS_COACH_INCLUDE = {
+  include: { user: { select: { id: true, fullName: true, email: true } } },
+};
 
 const classInclude = {
   sports: true,
-  coaches: {
-    include: {
-      coach: {
-        include: { user: { select: { id: true, fullName: true, email: true } } },
-      },
-    },
-  },
-  _count: { select: { enrollments: true, schedules: true } },
+  coach: CLASS_COACH_INCLUDE,
+  _count: { select: { schedules: true } },
 };
+
+/**
+ * Số lượt giữ chỗ (Enrollment) của từng lớp — đếm qua ClassSchedule vì Enrollment chỉ gắn với buổi học.
+ * Trả kèm vào `_count.enrollments` để response giữ nguyên định dạng cũ cho FE.
+ */
+async function countEnrollmentsByClass(classIds: string[]): Promise<Map<string, number>> {
+  if (classIds.length === 0) return new Map();
+  const rows = await prisma.classSchedule.findMany({
+    where: { classId: { in: classIds } },
+    select: { classId: true, _count: { select: { enrollments: true } } },
+  });
+  const map = new Map<string, number>();
+  for (const r of rows) map.set(r.classId, (map.get(r.classId) ?? 0) + r._count.enrollments);
+  return map;
+}
+
+function withEnrollmentCount<T extends { id: string; _count: { schedules: number } }>(cls: T, counts: Map<string, number>) {
+  return { ...cls, _count: { ...cls._count, enrollments: counts.get(cls.id) ?? 0 } };
+}
+
+async function withEnrollmentCountOne<T extends { id: string; _count: { schedules: number } }>(cls: T) {
+  return withEnrollmentCount(cls, await countEnrollmentsByClass([cls.id]));
+}
 
 function assertSportsSupportAreaType(sports: { name: string; areaTypes: string[] }[], areaType: string) {
   for (const sport of sports) {
@@ -35,25 +56,18 @@ export async function listClasses(query: any, actor?: { id: string; role: string
   if (query.classType) where.classType = query.classType;
   if (query.areaType) where.areaType = query.areaType;
   if (query.search) where.name = { contains: query.search, mode: "insensitive" };
-  if (query.coachId) {
-    where.coaches = { some: { coachId: query.coachId } };
-  }
+  if (query.coachId) where.coachId = query.coachId;
   if (query.status) {
     where.status = query.status;
   }
 
-  // Coach xem list: mặc định chỉ thấy class APPROVED + class của chính mình (mọi status)
+  // Coach xem list: mặc định thấy class APPROVED + class của chính mình (mọi status)
   if (actor?.role === "COACH") {
     const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: actor.id } });
     if (coachProfile && query.createdByMe === "true") {
-      where.createdById = actor.id;
+      where.coachId = coachProfile.id;
     } else if (coachProfile && !query.status) {
-      // Không filter status → trả APPROVED (public) + class của coach này (mọi status)
-      where.OR = [
-        { status: "APPROVED" },
-        { coaches: { some: { coachId: coachProfile.id } } },
-        { createdById: actor.id },
-      ];
+      where.OR = [{ status: "APPROVED" }, { coachId: coachProfile.id }];
     }
   } else if (actor?.role === "MEMBER" && !query.status) {
     // Member chỉ thấy class APPROVED
@@ -68,10 +82,20 @@ export async function listClasses(query: any, actor?: { id: string; role: string
       orderBy: { name: "asc" },
     }),
   ]);
-  return { classes, pagination: buildPaginationMeta(total, page, limit) };
+  const counts = await countEnrollmentsByClass(classes.map((c) => c.id));
+  return { classes: classes.map((c) => withEnrollmentCount(c, counts)), pagination: buildPaginationMeta(total, page, limit) };
 }
 
+/**
+ * CHỈ Coach tạo lớp (route chỉ mở cho COACH). Coach tạo ⇒ là HLV phụ trách lớp (Class.coachId),
+ * lớp ở trạng thái PENDING chờ Manager duyệt.
+ */
 export async function createClass(data: any, actor: { id: string; role: string }) {
+  if (actor.role !== "COACH") throw new AppError("Chỉ Coach được tạo lớp học", 403);
+
+  const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: actor.id } });
+  if (!coachProfile) throw new AppError("Coach profile not found", 404);
+
   const { sportIds, ...restData } = data;
   const sports = await prisma.sport.findMany({ where: { id: { in: sportIds }, isActive: true } });
   if (sports.length !== sportIds.length) throw new AppError("One or more sports not found or inactive", 404);
@@ -79,80 +103,51 @@ export async function createClass(data: any, actor: { id: string; role: string }
   // Business rule: TẤT CẢ sport của Class đều phải support Class.areaType.
   assertSportsSupportAreaType(sports, data.areaType);
 
-  // Coach tạo → PENDING, chờ Manager duyệt; Manager tạo → APPROVED trực tiếp
-  const isCoach = actor.role === "COACH";
-  const initialStatus = isCoach ? "PENDING" : "APPROVED";
-
   const newClass = await prisma.$transaction(async (tx) => {
     const cls = await tx.class.create({
       data: {
         ...restData,
         sports: { connect: sportIds.map((id: string) => ({ id })) },
-        status: initialStatus,
-        createdById: actor.id,
+        status: "PENDING",
+        coachId: coachProfile.id,
       },
       include: classInclude,
     });
 
-    // Coach tạo → tự gán là primary coach của class đó
-    if (isCoach) {
-      const coachProfile = await tx.coachProfile.findUnique({ where: { userId: actor.id } });
-      if (coachProfile) {
-        await tx.classMember.create({
-          data: { classId: cls.id, coachId: coachProfile.id, isPrimary: true },
-        });
-        // Tạo wallet nếu chưa có
-        await tx.coachWallet.upsert({
-          where: { coachId: coachProfile.id },
-          create: { coachId: coachProfile.id, balance: 0 },
-          update: {},
-        });
-      }
-    }
+    // Tạo ví HLV nếu chưa có (nhận 85% doanh thu khi có học viên mua lớp)
+    await tx.coachWallet.upsert({
+      where: { coachId: coachProfile.id },
+      create: { coachId: coachProfile.id, balance: 0 },
+      update: {},
+    });
 
     return cls;
   });
 
-  if (isCoach) {
-    // Thông báo cho tất cả Manager rằng có class mới chờ duyệt
-    const managers = await prisma.user.findMany({
-      where: { role: { name: "MANAGER" }, isActive: true },
-      select: { id: true },
-    });
-    broadcastNotification(
-      managers.map((m) => m.id),
-      "CLASS_APPROVED", // tái dùng type; FE phân biệt qua title
-      `Khóa học mới chờ duyệt: ${newClass.name}`,
-      `Coach đã tạo khóa học "${newClass.name}" và đang chờ xác nhận của bạn.`,
-      { metadata: { classId: newClass.id } }
-    ).catch(() => {});
-  } else {
-    // Manager tạo → APPROVED ngay, broadcast cho Members
-    prisma.memberProfile.findMany({
-      where: { user: { isActive: true, role: { name: "MEMBER" } } },
-      select: { userId: true },
-    }).then((members) => {
-      const userIds = members.map((m) => m.userId);
-      const typeLabel = newClass.classType === "PREMIUM" ? "Premium" : "Thường";
-      const sportNames = sports.map(s => s.name).join(", ");
-      return broadcastNotification(
-        userIds,
-        "NEW_CLASS",
-        `Lớp học mới: ${newClass.name}`,
-        `Lớp "${newClass.name}" (${sportNames} - ${typeLabel}) vừa được mở. Đặt chỗ ngay trước khi hết!`,
-        { metadata: { classId: newClass.id, sportIds } }
-      );
-    }).catch(() => {});
-  }
+  // Thông báo cho tất cả Manager rằng có class mới chờ duyệt
+  const managers = await prisma.user.findMany({
+    where: { role: { name: "MANAGER" }, isActive: true },
+    select: { id: true },
+  });
+  broadcastNotification(
+    managers.map((m) => m.id),
+    "CLASS_APPROVED", // tái dùng type; FE phân biệt qua title
+    `Khóa học mới chờ duyệt: ${newClass.name}`,
+    `Coach đã tạo khóa học "${newClass.name}" và đang chờ xác nhận của bạn.`,
+    { metadata: { classId: newClass.id } }
+  ).catch(() => {});
 
-  return newClass;
+  return withEnrollmentCountOne(newClass);
 }
 
 /**
  * Manager duyệt hoặc từ chối class do Coach tạo.
  */
 export async function reviewClass(classId: string, action: "APPROVE" | "REJECT", reason?: string) {
-  const cls = await prisma.class.findUnique({ where: { id: classId } });
+  const cls = await prisma.class.findUnique({
+    where: { id: classId },
+    include: { coach: { select: { userId: true } } },
+  });
   if (!cls) throw new AppError("Class not found", 404);
   if (cls.status !== "PENDING") {
     throw new AppError(`Class is already ${cls.status} — cannot review again`, 400);
@@ -165,39 +160,37 @@ export async function reviewClass(classId: string, action: "APPROVE" | "REJECT",
     include: classInclude,
   });
 
-  // Thông báo cho Coach biết kết quả
-  if (cls.createdById) {
-    const notifType = action === "APPROVE" ? "CLASS_APPROVED" : "CLASS_REJECTED";
-    const title =
-      action === "APPROVE"
-        ? `Khóa học được duyệt: ${cls.name}`
-        : `Khóa học bị từ chối: ${cls.name}`;
-    const body =
-      action === "APPROVE"
-        ? `Khóa học "${cls.name}" của bạn đã được Manager phê duyệt. Hãy thêm lịch học để bắt đầu!`
-        : `Khóa học "${cls.name}" của bạn bị từ chối.${reason ? ` Lý do: ${reason}` : ""}`;
-    createNotification(cls.createdById, notifType, title, body, {
-      metadata: { classId },
-    }).catch(() => {});
+  // Thông báo cho Coach phụ trách lớp biết kết quả
+  const notifType = action === "APPROVE" ? "CLASS_APPROVED" : "CLASS_REJECTED";
+  const title =
+    action === "APPROVE"
+      ? `Khóa học được duyệt: ${cls.name}`
+      : `Khóa học bị từ chối: ${cls.name}`;
+  const body =
+    action === "APPROVE"
+      ? `Khóa học "${cls.name}" của bạn đã được Manager phê duyệt. Hãy thêm lịch học để bắt đầu!`
+      : `Khóa học "${cls.name}" của bạn bị từ chối.${reason ? ` Lý do: ${reason}` : ""}`;
+  createNotification(cls.coach.userId, notifType, title, body, {
+    metadata: { classId },
+  }).catch(() => {});
 
-    // Nếu APPROVED: broadcast cho Members
-    if (action === "APPROVE") {
-      prisma.memberProfile
-        .findMany({ where: { user: { isActive: true, role: { name: "MEMBER" } } }, select: { userId: true } })
-        .then((members) =>
-          broadcastNotification(
-            members.map((m) => m.userId),
-            "NEW_CLASS",
-            `Lớp học mới: ${cls.name}`,
-            `Lớp "${cls.name}" vừa được mở. Đặt chỗ ngay!`,
-            { metadata: { classId } }
-          )
+  // Nếu APPROVED: broadcast cho Members
+  if (action === "APPROVE") {
+    prisma.memberProfile
+      .findMany({ where: { user: { isActive: true, role: { name: "MEMBER" } } }, select: { userId: true } })
+      .then((members) =>
+        broadcastNotification(
+          members.map((m) => m.userId),
+          "NEW_CLASS",
+          `Lớp học mới: ${cls.name}`,
+          `Lớp "${cls.name}" vừa được mở. Đặt chỗ ngay!`,
+          { metadata: { classId } }
         )
-        .catch(() => {});
-    }
+      )
+      .catch(() => {});
   }
 
-  return updated;
+  return withEnrollmentCountOne(updated);
 }
 
 
@@ -215,17 +208,20 @@ export async function getClassById(id: string) {
     },
   });
   if (!cls) throw new AppError("Class not found", 404);
-  return cls;
+  return withEnrollmentCountOne(cls);
 }
 
 export async function updateClass(id: string, data: any, actor?: { id: string; role: string }) {
-  const cls = await prisma.class.findUnique({ where: { id }, include: { sports: true } });
+  const cls = await prisma.class.findUnique({
+    where: { id },
+    include: { sports: true, coach: { select: { userId: true } } },
+  });
   if (!cls) throw new AppError("Class not found", 404);
 
   // Coach chỉ được sửa class PENDING của chính mình
   if (actor?.role === "COACH") {
-    if (cls.createdById !== actor.id) {
-      throw new AppError("Forbidden: You can only edit classes you created", 403);
+    if (cls.coach.userId !== actor.id) {
+      throw new AppError("Forbidden: You can only edit your own classes", 403);
     }
     if (cls.status !== "PENDING") {
       throw new AppError("Cannot edit a class that has already been reviewed by Manager", 400);
@@ -299,174 +295,8 @@ export async function updateClass(id: string, data: any, actor?: { id: string; r
     updateData.sports = { set: sportIds.map((sid: string) => ({ id: sid })) };
   }
 
-  return prisma.class.update({ where: { id }, data: updateData, include: classInclude });
-}
-
-async function notifyCoachChange(
-  classId: string,
-  className: string,
-  coachName: string,
-  action: "ASSIGNED" | "REMOVED",
-  isPrimary = true
-) {
-  const upcomingSchedules = await prisma.classSchedule.findMany({
-    where: { classId, status: "SCHEDULED", startTime: { gt: new Date() } },
-    include: {
-      enrollments: {
-        where: { status: "BOOKED" },
-        include: { member: true }
-      }
-    }
-  });
-
-  const userIdsToNotify = new Set<string>();
-  for (const schedule of upcomingSchedules) {
-    for (const enrollment of schedule.enrollments) {
-      userIdsToNotify.add(enrollment.member.userId);
-    }
-  }
-
-  if (userIdsToNotify.size > 0) {
-    const title = action === "ASSIGNED" ? `Thay đổi HLV: Lớp ${className}` : `Thay đổi HLV: Lớp ${className}`;
-    const body = action === "ASSIGNED" 
-      ? `${isPrimary ? "HLV" : "HLV hỗ trợ"} ${coachName} vừa được phân công ${isPrimary ? "phụ trách" : "hỗ trợ"} lớp "${className}" mà bạn đã đặt lịch. Cùng chờ đón các buổi tập sắp tới nhé!`
-      : isPrimary
-        ? `HLV ${coachName} sẽ ngừng phụ trách lớp "${className}" của bạn. Quản lý sẽ sớm phân công HLV thay thế.`
-        : `HLV hỗ trợ ${coachName} sẽ ngừng hỗ trợ lớp "${className}". Lớp vẫn diễn ra bình thường với HLV chính.`;
-    
-    broadcastNotification(
-      Array.from(userIdsToNotify),
-      "COACH_CHANGED",
-      title,
-      body,
-      { metadata: { classId } }
-    ).catch(() => {});
-  }
-}
-
-/** HLV hợp lệ để phân công: tồn tại, đúng role COACH và đang hoạt động. */
-async function findAssignableCoach(coachId: string) {
-  const coach = await prisma.coachProfile.findUnique({
-    where: { id: coachId },
-    include: { user: { select: { id: true, fullName: true, isActive: true, role: ROLE_NAME_SELECT } } },
-  });
-  if (!coach || !coach.user.isActive || coach.user.role.name !== "COACH") {
-    throw new AppError("Active coach not found", 404);
-  }
-  return coach;
-}
-
-/** Chặn phân công nếu coach bị trùng lịch với các buổi SCHEDULED sắp tới của Class. */
-async function assertNoUpcomingScheduleConflict(classId: string, coachId: string) {
-  const upcomingSchedules = await prisma.classSchedule.findMany({
-    where: { classId, status: "SCHEDULED", startTime: { gt: new Date() } },
-  });
-
-  for (const schedule of upcomingSchedules) {
-    const conflict = await prisma.classSchedule.findFirst({
-      where: {
-        status: "SCHEDULED",
-        classId: { not: classId },
-        startTime: { lt: schedule.endTime },
-        endTime: { gt: schedule.startTime },
-        class: { coaches: { some: { coachId } } },
-      },
-    });
-    if (conflict) {
-      throw new AppError(
-        `Coach has a conflicting schedule between ${schedule.startTime.toISOString()} and ${schedule.endTime.toISOString()}`,
-        409
-      );
-    }
-  }
-}
-
-export async function assignCoach(classId: string, coachId: string, isPrimary: boolean) {
-  const cls = await prisma.class.findUnique({ where: { id: classId } });
-  if (!cls) throw new AppError("Class not found", 404);
-
-  const coach = await findAssignableCoach(coachId);
-  await assertNoUpcomingScheduleConflict(classId, coachId);
-
-  // Check if coach is already assigned to determine if we should send ASSIGNED notification
-  const existingAssignment = await prisma.classMember.findUnique({
-    where: { classId_coachId: { classId, coachId } }
-  });
-
-  await prisma.$transaction(async (tx) => {
-    if (isPrimary) {
-      // Unset existing primary atomically
-      await tx.classMember.updateMany({
-        where: { classId, isPrimary: true },
-        data: { isPrimary: false },
-      });
-    }
-
-    await tx.classMember.upsert({
-      where: { classId_coachId: { classId, coachId } },
-      update: { isPrimary },
-      create: { classId, coachId, isPrimary },
-    });
-  });
-
-  if (!existingAssignment) {
-    await notifyCoachChange(classId, cls.name, coach.user.fullName, "ASSIGNED", isPrimary);
-  }
-
-  return getClassById(classId);
-}
-
-/**
- * Phân công HLV hỗ trợ (support coach) cho Class.
- * Quy ước: mỗi Class chỉ có duy nhất 1 HLV chính (isPrimary = true), HLV hỗ trợ lưu isPrimary = false.
- * - 400: Class đã ngừng hoạt động.
- * - 404: Class hoặc HLV đang hoạt động không tồn tại.
- * - 409: HLV đang là HLV chính của Class, hoặc trùng lịch với buổi SCHEDULED sắp tới.
- * Idempotent: HLV đã là HLV hỗ trợ thì trả về chi tiết Class và không gửi lại thông báo.
- */
-export async function assignSupportCoach(classId: string, coachId: string) {
-  const cls = await prisma.class.findUnique({ where: { id: classId } });
-  if (!cls) throw new AppError("Class not found", 404);
-  if (!cls.isActive) throw new AppError("Class is inactive", 400);
-
-  const coach = await findAssignableCoach(coachId);
-
-  const existingAssignment = await prisma.classMember.findUnique({
-    where: { classId_coachId: { classId, coachId } },
-  });
-
-  // HLV chính không kiêm nhiệm HLV hỗ trợ: đổi vai trò phải dùng POST /classes/:id/coaches.
-  if (existingAssignment?.isPrimary) {
-    throw new AppError(
-      "Coach is the primary coach of this class. Reassign roles via POST /classes/:id/coaches",
-      409
-    );
-  }
-
-  // Đã là HLV hỗ trợ: idempotent, không tạo trùng và không gửi lại thông báo.
-  if (existingAssignment) return getClassById(classId);
-
-  await assertNoUpcomingScheduleConflict(classId, coachId);
-
-  await prisma.classMember.create({ data: { classId, coachId, isPrimary: false } });
-
-  await notifyCoachChange(classId, cls.name, coach.user.fullName, "ASSIGNED", false);
-
-  return getClassById(classId);
-}
-
-export async function removeCoach(classId: string, coachId: string) {
-  const cm = await prisma.classMember.findUnique({
-    where: { classId_coachId: { classId, coachId } },
-    include: { class: true, coach: { include: { user: { select: { fullName: true } } } } }
-  });
-  if (!cm) throw new AppError("Coach assignment not found", 404);
-  
-  await prisma.classMember.delete({ where: { classId_coachId: { classId, coachId } } });
-  
-  await notifyCoachChange(classId, cm.class.name, cm.coach.user.fullName, "REMOVED", cm.isPrimary);
-
-  return getClassById(classId);
+  const updated = await prisma.class.update({ where: { id }, data: updateData, include: classInclude });
+  return withEnrollmentCountOne(updated);
 }
 
 export async function deleteClass(id: string) {

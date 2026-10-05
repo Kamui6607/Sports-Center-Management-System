@@ -89,8 +89,7 @@ export async function getMemberConcurrentClassQuota(
       },
       select: {
         id: true,
-        classId: true,
-        schedule: { select: { id: true, startTime: true, class: { select: { name: true } } } },
+        schedule: { select: { id: true, classId: true, startTime: true, class: { select: { name: true } } } },
       },
       // Buổi gần nhất đại diện cho Class trong response.
       orderBy: { schedule: { startTime: "asc" } },
@@ -110,13 +109,13 @@ export async function getMemberConcurrentClassQuota(
   // đang BOOKED của Class đó (quota KHÔNG nhân theo số buổi).
   const classes = new Map<string, ConcurrentClassUsage>();
   for (const row of bookedRows) {
-    const existing = classes.get(row.classId);
+    const existing = classes.get(row.schedule.classId);
     if (existing) {
       existing.futureBookedScheduleCount += 1;
       continue;
     }
-    classes.set(row.classId, {
-      classId: row.classId,
+    classes.set(row.schedule.classId, {
+      classId: row.schedule.classId,
       className: row.schedule.class.name,
       futureBookedScheduleCount: 1,
       scheduleId: row.schedule.id,

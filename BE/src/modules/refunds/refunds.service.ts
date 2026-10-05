@@ -304,7 +304,7 @@ export async function approveRefund(refundId: string, managerUserId: string, not
       await tx.invoice.updateMany({ where: { paymentId: refund.paymentId }, data: { status: "CANCELLED" } });
       if (refund.classId) {
         await tx.enrollment.updateMany({
-          where: { memberId: refund.memberId, classId: refund.classId, status: "BOOKED" },
+          where: { memberId: refund.memberId, schedule: { classId: refund.classId }, status: "BOOKED" },
           data: { status: "CANCELLED", cancelledAt: new Date() },
         });
       }

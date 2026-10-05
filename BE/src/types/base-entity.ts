@@ -41,7 +41,6 @@ type BaseEntityModels = {
   Sport: Models.Sport;
   Room: Models.Room;
   Class: Models.Class;
-  ClassMember: Models.ClassMember;
   ClassSchedule: Models.ClassSchedule;
   Enrollment: Models.Enrollment;
   Payment: Models.Payment;

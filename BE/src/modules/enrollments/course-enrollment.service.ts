@@ -138,20 +138,20 @@ export async function evaluateCourseEligibility(
     db.enrollment.findMany({
       where: {
         memberId: memberProfileId,
-        // Cùng Class không tính là trùng giờ: đó chính là các buổi đang đăng ký.
-        classId: { not: cls.id },
         status: { in: ["BOOKED", "COMPLETED"] },
         schedule: {
+          // Cùng Class không tính là trùng giờ: đó chính là các buổi đang đăng ký.
+          classId: { not: cls.id },
           status: "SCHEDULED",
           startTime: { lt: lastSession.endTime },
           endTime: { gt: sessions[0].startTime },
         },
       },
       select: {
-        classId: true,
         scheduleId: true,
         schedule: {
           select: {
+            classId: true,
             startTime: true,
             endTime: true,
             class: { select: { name: true } },
@@ -253,7 +253,7 @@ export async function evaluateCourseEligibility(
       ...(conflict
         ? {
             conflictWith: {
-              classId: conflict.classId,
+              classId: conflict.schedule.classId,
               className: conflict.schedule.class.name,
               scheduleId: conflict.scheduleId,
               startTime: conflict.schedule.startTime,
@@ -469,7 +469,6 @@ export async function enrollWholeCourse(classId: string, memberProfileId: string
           const created = await tx.enrollment.create({
             data: {
               memberId: memberProfileId,
-              classId,
               scheduleId: state.scheduleId,
               status: "BOOKED",
             },

@@ -146,7 +146,6 @@ model User {
   managerProfile             ManagerProfile?
   refreshTokens              RefreshToken[]
   createdPayments            Payment[]              @relation("PaymentCreatedBy")
-  createdClasses             Class[]                @relation("ClassCreatedBy")
   sentMessages               ChatMessage[]          @relation("SentMessages")
   receivedMessages           ChatMessage[]          @relation("ReceivedMessages")
   chatAttachmentsOwned       ChatAttachment[]       @relation("ChatAttachmentOwner")
@@ -219,7 +218,7 @@ model CoachProfile {
 
   /// Hồ sơ chứng nhận HLV (CV) — xem model Certification.
   certification Certification?
-  classes       ClassMember[]
+  classes       Class[]
   wallet        CoachWallet?
   trainingPlans TrainingPlan[]
   feedbacks     CoachFeedback[]
@@ -304,8 +303,9 @@ model Class {
 
   price       Decimal             @default(0) @db.Decimal(12, 2)
   status      ClassApprovalStatus @default(PENDING)
-  createdById String?
-  createdBy   User?               @relation("ClassCreatedBy", fields: [createdById], references: [id])
+  /// HLV tạo và phụ trách lớp — mỗi lớp đúng 1 HLV (nhận 85% doanh thu). Chỉ Coach được tạo lớp.
+  coachId     String
+  coach       CoachProfile        @relation(fields: [coachId], references: [id])
   capacity    Int
   classType   ClassType           @default(REGULAR)
   // Khu vực mà lớp học yêu cầu (POOL | INDOOR | OUTDOOR).
@@ -315,29 +315,13 @@ model Class {
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @default(now()) @updatedAt
 
-  coaches            ClassMember[]
   schedules          ClassSchedule[]
-  enrollments        Enrollment[]
   feedbacks          CoachFeedback[]
   penalties          AttendancePenalty[]
   walletTransactions WalletTransaction[]
   payments           Payment[]
   refunds            Refund[]
-}
 
-// Coach assignment to class (many-to-many)
-model ClassMember {
-  id        String       @id @default(uuid())
-  classId   String
-  class     Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
-  coachId   String
-  coach     CoachProfile @relation(fields: [coachId], references: [id])
-  isPrimary Boolean      @default(false)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @default(now()) @updatedAt
-
-  @@unique([classId, coachId])
-  @@index([classId])
   @@index([coachId])
 }
 
@@ -376,8 +360,7 @@ model Enrollment {
   id          String           @id @default(uuid())
   memberId    String
   member      MemberProfile    @relation(fields: [memberId], references: [id])
-  classId     String
-  class       Class            @relation(fields: [classId], references: [id])
+  /// Giữ chỗ theo TỪNG BUỔI; lớp của buổi lấy qua `schedule.classId` (không lưu trùng classId).
   scheduleId  String
   schedule    ClassSchedule    @relation(fields: [scheduleId], references: [id])
   status      EnrollmentStatus @default(BOOKED)
@@ -389,7 +372,6 @@ model Enrollment {
   @@unique([memberId, scheduleId])
   @@index([memberId])
   @@index([scheduleId])
-  @@index([classId])
 }
 
 // ─────────────────────────────────────────

@@ -131,7 +131,7 @@ export async function requestWithdrawal(coachUserId: string, data: {
   // Kiểm tra: tất cả class mà coach nhận thu nhập đã COMPLETED chưa?
   const pendingClasses = await prisma.class.count({
     where: {
-      coaches: { some: { coachId: coachProfile.id, isPrimary: true } },
+      coachId: coachProfile.id,
       status: { in: ["PENDING", "APPROVED"] },
     },
   });

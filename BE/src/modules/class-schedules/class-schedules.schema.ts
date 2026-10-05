@@ -145,18 +145,10 @@ export const CreateActivityPlanSchema = z.object({
     areaType: z.enum(["POOL", "INDOOR", "OUTDOOR"]),
     price: z.number().min(0).default(0),
   }),
-  primaryCoachId: z.string().min(1),
-  supportCoachId: z.string().min(1).optional(),
+  // HLV của lớp là chính Coach gọi API (mỗi lớp đúng 1 HLV) — không nhận coachId từ client.
   roomId: z.string().min(1),
   schedules: z.array(PlannerScheduleSchema).min(1).max(500),
 }).superRefine((data, ctx) => {
-  if (data.supportCoachId === data.primaryCoachId) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["supportCoachId"],
-      message: "Support coach must be different from primary coach",
-    });
-  }
 
   const ordered = data.schedules
     .map((schedule, index) => ({

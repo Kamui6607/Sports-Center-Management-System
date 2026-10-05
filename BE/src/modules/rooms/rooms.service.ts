@@ -139,7 +139,7 @@ async function loadTransferSchedules(sourceRoomId: string, input: TransferSchedu
 // Validate 1 schedule đúng rule PATCH /class-schedules/:id (area + capacity).
 // Room/coach conflict reuse checkScheduleConflicts(tx,...) trong cùng transaction.
 async function checkOneTransferSchedule(
-  db: { classMember: { findMany: (args: any) => Promise<{ coachId: string }[]> }; classSchedule: { findFirst: (args: any) => Promise<any> } },
+  db: { class: { findUnique: (args: any) => Promise<any> }; classSchedule: { findFirst: (args: any) => Promise<any> } },
   schedule: { id: string; classId: string; startTime: Date; endTime: Date; class: { capacity: number; areaType: string } },
   targetRoom: { id: string; capacity: number; areaType: string }
 ) {
@@ -222,12 +222,8 @@ export async function transferSchedules(
       orderBy: { startTime: "asc" },
     });
 
-    const classIds = [...new Set(schedules.map((s) => s.classId))];
-    const members = await tx.classMember.findMany({
-      where: { classId: { in: classIds } },
-      select: { coachId: true },
-    });
-    await lockTransferResources(tx as any, targetRoom.id, members.map((m) => m.coachId));
+    // Mỗi lớp đúng 1 HLV (Class.coachId) — lock toàn bộ HLV của các lớp bị dời phòng.
+    await lockTransferResources(tx as any, targetRoom.id, schedules.map((s) => s.class.coachId));
 
     for (const s of schedules) {
       await checkOneTransferSchedule(tx as any, s as any, targetRoom as any);

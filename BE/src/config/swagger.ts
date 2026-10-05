@@ -476,13 +476,10 @@ const options: swaggerJSDoc.Options = {
                       bio: "Yoga instructor",
                       classes: [
                         {
-                          isPrimary: true,
-                          class: {
-                            id: "class-yoga-001",
-                            name: "Morning Yoga",
-                            sports: [{ name: "Yoga" }],
-                            schedules: [],
-                          },
+                          id: "class-yoga-001",
+                          name: "Morning Yoga",
+                          sports: [{ name: "Yoga" }],
+                          schedules: [],
                         },
                       ],
                     },
@@ -766,7 +763,7 @@ const options: swaggerJSDoc.Options = {
                       classType: "REGULAR",
                       areaType: "INDOOR",
                       isActive: true,
-                      coaches: [{ isPrimary: true, coach: { user: { fullName: "Coach One" } } }],
+                      coach: { id: "coach-profile-1", user: { fullName: "Coach One" } },
                       _count: { enrollments: 3, schedules: 2 },
                     },
                   ],
@@ -799,7 +796,7 @@ const options: swaggerJSDoc.Options = {
           },
         },
         ClassOk: {
-          description: "Single class with coaches and upcoming schedules",
+          description: "Single class with its coach and upcoming schedules",
           content: {
             "application/json": {
               schema: {
@@ -815,7 +812,7 @@ const options: swaggerJSDoc.Options = {
                     classType: "REGULAR",
                     areaType: "INDOOR",
                     isActive: true,
-                    coaches: [{ isPrimary: true, coach: { user: { fullName: "Coach One" } } }],
+                    coach: { id: "coach-profile-1", user: { fullName: "Coach One" } },
                     schedules: [],
                   },
                 },
@@ -886,7 +883,7 @@ const options: swaggerJSDoc.Options = {
                     startTime: "2026-09-15T07:00:00.000Z",
                     endTime: "2026-09-15T08:00:00.000Z",
                     status: "SCHEDULED",
-                    class: { name: "Morning Yoga", areaType: "INDOOR", sports: [{ name: "Yoga" }], coaches: [] },
+                    class: { name: "Morning Yoga", areaType: "INDOOR", sports: [{ name: "Yoga" }], coach: { user: { fullName: "Coach One" } } },
                     room: { name: "Yoga Room A", areaType: "INDOOR" },
                     _count: { enrollments: 2 },
                   },

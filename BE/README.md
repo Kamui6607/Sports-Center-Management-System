@@ -91,7 +91,7 @@ router.post(
 router.get("/", validate(SportQuerySchema, "query"), sportsController.listSports); // route công khai
 ```
 
-- Role hợp lệ (enum `UserRole`): `MEMBER`, `COACH`, `MANAGER`. Mặc định mọi route cần Bearer token; route công khai khai báo `security: []` trong Swagger **và** không gắn `authenticate`.
+- Role hợp lệ (bảng `Role`, `User.roleId`; tên role dùng chung ở `src/utils/roles.ts`): `MEMBER`, `COACH`, `MANAGER`. Mặc định mọi route cần Bearer token; route công khai khai báo `security: []` trong Swagger **và** không gắn `authenticate`.
 - `authenticate` kiểm tra lại DB mỗi request (user tồn tại, `isActive`, role không đổi) rồi gán `req.user = { id, role }`. `authenticateIncludingInactive` chỉ dành cho luồng Coach nộp CV (tài khoản chưa duyệt) — đừng dùng bừa.
 - Phân quyền theo **dữ liệu** (VD "member chỉ hủy được đặt chỗ của chính mình") phải kiểm tra trong service bằng `req.user.id` truyền xuống — `authorize` chỉ lo role.
 - Mỗi route **phải có comment `@swagger`** ngay phía trên (tag, summary, parameters/requestBody, responses). Response lỗi/ok dùng `$ref: "#/components/responses/<Tên>"` đã định nghĩa trong `src/config/swagger.ts`; thiếu thì thêm vào đó. Swagger quét `./src/modules/**/*.routes.ts`. Path trong Swagger **không** có prefix `/api/v1` (đã nằm trong `servers`).
@@ -225,6 +225,19 @@ export async function getSportById(req: Request, res: Response, next: NextFuncti
 - **Không viết script vá/thay thế hàng loạt** (`fix_*.js`, `modify*.py`, regex chạy lên `src/`) và không để file tạm/backup (`.bak`, `*_errors.txt`) trong repo. Sửa trực tiếp file nguồn.
 - **Không thêm `(prisma as any)`, `as any` để "lách" lỗi biên dịch.** Lỗi kiểu do schema/model không khớp thì sửa đúng nguồn (schema, import, kiểu), không ép kiểu cho qua.
 - Hãy xác minh bằng `grep`/đọc file trước khi dựa vào bất kỳ tên hàm, route, biến môi trường nào; không có thì không bịa.
+
+---
+
+## 🧩 Nghiệp vụ cốt lõi: vai trò & lớp học
+
+Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manager** chỉ quản lý nền tảng.
+
+- **Manager — quản lý nền tảng, KHÔNG tạo/đứng lớp:** duyệt CV Coach, duyệt/từ chối lớp (`PATCH /classes/{id}/review`), quản lý phòng, môn tập, sản phẩm, duyệt hoàn tiền và rút tiền ví Coach, xem báo cáo.
+- **Chỉ Coach tạo lớp** (`POST /classes`, `POST /class-schedules/activity-plan`). Lớp mới ở trạng thái `PENDING`, Manager duyệt xong (`APPROVED`) thì Member mới mua được. Manager gọi API tạo lớp ⇒ 403.
+- **Mỗi lớp đúng 1 Coach:** `Class.coachId` (bắt buộc) là Coach đã tạo và phụ trách lớp, nhận 85% doanh thu vào `CoachWallet`. **Không có** bảng `ClassMember`, không có HLV phụ/đổi HLV — đừng tạo lại.
+- **Buổi học (`ClassSchedule`)** thuộc 1 lớp qua `ClassSchedule.classId`. **Chỉ Coach phụ trách lớp** được tạo/sửa/xóa/hủy/hoàn tất buổi (tạo buổi: lớp phải `APPROVED`); Manager gọi các API này ⇒ 403.
+- **Đặt chỗ (`Enrollment`) theo TỪNG BUỔI:** chỉ lưu `memberId` + `scheduleId`. Lớp của một enrollment lấy qua `enrollment.schedule.classId` — **không có** `Enrollment.classId`. Lọc theo lớp thì dùng `where: { schedule: { classId } }`; Prisma `groupBy` không group theo quan hệ nên muốn đếm theo lớp thì `select: { schedule: { select: { classId: true } } }` rồi cộng dồn.
+- **Kiểm tra quyền Coach trên lớp:** so `class.coachId === coachProfile.id` (hoặc `where: { coach: { userId } }`).
 
 ---
 

@@ -18,7 +18,11 @@ const router = Router();
  * @swagger
  * /class-schedules/activity-plan:
  *   post:
- *     summary: Atomically create a sport (optional), class, coach assignments and schedules
+ *     summary: Coach tạo nhanh lớp học (môn có sẵn + phòng) — lớp PENDING chờ Manager duyệt
+ *     description: |
+ *       CHỈ COACH. Coach gọi API là HLV phụ trách lớp (`Class.coachId`); không nhận `primaryCoachId`/`supportCoachId`.
+ *       `sport.mode = "new"` bị chặn 403 (danh mục môn tập do Manager quản lý).
+ *       Lớp PENDING nên chưa tạo buổi học — thêm lịch bằng `POST /class-schedules` sau khi lớp được duyệt.
  *     tags: [Class Schedules]
  *     requestBody:
  *       required: true
@@ -36,7 +40,7 @@ const router = Router();
 router.post(
   "/activity-plan",
   authenticate,
-  authorize("MANAGER", "COACH"),
+  authorize("COACH"),
   validate(CreateActivityPlanSchema),
   schedulesController.createActivityPlan,
 );
@@ -172,7 +176,7 @@ router.get(
  *   post:
  *     summary: Create a new schedule (checks area type, room & coach conflicts)
  *     description: |
- *       - COACH chỉ tạo được lịch cho lớp mình được phân công (khác ⇒ 403 `NOT_CLASS_COACH`); MANAGER mọi lớp.
+ *       - Chỉ COACH phụ trách lớp (`Class.coachId`) được tạo lịch (khác ⇒ 403 `NOT_CLASS_COACH`). Manager không thao tác lịch học.
  *       - Lớp phải `APPROVED` (khác ⇒ 400 `CLASS_NOT_APPROVED`); `startTime` phải ở tương lai (⇒ 400 `SCHEDULE_IN_PAST`).
  *       - Class.areaType phải bằng Room.areaType; phòng đủ sức chứa.
  *       - Không trùng giờ với buổi `SCHEDULED` khác cùng phòng (409 `ROOM_CONFLICT`) hoặc cùng HLV (409 `COACH_CONFLICT`).
@@ -216,7 +220,7 @@ router.get(
 router.post(
   "/",
   authenticate,
-  authorize("MANAGER", "COACH"),
+  authorize("COACH"),
   validate(CreateScheduleSchema),
   schedulesController.createSchedule
 );
@@ -228,7 +232,7 @@ router.post(
  *     summary: Update schedule (re-checks conflicts if room/time changed)
  *     description: |
  *       Closed schedules (CANCELLED/COMPLETED) are immutable. status=COMPLETED is rejected here — use PATCH /class-schedules/{id}/complete.
- *       COACH chỉ sửa lịch lớp mình được phân công (403 `NOT_CLASS_COACH`).
+ *       Chỉ COACH phụ trách lớp được sửa lịch (403 `NOT_CLASS_COACH`).
  *       Đổi phòng/giờ: lớp phải `APPROVED`, giờ bắt đầu mới ở tương lai, và kiểm tra lại
  *       409 `ROOM_CONFLICT` / `COACH_CONFLICT` như khi tạo.
  *     tags: [Class Schedules]
@@ -273,7 +277,7 @@ router.post(
 router.patch(
   "/:id",
   authenticate,
-  authorize("MANAGER", "COACH"),
+  authorize("COACH"),
   validate(ScheduleIdSchema, "params"),
   validate(UpdateScheduleSchema),
   schedulesController.updateSchedule
@@ -284,7 +288,7 @@ router.patch(
  * /class-schedules/{id}:
  *   delete:
  *     summary: Cancel a schedule that has NO bookings
- *     description: "COACH chỉ hủy lịch lớp mình được phân công (403 NOT_CLASS_COACH). Chỉ hủy được buổi CHƯA có ai đặt chỗ; buổi đã có người đặt ⇒ 400 SCHEDULE_CANCEL_RESOLUTION_REQUIRED, dùng POST /class-schedules/{id}/cancel. Idempotent for already-CANCELLED schedules. Rejects COMPLETED schedules."
+ *     description: "Chỉ COACH phụ trách lớp được hủy lịch (403 NOT_CLASS_COACH). Chỉ hủy được buổi CHƯA có ai đặt chỗ; buổi đã có người đặt ⇒ 400 SCHEDULE_CANCEL_RESOLUTION_REQUIRED, dùng POST /class-schedules/{id}/cancel. Idempotent for already-CANCELLED schedules. Rejects COMPLETED schedules."
  *     tags: [Class Schedules]
  *     parameters:
  *       - in: path
@@ -303,7 +307,7 @@ router.patch(
 router.delete(
   "/:id",
   authenticate,
-  authorize("MANAGER", "COACH"),
+  authorize("COACH"),
   validate(ScheduleIdSchema, "params"),
   schedulesController.deleteSchedule
 );
@@ -314,7 +318,7 @@ router.delete(
  *   post:
  *     summary: Hủy buổi học kèm DẠY BÙ hoặc HOÀN TIỀN cho hội viên đã đặt chỗ
  *     description: |
- *       COACH của lớp hoặc MANAGER. Buổi đã có hội viên giữ chỗ ⇒ BẮT BUỘC gửi `resolution`
+ *       Chỉ COACH phụ trách lớp. Buổi đã có hội viên giữ chỗ ⇒ BẮT BUỘC gửi `resolution`
  *       (thiếu ⇒ 400 `SCHEDULE_CANCEL_RESOLUTION_REQUIRED`):
  *       - `MAKEUP`: tạo buổi dạy bù ở giờ/phòng mới (kiểm tra trùng phòng, trùng HLV, trùng lịch của hội viên),
  *         chuyển toàn bộ hội viên đã đặt sang buổi bù. Không gửi `roomId` ⇒ dùng phòng cũ.
@@ -362,7 +366,7 @@ router.delete(
 router.post(
   "/:id/cancel",
   authenticate,
-  authorize("MANAGER", "COACH"),
+  authorize("COACH"),
   validate(ScheduleIdSchema, "params"),
   validate(CancelScheduleSchema),
   schedulesController.cancelSchedule
@@ -373,7 +377,7 @@ router.post(
  * /class-schedules/{id}/complete:
  *   patch:
  *     summary: Mark a schedule as COMPLETED (only after endTime)
- *     description: "COACH chỉ hoàn tất lịch lớp mình được phân công (403 NOT_CLASS_COACH)."
+ *     description: "Chỉ COACH phụ trách lớp được hoàn tất lịch (403 NOT_CLASS_COACH)."
  *     tags: [Class Schedules]
  *     parameters:
  *       - in: path
@@ -391,7 +395,7 @@ router.post(
 router.patch(
   "/:id/complete",
   authenticate,
-  authorize("MANAGER", "COACH"),
+  authorize("COACH"),
   validate(ScheduleIdSchema, "params"),
   schedulesController.completeSchedule
 );

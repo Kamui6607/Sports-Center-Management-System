@@ -22,7 +22,7 @@ async function verifyCoachAccess(scheduleId: string, user: any) {
 
   const schedule = await prisma.classSchedule.findUnique({
     where: { id: scheduleId },
-    include: { class: { include: { coaches: true } } },
+    include: { class: { select: { coachId: true } } },
   });
   if (!schedule) throw new AppError("Schedule not found", 404);
 
@@ -30,7 +30,7 @@ async function verifyCoachAccess(scheduleId: string, user: any) {
     const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: user.id } });
     if (!coachProfile) throw new AppError("Coach profile not found", 404);
     
-    const isAssigned = schedule.class.coaches.some(c => c.coachId === coachProfile.id);
+    const isAssigned = schedule.class.coachId === coachProfile.id;
     if (!isAssigned) throw new AppError("Forbidden: You are not assigned to this class", 403);
   }
 }
@@ -62,14 +62,14 @@ export const getAttendancesBySchedule = async (
 ) => {
   const schedule = await prisma.classSchedule.findUnique({
     where: { id: scheduleId },
-    include: { class: { include: { coaches: true } } },
+    include: { class: { select: { coachId: true } } },
   });
   if (!schedule) throw new AppError("Schedule not found", 404);
 
   if (actor.role === "COACH") {
     const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: actor.id } });
     const isAssigned =
-      Boolean(coachProfile) && schedule.class.coaches.some((c) => c.coachId === coachProfile!.id);
+      Boolean(coachProfile) && schedule.class.coachId === coachProfile!.id;
     if (!isAssigned) throw new AppError("Forbidden: You are not assigned to this class", 403);
   } else if (actor.role === "MEMBER") {
     const memberProfile = await prisma.memberProfile.findUnique({ where: { userId: actor.id } });

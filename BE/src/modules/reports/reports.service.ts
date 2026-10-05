@@ -155,24 +155,28 @@ export async function getEnrollmentReport(startDate: string, endDate: string) {
   const end = new Date(`${endDate}T23:59:59.999+07:00`);
   const dateFilter = { createdAt: { gte: start, lte: end } };
 
-  const [totalEnrollments, completedEnrollments, cancelledEnrollments, topClasses, byClassType] = await Promise.all([
+  const [totalEnrollments, completedEnrollments, cancelledEnrollments, enrolledRows] = await Promise.all([
     // BR-19: Count both BOOKED and COMPLETED as "enrolled" (not just BOOKED)
     prisma.enrollment.count({ where: { ...dateFilter, status: { in: ["BOOKED", "COMPLETED"] } } }),
     prisma.enrollment.count({ where: { ...dateFilter, status: "COMPLETED" } }),
     prisma.enrollment.count({ where: { ...dateFilter, status: "CANCELLED" } }),
-    prisma.enrollment.groupBy({
-      by: ["classId"],
+    // Enrollment không lưu classId — lớp lấy qua schedule.classId (groupBy không group theo quan hệ).
+    prisma.enrollment.findMany({
       where: { ...dateFilter, status: { in: ["BOOKED", "COMPLETED"] } },
-      _count: { classId: true },
-      orderBy: { _count: { classId: "desc" } },
-      take: 5,
-    }),
-    prisma.enrollment.groupBy({
-      by: ["classId"],
-      where: { ...dateFilter, status: { in: ["BOOKED", "COMPLETED"] } },
-      _count: true,
+      select: { schedule: { select: { classId: true } } },
     }),
   ]);
+
+  const countByClass = new Map<string, number>();
+  for (const row of enrolledRows) {
+    const id = row.schedule.classId;
+    countByClass.set(id, (countByClass.get(id) ?? 0) + 1);
+  }
+  const byClassType = [...countByClass].map(([classId, count]) => ({ classId, _count: count }));
+  const topClasses = [...byClassType]
+    .sort((a, b) => b._count - a._count)
+    .slice(0, 5)
+    .map((c) => ({ classId: c.classId, _count: { classId: c._count } }));
 
   // Fetch class names for top classes
   const topClassIds = topClasses.map((c) => c.classId);

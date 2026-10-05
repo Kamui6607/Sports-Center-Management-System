@@ -35,13 +35,16 @@ export async function computeAttendanceBuckets(
     where: {
       status: { in: ["BOOKED", "COMPLETED"] },
       ...(options.memberId ? { memberId: options.memberId } : {}),
-      ...(options.classId ? { classId: options.classId } : {}),
-      schedule: { status: { not: "CANCELLED" }, endTime: { lte: now } },
+      schedule: {
+        status: { not: "CANCELLED" },
+        endTime: { lte: now },
+        // Lớp của enrollment lấy qua buổi học (Enrollment không lưu classId).
+        ...(options.classId ? { classId: options.classId } : {}),
+      },
     },
     select: {
       memberId: true,
-      classId: true,
-      schedule: { select: { id: true, startTime: true } },
+      schedule: { select: { id: true, startTime: true, classId: true } },
     },
     orderBy: { schedule: { startTime: "desc" } },
   });
@@ -52,9 +55,9 @@ export async function computeAttendanceBuckets(
     { memberId: string; classId: string; schedules: { id: string; startTime: Date }[] }
   >();
   for (const e of enrollments) {
-    const key = `${e.memberId}|${e.classId}`;
-    const entry = grouped.get(key) ?? { memberId: e.memberId, classId: e.classId, schedules: [] };
-    if (entry.schedules.length < ATTENDANCE.SAMPLE_WINDOW) entry.schedules.push(e.schedule);
+    const key = `${e.memberId}|${e.schedule.classId}`;
+    const entry = grouped.get(key) ?? { memberId: e.memberId, classId: e.schedule.classId, schedules: [] };
+    if (entry.schedules.length < ATTENDANCE.SAMPLE_WINDOW) entry.schedules.push({ id: e.schedule.id, startTime: e.schedule.startTime });
     grouped.set(key, entry);
   }
 

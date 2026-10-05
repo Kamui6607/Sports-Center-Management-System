@@ -29,17 +29,6 @@ export const ApproveClassSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 
-export const AssignCoachSchema = z.object({
-  coachId: z.string().min(1),
-  isPrimary: z.boolean().default(false),
-});
-
-// Phân công HLV hỗ trợ (support coach): luôn lưu với isPrimary = false.
-// Mỗi Class chỉ có duy nhất 1 HLV chính nên endpoint này không nhận isPrimary.
-export const AssignSupportCoachSchema = z.object({
-  coachId: z.string().min(1),
-});
-
 export const ClassQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),

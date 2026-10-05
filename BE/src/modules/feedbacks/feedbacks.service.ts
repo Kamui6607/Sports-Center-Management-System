@@ -34,9 +34,7 @@ export async function createFeedback(data: CreateFeedbackInput, userId: string) 
       memberId: memberProfile.id,
       status: { in: ["BOOKED", "COMPLETED"] },
       schedule: {
-        class: {
-          coaches: { some: { coachId: data.coachId } },
-        },
+        class: { coachId: data.coachId },
       },
     },
   });
@@ -47,7 +45,7 @@ export async function createFeedback(data: CreateFeedbackInput, userId: string) 
   // Kiểm tra classId nếu có
   if (data.classId) {
     const classExists = await prisma.class.findFirst({
-      where: { id: data.classId, coaches: { some: { coachId: data.coachId } } },
+      where: { id: data.classId, coachId: data.coachId },
     });
     if (!classExists) throw new AppError("Lớp học này không thuộc HLV được chỉ định.", 400);
   }

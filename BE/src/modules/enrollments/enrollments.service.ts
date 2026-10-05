@@ -166,7 +166,6 @@ export async function bookClass(
       enrolled = await tx.enrollment.create({
         data: {
           memberId: memberProfileId,
-          classId: freshSchedule.classId,
           scheduleId,
           status: "BOOKED",
         },
@@ -274,12 +273,12 @@ export async function getScheduleEnrollments(
   if (actor.role === "COACH") {
     const schedule = await prisma.classSchedule.findUnique({
       where: { id: scheduleId },
-      include: { class: { include: { coaches: true } } },
+      include: { class: { select: { coachId: true } } },
     });
     if (!schedule) throw new AppError("Schedule not found", 404);
     const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: actor.id } });
     const isAssigned =
-      Boolean(coachProfile) && schedule.class.coaches.some((c) => c.coachId === coachProfile!.id);
+      Boolean(coachProfile) && schedule.class.coachId === coachProfile!.id;
     if (!isAssigned) throw new AppError("Forbidden: You are not assigned to this class", 403);
   }
 
@@ -350,7 +349,7 @@ export async function transferEnrollment(
   if (!target) throw new AppError("Target schedule not found", 404);
 
   // BR-08: chỉ đổi GIỜ trong cùng Class — không dùng endpoint này để chuyển sang lớp khác.
-  if (target.classId !== enrollment.classId)
+  if (target.classId !== enrollment.schedule.classId)
     throw new AppError(
       "Target schedule must belong to the same class as the current enrollment",
       400
@@ -368,7 +367,7 @@ export async function transferEnrollment(
     // BR-09: serialize mọi transfer của cùng (memberId, classId). Thiếu lock này, 2 request
     // đồng thời (lock schedule đích khác nhau) có thể cùng thấy enrollment BOOKED rồi cùng commit
     // -> member giữ 2 chỗ trong cùng Class.
-    await lockMemberClass(tx, enrollment.memberId, enrollment.classId);
+    await lockMemberClass(tx, enrollment.memberId, enrollment.schedule.classId);
     // Lock buổi đích: nhiều hội viên cùng chuyển tới không được vượt sức chứa.
     await lockSchedule(tx, targetScheduleId);
 
@@ -378,7 +377,7 @@ export async function transferEnrollment(
       where: {
         id: enrollment.id,
         memberId: enrollment.memberId,
-        classId: enrollment.classId,
+        schedule: { classId: enrollment.schedule.classId },
         status: "BOOKED",
       },
       data: { status: "CANCELLED", cancelledAt: new Date() },
@@ -392,7 +391,7 @@ export async function transferEnrollment(
     const existingTarget = await assertCanBook(tx, enrollment.memberId, target, {
       excludeEnrollmentId: enrollment.id,
       // §9: transfer chỉ đổi buổi TRONG CÙNG Class (BR-08) => số Class không đổi, không tiêu quota mới.
-      quotaExemptClassId: enrollment.classId,
+      quotaExemptClassId: enrollment.schedule.classId,
     });
 
     const enrollmentInclude = {
@@ -407,7 +406,6 @@ export async function transferEnrollment(
       : await tx.enrollment.create({
           data: {
             memberId: enrollment.memberId,
-            classId: target.classId,
             scheduleId: targetScheduleId,
             status: "BOOKED",
           },

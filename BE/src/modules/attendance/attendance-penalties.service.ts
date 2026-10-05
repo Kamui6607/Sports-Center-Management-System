@@ -42,7 +42,7 @@ export async function previewPenalties() {
   if (release.length === 0) return { items: [], totalPreviewed: 0, thresholds: { ...ATTENDANCE } };
 
   const pairs = release.map((b) => ({ memberId: b.memberId, classId: b.classId }));
-  const [activePenalties, futureCounts] = await Promise.all([
+  const [activePenalties, futureRows] = await Promise.all([
     prisma.attendancePenalty.findMany({
       // Read-only: coi penalty đã hết hạn chặn (blockedUntil <= now) như KHÔNG còn hiệu lực,
       // không mutate DB trong preview (lazy-expire chỉ chạy ở list/summary).
@@ -54,19 +54,23 @@ export async function previewPenalties() {
       },
       select: { memberId: true, classId: true, status: true, blockedUntil: true },
     }),
-    prisma.enrollment.groupBy({
-      by: ["memberId", "classId"],
+    // Enrollment không lưu classId — lớp lấy qua schedule.classId, đếm theo (member, class) ở dưới.
+    prisma.enrollment.findMany({
       where: {
         status: "BOOKED",
-        OR: pairs,
+        OR: pairs.map((p) => ({ memberId: p.memberId, schedule: { classId: p.classId } })),
         schedule: { startTime: { gt: now }, status: "SCHEDULED" },
       },
-      _count: { _all: true },
+      select: { memberId: true, schedule: { select: { classId: true } } },
     }),
   ]);
 
   const blockedPair = new Set(activePenalties.map((p) => `${p.memberId}|${p.classId}`));
-  const futureMap = new Map(futureCounts.map((f) => [`${f.memberId}|${f.classId}`, f._count._all]));
+  const futureMap = new Map<string, number>();
+  for (const f of futureRows) {
+    const key = `${f.memberId}|${f.schedule.classId}`;
+    futureMap.set(key, (futureMap.get(key) ?? 0) + 1);
+  }
 
   const items = release
     .filter((b) => !blockedPair.has(`${b.memberId}|${b.classId}`))
@@ -155,9 +159,8 @@ export async function applyPenalty(input: {
     const future = await tx.enrollment.findMany({
       where: {
         memberId: input.memberId,
-        classId: input.classId,
         status: "BOOKED",
-        schedule: { startTime: { gt: decidedAt }, status: "SCHEDULED" },
+        schedule: { classId: input.classId, startTime: { gt: decidedAt }, status: "SCHEDULED" },
       },
       select: { id: true },
     });

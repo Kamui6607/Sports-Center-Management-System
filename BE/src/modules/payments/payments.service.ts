@@ -7,7 +7,7 @@ import { createNotification } from "../notifications/notifications.service.js";
 const COACH_REVENUE_SHARE = 0.85;
 
 /**
- * Credit 85% doanh thu từ 1 payment cho primary coach của class.
+ * Credit 85% doanh thu từ 1 payment cho HLV của lớp (mỗi lớp đúng 1 HLV — Class.coachId).
  * Chạy TRONG transaction để đảm bảo atomicity với payment update.
  */
 export async function creditCoachWallet(
@@ -16,19 +16,19 @@ export async function creditCoachWallet(
   paymentId: string,
   paymentAmount: number
 ) {
-  // Tìm primary coach của class
-  const primaryCoachMember = await tx.classMember.findFirst({
-    where: { classId, isPrimary: true },
-    select: { coachId: true, coach: { select: { userId: true } }, class: { select: { name: true } } },
+  // HLV của lớp
+  const cls = await tx.class.findUnique({
+    where: { id: classId },
+    select: { coachId: true, name: true, coach: { select: { userId: true } } },
   });
-  if (!primaryCoachMember) return; // Không có primary coach → không credit
+  if (!cls) return;
 
   const coachAmount = Math.floor(paymentAmount * COACH_REVENUE_SHARE);
 
   // Upsert wallet rồi lấy ID
   const wallet = await tx.coachWallet.upsert({
-    where: { coachId: primaryCoachMember.coachId },
-    create: { coachId: primaryCoachMember.coachId, balance: coachAmount },
+    where: { coachId: cls.coachId },
+    create: { coachId: cls.coachId, balance: coachAmount },
     update: { balance: { increment: coachAmount } },
     select: { id: true, coachId: true },
   });
@@ -48,13 +48,13 @@ export async function creditCoachWallet(
   });
 
   // Gửi notification (userId + tên lớp đã lấy sẵn ở query đầu — không tốn thêm query trong transaction)
-  const coachUserId = primaryCoachMember.coach?.userId;
+  const coachUserId = cls.coach?.userId;
   if (coachUserId) {
     createNotification(
       coachUserId,
       "PAYMENT_SUCCESS",
       "Bạn vừa nhận được thu nhập!",
-      `${coachAmount.toLocaleString("vi-VN")}đ đã được ghi vào ví từ khóa học "${primaryCoachMember.class?.name ?? classId}".`
+      `${coachAmount.toLocaleString("vi-VN")}đ đã được ghi vào ví từ khóa học "${cls.name}".`
     ).catch(() => {});
   }
 }
@@ -71,7 +71,7 @@ export async function autoEnrollAfterPayment(tx: any, classId: string, memberPro
   if (schedules.length === 0) return 0;
   // 1 query cho mọi buổi; skipDuplicates giữ nguyên enrollment đã có (idempotent như upsert cũ).
   await tx.enrollment.createMany({
-    data: schedules.map((s) => ({ memberId: memberProfileId, classId, scheduleId: s.id, status: "BOOKED" })),
+    data: schedules.map((s) => ({ memberId: memberProfileId, scheduleId: s.id, status: "BOOKED" })),
     skipDuplicates: true,
   });
   return schedules.length;

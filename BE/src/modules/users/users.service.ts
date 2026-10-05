@@ -139,7 +139,7 @@ export async function updateUser(id: string, data: UpdateUserInput, requesterId:
     if (user.role === "COACH") {
       const upcomingSchedules = await prisma.classSchedule.count({
         where: { 
-          class: { coaches: { some: { coach: { userId: id } } } }, 
+          class: { coach: { userId: id } }, 
           status: "SCHEDULED", 
           startTime: { gt: new Date() } 
         }

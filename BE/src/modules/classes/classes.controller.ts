@@ -43,24 +43,6 @@ export async function updateClass(req: Request, res: Response, next: NextFunctio
     sendSuccess(res, cls, "Class updated successfully");
   } catch (err) { next(err); }
 }
-export async function assignCoach(req: Request, res: Response, next: NextFunction) {
-  try {
-    const cls = await classesService.assignCoach(req.params.id as string, req.body.coachId, req.body.isPrimary ?? false);
-    sendSuccess(res, cls, "Coach assigned successfully");
-  } catch (err) { next(err); }
-}
-export async function assignSupportCoach(req: Request, res: Response, next: NextFunction) {
-  try {
-    const cls = await classesService.assignSupportCoach(req.params.id as string, req.body.coachId);
-    sendSuccess(res, cls, "Support coach assigned successfully");
-  } catch (err) { next(err); }
-}
-export async function removeCoach(req: Request, res: Response, next: NextFunction) {
-  try {
-    const cls = await classesService.removeCoach(req.params.id as string, req.params.coachId as string);
-    sendSuccess(res, cls, "Coach removed successfully");
-  } catch (err) { next(err); }
-}
 export async function deleteClass(req: Request, res: Response, next: NextFunction) {
   try {
     const cls = await classesService.deleteClass(req.params.id as string);

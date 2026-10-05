@@ -69,17 +69,14 @@ export async function getCoachById(id: string) {
       coachProfile: {
         include: {
           certification: true,
+          // Lớp do HLV phụ trách (Class.coachId)
           classes: {
             include: {
-              class: {
-                include: {
-                  sports: true,
-                  schedules: {
-                    where: { status: "SCHEDULED" },
-                    take: 5,
-                    orderBy: { startTime: "asc" },
-                  },
-                },
+              sports: true,
+              schedules: {
+                where: { status: "SCHEDULED" },
+                take: 5,
+                orderBy: { startTime: "asc" },
               },
             },
           },

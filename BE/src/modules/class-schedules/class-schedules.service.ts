@@ -29,9 +29,10 @@ async function lockScheduleResources(db: DbClient, roomIds: string[], coachIds: 
   }
 }
 
+/** HLV phụ trách lớp (mỗi lớp đúng 1 HLV) — trả mảng để dùng chung với lockScheduleResources. */
 async function getCoachIdsOfClass(db: DbClient, classId: string): Promise<string[]> {
-  const rows = await db.classMember.findMany({ where: { classId }, select: { coachId: true } });
-  return rows.map((r) => r.coachId);
+  const cls = await db.class.findUnique({ where: { id: classId }, select: { coachId: true } });
+  return cls ? [cls.coachId] : [];
 }
 
 /** Người gọi API lịch học (lấy từ JWT ở controller). */
@@ -43,14 +44,14 @@ function fmtVn(d: Date): string {
 }
 
 /**
- * Quyền thao tác lịch của MỘT lớp: MANAGER mọi lớp; COACH chỉ lớp mình được phân công (ClassMember).
+ * Quyền thao tác lịch (tạo/sửa/xóa/hủy/hoàn tất buổi) của MỘT lớp: CHỈ COACH phụ trách lớp (Class.coachId).
+ * Manager chỉ quản lý nền tảng, không thao tác lịch học.
  * Chặn Coach A tạo/dời/hủy/hoàn tất buổi học (và giữ phòng) dưới tên lớp của Coach B.
  */
 async function assertCanManageClassSchedule(db: DbClient, actor: ScheduleActor, classId: string) {
-  if (actor.role === "MANAGER") return;
   if (actor.role !== "COACH") throw new AppError("Forbidden", 403);
-  const assigned = await db.classMember.findFirst({
-    where: { classId, coach: { userId: actor.id } },
+  const assigned = await db.class.findFirst({
+    where: { id: classId, coach: { userId: actor.id } },
     select: { id: true },
   });
   if (!assigned) {
@@ -121,51 +122,42 @@ async function checkConflicts(
     );
   }
 
-  // Coach conflict – get coaches of this class
-  const classCoaches = await db.classMember.findMany({ where: { classId } });
-  for (const cm of classCoaches) {
-    const coachConflict = await db.classSchedule.findFirst({
-      where: {
-        status: "SCHEDULED",
-        id: excludeScheduleId ? { not: excludeScheduleId } : undefined,
-        startTime: { lt: endTime },
-        endTime: { gt: startTime },
-        class: { coaches: { some: { coachId: cm.coachId } } },
-      },
-      include: {
-        class: {
-          include: {
-            coaches: {
-              where: { coachId: cm.coachId },
-              include: { coach: { include: { user: { select: { fullName: true } } } } },
-            },
-          },
-        },
-      },
-    });
+  // Coach conflict — HLV phụ trách lớp (mỗi lớp đúng 1 HLV) không được dạy 2 buổi trùng giờ
+  const cls = await db.class.findUnique({ where: { id: classId }, select: { coachId: true } });
+  if (!cls) return;
+  const coachConflict = await db.classSchedule.findFirst({
+    where: {
+      status: "SCHEDULED",
+      id: excludeScheduleId ? { not: excludeScheduleId } : undefined,
+      startTime: { lt: endTime },
+      endTime: { gt: startTime },
+      class: { coachId: cls.coachId },
+    },
+    include: {
+      class: { include: { coach: { include: { user: { select: { fullName: true } } } } } },
+    },
+  });
 
-    if (coachConflict) {
-      const coachName =
-        coachConflict.class.coaches[0]?.coach?.user?.fullName ?? "HLV";
-      throw new AppError(
-        `HLV "${coachName}" đã có lịch dạy lớp "${coachConflict.class.name}" từ ` +
-          `${fmtVn(coachConflict.startTime)} đến ${fmtVn(coachConflict.endTime)}.`,
-        409,
-        {
-          code: "COACH_CONFLICT",
-          conflict: {
-            scheduleId: coachConflict.id,
-            classId: coachConflict.classId,
-            className: coachConflict.class.name,
-            coachId: cm.coachId,
-            coachName,
-            roomId: coachConflict.roomId,
-            startTime: coachConflict.startTime,
-            endTime: coachConflict.endTime,
-          },
-        }
-      );
-    }
+  if (coachConflict) {
+    const coachName = coachConflict.class.coach.user.fullName ?? "HLV";
+    throw new AppError(
+      `HLV "${coachName}" đã có lịch dạy lớp "${coachConflict.class.name}" từ ` +
+        `${fmtVn(coachConflict.startTime)} đến ${fmtVn(coachConflict.endTime)}.`,
+      409,
+      {
+        code: "COACH_CONFLICT",
+        conflict: {
+          scheduleId: coachConflict.id,
+          classId: coachConflict.classId,
+          className: coachConflict.class.name,
+          coachId: cls.coachId,
+          coachName,
+          roomId: coachConflict.roomId,
+          startTime: coachConflict.startTime,
+          endTime: coachConflict.endTime,
+        },
+      }
+    );
   }
 }
 
@@ -347,21 +339,21 @@ export async function createSchedule(data: any, actor: ScheduleActor) {
 }
 
 /**
- * Creates the complete quick-planner workflow in one database transaction.
- * Any validation or conflict error rolls back the sport, class, assignments,
- * and every schedule created by this request.
+ * Quick-planner của COACH: tạo lớp (gắn môn có sẵn + phòng) trong MỘT transaction.
+ * Coach tạo lớp ⇒ là HLV phụ trách lớp (Class.coachId); lớp PENDING chờ Manager duyệt,
+ * nên CHƯA tạo buổi học — Coach thêm lịch sau khi lớp được APPROVED (POST /class-schedules).
+ * Manager không tạo lớp (chỉ quản lý nền tảng + duyệt lớp).
  */
 export async function createActivityPlan(data: any, actor: { id: string; role: string }) {
-  const isCoach = actor.role === "COACH";
-  const canCreateSport = !isCoach; // Coach không được tạo sport mới
-
-  if (data.sport.mode === "new" && !canCreateSport) {
-    throw new AppError("Only managers can create a new sport in activity-plan", 403);
+  if (actor.role !== "COACH") throw new AppError("Chỉ Coach được tạo lớp học", 403);
+  if (data.sport.mode === "new") {
+    throw new AppError("Coach chỉ chọn môn tập có sẵn — danh mục môn tập do Manager quản lý", 403);
   }
 
-  const initialStatus = isCoach ? "PENDING" : "APPROVED";
-
   return prisma.$transaction(async (tx) => {
+    const coachProfile = await tx.coachProfile.findUnique({ where: { userId: actor.id } });
+    if (!coachProfile) throw new AppError("Coach profile not found", 404);
+
     const room = await tx.room.findUnique({ where: { id: data.roomId } });
     if (!room || !room.isActive) throw new AppError("Room not found or inactive", 404);
     if (room.areaType !== data.class.areaType) {
@@ -374,53 +366,15 @@ export async function createActivityPlan(data: any, actor: { id: string; role: s
       throw new AppError("Room capacity is too small for this class", 400);
     }
 
-    // Coach dùng activity-plan: primaryCoachId phải là chính mình
-    if (isCoach) {
-      const coachProfile = await tx.coachProfile.findUnique({ where: { userId: actor.id } });
-      if (!coachProfile) throw new AppError("Coach profile not found", 404);
-      if (data.primaryCoachId !== coachProfile.id) {
-        throw new AppError("Coach can only set themselves as primary coach", 403);
-      }
+    const sport = await tx.sport.findUnique({ where: { id: data.sport.id } });
+    if (!sport || !sport.isActive) {
+      throw new AppError("Sport not found or inactive", 404);
     }
-
-    const coachIds = [data.primaryCoachId, data.supportCoachId].filter(
-      (id): id is string => Boolean(id),
-    );
-    const coaches = await tx.coachProfile.findMany({
-      where: {
-        id: { in: coachIds },
-        user: { isActive: true, role: { name: "COACH" } },
-      },
-      select: { id: true },
-    });
-    if (coaches.length !== coachIds.length) {
-      throw new AppError("Active coach not found", 404);
-    }
-
-    await lockScheduleResources(tx, [data.roomId], coachIds);
-
-    let sport;
-    if (data.sport.mode === "new") {
-      const existing = await tx.sport.findUnique({ where: { name: data.sport.name } });
-      if (existing) throw new AppError("Sport with this name already exists", 409);
-      sport = await tx.sport.create({
-        data: {
-          name: data.sport.name,
-          description: data.sport.description || undefined,
-          areaTypes: [data.class.areaType],
-        },
-      });
-    } else {
-      sport = await tx.sport.findUnique({ where: { id: data.sport.id } });
-      if (!sport || !sport.isActive) {
-        throw new AppError("Sport not found or inactive", 404);
-      }
-      if (!sport.areaTypes.includes(data.class.areaType)) {
-        throw new AppError(
-          `Sport "${sport.name}" does not support area type "${data.class.areaType}"`,
-          400,
-        );
-      }
+    if (!sport.areaTypes.includes(data.class.areaType)) {
+      throw new AppError(
+        `Sport "${sport.name}" does not support area type "${data.class.areaType}"`,
+        400,
+      );
     }
 
     const cls = await tx.class.create({
@@ -431,57 +385,25 @@ export async function createActivityPlan(data: any, actor: { id: string; role: s
         classType: data.class.classType,
         areaType: data.class.areaType,
         price: data.class.price ?? 0,
-        status: initialStatus,
-        createdById: actor.id,
+        status: "PENDING",
+        coachId: coachProfile.id,
         sports: { connect: { id: sport.id } },
-        coaches: {
-          create: coachIds.map((coachId) => ({
-            coachId,
-            isPrimary: coachId === data.primaryCoachId,
-          })),
-        },
       },
     });
 
-    // Đảm bảo CoachWallet tồn tại cho primary coach
-    const primaryCoach = coaches.find((c) => c.id === data.primaryCoachId);
-    if (primaryCoach) {
-      await tx.coachWallet.upsert({
-        where: { coachId: primaryCoach.id },
-        create: { coachId: primaryCoach.id, balance: 0 },
-        update: {},
-      });
-    }
-
-    // Coach tạo PENDING → chỉ tạo schedule khi APPROVED sau (không tạo schedule lúc PENDING)
-    // Manager tạo APPROVED → tạo schedule ngay
-    const createdSchedules = [];
-    if (!isCoach) {
-      for (const schedule of data.schedules) {
-        const startTime = new Date(schedule.startTime);
-        const endTime = new Date(schedule.endTime);
-        assertStartsInFuture(startTime);
-        await checkConflicts(tx, room.id, cls.id, startTime, endTime);
-        createdSchedules.push(await tx.classSchedule.create({
-          data: {
-            classId: cls.id,
-            roomId: room.id,
-            startTime,
-            endTime,
-            status: "SCHEDULED",
-          },
-        }));
-      }
-    }
+    // Đảm bảo CoachWallet tồn tại cho HLV của lớp
+    await tx.coachWallet.upsert({
+      where: { coachId: coachProfile.id },
+      create: { coachId: coachProfile.id, balance: 0 },
+      update: {},
+    });
 
     return {
       class: cls,
       sport,
-      schedulesCreated: createdSchedules.length,
-      status: initialStatus,
-      note: isCoach
-        ? "Class created as PENDING and awaiting Manager approval. Schedules will be set after approval."
-        : undefined,
+      schedulesCreated: 0,
+      status: "PENDING" as const,
+      note: "Class created as PENDING and awaiting Manager approval. Schedules will be set after approval.",
     };
   }, { timeout: 30_000 });
 }
@@ -491,7 +413,7 @@ export async function getScheduleById(id: string) {
   const schedule = await prisma.classSchedule.findUnique({
     where: { id },
     include: {
-      class: { include: { sports: true, coaches: { include: { coach: { include: { user: { select: { fullName: true } } } } } } } },
+      class: { include: { sports: true, coach: { include: { user: { select: { fullName: true } } } } } },
       room: true,
       _count: { select: { enrollments: { where: { status: { in: ["BOOKED", "COMPLETED"] } } } } },
     },
@@ -611,7 +533,7 @@ export type ScheduleCancelResolution =
   | { mode: "REFUND" };
 
 /**
- * Hủy MỘT buổi học kèm xử lý quyền lợi hội viên (COACH của lớp hoặc MANAGER).
+ * Hủy MỘT buổi học kèm xử lý quyền lợi hội viên (chỉ COACH phụ trách lớp).
  *
  * - Buổi đã có hội viên giữ chỗ ⇒ BẮT BUỘC chọn `resolution`, thiếu ⇒ 400 SCHEDULE_CANCEL_RESOLUTION_REQUIRED:
  *   - `MAKEUP`: tạo buổi DẠY BÙ (giờ + phòng mới; kiểm tra trùng phòng/HLV và trùng lịch của hội viên),
@@ -697,7 +619,6 @@ export async function cancelScheduleWithResolution(
         await tx.enrollment.createMany({
           data: memberIds.map((memberId) => ({
             memberId,
-            classId: fresh.classId,
             scheduleId: makeup!.id,
             status: "BOOKED" as const,
           })),
