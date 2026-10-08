@@ -1,7 +1,7 @@
 /**
  * E2E THẬT (HTTP + PostgreSQL) cho thanh toán ONLINE qua SePay (chuyển khoản VietQR):
  * - `POST /payments/sepay/checkout`     → Member tạo đơn PENDING + mã thanh toán + ảnh QR.
- * - `POST /payments/sepay/webhook`      → SePay xác nhận giao dịch (API key) ⇒ kích hoạt gói + invoice.
+ * - `POST /payments/sepay/webhook`      → SePay xác nhận giao dịch (API key) ⇒ kích hoạt gói.
  * - `GET  /payments/sepay/{id}`         → FE polling trạng thái (PENDING → SUCCESS).
  * - `POST /payments/sepay/mock-confirm` → DEV/DEMO (SEPAY_MOCK_MODE=true).
  *
@@ -309,7 +309,7 @@ async function scenarioNotConfigured(member: FixtureUser, plan: any): Promise<vo
   setSepayEnv({});
 }
 
-/** B) Luồng chính: checkout → QR → các nhánh webhook → kích hoạt gói + hóa đơn + thông báo. */
+/** B) Luồng chính: checkout → QR → các nhánh webhook → kích hoạt gói + thông báo. */
 async function scenarioCheckoutAndWebhookCore(
   ctx: Ctx,
   member: FixtureUser,
@@ -475,7 +475,7 @@ async function scenarioCheckoutAndWebhookCore(
   });
   check("Notification GENERAL nhắc hội viên đối soát khi tiền không khớp", Boolean(mismatchNotify), mismatchNotify?.body);
 
-  // ── Webhook HỢP LỆ → kích hoạt gói + invoice + thông báo ───────────────
+  // ── Webhook HỢP LỆ → kích hoạt gói + thông báo ───────────────
   const okBody = webhookBody(dbPending!);
   const okRes = await sepayWebhook(okBody);
   check(
@@ -492,7 +492,7 @@ async function scenarioCheckoutAndWebhookCore(
 
   const paid = await prisma.payment.findUnique({
     where: { id: paymentId },
-    include: { invoice: true, subscription: { include: { plan: true } } },
+    include: { subscription: { include: { plan: true } } },
   });
   check(
     "DB: Payment SUCCESS + paidAt + gatewayTransId = referenceCode + gatewayPayload là payload webhook",
@@ -501,13 +501,6 @@ async function scenarioCheckoutAndWebhookCore(
       paid?.gatewayTransId === okBody.referenceCode &&
       (paid?.gatewayPayload as Record<string, unknown>)?.id === okBody.id,
     { status: paid?.status, gatewayTransId: paid?.gatewayTransId }
-  );
-  check(
-    "DB: Invoice ISSUED + snapshot planName/planTier (BR-25)",
-    paid?.invoice?.status === "ISSUED" &&
-      paid?.invoice?.planName === plan.name &&
-      paid?.invoice?.planTier === plan.tier,
-    paid?.invoice
   );
 
   // Giao dịch online KHÔNG được đổi trạng thái thủ công: phải qua webhook/đối soát.
@@ -1339,7 +1332,7 @@ async function scenarioOfferSnapshotAndReview(
 
   const snapSub = await prisma.membershipSubscription.findFirst({
     where: { memberId: snapshotMember.memberProfileId, status: "ACTIVE" },
-    include: { payments: { include: { invoice: true } } },
+    include: { payments: true },
     orderBy: { createdAt: "desc" },
   });
   const snapDays = snapSub
@@ -1355,11 +1348,11 @@ async function scenarioOfferSnapshotAndReview(
     snapSub?.maxConcurrentClassesSnapshot === 3,
     snapSub?.maxConcurrentClassesSnapshot
   );
-  const snapInvoice = snapSub?.payments?.[0]?.invoice;
+  const snapPayment = snapSub?.payments?.[0];
   check(
-    `A07: hóa đơn = 123000 (tiền đã thu) & tên gói snapshot (total=${String(snapInvoice?.total)})`,
-    Number(snapInvoice?.total) === 123000 && snapInvoice?.planName === `E2E SEPAY SNAP ${RUN}`,
-    { total: snapInvoice?.total, planName: snapInvoice?.planName }
+    `A07: payment = 123000 (tiền đã thu) (amount=${String(snapPayment?.amount)})`,
+    Number(snapPayment?.amount) === 123000,
+    { amount: snapPayment?.amount }
   );
 
   // ── A06: tiền về nhưng không thể kích hoạt (bị chặn hạ hạng) → REQUIRES_REVIEW ──
@@ -1632,8 +1625,7 @@ async function cleanup(): Promise<void> {
     });
   }
   if (memberIds.length > 0) {
-    // FK: Invoice → Payment → MembershipSubscription → MemberProfile.
-    await prisma.invoice.deleteMany({ where: { memberId: { in: memberIds } } });
+    // FK: Payment → MembershipSubscription → MemberProfile.
     await prisma.payment.deleteMany({ where: { memberId: { in: memberIds } } });
     await prisma.membershipSubscription.deleteMany({ where: { memberId: { in: memberIds } } });
   }

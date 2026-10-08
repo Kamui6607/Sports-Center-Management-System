@@ -253,7 +253,7 @@ export async function createSessionRefundsTx(
  * Manager DUYỆT (sau khi đã chuyển khoản tay cho hội viên):
  * - Trừ ví HLV `coachDebitAmount` + ghi giao dịch ví REFUND_DEBIT (số dư có thể âm nếu HLV đã rút trước đó
  *   — khi đó HLV không rút được tới khi bù đủ).
- * - Hủy khóa học: Payment → REFUNDED, hóa đơn → CANCELLED, hủy mọi chỗ đang giữ của hội viên trong lớp.
+ * - Hủy khóa học: Payment → REFUNDED, hủy mọi chỗ đang giữ của hội viên trong lớp.
  * - Hoàn buổi lẻ: Payment giữ SUCCESS (báo cáo trừ riêng khoản hoàn này).
  */
 export async function approveRefund(refundId: string, managerUserId: string, note?: string) {
@@ -301,7 +301,6 @@ export async function approveRefund(refundId: string, managerUserId: string, not
 
     if (refund.reason === "MEMBER_CANCEL_COURSE") {
       await tx.payment.update({ where: { id: refund.paymentId }, data: { status: "REFUNDED" } });
-      await tx.invoice.updateMany({ where: { paymentId: refund.paymentId }, data: { status: "CANCELLED" } });
       if (refund.classId) {
         await tx.enrollment.updateMany({
           where: { memberId: refund.memberId, schedule: { classId: refund.classId }, status: "BOOKED" },

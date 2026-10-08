@@ -19,11 +19,11 @@ const router = Router();
  *       - `memberId`: nhận `MemberProfile.id` hoặc `User.id` của hội viên.
  *       - `classId`: lớp phải ở trạng thái `APPROVED`, nếu không trả 400 `Class is not yet approved`.
  *       - `status` mặc định `SUCCESS`. Khi `SUCCESS`, trong cùng transaction:
- *         tạo `Invoice` (ISSUED), ghi danh hội viên vào mọi buổi `SCHEDULED` của lớp,
+ *         ghi danh hội viên vào mọi buổi `SCHEDULED` của lớp,
  *         cộng 85% số tiền vào ví HLV chính của lớp.
  *       - `status = PENDING`: chỉ tạo Payment; chốt sau bằng `PATCH /payments/{id}/status`.
  *       - `amount` phải bằng đúng `Class.price` (lệch ⇒ 400 `AMOUNT_MISMATCH`); lớp giá 0đ ⇒ 400.
- *       - Chỉ ghi danh vào các buổi chưa diễn ra; hóa đơn lưu snapshot `memberName` + `className`.
+ *       - Chỉ ghi danh vào các buổi chưa diễn ra.
  *     tags: [Payments]
  *     requestBody:
  *       required: true
@@ -130,7 +130,7 @@ router.get(
  *     description: |
  *       Chỉ áp dụng cho giao dịch ghi nhận TẠI QUẦY (CASH/BANK_TRANSFER — không có `gateway`).
  *       Giao dịch ONLINE (SePay) bị từ chối **400**: trạng thái chỉ được chốt bởi
- *       webhook / đối soát / mock-confirm để không lệch entitlement và hóa đơn.
+ *       webhook / đối soát / mock-confirm để không lệch entitlement.
  *     tags: [Payments]
  *     parameters:
  *       - in: path
@@ -169,7 +169,7 @@ router.patch(
  *     description: |
  *       Dùng khi `activationStatus = REQUIRES_REVIEW` (tiền ĐÃ về nhưng không ghi danh / cộng ví HLV
  *       tự động được). Chạy lại ghi danh vào các buổi sắp tới + cộng 85% ví HLV chính của lớp,
- *       chuyển `activationStatus = ACTIVATED`, xuất hóa đơn (nếu chưa có) và thông báo hội viên.
+ *       chuyển `activationStatus = ACTIVATED` và thông báo hội viên.
  *       Đã xử lý rồi (VD 2 Manager bấm cùng lúc) ⇒ 409 `SEPAY_ALREADY_HANDLED`.
  *       - 400: không phải giao dịch SePay / chưa thu tiền / không ở trạng thái REQUIRES_REVIEW / đơn sản phẩm.
  *       - 409: vẫn không kích hoạt được (VD lớp đã bị xóa) — giữ nguyên review, cập nhật lý do.
@@ -323,8 +323,8 @@ router.post(
  *          không xử lý lại; giao dịch đã SUCCESS ⇒ DUPLICATE.
  *       7. Hợp lệ ⇒ chốt giao dịch trong cùng transaction:
  *          - **Lớp học**: ghi danh hội viên vào các buổi sắp tới + cộng 85% vào ví HLV chính, Payment `SUCCESS`
- *            (`activationStatus = ACTIVATED`), tạo `Invoice` snapshot, notification `PAYMENT_SUCCESS` cho hội viên.
- *          - **Đơn sản phẩm**: Payment `SUCCESS`, `ProductOrder` `SUCCESS`, tạo `Invoice` snapshot, notification `PAYMENT_SUCCESS`.
+ *            (`activationStatus = ACTIVATED`), notification `PAYMENT_SUCCESS` cho hội viên.
+ *          - **Đơn sản phẩm**: Payment `SUCCESS`, `ProductOrder` `SUCCESS`, notification `PAYMENT_SUCCESS`.
  *          A06: `Payment.activationStatus` tách khỏi trạng thái tiền — tiền đã thu nhưng không kích hoạt được
  *          (VD lớp đã bị xóa, đơn sản phẩm không còn PENDING) ⇒ `REQUIRES_REVIEW` + `reviewReason` để
  *          quản lý xử lý (`POST /payments/{id}/retry-activation` với lớp học).
@@ -419,7 +419,7 @@ router.post(
  *     description: |
  *       Dùng cho môi trường dev/demo/e2e khi KHÔNG có giao dịch ngân hàng thật / SePay không gọi được
  *       webhook vào localhost: tạo đơn bằng `POST /payments/sepay/checkout` rồi gọi endpoint này để chạy
- *       ĐÚNG luồng chốt giao dịch như webhook thật (lớp học: ghi danh + ví HLV; sản phẩm: chốt đơn + invoice + notification).
+ *       ĐÚNG luồng chốt giao dịch như webhook thật (lớp học: ghi danh + ví HLV; sản phẩm: chốt đơn + notification).
  *
  *       Quyền: MEMBER chỉ xác nhận giao dịch CỦA MÌNH; COACH chỉ xác nhận đơn sản phẩm CỦA MÌNH;
  *       MANAGER được xác nhận hộ (phục vụ demo).

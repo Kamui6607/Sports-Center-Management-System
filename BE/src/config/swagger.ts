@@ -1018,9 +1018,9 @@ const options: swaggerJSDoc.Options = {
             },
           },
         },
-        // -- Payments & Invoices --
+        // -- Payments --
         PaymentCreated: {
-          description: "Payment recorded (invoice auto-created on SUCCESS)",
+          description: "Payment recorded",
           content: {
             "application/json": {
               schema: {
@@ -1035,7 +1035,6 @@ const options: swaggerJSDoc.Options = {
                     status: "SUCCESS",
                     paidAt: "2026-09-12T08:00:00.000Z",
                     member: { user: { fullName: "John Doe" } },
-                    invoice: { invoiceNumber: "INV-1789136414987-001" },
                   },
                 },
               },
@@ -1059,7 +1058,6 @@ const options: swaggerJSDoc.Options = {
                       status: "SUCCESS",
                       paidAt: "2026-09-12T08:00:00.000Z",
                       member: { user: { fullName: "John Doe", email: "member1@example.com" } },
-                      invoice: { invoiceNumber: "INV-1789136414987-001" },
                     },
                   ],
                   pagination: { page: 1, limit: 10, total: 2, totalPages: 1 },
@@ -1084,72 +1082,12 @@ const options: swaggerJSDoc.Options = {
                     status: "SUCCESS",
                     member: { user: { fullName: "John Doe" } },
                     subscription: { plan: { name: "Membership Monthly", tier: "MEMBERSHIP" } },
-                    invoice: { invoiceNumber: "INV-1789136414987-001" },
                   },
                 },
               },
             },
           },
         },
-        InvoiceListOk: {
-          description: "Paginated list of invoices (compact example)",
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                example: {
-                  success: true,
-                  message: "Invoices retrieved successfully",
-                  data: [
-                    {
-                      id: "6b6b6b6b-0000-4000-8000-000000000301",
-                      invoiceNumber: "INV-1789136414987-001",
-                      subtotal: "300000",
-                      discount: "0",
-                      total: "300000",
-                      status: "ISSUED",
-                      issuedAt: "2026-09-12T08:00:00.000Z",
-                      memberName: "John Doe",
-                      planName: "Membership Monthly",
-                      planTier: "MEMBERSHIP",
-                      member: { user: { fullName: "John Doe" } },
-                    },
-                  ],
-                  pagination: { page: 1, limit: 10, total: 2, totalPages: 1 },
-                },
-              },
-            },
-          },
-        },
-        InvoiceOk: {
-          description: "Single invoice",
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                example: {
-                  success: true,
-                  message: "Invoice retrieved successfully",
-                  data: {
-                    id: "6b6b6b6b-0000-4000-8000-000000000301",
-                    invoiceNumber: "INV-1789136414987-001",
-                    subtotal: "300000",
-                    discount: "0",
-                    total: "300000",
-                    status: "ISSUED",
-                    issuedAt: "2026-09-12T08:00:00.000Z",
-                    memberName: "John Doe",
-                    planName: "Membership Monthly",
-                    planTier: "MEMBERSHIP",
-                    member: { user: { fullName: "John Doe", email: "member1@example.com" } },
-                    payment: { amount: "300000", method: "CASH", status: "SUCCESS" },
-                  },
-                },
-              },
-            },
-          },
-        },
-        // -- Reports --
         RevenueReportOk: {
           description: "Revenue report",
           content: {
@@ -1175,7 +1113,6 @@ const options: swaggerJSDoc.Options = {
                         amount: "600000",
                         status: "SUCCESS",
                         member: { user: { fullName: "John Doe" } },
-                        invoice: { invoiceNumber: "INV-1789136414987-002" },
                       },
                     ],
                   },
@@ -1240,7 +1177,6 @@ const options: swaggerJSDoc.Options = {
       { name: "Class Schedules", description: "Schedule management" },
       { name: "Enrollments", description: "Class booking" },
       { name: "Payments", description: "Payment recording" },
-      { name: "Invoices", description: "Invoice management" },
       { name: "Reports", description: "Analytics & reports" },
       { name: "Chat", description: "Real-time messaging (Manager & Staff)" },
       { name: "Attendance", description: "Class attendance tracking" },

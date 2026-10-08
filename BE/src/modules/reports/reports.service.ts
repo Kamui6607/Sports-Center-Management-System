@@ -41,7 +41,6 @@ export async function getRevenueReport(startDate: string, endDate: string) {
         where: { ...cashFilter, status: { in: ["SUCCESS", "REFUNDED"] } },
         include: {
           member: { include: { user: { select: { fullName: true } } } },
-          invoice: { select: { invoiceNumber: true } },
         },
         orderBy: { paidAt: "desc" },
         take: 10,

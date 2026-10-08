@@ -47,7 +47,6 @@ type BaseEntityModels = {
   SepayBankTransaction: Models.SepayBankTransaction;
   NotificationOutbox: Models.NotificationOutbox;
   SepayWebhookEvent: Models.SepayWebhookEvent;
-  Invoice: Models.Invoice;
   ChatMessage: Models.ChatMessage;
   ChatAttachment: Models.ChatAttachment;
   Attendance: Models.Attendance;

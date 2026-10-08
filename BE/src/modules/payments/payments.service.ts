@@ -95,7 +95,7 @@ export async function createPayment(data: any, createdById: string) {
     if (price <= 0) {
       throw new AppError("Khóa học miễn phí, không cần ghi nhận thanh toán.", 400);
     }
-    // Số tiền là căn cứ cho hóa đơn, 85% ví HLV và tiền hoàn ⇒ phải đúng giá khóa học.
+    // Số tiền là căn cứ cho 85% ví HLV và tiền hoàn ⇒ phải đúng giá khóa học.
     if (Number(data.amount) !== price) {
       throw new AppError(
         `Số tiền phải bằng giá khóa học (${price.toLocaleString("vi-VN")}đ).`,
@@ -123,26 +123,9 @@ export async function createPayment(data: any, createdById: string) {
       include: { member: { include: { user: { select: { fullName: true } } } } },
     });
 
-    let invoice = null;
     let enrolledCount = 0;
 
     if (payment.status === "SUCCESS") {
-      invoice = await tx.invoice.create({
-        data: {
-          invoiceNumber: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-          memberId: memberProfile.id,
-          paymentId: payment.id,
-          subtotal: data.amount,
-          discount: 0,
-          total: data.amount,
-          status: "ISSUED",
-          issuedAt: new Date(),
-          // BR-25: snapshot tên người trả + lớp tại thời điểm xuất hóa đơn
-          memberName: memberProfile.user.fullName,
-          className: cls?.name ?? null,
-        },
-      });
-
       // Nếu payment cho 1 class → auto-enroll + credit coach wallet
       if (data.classId && cls) {
         enrolledCount = await autoEnrollAfterPayment(tx, data.classId, memberProfile.id);
@@ -150,7 +133,7 @@ export async function createPayment(data: any, createdById: string) {
       }
     }
 
-    return { ...payment, invoice, enrolledCount };
+    return { ...payment, enrolledCount };
   });
 }
 
@@ -174,7 +157,6 @@ export async function listPayments(query: any) {
       where, skip, take: limit,
       include: {
         member: { include: { user: { select: { fullName: true, email: true } } } },
-        invoice: true,
       },
       orderBy: { createdAt: "desc" },
     }),
@@ -187,7 +169,6 @@ export async function getPaymentById(id: string, currentUser: any) {
     where: { id },
     include: {
       member: { include: { user: { select: { fullName: true, email: true, phone: true } } } },
-      invoice: true,
       createdBy: { select: { fullName: true, email: true } },
     },
   });
@@ -208,7 +189,7 @@ export async function getPaymentById(id: string, currentUser: any) {
 }
 
 export async function updatePaymentStatus(id: string, status: string) {
-  const payment = await prisma.payment.findUnique({ where: { id }, include: { invoice: true } });
+  const payment = await prisma.payment.findUnique({ where: { id } });
   if (!payment) throw new AppError("Payment not found", 404);
 
   // Giao dịch online (SePay): trạng thái CHỈ được chốt bởi webhook/đối soát (settlement).
@@ -235,42 +216,12 @@ export async function updatePaymentStatus(id: string, status: string) {
   await prisma.$transaction(async (tx) => {
     await tx.payment.update({ where: { id }, data: updateData });
 
-    // Auto create invoice if SUCCESS and no invoice
-    if (status === "SUCCESS" && !payment.invoice) {
-      const memberUser = payment.memberId
-        ? await tx.memberProfile.findUnique({
-            where: { id: payment.memberId },
-            select: { user: { select: { fullName: true } } },
-          })
-        : null;
-      await tx.invoice.create({
-        data: {
-          invoiceNumber: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-          memberId: payment.memberId,
-          paymentId: payment.id,
-          subtotal: Number(payment.amount),
-          discount: 0,
-          total: Number(payment.amount),
-          status: "ISSUED",
-          issuedAt: new Date(),
-          memberName: memberUser?.user.fullName ?? null,
-          className: payment.classNameSnapshot ?? null,
-        },
-      });
-
+    if (status === "SUCCESS") {
       // Auto-enroll + credit wallet nếu là payment cho class (payment lớp học luôn có memberId)
       if (payment.classId && payment.memberId) {
         await autoEnrollAfterPayment(tx, payment.classId, payment.memberId);
         await creditCoachWallet(tx, payment.classId, payment.id, Number(payment.amount));
       }
-    }
-
-    // Cancel invoice if REFUNDED or FAILED
-    if ((status === "REFUNDED" || status === "FAILED") && payment.invoice) {
-      await tx.invoice.update({
-        where: { id: payment.invoice.id },
-        data: { status: "CANCELLED" },
-      });
     }
   });
 

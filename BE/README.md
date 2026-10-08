@@ -1,6 +1,6 @@
 # Sports Center Management System - Backend
 
-REST API (Express 5 + TypeScript + Prisma/PostgreSQL) cho hệ thống quản lý trung tâm thể thao: người dùng, lớp học & lịch, đặt chỗ, điểm danh, thanh toán (SePay VietQR), hóa đơn, báo cáo, chat, thông báo.
+REST API (Express 5 + TypeScript + Prisma/PostgreSQL) cho hệ thống quản lý trung tâm thể thao: người dùng, lớp học & lịch, đặt chỗ, điểm danh, thanh toán (SePay VietQR), báo cáo, chat, thông báo.
 
 > **Dành cho AI agent / dev mới:** đọc mục [Quy ước code (BẮT BUỘC đọc trước khi sửa)](#-quy-ước-code-bắt-buộc-đọc-trước-khi-sửa) và [Nguồn sự thật & những thứ KHÔNG được giả định](#-nguồn-sự-thật--những-thứ-không-được-giả-định) TRƯỚC khi viết code. Các quy ước được rút ra từ code thật; nếu thấy code lệch README thì **code thắng** — hãy sửa README luôn trong cùng thay đổi.
 
@@ -37,7 +37,7 @@ REST API (Express 5 + TypeScript + Prisma/PostgreSQL) cho hệ thống quản l�
 └── uploads/                  # File upload local (avatars công khai; chat/cvs riêng tư)
 ```
 
-Các module đang được mount trong `src/app.ts` (prefix `/api/v1`): `auth`, `users`, `members`, `coaches`, `sports`, `rooms`, `classes`, `class-schedules`, `enrollments`, `payments`, `invoices`, `reports`, `products`, `chat`, `attendance`, `training-plans`, `notifications`, `feedbacks`.
+Các module đang được mount trong `src/app.ts` (prefix `/api/v1`): `auth`, `users`, `members`, `coaches`, `sports`, `rooms`, `classes`, `class-schedules`, `enrollments`, `payments`, `reports`, `products`, `chat`, `attendance`, `training-plans`, `notifications`, `feedbacks`.
 Logic ví HLV nằm ở `coaches/coach-wallet.*`.
 
 ---
@@ -237,6 +237,7 @@ Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manage
 - **Mỗi lớp đúng 1 Coach:** `Class.coachId` (bắt buộc) là Coach đã tạo và phụ trách lớp, nhận 85% doanh thu vào `CoachWallet`. **Không có** bảng `ClassMember`, không có HLV phụ/đổi HLV — đừng tạo lại.
 - **Hai loại "mục tiêu":** `MemberProfile.fitnessGoal` là mục tiêu của Member (Coach đọc trên hồ sơ); `Class.goal` là mục tiêu của lớp do Coach ghi để Member xem và tự đánh giá có nên đăng ký (hiển thị ở `GET /classes` và `course.goal` của course-plan).
 - **Tiến độ tập luyện:** Coach ghi mốc qua `POST /training-plans/results` (chỉ Coach phụ trách plan; `metrics` = danh sách `{name, value, unit?, lowerIsBetter?}` theo bài tập/thành tích, không phải chỉ số y tế). Member xem tiến bộ ở `GET /training-plans/:id/progress` (chênh lệch đầu → mới nhất từng chỉ số + dữ liệu vẽ biểu đồ).
+- **Không có hóa đơn:** hệ thống không phát hành hóa đơn — bảng `Invoice` và module `/invoices` đã bị gỡ (migration `drop_invoice`). Thanh toán thành công chỉ ghi `Payment`, ghi danh/cộng ví HLV và gửi thông báo.
 - **Buổi học (`ClassSchedule`)** thuộc 1 lớp qua `ClassSchedule.classId`. **Chỉ Coach phụ trách lớp** được tạo/sửa/xóa/hủy/hoàn tất buổi (tạo buổi: lớp phải `APPROVED`); Manager gọi các API này ⇒ 403.
 - **Đặt chỗ (`Enrollment`) theo TỪNG BUỔI:** chỉ lưu `memberId` + `scheduleId`. Lớp của một enrollment lấy qua `enrollment.schedule.classId` — **không có** `Enrollment.classId`. Lọc theo lớp thì dùng `where: { schedule: { classId } }`; Prisma `groupBy` không group theo quan hệ nên muốn đếm theo lớp thì `select: { schedule: { select: { classId: true } } }` rồi cộng dồn.
 - **Kiểm tra quyền Coach trên lớp:** so `class.coachId === coachProfile.id` (hoặc `where: { coach: { userId } }`).
@@ -295,7 +296,7 @@ Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manage
 
    # ── SePay online payment (chuyển khoản VietQR + webhook) ──
    # Hội viên tự mua gói: BE tạo đơn PENDING + mã thanh toán + ảnh VietQR;
-   # SePay gọi webhook khi phát hiện giao dịch ⇒ BE kích hoạt gói + tạo hóa đơn + thông báo.
+   # SePay gọi webhook khi phát hiện giao dịch ⇒ BE kích hoạt gói + thông báo.
    SEPAY_WEBHOOK_API_KEY=""            # Phương thức API Key ở bước "Bảo mật" khi tạo webhook trên my.sepay.vn
    SEPAY_WEBHOOK_SECRET=""             # Phương thức HMAC-SHA256 (khuyến nghị) — Secret key ở cùng bước đó
    SEPAY_QR_BASE_URL="https://qr.sepay.vn/img"

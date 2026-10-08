@@ -114,7 +114,7 @@ router.get(
  *     summary: MANAGER duyệt hoàn tiền (sau khi đã chuyển khoản tay cho hội viên)
  *     description: |
  *       Trừ ví HLV `coachDebitAmount` (giao dịch ví REFUND_DEBIT). Hủy khóa học ⇒ giao dịch REFUNDED,
- *       hóa đơn CANCELLED, hủy chỗ đang giữ của hội viên trong lớp. Đã xử lý ⇒ 409 `REFUND_ALREADY_PROCESSED`.
+ *       hủy chỗ đang giữ của hội viên trong lớp. Đã xử lý ⇒ 409 `REFUND_ALREADY_PROCESSED`.
  *     tags: [Refunds]
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }

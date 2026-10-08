@@ -1112,11 +1112,10 @@ async function scenarioMembershipStatusConsistency(ctx: Ctx): Promise<void> {
 async function cleanup(): Promise<void> {
   const memberIds = created.memberProfileIds;
   if (memberIds.length > 0) {
-    // Thứ tự theo FK: enrollment/attendance/penalty → invoice → payment → subscription → member.
+    // Thứ tự theo FK: enrollment/attendance/penalty → payment → subscription → member.
     await prisma.enrollment.deleteMany({ where: { memberId: { in: memberIds } } });
     await prisma.attendance.deleteMany({ where: { memberId: { in: memberIds } } });
     await prisma.attendancePenalty.deleteMany({ where: { memberId: { in: memberIds } } });
-    await prisma.invoice.deleteMany({ where: { memberId: { in: memberIds } } });
     await prisma.payment.deleteMany({ where: { memberId: { in: memberIds } } });
     await prisma.membershipSubscription.deleteMany({ where: { memberId: { in: memberIds } } });
   }

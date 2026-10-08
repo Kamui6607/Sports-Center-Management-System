@@ -607,7 +607,7 @@ type TransferInput = {
  * 4. Số tài khoản nhận tiền (hoặc VA) phải đúng tài khoản của trung tâm.
  * 5. Số tiền phải khớp CHÍNH XÁC số tiền của đơn.
  * 6. Chống trùng: `sepayId` UNIQUE (SePay retry/replay không xử lý lại) + giao dịch đã SUCCESS ⇒ duplicate.
- * 7. Hợp lệ ⇒ kích hoạt `MembershipSubscription` + `Invoice` + notification (cùng transaction với claim webhook).
+ * 7. Hợp lệ ⇒ kích hoạt `MembershipSubscription` + notification (cùng transaction với claim webhook).
  *
  * - 401 `SEPAY_INVALID_SIGNATURE` / `SEPAY_INVALID_API_KEY`: xác thực sai (không xử lý gì).
  * - 503 `SEPAY_NOT_CONFIGURED`: server chưa có API key/secret/tài khoản nhận tiền.
@@ -788,7 +788,7 @@ export async function retrySepayActivation(managerUserId: string, paymentId: str
       await autoEnrollAfterPayment(tx, fresh.classId!, member.id);
       await creditCoachWallet(tx, fresh.classId!, fresh.id, Number(fresh.amount));
 
-      // Chốt ACTIVATED + hóa đơn + thông báo; ghi ai/khi nào xử lý + xoá lý do review.
+      // Chốt ACTIVATED + thông báo; ghi ai/khi nào xử lý + xoá lý do review.
       const now = new Date();
       const updated = await finalizeClassPaymentTx(tx, fresh, member, fresh.classNameSnapshot ?? cls.name, now, {
         reviewReason: null,
@@ -927,7 +927,7 @@ async function runSepayReconcile(paymentId: string): Promise<SepayWebhookOutcome
 
 /**
  * Hoàn tất giao dịch KHÓA HỌC đã thu tiền (gọi SAU khi đã ghi danh + cộng ví HLV, trong cùng transaction):
- * Payment → SUCCESS + `paidAt` + `activationStatus = ACTIVATED`, xuất hóa đơn snapshot (BR-25),
+ * Payment → SUCCESS + `paidAt` + `activationStatus = ACTIVATED` (KHÔNG xuất hóa đơn — nghiệp vụ mới),
  * ghi outbox thông báo cho hội viên (caller tự `flushNotificationOutbox()` sau commit).
  *
  * Payment SUCCESS là chốt chống chốt lặp: webhook/mock/đối soát sau đó dừng ở bước "đã thanh toán"
@@ -948,23 +948,6 @@ async function finalizeClassPaymentTx(
       status: "SUCCESS",
       paidAt: payment.paidAt ?? now,
       activationStatus: "ACTIVATED",
-    },
-  });
-  // paymentId UNIQUE trên Invoice ⇒ upsert để không lỗi nếu hóa đơn đã có từ trước.
-  await tx.invoice.upsert({
-    where: { paymentId: payment.id },
-    update: {},
-    create: {
-      invoiceNumber: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-      memberId: member.id,
-      paymentId: payment.id,
-      subtotal: money(payment.amount),
-      discount: 0,
-      total: money(payment.amount),
-      status: "ISSUED",
-      issuedAt: now,
-      memberName: member.user.fullName,
-      className,
     },
   });
   await enqueueNotification(tx, {
@@ -1219,7 +1202,7 @@ async function settleSepayTransfer(
       },
     });
 
-    // (8a) Đơn mua sản phẩm: chốt đơn + hóa đơn + thông báo (không ghi danh lớp, không cộng ví HLV).
+    // (8a) Đơn mua sản phẩm: chốt đơn + thông báo (không ghi danh lớp, không cộng ví HLV).
     if (payment.productOrderId) {
       const order = await tx.productOrder.findUnique({
         where: { id: payment.productOrderId },
@@ -1254,20 +1237,6 @@ async function settleSepayTransfer(
       await tx.payment.update({
         where: { id: payment.id },
         data: { status: "SUCCESS", paidAt: now, activationStatus: "ACTIVATED" },
-      });
-      await tx.invoice.create({
-        data: {
-          invoiceNumber: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-          memberId: payment.memberId,
-          paymentId: payment.id,
-          subtotal: money(payment.amount),
-          discount: 0,
-          total: money(payment.amount),
-          status: "ISSUED",
-          issuedAt: now,
-          memberName: order.user.fullName,
-          productName: order.product.name,
-        },
       });
       // F01: ghi outbox trong transaction — gửi sau commit (dòng flushNotificationOutbox bên dưới).
       await enqueueNotification(tx, {
@@ -1350,7 +1319,7 @@ async function settleSepayTransfer(
       throw err;
     }
 
-    // Lớp học: chốt tiền + hóa đơn + thông báo hội viên (trước đây thiếu bước này ⇒ payment kẹt PENDING).
+    // Lớp học: chốt tiền + thông báo hội viên (trước đây thiếu bước này ⇒ payment kẹt PENDING).
     await finalizeClassPaymentTx(tx, payment, member, payment.classNameSnapshot ?? cls.name, now);
 
     return finish({

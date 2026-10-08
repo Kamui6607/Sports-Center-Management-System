@@ -75,7 +75,7 @@ enum PaymentMethod {
 /// Trạng thái xử lý một webhook SePay (bảng `SepayWebhookEvent`).
 enum SepayWebhookStatus {
   PENDING // Đã claim sepayId, đang xử lý trong transaction (không thấy được nếu transaction rollback)
-  PROCESSED // Đã chốt giao dịch (kích hoạt gói + invoice)
+  PROCESSED // Đã chốt giao dịch (kích hoạt gói)
   DUPLICATE // Webhook lặp (cùng sepayId) hoặc giao dịch đã SUCCESS trước đó
   LATE // Tiền về sau khi giao dịch đã đóng (hết hạn/thất bại) — cần đối soát, KHÔNG kích hoạt
   MISMATCH // Lệch số tiền hoặc số tài khoản — cần đối soát, KHÔNG kích hoạt
@@ -87,11 +87,6 @@ enum PaymentStatus {
   SUCCESS
   FAILED
   REFUNDED
-}
-
-enum InvoiceStatus {
-  ISSUED
-  CANCELLED
 }
 
 /// A06: trạng thái CẤP QUYỀN của giao dịch — tách khỏi `status` (trạng thái TIỀN).
@@ -197,7 +192,6 @@ model MemberProfile {
 
   enrollments        Enrollment[]
   payments           Payment[]
-  invoices           Invoice[]
   attendances        Attendance[]
   trainingPlans      TrainingPlan[]
   feedbacks          CoachFeedback[]
@@ -384,7 +378,7 @@ model Enrollment {
 }
 
 // ─────────────────────────────────────────
-// PAYMENT & INVOICE
+// PAYMENT
 // ─────────────────────────────────────────
 
 model Payment {
@@ -427,7 +421,6 @@ model Payment {
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @default(now()) @updatedAt
 
-  invoice            Invoice?
   sepayWebhookEvents SepayWebhookEvent[]
   bankTransactions   SepayBankTransaction[]
   refunds            Refund[]
@@ -511,30 +504,6 @@ model SepayWebhookEvent {
 
   @@index([paymentId])
   @@index([createdAt])
-}
-
-model Invoice {
-  id            String        @id @default(uuid())
-  invoiceNumber String        @unique
-  /// NULL với hóa đơn mua sản phẩm của người không phải hội viên (HLV).
-  memberId      String?
-  member        MemberProfile? @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  paymentId     String        @unique
-  payment       Payment       @relation(fields: [paymentId], references: [id])
-  subtotal      Decimal       @db.Decimal(12, 2)
-  discount      Decimal       @default(0) @db.Decimal(12, 2)
-  total         Decimal       @db.Decimal(12, 2)
-  status        InvoiceStatus @default(ISSUED)
-  issuedAt      DateTime      @default(now())
-  // BR-25: Snapshot fields — immutable record of who paid for what
-  memberName    String? // Copied from user.fullName at time of issue
-  className     String? // Copied from class.name at time of issue
-  productName   String? // Copied from product.name at time of issue (hóa đơn mua sản phẩm)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @default(now()) @updatedAt
-
-  @@index([memberId])
-  @@index([issuedAt])
 }
 
 // ─────────────────────────────────────────

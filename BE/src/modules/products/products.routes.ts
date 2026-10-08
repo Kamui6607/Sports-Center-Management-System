@@ -80,7 +80,7 @@ router.get("/:id", productsController.getProductById);
  *       Chỉ MEMBER hoặc COACH. Giữ hàng (trừ kho) ngay khi tạo đơn; đơn ở trạng thái PENDING và trả về
  *       thông tin QR chuyển khoản (giống `POST /payments/sepay/checkout`). FE polling
  *       `GET /payments/sepay/{paymentId}` để biết khi nào đơn được thanh toán.
- *       - SePay báo đã thu tiền ⇒ đơn SUCCESS + hóa đơn + thông báo.
+ *       - SePay báo đã thu tiền ⇒ đơn SUCCESS + thông báo.
  *       - Hủy (`POST /products/orders/{id}/cancel`) hoặc quá hạn chờ chuyển khoản ⇒ đơn CANCELLED, hoàn kho.
  *     tags: [Products]
  *     security:
