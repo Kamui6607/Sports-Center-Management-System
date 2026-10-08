@@ -166,6 +166,11 @@ router.get("/:id/course-plan", authenticate, classesController.getClassCoursePla
  *                 example: "Morning Yoga"
  *               description:
  *                 type: string
+ *               goal:
+ *                 type: string
+ *                 maxLength: 1000
+ *                 example: "Giảm 3-5kg sau 8 tuần, cải thiện sức bền"
+ *                 description: "Mục tiêu của lớp để Member xem và tự đánh giá trước khi enroll (tùy chọn)."
  *               sportIds:
  *                 type: array
  *                 items:
@@ -267,6 +272,11 @@ router.patch(
  *                 type: string
  *               description:
  *                 type: string
+ *               goal:
+ *                 type: string
+ *                 maxLength: 1000
+ *                 example: "Giảm 3-5kg sau 8 tuần, cải thiện sức bền"
+ *                 description: "Mục tiêu của lớp để Member xem và tự đánh giá trước khi enroll (tùy chọn)."
  *               sportIds:
  *                 type: array
  *                 items:

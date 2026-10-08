@@ -303,6 +303,9 @@ model Class {
   id          String  @id @default(uuid())
   name        String
   description String?
+  /// Mục tiêu của lớp (HLV ghi) để Member xem và tự đánh giá có phù hợp trước khi đăng ký.
+  /// Khác MemberProfile.fitnessGoal (mục tiêu của Member, để HLV đọc).
+  goal        String?
 
   // Many-to-Many with Sport (bảng nối dưới DB: "_ClassToFitness")
   sports Sport[] @relation("ClassToFitness")
