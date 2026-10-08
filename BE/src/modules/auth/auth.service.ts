@@ -13,7 +13,8 @@ import { createNotification } from "../notifications/notifications.service.js";
 import { disconnectUserSockets } from "../chat/chat.socket.js";
 import { env } from "../../config/env.js";
 import jwt from "jsonwebtoken";
-import { sendResetPasswordEmail } from "../../utils/mail.js";
+import { buildResetPasswordEmail } from "../../utils/mail.js";
+import { enqueueEmail, flushNotificationOutbox } from "../notifications/outbox.service.js";
 import type { RegisterInput, UpdateProfileInput, ForgotPasswordInput, ResetPasswordInput } from "./auth.schema.js";
 import { ROLE_NAME_SELECT, connectRole, flattenRole } from "../../utils/roles.js";
 import { COACH_PROFILE_WITH_CERT, withUserCvFields } from "../../utils/certification.js";
@@ -26,12 +27,12 @@ export async function forgotPassword(data: ForgotPasswordInput) {
   const secret = env.JWT_ACCESS_SECRET + user.password;
   const token = jwt.sign({ email: user.email, id: user.id }, secret, { expiresIn: "15m" });
 
-  const resetLink = `http://localhost:3000/reset-password?token=${token}`;
-  
-  // Gửi mail (sẽ tự skip nếu chưa có cấu hình SMTP)
-  await sendResetPasswordEmail(user.email, resetLink).catch(err => {
-    console.error("[MAIL ERROR] Failed to send reset email:", err);
-  });
+  const resetLink = `${env.FRONTEND_URL}/reset-password?token=${token}`;
+
+  // Đưa email vào OUTBOX (Brevo): lỗi mạng/Brevo không làm hỏng request, worker sẽ retry.
+  const { subject, html } = buildResetPasswordEmail(resetLink);
+  await enqueueEmail(prisma, { userId: user.id, to: user.email, subject, html, type: "EMAIL_RESET_PASSWORD" });
+  void flushNotificationOutbox().catch((err) => console.error("[OUTBOX] flush error:", err));
   
   return { message: "Reset link generated (check email or response for testing)", resetLink, token };
 }

@@ -175,7 +175,7 @@ export async function getSportById(req: Request, res: Response, next: NextFuncti
 
 ### 11. Biến môi trường & cấu hình
 
-- Biến bắt buộc đọc qua `src/config/env.ts` (`required("KEY")` ném lỗi khi thiếu). Biến lõi: `PORT`, `DATABASE_URL`, `JWT_*`, `SMTP_*`. Thêm biến lõi ⇒ thêm vào `env.ts` **và** README mục Environment Variables.
+- Biến bắt buộc đọc qua `src/config/env.ts` (`required("KEY")` ném lỗi khi thiếu). Biến lõi: `PORT`, `DATABASE_URL`, `JWT_*`, `BREVO_*` (SMTP_* là dự phòng), `FRONTEND_URL`. Thêm biến lõi ⇒ thêm vào `env.ts` **và** README mục Environment Variables.
 - Cấu hình theo tính năng nằm file riêng trong `src/config/` (`sepay.ts`, `storage.ts`, `attendance.ts`…), có giá trị mặc định tại đó. Không rải `process.env.X` khắp service.
 - **Không commit `.env`** (đã trong `.gitignore`), không in secret ra log, không hard-code secret/API key vào code hay README.
 - `SEPAY_MOCK_MODE=true` chỉ cho dev/demo/e2e; `server.ts` sẽ thoát (fail-fast) nếu bật ở `NODE_ENV=production`. Đừng gỡ chốt này.
@@ -263,6 +263,20 @@ Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manage
    JWT_REFRESH_SECRET="your_refresh_secret"
    JWT_ACCESS_EXPIRES_IN="15m"
    JWT_REFRESH_EXPIRES_IN="7d"
+
+   # ── Email (Brevo Transactional API, gửi qua outbox có retry) ──
+   # Ưu tiên Brevo; không có Brevo thì dùng SMTP dự phòng (bên dưới); không có cả hai: dev chỉ log cảnh báo, production báo lỗi để outbox retry.
+   BREVO_API_KEY=""                    # Brevo → SMTP & API → API Keys
+   BREVO_SENDER_EMAIL=""               # Phải là sender đã verify trên Brevo
+   BREVO_SENDER_NAME="Gym Center"
+   # Fallback SMTP (dev local, vd. Gmail App Password) — chỉ dùng khi KHÔNG có Brevo
+   SMTP_HOST="smtp.gmail.com"
+   SMTP_PORT="587"
+   SMTP_SECURE="false"
+   SMTP_USER=""
+   SMTP_PASS=""
+   SMTP_FROM=""                        # tuỳ chọn, mặc định = SMTP_USER
+   FRONTEND_URL="http://localhost:3000"   # Base URL FE để dựng link reset password
 
    # ── Avatar upload storage (local | Cloudinary) ──
    # Bỏ trống cả 3 biến CLOUDINARY_* => avatar lưu local trong uploads/avatars (dev không cần cloud).

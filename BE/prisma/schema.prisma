@@ -109,6 +109,12 @@ enum OutboxStatus {
   FAILED
 }
 
+/// Kênh giao của một dòng outbox: thông báo trong app hoặc email (Brevo).
+enum OutboxChannel {
+  IN_APP
+  EMAIL
+}
+
 // ─────────────────────────────────────────
 // AUTH / USER
 // ─────────────────────────────────────────
@@ -465,6 +471,9 @@ model SepayBankTransaction {
 model NotificationOutbox {
   id          String       @id @default(uuid())
   userId      String
+  /// IN_APP ⇒ tạo Notification; EMAIL ⇒ gửi qua Brevo (title = subject, body = HTML, email = người nhận).
+  channel     OutboxChannel @default(IN_APP)
+  email       String?
   type        String
   title       String
   body        String

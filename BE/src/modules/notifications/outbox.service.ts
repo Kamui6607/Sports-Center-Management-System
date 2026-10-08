@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { createNotification, type NotificationTypeEnum } from "./notifications.service.js";
+import { sendEmail } from "../../utils/mail.js";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
@@ -43,6 +44,33 @@ export async function enqueueNotification(db: DbClient, input: OutboxNotificatio
   });
 }
 
+export interface OutboxEmailInput {
+  userId: string;
+  to: string;
+  subject: string;
+  html: string;
+  /** Nhãn loại email (vd. "EMAIL_RESET_PASSWORD") để tra cứu/debug. */
+  type: string;
+}
+
+/** Ghi EMAIL vào outbox (gọi được trong transaction). Worker gửi qua Brevo và retry khi lỗi. */
+export async function enqueueEmail(db: DbClient, input: OutboxEmailInput) {
+  return db.notificationOutbox.create({
+    data: {
+      userId: input.userId,
+      channel: "EMAIL",
+      email: input.to,
+      type: input.type,
+      title: input.subject,
+      body: input.html,
+      availableAt: new Date(),
+    },
+  });
+}
+
+/** Dòng kẹt ở SENDING quá lâu (process chết giữa chừng) được trả về PENDING để gửi lại. */
+const OUTBOX_STUCK_SENDING_MS = 5 * 60 * 1000;
+
 /**
  * F01 — Gửi các notification đang PENDING (gọi NGAY sau commit của luồng nghiệp vụ + worker định kỳ).
  *
@@ -54,6 +82,10 @@ export async function enqueueNotification(db: DbClient, input: OutboxNotificatio
  */
 export async function flushNotificationOutbox(limit = OUTBOX_BATCH_SIZE): Promise<number> {
   const now = new Date();
+  await prisma.notificationOutbox.updateMany({
+    where: { status: "SENDING", updatedAt: { lt: new Date(now.getTime() - OUTBOX_STUCK_SENDING_MS) } },
+    data: { status: "PENDING" },
+  });
   const pending = await prisma.notificationOutbox.findMany({
     where: { status: "PENDING", availableAt: { lte: now } },
     orderBy: { createdAt: "asc" },
@@ -70,16 +102,21 @@ export async function flushNotificationOutbox(limit = OUTBOX_BATCH_SIZE): Promis
     if (claimed.count === 0) continue;
 
     try {
-      await createNotification(
-        row.userId,
-        row.type as NotificationTypeEnum,
-        row.title,
-        row.body,
-        {
-          reason: row.reason ?? undefined,
-          metadata: (row.metadata as Record<string, unknown> | null) ?? undefined,
-        }
-      );
+      if (row.channel === "EMAIL") {
+        if (!row.email) throw new Error("Outbox EMAIL thiếu địa chỉ người nhận");
+        await sendEmail({ to: row.email, subject: row.title, html: row.body });
+      } else {
+        await createNotification(
+          row.userId,
+          row.type as NotificationTypeEnum,
+          row.title,
+          row.body,
+          {
+            reason: row.reason ?? undefined,
+            metadata: (row.metadata as Record<string, unknown> | null) ?? undefined,
+          }
+        );
+      }
       await prisma.notificationOutbox.update({
         where: { id: row.id },
         data: { status: "SENT", sentAt: new Date(), lastError: null },
