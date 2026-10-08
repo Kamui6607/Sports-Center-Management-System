@@ -478,7 +478,6 @@ const options: swaggerJSDoc.Options = {
                         {
                           id: "class-yoga-001",
                           name: "Morning Yoga",
-                          sports: [{ name: "Yoga" }],
                           schedules: [],
                         },
                       ],
@@ -641,62 +640,7 @@ const options: swaggerJSDoc.Options = {
             },
           },
         },
-        // -- Sports & Rooms --
-        SportListOk: {
-          description: "Paginated list of sports (compact example)",
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                example: {
-                  success: true,
-                  message: "Sports retrieved successfully",
-                  data: [
-                    {
-                      id: "c3e1ef3e-0000-4000-8000-000000000001",
-                      name: "Yoga",
-                      description: "Yoga class improves flexibility",
-                      areaTypes: ["INDOOR"],
-                      isActive: true,
-                      _count: { classes: 2 },
-                    },
-                  ],
-                  pagination: { page: 1, limit: 10, total: 3, totalPages: 1 },
-                },
-              },
-            },
-          },
-        },
-        SportCreated: {
-          description: "Sport created",
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                example: {
-                  success: true,
-                  message: "Sport created successfully",
-                  data: { id: "c3e1ef3e-0000-4000-8000-000000000009", name: "Boxing", description: "Boxing classes", areaTypes: ["INDOOR"], isActive: true },
-                },
-              },
-            },
-          },
-        },
-        SportOk: {
-          description: "Single sport",
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                example: {
-                  success: true,
-                  message: "Sport retrieved successfully",
-                  data: { id: "c3e1ef3e-0000-4000-8000-000000000001", name: "Yoga", areaTypes: ["INDOOR"], isActive: true, classes: [] },
-                },
-              },
-            },
-          },
-        },
+        // -- Rooms --
         RoomListOk: {
           description: "Paginated list of rooms (compact example)",
           content: {
@@ -758,7 +702,6 @@ const options: swaggerJSDoc.Options = {
                       id: "class-yoga-001",
                       name: "Morning Yoga",
                       description: "Gentle yoga class",
-                      sports: [{ name: "Yoga" }],
                       capacity: 15,
                       classType: "REGULAR",
                       areaType: "INDOOR",
@@ -785,7 +728,6 @@ const options: swaggerJSDoc.Options = {
                   data: {
                     id: "class-boxing-001",
                     name: "Boxing Basics",
-                    sports: [{ name: "Boxing" }],
                     capacity: 12,
                     classType: "REGULAR",
                     areaType: "INDOOR",
@@ -807,7 +749,6 @@ const options: swaggerJSDoc.Options = {
                   data: {
                     id: "class-yoga-001",
                     name: "Morning Yoga",
-                    sports: [{ name: "Yoga" }],
                     capacity: 15,
                     classType: "REGULAR",
                     areaType: "INDOOR",
@@ -836,7 +777,7 @@ const options: swaggerJSDoc.Options = {
                       startTime: "2026-09-15T07:00:00.000Z",
                       endTime: "2026-09-15T08:00:00.000Z",
                       status: "SCHEDULED",
-                      class: { name: "Morning Yoga", areaType: "INDOOR", sports: [{ name: "Yoga" }] },
+                      class: { name: "Morning Yoga", areaType: "INDOOR" },
                       room: { name: "Yoga Room A", areaType: "INDOOR" },
                       _count: { enrollments: 2 },
                     },
@@ -883,7 +824,7 @@ const options: swaggerJSDoc.Options = {
                     startTime: "2026-09-15T07:00:00.000Z",
                     endTime: "2026-09-15T08:00:00.000Z",
                     status: "SCHEDULED",
-                    class: { name: "Morning Yoga", areaType: "INDOOR", sports: [{ name: "Yoga" }], coach: { user: { fullName: "Coach One" } } },
+                    class: { name: "Morning Yoga", areaType: "INDOOR", coach: { user: { fullName: "Coach One" } } },
                     room: { name: "Yoga Room A", areaType: "INDOOR" },
                     _count: { enrollments: 2 },
                   },
@@ -909,7 +850,7 @@ const options: swaggerJSDoc.Options = {
                     schedule: {
                       startTime: "2026-09-15T07:00:00.000Z",
                       endTime: "2026-09-15T08:00:00.000Z",
-                      class: { name: "Morning Yoga", sports: [{ name: "Yoga" }] },
+                      class: { name: "Morning Yoga" },
                       room: { name: "Yoga Room A" },
                     },
                   },
@@ -961,7 +902,7 @@ const options: swaggerJSDoc.Options = {
                     schedule: {
                       startTime: "2026-09-15T07:00:00.000Z",
                       endTime: "2026-09-15T08:00:00.000Z",
-                      class: { name: "Morning Yoga", sports: [{ name: "Yoga" }] },
+                      class: { name: "Morning Yoga" },
                       room: { name: "Yoga Room A" },
                     },
                   },
@@ -1171,7 +1112,6 @@ const options: swaggerJSDoc.Options = {
       { name: "Users", description: "User management (Manager)" },
       { name: "Members", description: "Member profiles" },
       { name: "Coaches", description: "Coach profiles" },
-      { name: "Sports", description: "Sport / discipline management" },
       { name: "Rooms", description: "Room management" },
       { name: "Classes", description: "Class management" },
       { name: "Class Schedules", description: "Schedule management" },

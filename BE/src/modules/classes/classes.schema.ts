@@ -5,9 +5,10 @@ export const AreaTypeEnum = z.enum(["POOL", "INDOOR", "OUTDOOR"]);
 export const CreateClassSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
+  // Môn tập của lớp (Yoga, HIIT, Bơi...) — nhập tự do, không có bảng bộ môn.
+  fitness: z.string().trim().min(2).max(60),
   // Mục tiêu của lớp — Member xem để quyết định có đăng ký hay không.
   goal: z.string().trim().min(1).max(1000).optional(),
-  sportIds: z.array(z.string().min(1)).min(1, "Must assign at least one sport"),
   capacity: z.number().int().positive().max(200),
   classType: z.enum(["REGULAR", "PREMIUM"]).default("REGULAR"),
   areaType: AreaTypeEnum,
@@ -19,7 +20,7 @@ export const UpdateClassSchema = z.object({
   name: z.string().min(2).optional(),
   description: z.string().optional(),
   goal: z.string().trim().min(1).max(1000).optional(),
-  sportIds: z.array(z.string().min(1)).min(1, "Must assign at least one sport").optional(),
+  fitness: z.string().trim().min(2).max(60).optional(),
   capacity: z.number().int().positive().max(200).optional(),
   classType: z.enum(["REGULAR", "PREMIUM"]).optional(),
   areaType: AreaTypeEnum.optional(),
@@ -36,7 +37,7 @@ export const ClassQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
   search: z.string().optional(),
-  sportId: z.string().optional(),
+  fitness: z.string().optional(),
   classType: z.enum(["REGULAR", "PREMIUM"]).optional(),
   areaType: AreaTypeEnum.optional(),
   isActive: z.string().optional(),

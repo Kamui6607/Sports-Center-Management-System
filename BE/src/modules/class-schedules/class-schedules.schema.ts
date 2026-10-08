@@ -129,16 +129,9 @@ const PlannerScheduleSchema = z.object({
 });
 
 export const CreateActivityPlanSchema = z.object({
-  sport: z.union([
-    z.object({ mode: z.literal("existing"), id: z.string().min(1) }),
-    z.object({
-      mode: z.literal("new"),
-      name: z.string().trim().min(2),
-      description: z.string().trim().optional(),
-    }),
-  ]),
   class: z.object({
     name: z.string().trim().min(2),
+    fitness: z.string().trim().min(2).max(60),
     description: z.string().trim().optional(),
     capacity: z.number().int().positive().max(200),
     classType: z.enum(["REGULAR", "PREMIUM"]),

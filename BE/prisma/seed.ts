@@ -195,41 +195,6 @@ async function main() {
   });
   console.log("Member SePay test:", memberSepay.email);
 
-  // ─── SPORTS ──────────────────────────────────────────
-  const yoga = await prisma.sport.upsert({
-    where: { name: "Yoga" },
-    update: { areaTypes: [AreaType.INDOOR] },
-    create: {
-      name: "Yoga",
-      description: "Lớp Yoga cải thiện sự linh hoạt, cân bằng và tâm trí.",
-      areaTypes: [AreaType.INDOOR],
-      isActive: true,
-    },
-  });
-
-  const hiit = await prisma.sport.upsert({
-    where: { name: "HIIT" },
-    update: { areaTypes: [AreaType.INDOOR] },
-    create: {
-      name: "HIIT",
-      description: "High Intensity Interval Training – đốt cháy calo hiệu quả.",
-      areaTypes: [AreaType.INDOOR],
-      isActive: true,
-    },
-  });
-
-  const swimming = await prisma.sport.upsert({
-    where: { name: "Swimming" },
-    update: { areaTypes: [AreaType.POOL] },
-    create: {
-      name: "Swimming",
-      description: "Lớp bơi lội cho mọi trình độ.",
-      areaTypes: [AreaType.POOL],
-      isActive: true,
-    },
-  });
-  console.log("Sports created");
-
   // ─── ROOMS ───────────────────────────────────────────
   const room1 = await prisma.room.upsert({
     where: { name: "Phòng Yoga A" },
@@ -276,15 +241,15 @@ async function main() {
 
   const yogaClass = await prisma.class.upsert({
     where: { id: "class-yoga-001" },
-    update: { sports: { set: [{ id: yoga.id }] }, areaType: AreaType.INDOOR, coach: { connect: { id: coachProfile1.id } } },
+    update: { areaType: AreaType.INDOOR, coach: { connect: { id: coachProfile1.id } } },
     create: {
       // Seed dùng ID custom ổn định (không phải UUID) để test/dev dễ tham chiếu.
       // API giữ string.min(1), KHÔNG ép uuid để tương thích các ID này.
       id: "class-yoga-001",
       name: "Yoga Buổi Sáng",
       description: "Lớp Yoga nhẹ nhàng buổi sáng, phù hợp mọi trình độ.",
+      fitness: "Yoga",
       goal: "Tăng độ linh hoạt, cải thiện tư thế và giảm căng thẳng sau 8 tuần.",
-      sports: { connect: [{ id: yoga.id }] },
       coach: { connect: { id: coachProfile1.id } },
       capacity: 15,
       classType: ClassType.REGULAR,
@@ -297,13 +262,13 @@ async function main() {
 
   const hiitClass = await prisma.class.upsert({
     where: { id: "class-hiit-001" },
-    update: { sports: { set: [{ id: hiit.id }] }, areaType: AreaType.INDOOR, coach: { connect: { id: coachProfile2.id } } },
+    update: { areaType: AreaType.INDOOR, coach: { connect: { id: coachProfile2.id } } },
     create: {
       id: "class-hiit-001",
       name: "HIIT Cardio",
       description: "Lớp HIIT cường độ cao, đốt cháy calo tối đa.",
+      fitness: "HIIT",
       goal: "Giảm mỡ, tăng sức bền tim mạch; yêu cầu thể lực cơ bản.",
-      sports: { connect: [{ id: hiit.id }] },
       coach: { connect: { id: coachProfile2.id } },
       capacity: 12,
       classType: ClassType.REGULAR,
@@ -316,13 +281,13 @@ async function main() {
 
   const premiumYoga = await prisma.class.upsert({
     where: { id: "class-yoga-premium-001" },
-    update: { sports: { set: [{ id: yoga.id }] }, areaType: AreaType.INDOOR, coach: { connect: { id: coachProfile1.id } } },
+    update: { areaType: AreaType.INDOOR, coach: { connect: { id: coachProfile1.id } } },
     create: {
       id: "class-yoga-premium-001",
       name: "Premium Yoga & Meditation",
       description: "Lớp Yoga Premium với coach 1-1 và thiền định chuyên sâu.",
+      fitness: "Yoga",
       goal: "Nâng cao kỹ thuật Yoga và thiền định, phù hợp người đã có nền tảng.",
-      sports: { connect: [{ id: yoga.id }] },
       coach: { connect: { id: coachProfile1.id } },
       capacity: 8,
       classType: ClassType.PREMIUM,

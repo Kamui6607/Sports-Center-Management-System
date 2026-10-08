@@ -37,7 +37,7 @@ REST API (Express 5 + TypeScript + Prisma/PostgreSQL) cho hệ thống quản l�
 └── uploads/                  # File upload local (avatars công khai; chat/cvs riêng tư)
 ```
 
-Các module đang được mount trong `src/app.ts` (prefix `/api/v1`): `auth`, `users`, `members`, `coaches`, `sports`, `rooms`, `classes`, `class-schedules`, `enrollments`, `payments`, `reports`, `products`, `chat`, `attendance`, `training-plans`, `notifications`, `feedbacks`.
+Các module đang được mount trong `src/app.ts` (prefix `/api/v1`): `auth`, `users`, `members`, `coaches`, `rooms`, `classes`, `class-schedules`, `enrollments`, `payments`, `reports`, `products`, `chat`, `attendance`, `training-plans`, `notifications`, `feedbacks`.
 Logic ví HLV nằm ở `coaches/coach-wallet.*`.
 
 ---
@@ -46,7 +46,7 @@ Logic ví HLV nằm ở `coaches/coach-wallet.*`.
 
 ### 0. Nguyên tắc chung
 
-1. **Bắt chước module sẵn có.** Trước khi thêm tính năng, mở một module tương tự (mẫu gọn nhất: `modules/sports/`; mẫu có transaction/lock/outbox: `modules/enrollments/enrollments.service.ts`) và làm đúng cùng khuôn.
+1. **Bắt chước module sẵn có.** Trước khi thêm tính năng, mở một module tương tự (mẫu gọn nhất: `modules/rooms/`; mẫu có transaction/lock/outbox: `modules/enrollments/enrollments.service.ts`) và làm đúng cùng khuôn.
 2. **Đọc trước, sửa sau.** Không đoán tên hàm/field/route. `grep` code hoặc đọc `prisma/schema.prisma` để xác nhận trước khi dùng. Không bịa model, enum, endpoint, biến môi trường.
 3. **Sửa tối thiểu, đúng chỗ.** Chỉ đụng file liên quan tới yêu cầu. Không refactor/format lại hàng loạt file khác.
 4. **Sửa trực tiếp file nguồn.** KHÔNG tạo script vá kiểu `fix_*.js`, `modify*.py`, regex find-and-replace chạy lên `src/` (xem [Nguồn sự thật](#-nguồn-sự-thật--những-thứ-không-được-giả-định)). Muốn đổi gì thì dùng công cụ sửa file/đọc diff.
@@ -73,7 +73,7 @@ Thêm module mới ⇒ (a) tạo 4 file trên, (b) `import` + `app.use("/api/v1/
 - Dự án chạy ESM `NodeNext` ⇒ **mọi import tương đối phải có đuôi `.js`** dù file nguồn là `.ts`:
   `import { prisma } from "../../config/prisma.js";`
 - Import kiểu thuần: `import type { ... }`.
-- Dùng namespace import cho service trong controller: `import * as sportsService from "./sports.service.js";`
+- Dùng namespace import cho service trong controller: `import * as roomsService from "./rooms.service.js";`
 - Chỉ dùng **một** Prisma client: `import { prisma } from "<…>/config/prisma.js"`. **Không** `new PrismaClient()` ở nơi khác.
 
 ### 3. Routes (`*.routes.ts`)
@@ -85,10 +85,10 @@ router.post(
   "/",
   authenticate,
   authorize("MANAGER"),
-  validate(CreateSportSchema),
-  sportsController.createSport
+  validate(CreateRoomSchema),
+  roomsController.createRoom
 );
-router.get("/", validate(SportQuerySchema, "query"), sportsController.listSports); // route công khai
+router.get("/", validate(RoomQuerySchema, "query"), roomsController.listRooms);
 ```
 
 - Role hợp lệ (bảng `Role`, `User.roleId`; tên role dùng chung ở `src/utils/roles.ts`): `MEMBER`, `COACH`, `MANAGER`. Mặc định mọi route cần Bearer token; route công khai khai báo `security: []` trong Swagger **và** không gắn `authenticate`.
@@ -102,10 +102,10 @@ router.get("/", validate(SportQuerySchema, "query"), sportsController.listSports
 Mẫu duy nhất đang dùng — mỗi handler `async`, bọc `try/catch`, lỗi chuyển `next(err)`, không chứa nghiệp vụ:
 
 ```ts
-export async function getSportById(req: Request, res: Response, next: NextFunction) {
+export async function getRoomById(req: Request, res: Response, next: NextFunction) {
   try {
-    const sport = await sportsService.getSportById(req.params.id as string); // Express 5: params là string | string[]
-    sendSuccess(res, sport, "Sport retrieved successfully");
+    const room = await roomsService.getRoomById(req.params.id as string); // Express 5: params là string | string[]
+    sendSuccess(res, room, "Room retrieved successfully");
   } catch (err) { next(err); }
 }
 ```
@@ -120,7 +120,7 @@ export async function getSportById(req: Request, res: Response, next: NextFuncti
 - Mọi input từ client (`body`, `query`, `params`) đi qua `validate()`; schema đặt trong `<tên>.schema.ts`.
 - Query string luôn là chuỗi ⇒ khai báo `z.string().optional()` rồi parse trong service (`page`, `limit`, `isActive: "true"|"false"`). Enum thì dùng `z.enum([...])`.
 - Lỗi validate trả `400` dạng `{ success:false, message:"Validation failed", errors:[{field, message}] }`. `validate` ghi đè `req.body/params/query` bằng dữ liệu đã parse (key lạ bị loại) và gán `req.validated`.
-- Export type bằng `z.infer` và dùng cho tham số service (xem `members.schema.ts` + `members.service.ts`) — **ưu tiên cách này, tránh `data: any`**. (Một số service cũ như `sports.service.ts` đang dùng `any`; đừng nhân rộng.)
+- Export type bằng `z.infer` và dùng cho tham số service (xem `members.schema.ts` + `members.service.ts`) — **ưu tiên cách này, tránh `data: any`**. (Một số service cũ như `rooms.service.ts` đang dùng `any`; đừng nhân rộng.)
 - Muốn Zod giữ chặt dữ liệu vào DB thì thêm ràng buộc thực sự (min/max/regex) — ví dụ `phone` trong `members.schema.ts`.
 
 ### 6. Services & Prisma
@@ -132,7 +132,7 @@ export async function getSportById(req: Request, res: Response, next: NextFuncti
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
   ```
-- **Xóa mềm** là mặc định cho thực thể có `isActive` (VD `deleteSport` đặt `isActive=false` và chặn nếu còn Class active). Không `delete` cứng bản ghi có liên kết nghiệp vụ.
+- **Xóa mềm** là mặc định cho thực thể có `isActive` (VD `deleteRoom` đặt `isActive=false`, chặn nếu còn buổi học sắp tới). Không `delete` cứng bản ghi có liên kết nghiệp vụ.
 - Cập nhật **nhiều bảng phải atomic** ⇒ `prisma.$transaction(async (tx) => { ... })` và truyền `tx` xuống các hàm con (helper nhận `db: typeof prisma | Prisma.TransactionClient`).
 - Dùng `select`/`include` có chủ đích; **không bao giờ trả `password`** hoặc token hash ra response (xem `memberInclude` trong `members.service.ts` — chỉ select các cột an toàn của `user`).
 - Tiền dùng `Decimal(12,2)` trong schema; ID là `String @default(uuid())`.
@@ -234,6 +234,7 @@ Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manage
 
 - **Manager — quản lý nền tảng, KHÔNG tạo/đứng lớp:** duyệt CV Coach, duyệt/từ chối lớp (`PATCH /classes/{id}/review`), quản lý phòng, môn tập, sản phẩm, duyệt hoàn tiền và rút tiền ví Coach, xem báo cáo.
 - **Chỉ Coach tạo lớp** (`POST /classes`, `POST /class-schedules/activity-plan`). Lớp mới ở trạng thái `PENDING`, Manager duyệt xong (`APPROVED`) thì Member mới mua được. Manager gọi API tạo lớp ⇒ 403.
+- **Môn tập là field của lớp:** `Class.fitness` (chuỗi bắt buộc, Coach nhập: Yoga, HIIT, Bơi...). Không có bảng bộ môn và không có quan hệ nhiều-nhiều lớp ↔ bộ môn; lọc bằng `GET /classes?fitness=Yoga`. Lớp chỉ cần `areaType` khớp phòng.
 - **Mỗi lớp đúng 1 Coach:** `Class.coachId` (bắt buộc) là Coach đã tạo và phụ trách lớp, nhận 85% doanh thu vào `CoachWallet`. **Không có** bảng `ClassMember`, không có HLV phụ/đổi HLV — đừng tạo lại.
 - **Hai loại "mục tiêu":** `MemberProfile.fitnessGoal` là mục tiêu của Member (Coach đọc trên hồ sơ); `Class.goal` là mục tiêu của lớp do Coach ghi để Member xem và tự đánh giá có nên đăng ký (hiển thị ở `GET /classes` và `course.goal` của course-plan).
 - **Tiến độ tập luyện:** Coach ghi mốc qua `POST /training-plans/results` (chỉ Coach phụ trách plan; `metrics` = danh sách `{name, value, unit?, lowerIsBetter?}` theo bài tập/thành tích, không phải chỉ số y tế). Member xem tiến bộ ở `GET /training-plans/:id/progress` (chênh lệch đầu → mới nhất từng chỉ số + dữ liệu vẽ biểu đồ).
@@ -406,6 +407,6 @@ Once the server is running, you can view the interactive Swagger API documentati
 
 ## 🤝 Project Flows
 
-Các luồng đang có code trong repo: quản lý người dùng/hồ sơ (member, coach, manager), catalog (sports, rooms), lớp học & lịch, đặt chỗ/hủy/đổi chỗ kèm quota lớp song song, điểm danh (QR + mã dự phòng) và hình phạt chuyên cần, thanh toán SePay (VietQR + webhook + đối soát API) kèm hóa đơn, báo cáo, chat (REST + Socket.IO, file đính kèm riêng tư), thông báo (outbox), kế hoạch tập luyện, phản hồi HLV, sản phẩm.
+Các luồng đang có code trong repo: quản lý người dùng/hồ sơ (member, coach, manager), catalog (rooms), lớp học & lịch, đặt chỗ/hủy/đổi chỗ kèm quota lớp song song, điểm danh (QR + mã dự phòng) và hình phạt chuyên cần, thanh toán SePay (VietQR + webhook + đối soát API) báo cáo, chat (REST + Socket.IO, file đính kèm riêng tư), thông báo (outbox), kế hoạch tập luyện, phản hồi HLV, sản phẩm.
 
 *(AI Workouts / AI Assistant là kế hoạch tương lai.)*

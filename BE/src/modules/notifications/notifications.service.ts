@@ -161,7 +161,7 @@ export async function sendUpcomingClassReminders() {
       startTime: { gte: now, lte: in24h },
     },
     include: {
-      class: { include: { sports: true } },
+      class: true,
       enrollments: {
         where: { status: "BOOKED" },
         include: { member: { select: { id: true, userId: true } } },
@@ -185,12 +185,11 @@ export async function sendUpcomingClassReminders() {
       if (exists) continue;
 
       const startStr = schedule.startTime.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-      const sportNames = schedule.class.sports.map(s => s.name).join(", ");
       await createNotification(
         userId,
         "UPCOMING_CLASS",
         `Nhắc nhở: Lớp ${schedule.class.name} sắp bắt đầu`,
-        `Lớp "${schedule.class.name}" (${sportNames}) sẽ bắt đầu lúc ${startStr}. Đừng quên chuẩn bị!`,
+        `Lớp "${schedule.class.name}" sẽ bắt đầu lúc ${startStr}. Đừng quên chuẩn bị!`,
         { metadata: { scheduleId: schedule.id, classId: schedule.classId } }
       );
       sent++;

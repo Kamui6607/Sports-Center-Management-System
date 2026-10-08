@@ -257,24 +257,8 @@ model ManagerProfile {
 // ─────────────────────────────────────────
 
 // ─────────────────────────────────────────
-// SPORTS & ROOMS
+// ROOMS
 // ─────────────────────────────────────────
-
-/// Bộ môn tập (Yoga, HIIT, Bơi...). Tên bảng dưới DB là "Fitness" (@@map);
-/// model Prisma, code BE và API vẫn giữ tên Sport / sports để không ảnh hưởng FE.
-model Sport {
-  id          String     @id @default(uuid())
-  name        String     @unique
-  description String?
-  areaTypes   AreaType[]
-  isActive    Boolean    @default(true)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @default(now()) @updatedAt
-
-  classes Class[] @relation("ClassToFitness")
-
-  @@map("Fitness")
-}
 
 model Room {
   id        String   @id @default(uuid())
@@ -300,9 +284,8 @@ model Class {
   /// Mục tiêu của lớp (HLV ghi) để Member xem và tự đánh giá có phù hợp trước khi đăng ký.
   /// Khác MemberProfile.fitnessGoal (mục tiêu của Member, để HLV đọc).
   goal        String?
-
-  // Many-to-Many with Sport (bảng nối dưới DB: "_ClassToFitness")
-  sports Sport[] @relation("ClassToFitness")
+  /// Môn tập của lớp (Yoga, HIIT, Bơi...). Chuỗi tự do do Coach nhập — KHÔNG còn bảng bộ môn / quan hệ nhiều-nhiều.
+  fitness     String
 
   price       Decimal             @default(0) @db.Decimal(12, 2)
   status      ClassApprovalStatus @default(PENDING)

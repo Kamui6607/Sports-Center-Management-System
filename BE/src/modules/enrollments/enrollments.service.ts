@@ -158,7 +158,7 @@ export async function bookClass(
         where: { id: existing.id },
         data: { status: "BOOKED", bookedAt: new Date(), cancelledAt: null },
         include: {
-          schedule: { include: { class: { include: { sports: true } }, room: true } },
+          schedule: { include: { class: true, room: true } },
           member: { select: { id: true, userId: true } },
         },
       });
@@ -170,7 +170,7 @@ export async function bookClass(
           status: "BOOKED",
         },
         include: {
-          schedule: { include: { class: { include: { sports: true } }, room: true } },
+          schedule: { include: { class: true, room: true } },
           member: { select: { id: true, userId: true } },
         },
       });
@@ -255,7 +255,7 @@ export async function getMyEnrollments(userId: string, query: any) {
       where, skip, take: limit,
       include: {
         schedule: {
-          include: { class: { include: { sports: true } }, room: true },
+          include: { class: true, room: true },
         },
       },
       orderBy: { bookedAt: "desc" },
@@ -395,7 +395,7 @@ export async function transferEnrollment(
     });
 
     const enrollmentInclude = {
-      schedule: { include: { class: { include: { sports: true } }, room: true } },
+      schedule: { include: { class: true, room: true } },
     };
     const transferred = existingTarget
       ? await tx.enrollment.update({

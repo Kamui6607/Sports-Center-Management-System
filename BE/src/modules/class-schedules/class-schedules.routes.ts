@@ -18,10 +18,9 @@ const router = Router();
  * @swagger
  * /class-schedules/activity-plan:
  *   post:
- *     summary: Coach tạo nhanh lớp học (môn có sẵn + phòng) — lớp PENDING chờ Manager duyệt
+ *     summary: Coach tạo nhanh lớp học (có phòng) — lớp PENDING chờ Manager duyệt
  *     description: |
  *       CHỈ COACH. Coach gọi API là HLV phụ trách lớp (`Class.coachId`); không nhận `primaryCoachId`/`supportCoachId`.
- *       `sport.mode = "new"` bị chặn 403 (danh mục môn tập do Manager quản lý).
  *       Lớp PENDING nên chưa tạo buổi học — thêm lịch bằng `POST /class-schedules` sau khi lớp được duyệt.
  *     tags: [Class Schedules]
  *     requestBody:

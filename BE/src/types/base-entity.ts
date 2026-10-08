@@ -28,7 +28,7 @@ export type EntityData<T extends BaseEntity> = Omit<T, BaseEntityKeys>;
 
 /**
  * Danh sách MỌI model kế thừa BaseEntity. Thêm model mới vào schema ⇒ thêm 1 dòng ở đây.
- * Key phải trùng tên model trong schema (VD `Sport`, dù bảng dưới DB tên `Fitness`).
+ * Key phải trùng tên model trong schema (VD `Room`).
  */
 type BaseEntityModels = {
   Role: Models.Role;
@@ -38,7 +38,6 @@ type BaseEntityModels = {
   CoachProfile: Models.CoachProfile;
   Certification: Models.Certification;
   ManagerProfile: Models.ManagerProfile;
-  Sport: Models.Sport;
   Room: Models.Room;
   Class: Models.Class;
   ClassSchedule: Models.ClassSchedule;

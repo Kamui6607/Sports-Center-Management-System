@@ -32,10 +32,10 @@ const router = Router();
  *           type: string
  *         description: Search by class name
  *       - in: query
- *         name: sportId
+ *         name: fitness
  *         schema:
  *           type: string
- *         description: Filter by sport
+ *         description: Lọc theo môn tập (không phân biệt hoa/thường, khớp đúng tên môn)
  *       - in: query
  *         name: classType
  *         schema:
@@ -157,13 +157,17 @@ router.get("/:id/course-plan", authenticate, classesController.getClassCoursePla
  *             type: object
  *             required:
  *               - name
- *               - sportIds
+ *               - fitness
  *               - capacity
  *               - areaType
  *             properties:
  *               name:
  *                 type: string
  *                 example: "Morning Yoga"
+ *               fitness:
+ *                 type: string
+ *                 example: "Yoga"
+ *                 description: "Môn tập của lớp (Yoga, HIIT, Bơi...). Nhập tự do, 2-60 ký tự."
  *               description:
  *                 type: string
  *               goal:
@@ -171,11 +175,6 @@ router.get("/:id/course-plan", authenticate, classesController.getClassCoursePla
  *                 maxLength: 1000
  *                 example: "Giảm 3-5kg sau 8 tuần, cải thiện sức bền"
  *                 description: "Mục tiêu của lớp để Member xem và tự đánh giá trước khi enroll (tùy chọn)."
- *               sportIds:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: uuid
  *               capacity:
  *                 type: integer
  *                 example: 20
@@ -188,7 +187,7 @@ router.get("/:id/course-plan", authenticate, classesController.getClassCoursePla
  *                 type: string
  *                 enum: [POOL, INDOOR, OUTDOOR]
  *                 example: "INDOOR"
- *                 description: "Area type required by this class. Every selected sport must support it."
+ *                 description: "Area type required by this class (phải khớp areaType của phòng khi xếp lịch)."
  *     responses:
  *       201: { $ref: "#/components/responses/ClassCreated" }
  *       400: { $ref: "#/components/responses/BadRequest" }
@@ -270,6 +269,9 @@ router.patch(
  *             properties:
  *               name:
  *                 type: string
+ *               fitness:
+ *                 type: string
+ *                 description: "Môn tập của lớp (2-60 ký tự)."
  *               description:
  *                 type: string
  *               goal:
@@ -277,11 +279,6 @@ router.patch(
  *                 maxLength: 1000
  *                 example: "Giảm 3-5kg sau 8 tuần, cải thiện sức bền"
  *                 description: "Mục tiêu của lớp để Member xem và tự đánh giá trước khi enroll (tùy chọn)."
- *               sportIds:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: uuid
  *               capacity:
  *                 type: integer
  *               classType:
@@ -290,7 +287,7 @@ router.patch(
  *               areaType:
  *                 type: string
  *                 enum: [POOL, INDOOR, OUTDOOR]
- *                 description: "New area type. All sports of this class must support it, and upcoming schedules must use a matching Room."
+ *                 description: "New area type. Upcoming schedules must use a matching Room."
  *               isActive:
  *                 type: boolean
  *     responses:

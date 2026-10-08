@@ -218,7 +218,7 @@ export async function listSchedules(query: any) {
     : undefined;
 
   const include = {
-    class: { include: { sports: true } },
+    class: true,
     room: true,
     _count: {
       select: {
@@ -333,23 +333,19 @@ export async function createSchedule(data: any, actor: ScheduleActor) {
 
     return tx.classSchedule.create({
       data: { classId: data.classId, roomId: data.roomId, startTime, endTime, status: "SCHEDULED" },
-      include: { class: { include: { sports: true } }, room: true },
+      include: { class: true, room: true },
     });
   });
 }
 
 /**
- * Quick-planner của COACH: tạo lớp (gắn môn có sẵn + phòng) trong MỘT transaction.
+ * Quick-planner của COACH: tạo lớp (phòng) trong MỘT transaction.
  * Coach tạo lớp ⇒ là HLV phụ trách lớp (Class.coachId); lớp PENDING chờ Manager duyệt,
  * nên CHƯA tạo buổi học — Coach thêm lịch sau khi lớp được APPROVED (POST /class-schedules).
  * Manager không tạo lớp (chỉ quản lý nền tảng + duyệt lớp).
  */
 export async function createActivityPlan(data: any, actor: { id: string; role: string }) {
   if (actor.role !== "COACH") throw new AppError("Chỉ Coach được tạo lớp học", 403);
-  if (data.sport.mode === "new") {
-    throw new AppError("Coach chỉ chọn môn tập có sẵn — danh mục môn tập do Manager quản lý", 403);
-  }
-
   return prisma.$transaction(async (tx) => {
     const coachProfile = await tx.coachProfile.findUnique({ where: { userId: actor.id } });
     if (!coachProfile) throw new AppError("Coach profile not found", 404);
@@ -366,20 +362,10 @@ export async function createActivityPlan(data: any, actor: { id: string; role: s
       throw new AppError("Room capacity is too small for this class", 400);
     }
 
-    const sport = await tx.sport.findUnique({ where: { id: data.sport.id } });
-    if (!sport || !sport.isActive) {
-      throw new AppError("Sport not found or inactive", 404);
-    }
-    if (!sport.areaTypes.includes(data.class.areaType)) {
-      throw new AppError(
-        `Sport "${sport.name}" does not support area type "${data.class.areaType}"`,
-        400,
-      );
-    }
-
     const cls = await tx.class.create({
       data: {
         name: data.class.name,
+        fitness: data.class.fitness,
         description: data.class.description || undefined,
         capacity: data.class.capacity,
         classType: data.class.classType,
@@ -387,7 +373,6 @@ export async function createActivityPlan(data: any, actor: { id: string; role: s
         price: data.class.price ?? 0,
         status: "PENDING",
         coachId: coachProfile.id,
-        sports: { connect: { id: sport.id } },
       },
     });
 
@@ -400,7 +385,6 @@ export async function createActivityPlan(data: any, actor: { id: string; role: s
 
     return {
       class: cls,
-      sport,
       schedulesCreated: 0,
       status: "PENDING" as const,
       note: "Class created as PENDING and awaiting Manager approval. Schedules will be set after approval.",
@@ -413,7 +397,7 @@ export async function getScheduleById(id: string) {
   const schedule = await prisma.classSchedule.findUnique({
     where: { id },
     include: {
-      class: { include: { sports: true, coach: { include: { user: { select: { fullName: true } } } } } },
+      class: { include: { coach: { include: { user: { select: { fullName: true } } } } } },
       room: true,
       _count: { select: { enrollments: { where: { status: { in: ["BOOKED", "COMPLETED"] } } } } },
     },
@@ -442,7 +426,7 @@ async function cancelScheduleTx(
   if (fresh.status === "CANCELLED") {
     const current = await tx.classSchedule.findUnique({
       where: { id: schedule.id },
-      include: { class: { include: { sports: true } }, room: true },
+      include: { class: true, room: true },
     });
     return { updated: current!, reason: reason ?? "Lịch học bị hủy" };
   }
@@ -473,7 +457,7 @@ async function cancelScheduleTx(
   }
   const updated = await tx.classSchedule.findUnique({
     where: { id: schedule.id },
-    include: { class: { include: { sports: true } }, room: true },
+    include: { class: true, room: true },
   });
   return { updated: updated!, reason: reason ?? "Lịch học bị hủy" };
 }
@@ -613,7 +597,7 @@ export async function cancelScheduleWithResolution(
       await cancelScheduleTx(tx, cancelTarget, reason, { allowBooked: true });
       makeup = await tx.classSchedule.create({
         data: { classId: fresh.classId, roomId, startTime, endTime, status: "SCHEDULED", makeupForId: id },
-        include: { class: { include: { sports: true } }, room: true },
+        include: { class: true, room: true },
       });
       if (memberIds.length > 0) {
         await tx.enrollment.createMany({
@@ -641,7 +625,7 @@ export async function cancelScheduleWithResolution(
 
     const cancelled = await tx.classSchedule.findUnique({
       where: { id },
-      include: { class: { include: { sports: true } }, room: true },
+      include: { class: true, room: true },
     });
     return { cancelled, makeup, refunds, userIds: [...new Set(booked.map((b) => b.member.userId))] };
   });
@@ -773,7 +757,7 @@ export async function updateSchedule(id: string, data: any, actor: ScheduleActor
 
       return tx.classSchedule.findUnique({
         where: { id },
-        include: { class: { include: { sports: true } }, room: true },
+        include: { class: true, room: true },
       });
     });
     if (!updated) throw new AppError("Schedule not found", 404);
@@ -816,7 +800,7 @@ export async function updateSchedule(id: string, data: any, actor: ScheduleActor
   // Không có gì để đổi (ví dụ status=SCHEDULED trong khi đã SCHEDULED): trả hiện tại.
   return prisma.classSchedule.findUnique({
     where: { id },
-    include: { class: { include: { sports: true } }, room: true },
+    include: { class: true, room: true },
   });
 }
 
@@ -866,7 +850,7 @@ export async function deleteSchedule(id: string, actor: ScheduleActor) {
 export async function completeSchedule(id: string, actor: ScheduleActor) {
   const schedule = await prisma.classSchedule.findUnique({
     where: { id },
-    include: { class: { include: { sports: true } }, room: true },
+    include: { class: true, room: true },
   });
   if (!schedule) throw new AppError("Schedule not found", 404);
   await assertCanManageClassSchedule(prisma, actor, schedule.classId);
@@ -934,7 +918,7 @@ export async function completeSchedule(id: string, actor: ScheduleActor) {
 
     return tx.classSchedule.findUnique({
       where: { id },
-      include: { class: { include: { sports: true } }, room: true },
+      include: { class: true, room: true },
     });
   });
   if (!completed) throw new AppError("Schedule not found", 404);

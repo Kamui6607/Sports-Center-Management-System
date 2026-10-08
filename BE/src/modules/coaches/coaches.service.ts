@@ -72,7 +72,6 @@ export async function getCoachById(id: string) {
           // Lớp do HLV phụ trách (Class.coachId)
           classes: {
             include: {
-              sports: true,
               schedules: {
                 where: { status: "SCHEDULED" },
                 take: 5,

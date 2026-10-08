@@ -10,7 +10,6 @@ const CLASS_COACH_INCLUDE = {
 };
 
 const classInclude = {
-  sports: true,
   coach: CLASS_COACH_INCLUDE,
   _count: { select: { schedules: true } },
 };
@@ -38,21 +37,13 @@ async function withEnrollmentCountOne<T extends { id: string; _count: { schedule
   return withEnrollmentCount(cls, await countEnrollmentsByClass([cls.id]));
 }
 
-function assertSportsSupportAreaType(sports: { name: string; areaTypes: string[] }[], areaType: string) {
-  for (const sport of sports) {
-    if (!sport.areaTypes.includes(areaType)) {
-      throw new AppError(`Sport "${sport.name}" does not support area type "${areaType}"`, 400);
-    }
-  }
-}
-
 export async function listClasses(query: any, actor?: { id: string; role: string }) {
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
   const skip = (page - 1) * limit;
   const where: any = {};
   if (query.isActive !== undefined) where.isActive = query.isActive === "true";
-  if (query.sportId) where.sports = { some: { id: query.sportId } };
+  if (query.fitness) where.fitness = { equals: String(query.fitness).trim(), mode: "insensitive" };
   if (query.classType) where.classType = query.classType;
   if (query.areaType) where.areaType = query.areaType;
   if (query.search) where.name = { contains: query.search, mode: "insensitive" };
@@ -96,18 +87,10 @@ export async function createClass(data: any, actor: { id: string; role: string }
   const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: actor.id } });
   if (!coachProfile) throw new AppError("Coach profile not found", 404);
 
-  const { sportIds, ...restData } = data;
-  const sports = await prisma.sport.findMany({ where: { id: { in: sportIds }, isActive: true } });
-  if (sports.length !== sportIds.length) throw new AppError("One or more sports not found or inactive", 404);
-
-  // Business rule: TẤT CẢ sport của Class đều phải support Class.areaType.
-  assertSportsSupportAreaType(sports, data.areaType);
-
   const newClass = await prisma.$transaction(async (tx) => {
     const cls = await tx.class.create({
       data: {
-        ...restData,
-        sports: { connect: sportIds.map((id: string) => ({ id })) },
+        ...data,
         status: "PENDING",
         coachId: coachProfile.id,
       },
@@ -214,7 +197,7 @@ export async function getClassById(id: string) {
 export async function updateClass(id: string, data: any, actor?: { id: string; role: string }) {
   const cls = await prisma.class.findUnique({
     where: { id },
-    include: { sports: true, coach: { select: { userId: true } } },
+    include: { coach: { select: { userId: true } } },
   });
   if (!cls) throw new AppError("Class not found", 404);
 
@@ -256,20 +239,6 @@ export async function updateClass(id: string, data: any, actor?: { id: string; r
     }
   }
 
-  // Tính effectiveAreaType để xử lý partial update (chỉ đổi sportIds hoặc chỉ đổi areaType).
-  const effectiveAreaType = data.areaType ?? cls.areaType;
-
-  let sportsToCheck = cls.sports;
-  if (data.sportIds) {
-    const sports = await prisma.sport.findMany({ where: { id: { in: data.sportIds }, isActive: true } });
-    if (sports.length !== data.sportIds.length) throw new AppError("One or more sports not found or inactive", 404);
-    sportsToCheck = sports;
-  }
-
-  if (data.areaType !== undefined || data.sportIds !== undefined) {
-    assertSportsSupportAreaType(sportsToCheck, effectiveAreaType);
-  }
-
   // Không được để upcoming SCHEDULED tồn tại ở Room không còn phù hợp với areaType mới.
   if (data.areaType !== undefined && data.areaType !== cls.areaType) {
     const mismatched = await prisma.classSchedule.count({
@@ -288,14 +257,7 @@ export async function updateClass(id: string, data: any, actor?: { id: string; r
     }
   }
 
-  const { sportIds, ...restData } = data;
-  const updateData: any = { ...restData };
-
-  if (sportIds) {
-    updateData.sports = { set: sportIds.map((sid: string) => ({ id: sid })) };
-  }
-
-  const updated = await prisma.class.update({ where: { id }, data: updateData, include: classInclude });
+  const updated = await prisma.class.update({ where: { id }, data, include: classInclude });
   return withEnrollmentCountOne(updated);
 }
 
@@ -383,11 +345,11 @@ export async function getClassCoursePlan(
       name: true,
       description: true,
       goal: true,
+      fitness: true,
       classType: true,
       areaType: true,
       capacity: true,
       isActive: true,
-      sports: { select: { id: true, name: true } },
     },
   });
   if (!cls) throw new AppError("Class not found", 404);
@@ -524,10 +486,10 @@ export async function getClassCoursePlan(
             className: cls.name,
             description: cls.description,
             goal: cls.goal,
+            fitness: cls.fitness,
             classType: cls.classType,
             areaType: cls.areaType,
             capacity: cls.capacity,
-            sports: cls.sports,
             totalSessions: sessions.length,
             firstSessionStart: firstSession.startTime,
             lastSessionStart: lastSession.startTime,
