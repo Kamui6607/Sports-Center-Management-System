@@ -3,7 +3,7 @@ import { authenticate } from "../../middlewares/authenticate.js";
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
 import * as controller from "./training-plans.controller.js";
-import { CreateTrainingPlanSchema, CreateTrainingResultSchema, UpdateTrainingPlanSchema } from "./training-plans.schema.js";
+import { CreateTrainingPlanSchema, CreateTrainingResultSchema, UpdateTrainingPlanSchema, UpdateTrainingResultSchema } from "./training-plans.schema.js";
 
 const router = Router();
 router.use(authenticate);
@@ -126,6 +126,11 @@ router.patch(
  * @swagger
  * /training-plans/results:
  *   post:
+ *     summary: Coach ghi một mốc tiến độ cho kế hoạch (CHỈ Coach phụ trách plan)
+ *     description: |
+ *       `metrics` là danh sách chỉ số tập luyện thực tế (không phải chỉ số y tế), mỗi phần tử
+ *       `{ name, value, unit?, lowerIsBetter? }`. Cùng `name` ở các mốc khác nhau sẽ được so sánh thành một đường tiến bộ.
+ *       Manager nhận 403; Coach không phụ trách plan nhận 403.
  *     tags: [Training]
  *     requestBody:
  *       required: true
@@ -133,12 +138,104 @@ router.patch(
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [planId, date]
  *             properties:
- *               planId: { type: string }
- *               date: { type: string }
+ *               planId: { type: string, format: uuid }
+ *               date: { type: string, format: date-time }
+ *               coachNote: { type: string, maxLength: 1000 }
+ *               metrics:
+ *                 type: array
+ *                 maxItems: 30
+ *                 items:
+ *                   type: object
+ *                   required: [name, value]
+ *                   properties:
+ *                     name: { type: string, example: "Squat" }
+ *                     value: { type: number, example: 80 }
+ *                     unit: { type: string, example: "kg" }
+ *                     lowerIsBetter: { type: boolean, description: "true nếu số càng nhỏ càng tốt (vd. thời gian chạy)" }
+ *           example:
+ *             planId: "b7e3d6f0-0000-4000-8000-000000000001"
+ *             date: "2026-10-08T09:00:00.000Z"
+ *             coachNote: "Giữ form tốt, tăng tạ ở buổi sau."
+ *             metrics:
+ *               - { name: "Squat", value: 80, unit: "kg" }
+ *               - { name: "Chạy 2km", value: 11.5, unit: "phút", lowerIsBetter: true }
  *     responses:
  *       201: { description: "Success" }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
  */
-router.post("/results", authorize("COACH", "MANAGER"), validate(CreateTrainingResultSchema), controller.createResult);
+router.post("/results", authorize("COACH"), validate(CreateTrainingResultSchema), controller.createResult);
+
+/**
+ * @swagger
+ * /training-plans/results/{id}:
+ *   patch:
+ *     summary: Coach sửa một mốc tiến độ (CHỈ Coach phụ trách plan)
+ *     tags: [Training]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: Cần ít nhất một trường. `metrics` nếu gửi sẽ thay toàn bộ danh sách chỉ số của mốc.
+ *             properties:
+ *               date: { type: string, format: date-time }
+ *               coachNote: { type: string, maxLength: 1000 }
+ *               metrics: { type: array, items: { type: object } }
+ *     responses:
+ *       200: { description: "Updated" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.patch("/results/:id", authorize("COACH"), validate(UpdateTrainingResultSchema), controller.updateResult);
+
+/**
+ * @swagger
+ * /training-plans/results/{id}:
+ *   delete:
+ *     summary: Coach xóa một mốc tiến độ (CHỈ Coach phụ trách plan)
+ *     tags: [Training]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200: { description: "Deleted" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.delete("/results/:id", authorize("COACH"), controller.deleteResult);
+
+/**
+ * @swagger
+ * /training-plans/{id}/progress:
+ *   get:
+ *     summary: Xem tiến độ của một kế hoạch (Member chủ plan, Coach phụ trách, Manager)
+ *     description: |
+ *       Trả về `checkpoints` (các mốc theo thời gian) và `summary.metrics`: với mỗi chỉ số có `first`, `latest`,
+ *       `change`, `changePercent`, `trend` (IMPROVED | DECLINED | UNCHANGED | INSUFFICIENT_DATA) và `points` để vẽ biểu đồ.
+ *       MEMBER chỉ xem plan của chính mình; COACH chỉ plan mình phụ trách (403 nếu không).
+ *     tags: [Training]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200: { description: "Success" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.get("/:id/progress", controller.getPlanProgress);
 
 export default router;

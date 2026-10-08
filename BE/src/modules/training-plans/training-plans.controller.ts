@@ -23,6 +23,27 @@ export const createResult = async (req: Request, res: Response, next: NextFuncti
   } catch (error) { next(error); }
 };
 
+export const updateResult = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await service.updateResult(req.params.id as string, req.body, req.user);
+    sendSuccess(res, result, "Training result updated successfully");
+  } catch (error) { next(error); }
+};
+
+export const deleteResult = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await service.deleteResult(req.params.id as string, req.user);
+    sendSuccess(res, null, "Training result deleted successfully");
+  } catch (error) { next(error); }
+};
+
+export const getPlanProgress = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await service.getPlanProgress(req.params.id as string, req.user!);
+    sendSuccess(res, data);
+  } catch (error) { next(error); }
+};
+
 export const updatePlanCoach = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const plan = await service.updatePlanCoach(

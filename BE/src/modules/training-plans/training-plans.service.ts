@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { ROLE_NAME_SELECT } from "../../utils/roles.js";
+import type { ProgressMetric } from "./training-plans.schema.js";
 
 async function verifyCoachOwnership(coachId: string, user: any) {
   if (user.role === "MANAGER") return true;
@@ -53,7 +54,7 @@ export const createPlan = async (data: Prisma.TrainingPlanUncheckedCreateInput, 
 /** Field an toàn trả về cho HTTP — TUYỆT ĐỐI không include password/secret của user. */
 const planInclude = {
   coach: { include: { user: { select: { id: true, fullName: true } } } },
-  results: true,
+  results: { orderBy: { date: "asc" } },
 } satisfies Prisma.TrainingPlanInclude;
 
 /**
@@ -97,12 +98,157 @@ export const getPlans = async (
   throw new AppError("Forbidden: bạn không có quyền xem kế hoạch tập luyện", 403);
 };
 
-export const createResult = async (data: Prisma.TrainingResultUncheckedCreateInput, user: any) => {
+/** Ghi/sửa/xóa mốc tiến độ: CHỈ Coach phụ trách plan (Manager chỉ quản trị nền tảng). */
+async function assertPlanCoach(plan: { coachId: string }, user: { id: string; role: string }) {
+  if (user.role !== "COACH") throw new AppError("Forbidden: Chỉ Coach phụ trách mới được ghi tiến độ", 403);
+  await verifyCoachOwnership(plan.coachId, user);
+}
+
+export const createResult = async (
+  data: { planId: string; date: string; metrics?: ProgressMetric[]; coachNote?: string },
+  user: any
+) => {
   const plan = await prisma.trainingPlan.findUnique({ where: { id: data.planId } });
   if (!plan) throw new AppError("Training plan not found", 404);
-  
-  await verifyCoachOwnership(plan.coachId, user);
-  return prisma.trainingResult.create({ data });
+
+  await assertPlanCoach(plan, user);
+  return prisma.trainingResult.create({
+    data: {
+      planId: data.planId,
+      date: new Date(data.date),
+      coachNote: data.coachNote,
+      ...(data.metrics ? { metrics: data.metrics as unknown as Prisma.InputJsonValue } : {}),
+    },
+  });
+};
+
+export const updateResult = async (
+  id: string,
+  data: { date?: string; metrics?: ProgressMetric[]; coachNote?: string },
+  user: any
+) => {
+  const result = await prisma.trainingResult.findUnique({ where: { id }, include: { plan: true } });
+  if (!result) throw new AppError("Training result not found", 404);
+  await assertPlanCoach(result.plan, user);
+
+  return prisma.trainingResult.update({
+    where: { id },
+    data: {
+      ...(data.date ? { date: new Date(data.date) } : {}),
+      ...(data.coachNote !== undefined ? { coachNote: data.coachNote } : {}),
+      ...(data.metrics ? { metrics: data.metrics as unknown as Prisma.InputJsonValue } : {}),
+    },
+  });
+};
+
+export const deleteResult = async (id: string, user: any) => {
+  const result = await prisma.trainingResult.findUnique({ where: { id }, include: { plan: true } });
+  if (!result) throw new AppError("Training result not found", 404);
+  await assertPlanCoach(result.plan, user);
+  await prisma.trainingResult.delete({ where: { id } });
+};
+
+/** Chuẩn hóa `metrics` đã lưu: mảng chuẩn, hoặc object cũ {tên: số} (dữ liệu legacy). */
+function normalizeMetrics(raw: unknown): ProgressMetric[] {
+  if (Array.isArray(raw)) {
+    return raw.filter(
+      (m): m is ProgressMetric =>
+        !!m && typeof m === "object" && typeof (m as any).name === "string" && typeof (m as any).value === "number"
+    );
+  }
+  if (raw && typeof raw === "object") {
+    return Object.entries(raw as Record<string, unknown>)
+      .filter(([, v]) => typeof v === "number" && Number.isFinite(v))
+      .map(([name, value]) => ({ name, value: value as number }));
+  }
+  return [];
+}
+
+const round = (n: number, digits = 1) => Math.round(n * 10 ** digits) / 10 ** digits;
+
+/**
+ * GET /training-plans/:id/progress — các mốc theo thời gian + chênh lệch từng chỉ số (đầu → mới nhất)
+ * để Member thấy mình đang tiến bộ. Quyền: MEMBER chủ plan, COACH phụ trách plan, MANAGER (xem).
+ */
+export const getPlanProgress = async (planId: string, actor: { id: string; role: string }) => {
+  const plan = await prisma.trainingPlan.findUnique({
+    where: { id: planId },
+    include: {
+      member: { include: { user: { select: { id: true, fullName: true } } } },
+      coach: { include: { user: { select: { id: true, fullName: true } } } },
+      results: { orderBy: { date: "asc" } },
+    },
+  });
+  if (!plan) throw new AppError("Training plan not found", 404);
+
+  if (actor.role === "MEMBER") {
+    if (plan.member.userId !== actor.id) throw new AppError("Forbidden: You can only view your own progress", 403);
+  } else if (actor.role === "COACH") {
+    if (plan.coach.userId !== actor.id) throw new AppError("Forbidden: You can only view progress of your own plans", 403);
+  } else if (actor.role !== "MANAGER") {
+    throw new AppError("Forbidden", 403);
+  }
+
+  const checkpoints = plan.results.map((r) => ({
+    id: r.id,
+    date: r.date,
+    coachNote: r.coachNote,
+    metrics: normalizeMetrics(r.metrics),
+  }));
+
+  // Gom theo tên chỉ số (không phân biệt hoa/thường) qua các mốc đã sắp theo thời gian.
+  const series = new Map<string, { name: string; unit?: string; lowerIsBetter: boolean; points: { date: Date; value: number }[] }>();
+  for (const cp of checkpoints) {
+    for (const m of cp.metrics) {
+      const key = m.name.trim().toLowerCase();
+      const s = series.get(key) ?? { name: m.name.trim(), unit: m.unit, lowerIsBetter: false, points: [] };
+      s.unit = m.unit ?? s.unit;
+      s.lowerIsBetter = m.lowerIsBetter ?? s.lowerIsBetter;
+      s.points.push({ date: cp.date, value: m.value });
+      series.set(key, s);
+    }
+  }
+
+  const metrics = [...series.values()].map((s) => {
+    const first = s.points[0].value;
+    const latest = s.points[s.points.length - 1].value;
+    const change = round(latest - first, 2);
+    const better = s.lowerIsBetter ? change < 0 : change > 0;
+    const trend =
+      s.points.length < 2 ? "INSUFFICIENT_DATA" : change === 0 ? "UNCHANGED" : better ? "IMPROVED" : "DECLINED";
+    return {
+      name: s.name,
+      unit: s.unit ?? null,
+      lowerIsBetter: s.lowerIsBetter,
+      first,
+      latest,
+      change,
+      changePercent: first !== 0 ? round((change / Math.abs(first)) * 100) : null,
+      trend,
+      points: s.points,
+    };
+  });
+
+  return {
+    plan: {
+      id: plan.id,
+      name: plan.name,
+      description: plan.description,
+      startDate: plan.startDate,
+      endDate: plan.endDate,
+      isActive: plan.isActive,
+      member: { id: plan.memberId, fullName: plan.member.user.fullName },
+      coach: { id: plan.coachId, fullName: plan.coach.user.fullName },
+    },
+    summary: {
+      totalCheckpoints: checkpoints.length,
+      firstDate: checkpoints[0]?.date ?? null,
+      latestDate: checkpoints[checkpoints.length - 1]?.date ?? null,
+      improvedCount: metrics.filter((m) => m.trend === "IMPROVED").length,
+      metrics,
+    },
+    checkpoints,
+  };
 };
 
 /**
