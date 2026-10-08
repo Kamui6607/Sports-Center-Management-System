@@ -17,9 +17,14 @@ export const ProductQuerySchema = z.object({
   isActive: z.enum(["true", "false", "all"]).optional(),
 });
 
-export const CreateProductOrderSchema = z.object({
+export const OrderItemInputSchema = z.object({
   productId: z.string().min(1),
-  quantity: z.number().int().positive().min(1),
+  quantity: z.number().int().positive(),
+});
+
+/** Một đơn có thể mua nhiều sản phẩm: `items` ít nhất 1 dòng (cùng sản phẩm xuất hiện nhiều lần sẽ được cộng dồn). */
+export const CreateOrderSchema = z.object({
+  items: z.array(OrderItemInputSchema).min(1).max(50),
 });
 
 export const CreateProductReviewSchema = z.object({

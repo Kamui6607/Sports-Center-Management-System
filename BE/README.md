@@ -232,7 +232,7 @@ export async function getRoomById(req: Request, res: Response, next: NextFunctio
 
 Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manager** chỉ quản lý nền tảng.
 
-- **Manager — quản lý nền tảng, KHÔNG tạo/đứng lớp:** duyệt CV Coach, duyệt/từ chối lớp (`PATCH /classes/{id}/review`), quản lý phòng, môn tập, sản phẩm, duyệt hoàn tiền và rút tiền ví Coach, xem báo cáo.
+- **Manager — quản lý nền tảng, KHÔNG tạo/đứng lớp:** duyệt CV Coach, duyệt/từ chối lớp (`PATCH /classes/{id}/review`), quản lý phòng, sản phẩm, duyệt hoàn tiền và rút tiền ví Coach, xem báo cáo.
 - **Chỉ Coach tạo lớp** (`POST /classes`, `POST /class-schedules/activity-plan`). Lớp mới ở trạng thái `PENDING`, Manager duyệt xong (`APPROVED`) thì Member mới mua được. Manager gọi API tạo lớp ⇒ 403.
 - **Môn tập là field của lớp:** `Class.fitness` (chuỗi bắt buộc, Coach nhập: Yoga, HIIT, Bơi...). Không có bảng bộ môn và không có quan hệ nhiều-nhiều lớp ↔ bộ môn; lọc bằng `GET /classes?fitness=Yoga`. Lớp chỉ cần `areaType` khớp phòng.
 - **Mỗi lớp đúng 1 Coach:** `Class.coachId` (bắt buộc) là Coach đã tạo và phụ trách lớp, nhận 85% doanh thu vào `CoachWallet`. **Không có** bảng `ClassMember`, không có HLV phụ/đổi HLV — đừng tạo lại.
@@ -407,6 +407,6 @@ Once the server is running, you can view the interactive Swagger API documentati
 
 ## 🤝 Project Flows
 
-Các luồng đang có code trong repo: quản lý người dùng/hồ sơ (member, coach, manager), catalog (rooms), lớp học & lịch, đặt chỗ/hủy/đổi chỗ kèm quota lớp song song, điểm danh (QR + mã dự phòng) và hình phạt chuyên cần, thanh toán SePay (VietQR + webhook + đối soát API) báo cáo, chat (REST + Socket.IO, file đính kèm riêng tư), thông báo (outbox), kế hoạch tập luyện, phản hồi HLV, sản phẩm.
+Các luồng đang có code trong repo: quản lý người dùng/hồ sơ (member, coach, manager), catalog (rooms), lớp học & lịch, đặt chỗ/hủy/đổi chỗ kèm quota lớp song song, điểm danh (QR + mã dự phòng) và hình phạt chuyên cần, thanh toán SePay (VietQR + webhook + đối soát API) báo cáo, chat (REST + Socket.IO, file đính kèm riêng tư), thông báo (outbox), kế hoạch tập luyện, phản hồi HLV, sản phẩm và đơn hàng (một `Order` gồm nhiều `OrderItem`; `OrderItem.totalAmount = quantity × unitPrice`, `Order.totalPrice` = tổng các `totalAmount`, thanh toán SePay).
 
 *(AI Workouts / AI Assistant là kế hoạch tương lai.)*

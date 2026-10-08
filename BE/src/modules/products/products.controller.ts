@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as productsService from "./products.service.js";
-import { createProductSepayCheckout } from "../payments/sepay-payments.service.js";
+import { createOrderSepayCheckout } from "../payments/sepay-payments.service.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
 
 export async function createProduct(req: Request, res: Response, next: NextFunction) {
@@ -50,28 +50,27 @@ export async function deleteProduct(req: Request, res: Response, next: NextFunct
 
 // ── Mua và Đánh giá ──────────────────────────────────────────────────────────
 
-export async function createProductOrder(req: Request, res: Response, next: NextFunction) {
+export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
-    const { productId, quantity } = req.body;
-    const checkout = await createProductSepayCheckout(req.user!.id, req.user!.role, productId, quantity);
-    sendCreated(res, checkout, "Product order created — waiting for SePay transfer");
+    const checkout = await createOrderSepayCheckout(req.user!.id, req.user!.role, req.body.items);
+    sendCreated(res, checkout, "Order created — waiting for SePay transfer");
   } catch (err) {
     next(err);
   }
 }
 
-export async function cancelProductOrder(req: Request, res: Response, next: NextFunction) {
+export async function cancelOrder(req: Request, res: Response, next: NextFunction) {
   try {
-    const order = await productsService.cancelProductOrder(req.params.id as string, req.user!);
-    sendSuccess(res, order, "Product order cancelled");
+    const order = await productsService.cancelOrder(req.params.id as string, req.user!);
+    sendSuccess(res, order, "Order cancelled");
   } catch (err) {
     next(err);
   }
 }
 
-export async function listMyProductOrders(req: Request, res: Response, next: NextFunction) {
+export async function listMyOrders(req: Request, res: Response, next: NextFunction) {
   try {
-    const { orders, pagination } = await productsService.listMyProductOrders(req.user!.id, req.query);
+    const { orders, pagination } = await productsService.listMyOrders(req.user!.id, req.query);
     sendSuccess(res, orders, "My orders retrieved successfully", 200, pagination);
   } catch (err) {
     next(err);

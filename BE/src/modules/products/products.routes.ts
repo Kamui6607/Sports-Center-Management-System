@@ -6,7 +6,7 @@ import {
   CreateProductSchema,
   UpdateProductSchema,
   ProductQuerySchema,
-  CreateProductOrderSchema,
+  CreateOrderSchema,
   CreateProductReviewSchema,
 } from "./products.schema.js";
 import * as productsController from "./products.controller.js";
@@ -75,9 +75,9 @@ router.get("/:id", productsController.getProductById);
  * @swagger
  * /products/orders:
  *   post:
- *     summary: Create a product order and its SePay (VietQR) payment
+ *     summary: Create an order (multiple products) and its SePay (VietQR) payment
  *     description: |
- *       Chỉ MEMBER hoặc COACH. Giữ hàng (trừ kho) ngay khi tạo đơn; đơn ở trạng thái PENDING và trả về
+ *       Chỉ MEMBER hoặc COACH. Giữ hàng (trừ kho từng sản phẩm) ngay khi tạo đơn; `totalAmount` mỗi dòng = quantity × unitPrice, `totalPrice` đơn = tổng các `totalAmount`; đơn ở trạng thái PENDING và trả về
  *       thông tin QR chuyển khoản (giống `POST /payments/sepay/checkout`). FE polling
  *       `GET /payments/sepay/{paymentId}` để biết khi nào đơn được thanh toán.
  *       - SePay báo đã thu tiền ⇒ đơn SUCCESS + thông báo.
@@ -91,13 +91,21 @@ router.get("/:id", productsController.getProductById);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [productId, quantity]
+ *             required: [items]
  *             properties:
- *               productId: { type: string }
- *               quantity: { type: integer, minimum: 1 }
+ *               items:
+ *                 type: array
+ *                 minItems: 1
+ *                 description: Các sản phẩm trong đơn (cùng productId lặp lại sẽ được cộng dồn số lượng)
+ *                 items:
+ *                   type: object
+ *                   required: [productId, quantity]
+ *                   properties:
+ *                     productId: { type: string }
+ *                     quantity: { type: integer, minimum: 1 }
  *     responses:
  *       201:
- *         description: Đơn PENDING + thông tin QR (paymentId, orderCode, amount, qrUrl, expiresAt, productOrder)
+ *         description: Đơn PENDING + thông tin QR (paymentId, orderCode, amount, qrUrl, expiresAt, order{ id, totalPrice, status, items[{ productId, productName, quantity, unitPrice, totalAmount }] })
  *       400: { $ref: "#/components/responses/BadRequest" }
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       403: { $ref: "#/components/responses/Forbidden" }
@@ -109,15 +117,15 @@ router.post(
   "/orders",
   authenticate,
   authorize("MEMBER", "COACH"),
-  validate(CreateProductOrderSchema),
-  productsController.createProductOrder
+  validate(CreateOrderSchema),
+  productsController.createOrder
 );
 
 /**
  * @swagger
  * /products/orders/{id}/cancel:
  *   post:
- *     summary: Cancel a PENDING product order (restores stock)
+ *     summary: Cancel a PENDING order (restores stock)
  *     description: Người đặt đơn hoặc MANAGER. Chỉ hủy được đơn chưa thanh toán; đơn đã thu tiền ⇒ 409.
  *     tags: [Products]
  *     security:
@@ -142,14 +150,14 @@ router.post(
   "/orders/:id/cancel",
   authenticate,
   authorize("MEMBER", "COACH", "MANAGER"),
-  productsController.cancelProductOrder
+  productsController.cancelOrder
 );
 
 /**
  * @swagger
  * /products/my/orders:
  *   get:
- *     summary: Get my product orders
+ *     summary: Get my orders (with items)
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
@@ -160,7 +168,7 @@ router.post(
 router.get(
   "/my/orders",
   authenticate,
-  productsController.listMyProductOrders
+  productsController.listMyOrders
 );
 
 /**

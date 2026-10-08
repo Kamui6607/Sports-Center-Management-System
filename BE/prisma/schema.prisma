@@ -156,7 +156,7 @@ model User {
   createdManualCodes         AttendanceManualCode[] @relation("AttendanceManualCodeCreatedBy")
   createdProducts            Product[]              @relation("ProductCreatedBy")
   productReviews             ProductReview[]        @relation("ProductReviewUser")
-  productOrders              ProductOrder[]         @relation("ProductOrderUser")
+  orders                     Order[]                @relation("OrderUser")
   refundsRequested           Refund[]               @relation("RefundRequestedBy")
   refundsProcessed           Refund[]               @relation("RefundProcessedBy")
 
@@ -366,7 +366,7 @@ model Enrollment {
 
 model Payment {
   id                String                   @id @default(uuid())
-  /// NULL khi người mua không phải hội viên (HLV mua sản phẩm) — người mua lấy từ ProductOrder.userId.
+  /// NULL khi người mua không phải hội viên (HLV mua sản phẩm) — người mua lấy từ Order.userId.
   memberId          String?
   member            MemberProfile?           @relation(fields: [memberId], references: [id], onDelete: Restrict)
   /// Gói hội viên mà giao dịch này muốn mua — cần cho giao dịch ONLINE: Payment PENDING
@@ -376,9 +376,9 @@ model Payment {
   classId           String?
   class             Class?                   @relation(fields: [classId], references: [id])
   classNameSnapshot String?
-  /// Đơn mua sản phẩm mà giao dịch này thanh toán. Một giao dịch chỉ trỏ tới classId HOẶC productOrderId.
-  productOrderId    String?                  @unique
-  productOrder      ProductOrder?            @relation(fields: [productOrderId], references: [id], onDelete: SetNull)
+  /// Đơn mua sản phẩm mà giao dịch này thanh toán. Một giao dịch chỉ trỏ tới classId HOẶC orderId.
+  orderId           String?                  @unique
+  order             Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
   status            PaymentStatus            @default(PENDING)
   /// Mã đơn/mã thanh toán duy nhất — với giao dịch SePay đây là mã SePay bóc tách từ nội dung CK.
   transactionCode   String?                  @unique
@@ -873,7 +873,7 @@ model Product {
   updatedAt     DateTime        @default(now()) @updatedAt
 
   reviews       ProductReview[]
-  orders        ProductOrder[]
+  orderItems    OrderItem[]
 }
 
 model ProductReview {
@@ -890,23 +890,41 @@ model ProductReview {
   @@unique([productId, userId])
 }
 
-model ProductOrder {
-  id          String             @id @default(uuid())
-  productId   String
-  product     Product            @relation(fields: [productId], references: [id])
+model Order {
+  id          String      @id @default(uuid())
   userId      String
-  user        User               @relation("ProductOrderUser", fields: [userId], references: [id])
-  quantity    Int
-  totalPrice  Decimal            @db.Decimal(12, 2)
-  status      ProductOrderStatus @default(PENDING)
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @default(now()) @updatedAt
+  user        User        @relation("OrderUser", fields: [userId], references: [id])
+  /// Tổng tiền đơn = tổng `OrderItem.totalAmount` của các dòng hàng.
+  totalPrice  Decimal     @db.Decimal(12, 2)
+  status      OrderStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @default(now()) @updatedAt
 
+  /// Các dòng hàng của đơn (một đơn có thể mua nhiều sản phẩm).
+  items       OrderItem[]
   /// Giao dịch thanh toán của đơn (SePay). PENDING = đang giữ hàng chờ chuyển khoản.
   payment     Payment?
 }
 
-enum ProductOrderStatus {
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  /// Đơn giá tại thời điểm đặt (snapshot — đổi giá sản phẩm sau này không ảnh hưởng đơn cũ).
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  /// Thành tiền của dòng = quantity × unitPrice.
+  totalAmount Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([orderId, productId])
+  @@index([productId])
+}
+
+enum OrderStatus {
   PENDING
   SUCCESS
   CANCELLED

@@ -72,25 +72,31 @@ export async function deleteProduct(id: string) {
   return prisma.product.delete({ where: { id } });
 }
 
-// ── Mua sản phẩm ─────────────────────────────────────────────────────────────
+// ── Mua hàng (Order + OrderItem) ─────────────────────────────────────────────
 
-// Tạo đơn + giao dịch SePay: xem `createProductSepayCheckout` (payments/sepay-payments.service.ts).
-// Đơn chỉ thành SUCCESS khi SePay báo đã thu tiền; hủy / hết hạn ⇒ CANCELLED + hoàn kho (bên dưới).
+// Tạo đơn + giao dịch SePay: xem `createOrderSepayCheckout` (payments/sepay-payments.service.ts).
+// Mỗi dòng hàng: totalAmount = quantity × unitPrice; Order.totalPrice = tổng các totalAmount.
+// Đơn chỉ thành SUCCESS khi SePay báo đã thu tiền; hủy / hết hạn ⇒ CANCELLED + hoàn kho TỪNG sản phẩm (bên dưới).
 
-export async function listMyProductOrders(userId: string, query: any) {
+const ORDER_INCLUDE = {
+  items: {
+    include: { product: { select: { id: true, name: true } } },
+    orderBy: { createdAt: "asc" as const },
+  },
+  // FE cần mã đơn + trạng thái tiền để mở lại màn QR khi đơn còn PENDING.
+  payment: { select: { id: true, status: true, transactionCode: true, paidAt: true } },
+};
+
+export async function listMyOrders(userId: string, query: any) {
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
   const skip = (page - 1) * limit;
 
   const [total, orders] = await Promise.all([
-    prisma.productOrder.count({ where: { userId } }),
-    prisma.productOrder.findMany({
+    prisma.order.count({ where: { userId } }),
+    prisma.order.findMany({
       where: { userId },
-      include: {
-        product: true,
-        // FE cần mã đơn + trạng thái tiền để mở lại màn QR khi đơn còn PENDING.
-        payment: { select: { id: true, status: true, transactionCode: true, paidAt: true } },
-      },
+      include: ORDER_INCLUDE,
       skip,
       take: limit,
       orderBy: { createdAt: "desc" },
@@ -103,23 +109,23 @@ export async function listMyProductOrders(userId: string, query: any) {
 // ── Hủy / hết hạn đơn chờ thanh toán: hoàn kho ───────────────────────────────
 
 /**
- * Đóng MỘT đơn sản phẩm đang PENDING: payment PENDING → FAILED, đơn → CANCELLED, cộng trả kho.
+ * Đóng MỘT đơn đang PENDING: payment PENDING → FAILED, đơn → CANCELLED, cộng trả kho cho từng dòng hàng.
  * Chạy dưới `lockPaymentWebhook` (cùng lock với luồng chốt tiền SePay) và đọc lại trạng thái SAU lock:
  * nếu tiền vừa về trước đó thì KHÔNG hủy. Tiền về SAU khi hủy ⇒ luồng SePay ghi LATE để hoàn tiền.
  * @returns `true` nếu đơn đã được hủy trong lần gọi này.
  */
-export async function closePendingProductOrder(orderId: string, note: string): Promise<boolean> {
+export async function closePendingOrder(orderId: string, note: string): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
-    const current = await tx.productOrder.findUnique({
+    const current = await tx.order.findUnique({
       where: { id: orderId },
       select: { payment: { select: { id: true } } },
     });
     if (!current) return false;
     if (current.payment) await lockPaymentWebhook(tx, current.payment.id);
 
-    const order = await tx.productOrder.findUnique({
+    const order = await tx.order.findUnique({
       where: { id: orderId },
-      include: { payment: { select: { id: true, status: true } } },
+      include: { items: true, payment: { select: { id: true, status: true } } },
     });
     if (!order || order.status !== "PENDING") return false;
     if (order.payment && order.payment.status !== "PENDING") return false;
@@ -127,19 +133,22 @@ export async function closePendingProductOrder(orderId: string, note: string): P
     if (order.payment) {
       await tx.payment.update({ where: { id: order.payment.id }, data: { status: "FAILED", note } });
     }
-    await tx.productOrder.update({ where: { id: order.id }, data: { status: "CANCELLED" } });
-    await tx.product.update({
-      where: { id: order.productId },
-      data: { stockQuantity: { increment: order.quantity } },
-    });
+    await tx.order.update({ where: { id: order.id }, data: { status: "CANCELLED" } });
+    // Hoàn kho theo thứ tự productId cố định (tránh deadlock giữa hai đơn cùng hủy).
+    for (const item of [...order.items].sort((a, b) => a.productId.localeCompare(b.productId))) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { stockQuantity: { increment: item.quantity } },
+      });
+    }
     return true;
   });
 }
 
 /** Người đặt đơn (hoặc MANAGER) hủy đơn còn chờ chuyển khoản ⇒ hoàn kho. */
-export async function cancelProductOrder(orderId: string, actor: { id: string; role: string }) {
-  const order = await prisma.productOrder.findUnique({ where: { id: orderId } });
-  if (!order) throw new AppError("Product order not found", 404);
+export async function cancelOrder(orderId: string, actor: { id: string; role: string }) {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) throw new AppError("Order not found", 404);
   if (actor.role !== "MANAGER" && order.userId !== actor.id) {
     throw new AppError("Forbidden: You can only cancel your own orders", 403);
   }
@@ -147,31 +156,22 @@ export async function cancelProductOrder(orderId: string, actor: { id: string; r
     throw new AppError("Only PENDING orders can be cancelled", 400);
   }
 
-  const closed = await closePendingProductOrder(
-    orderId,
-    "Đơn sản phẩm bị hủy trước khi thanh toán — đã hoàn kho."
-  );
+  const closed = await closePendingOrder(orderId, "Đơn hàng bị hủy trước khi thanh toán — đã hoàn kho.");
   if (!closed) {
     throw new AppError("Đơn đã được thanh toán hoặc không còn ở trạng thái chờ — không thể hủy.", 409);
   }
 
-  return prisma.productOrder.findUnique({
-    where: { id: orderId },
-    include: {
-      product: true,
-      payment: { select: { id: true, status: true, transactionCode: true, paidAt: true } },
-    },
-  });
+  return prisma.order.findUnique({ where: { id: orderId }, include: ORDER_INCLUDE });
 }
 
 /**
  * Worker (server.ts): hủy các đơn PENDING quá thời hạn chờ chuyển khoản (`VIETQR_PAYMENT_TTL_MINUTES`)
- * và hoàn kho. An toàn khi chạy song song với webhook nhờ `closePendingProductOrder`.
+ * và hoàn kho. An toàn khi chạy song song với webhook nhờ `closePendingOrder`.
  * @returns số đơn đã hủy trong lượt này.
  */
-export async function expireStaleProductOrders(limit = 50): Promise<number> {
+export async function expireStaleOrders(limit = 50): Promise<number> {
   const ttlMs = sepayConfig().ttlMinutes * 60 * 1000;
-  const stale = await prisma.productOrder.findMany({
+  const stale = await prisma.order.findMany({
     where: { status: "PENDING", createdAt: { lt: new Date(Date.now() - ttlMs) } },
     select: { id: true },
     orderBy: { createdAt: "asc" },
@@ -180,9 +180,9 @@ export async function expireStaleProductOrders(limit = 50): Promise<number> {
 
   let closed = 0;
   for (const { id } of stale) {
-    const ok = await closePendingProductOrder(
+    const ok = await closePendingOrder(
       id,
-      "Hết hạn chờ thanh toán chuyển khoản — đơn sản phẩm bị hủy, đã hoàn kho."
+      "Hết hạn chờ thanh toán chuyển khoản — đơn hàng bị hủy, đã hoàn kho."
     );
     if (ok) closed += 1;
   }
@@ -193,8 +193,8 @@ export async function expireStaleProductOrders(limit = 50): Promise<number> {
 
 export async function addProductReview(userId: string, productId: string, data: { rating: number; comment?: string }) {
   // Chỉ cho đánh giá nếu đã từng mua thành công sản phẩm này
-  const orderCount = await prisma.productOrder.count({
-    where: { userId, productId, status: "SUCCESS" },
+  const orderCount = await prisma.orderItem.count({
+    where: { productId, order: { userId, status: "SUCCESS" } },
   });
   if (orderCount === 0) {
     throw new AppError("You can only review products that you have successfully purchased.", 403);

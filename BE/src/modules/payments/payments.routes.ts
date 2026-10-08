@@ -324,7 +324,7 @@ router.post(
  *       7. Hợp lệ ⇒ chốt giao dịch trong cùng transaction:
  *          - **Lớp học**: ghi danh hội viên vào các buổi sắp tới + cộng 85% vào ví HLV chính, Payment `SUCCESS`
  *            (`activationStatus = ACTIVATED`), notification `PAYMENT_SUCCESS` cho hội viên.
- *          - **Đơn sản phẩm**: Payment `SUCCESS`, `ProductOrder` `SUCCESS`, notification `PAYMENT_SUCCESS`.
+ *          - **Đơn sản phẩm**: Payment `SUCCESS`, `Order` `SUCCESS`, notification `PAYMENT_SUCCESS`.
  *          A06: `Payment.activationStatus` tách khỏi trạng thái tiền — tiền đã thu nhưng không kích hoạt được
  *          (VD lớp đã bị xóa, đơn sản phẩm không còn PENDING) ⇒ `REQUIRES_REVIEW` + `reviewReason` để
  *          quản lý xử lý (`POST /payments/{id}/retry-activation` với lớp học).
@@ -479,7 +479,7 @@ router.post(
  *       mới nhất: `PENDING` (chưa nhận được tiền) → `SUCCESS` (đã xác nhận thu tiền).
  *       Đơn còn PENDING và server có cấu hình API SePay ⇒ BE tự đối soát trước khi trả.
  *
- *       Response luôn có `classId` (giao dịch lớp học) hoặc `productOrderId` (đơn sản phẩm) và `paidAt`.
+ *       Response luôn có `classId` (giao dịch lớp học) hoặc `orderId` (đơn hàng) và `paidAt`.
  *       `activationStatus = REQUIRES_REVIEW` + `requiresReview: true` ⇒ tiền đã về nhưng chưa kích hoạt được,
  *       FE hiển thị "đang đối soát".
  *       Quyền: chủ giao dịch (MEMBER mua lớp; MEMBER/COACH đặt đơn sản phẩm) hoặc MANAGER.
@@ -518,7 +518,7 @@ router.post(
  *                     bank: { id: "SACOMBANK", accountNumber: "0703339186", accountHolder: "NGUYEN TRAN TU" }
  *                     classInfo: { id: "class-hiit-001", name: "HIIT Cardio" }
  *                     classId: "class-hiit-001"
- *                     productOrderId: null
+ *                     orderId: null
  *                     paidAt: null
  *               paid:
  *                 summary: Đơn sản phẩm — webhook đã xác nhận thu tiền
@@ -532,7 +532,7 @@ router.post(
  *                     status: SUCCESS
  *                     activationStatus: ACTIVATED
  *                     classId: null
- *                     productOrderId: "d2b3c4d5-0000-0000-0000-000000000001"
+ *                     orderId: "d2b3c4d5-0000-0000-0000-000000000001"
  *                     paidAt: "2026-10-04T11:08:35.000Z"
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       403: { description: "Không phải chủ giao dịch" }

@@ -15,8 +15,8 @@ import {
   verifySepayHmacSignature,
 } from "../../config/sepay.js";
 import { fetchSepayTransactionsByCode } from "./sepay-api.client.js";
-import { lockPaymentWebhook, lockUserProductOrder } from "../../utils/dbLocks.js";
-import { closePendingProductOrder } from "../products/products.service.js";
+import { lockPaymentWebhook, lockUserOrder } from "../../utils/dbLocks.js";
+import { closePendingOrder } from "../products/products.service.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { enqueueNotification, flushNotificationOutbox } from "../notifications/outbox.service.js";
 import { creditCoachWallet, autoEnrollAfterPayment } from "./payments.service.js";
@@ -300,27 +300,29 @@ export async function createSepayCheckout(userId: string, classId: string) {
 }
 
 /**
- * Mua sản phẩm qua chuyển khoản VietQR (SePay) — chỉ MEMBER hoặc COACH (MANAGER không mua).
+ * Mua hàng (một đơn có thể gồm NHIỀU sản phẩm) qua chuyển khoản VietQR (SePay) — chỉ MEMBER hoặc COACH.
  *
- * Trong CÙNG một transaction: trừ kho có điều kiện (giữ hàng, không bán quá số lượng) → tạo
- * `ProductOrder` PENDING → tạo `Payment` PENDING trỏ `productOrderId`. Đơn chỉ chuyển SUCCESS khi
+ * Tiền: mỗi dòng `totalAmount = quantity × unitPrice` (unitPrice = giá sản phẩm lúc đặt), rồi
+ * `Order.totalPrice = Σ totalAmount` — đây cũng là số tiền của Payment / mã QR.
+ *
+ * Trong CÙNG một transaction: trừ kho có điều kiện từng sản phẩm (giữ hàng, không bán quá số lượng) → tạo
+ * `Order` PENDING + `OrderItem` → tạo `Payment` PENDING trỏ `orderId`. Đơn chỉ chuyển SUCCESS khi
  * SePay báo đã thu tiền (`settleSepayTransfer`); hủy / hết hạn chờ ⇒ đơn CANCELLED + hoàn kho
- * (`cancelProductOrder` / `expireStaleProductOrders` trong products.service).
+ * (`cancelOrder` / `expireStaleOrders` trong products.service).
  *
- * Chống giữ hàng ảo: mỗi người chỉ có 1 đơn PENDING cho mỗi sản phẩm (serialize bằng `lockUserProductOrder`).
+ * Chống giữ hàng ảo: một người không có 2 đơn PENDING chứa cùng một sản phẩm (serialize bằng `lockUserOrder`).
  * Đơn chờ cũ đã quá hạn chuyển khoản ⇒ đóng (hoàn kho) rồi cho tạo đơn mới.
  *
- * - 400: hết hàng / sản phẩm ngừng bán / giá 0.
+ * - 400: hết hàng / sản phẩm ngừng bán / tổng tiền 0.
  * - 403: không phải MEMBER hoặc COACH.
  * - 404: không thấy sản phẩm / hồ sơ hội viên.
- * - 409 `SEPAY_PAYMENT_PENDING`: đã có đơn chờ chuyển khoản cho sản phẩm này (trả kèm QR + đơn để FE mở lại).
+ * - 409 `SEPAY_PAYMENT_PENDING`: đã có đơn chờ chuyển khoản chứa sản phẩm này (trả kèm QR + đơn để FE mở lại).
  * - 503: chưa cấu hình tài khoản nhận tiền SePay.
  */
-export async function createProductSepayCheckout(
+export async function createOrderSepayCheckout(
   userId: string,
   role: string,
-  productId: string,
-  quantity: number
+  rawItems: { productId: string; quantity: number }[]
 ) {
   const cfg = sepayConfig();
 
@@ -335,7 +337,7 @@ export async function createProductSepayCheckout(
     throw new AppError("Forbidden: only MEMBER or COACH can buy products", 403);
   }
 
-  // Hội viên mua ⇒ gắn memberId như giao dịch lớp học; HLV mua ⇒ memberId = null (người mua = ProductOrder.userId).
+  // Hội viên mua ⇒ gắn memberId như giao dịch lớp học; HLV mua ⇒ memberId = null (người mua = Order.userId).
   let memberId: string | null = null;
   if (role === "MEMBER") {
     const memberProfile = await prisma.memberProfile.findUnique({
@@ -346,30 +348,52 @@ export async function createProductSepayCheckout(
     memberId = memberProfile.id;
   }
 
-  const product = await prisma.product.findUnique({ where: { id: productId } });
-  if (!product) throw new AppError("Product not found", 404);
-  if (!product.isActive) throw new AppError("Product is no longer active", 400);
+  // Gộp các dòng trùng sản phẩm; sắp theo productId để trừ kho theo thứ tự cố định (tránh deadlock).
+  const merged = new Map<string, number>();
+  for (const it of rawItems) merged.set(it.productId, (merged.get(it.productId) ?? 0) + it.quantity);
+  const requested = [...merged.entries()]
+    .map(([productId, quantity]) => ({ productId, quantity }))
+    .sort((a, b) => a.productId.localeCompare(b.productId));
+  const productIds = requested.map((r) => r.productId);
 
-  const amount = money(Number(product.price) * quantity);
-  if (amount <= 0) {
-    throw new AppError("Sản phẩm giá 0đ không cần thanh toán qua SePay.", 400);
+  const products = await prisma.product.findMany({ where: { id: { in: productIds } } });
+  const productMap = new Map(products.map((p) => [p.id, p]));
+  for (const id of productIds) {
+    const product = productMap.get(id);
+    if (!product) throw new AppError(`Product not found: ${id}`, 404);
+    if (!product.isActive) throw new AppError(`Product is no longer active: ${product.name}`, 400);
   }
 
-  // Đơn chờ cũ đã quá hạn nhưng worker chưa kịp quét ⇒ đóng ngay (hoàn kho) để người mua tạo đơn mới.
-  const stalePending = await prisma.productOrder.findFirst({
-    where: { userId, productId, status: "PENDING" },
-    include: { payment: true },
-    orderBy: { createdAt: "desc" },
+  // Thành tiền từng dòng, rồi tổng đơn.
+  const lines = requested.map(({ productId, quantity }) => {
+    const product = productMap.get(productId)!;
+    const unitPrice = money(product.price);
+    return { productId, productName: product.name, quantity, unitPrice, totalAmount: money(unitPrice * quantity) };
   });
-  if (
-    stalePending?.payment &&
-    sepayExpiresAt(stalePending.payment, cfg.ttlMinutes).getTime() <= Date.now()
-  ) {
-    await closePendingProductOrder(
-      stalePending.id,
-      "Hết hạn chờ thanh toán chuyển khoản — đơn sản phẩm bị hủy, đã hoàn kho."
-    );
+  const amount = money(lines.reduce((sum, l) => sum + l.totalAmount, 0));
+  if (amount <= 0) {
+    throw new AppError("Đơn hàng 0đ không cần thanh toán qua SePay.", 400);
   }
+
+  // Đơn chờ cũ (chứa sản phẩm đang mua) đã quá hạn nhưng worker chưa kịp quét ⇒ đóng ngay (hoàn kho).
+  const stalePendings = await prisma.order.findMany({
+    where: { userId, status: "PENDING", items: { some: { productId: { in: productIds } } } },
+    include: { payment: true },
+  });
+  for (const stale of stalePendings) {
+    if (stale.payment && sepayExpiresAt(stale.payment, cfg.ttlMinutes).getTime() <= Date.now()) {
+      await closePendingOrder(stale.id, "Hết hạn chờ thanh toán chuyển khoản — đơn hàng bị hủy, đã hoàn kho.");
+    }
+  }
+
+  const itemsView = (items: { productId: string; quantity: number; unitPrice: unknown; totalAmount: unknown }[]) =>
+    items.map((i) => ({
+      productId: i.productId,
+      productName: productMap.get(i.productId)?.name ?? null,
+      quantity: i.quantity,
+      unitPrice: money(i.unitPrice as any),
+      totalAmount: money(i.totalAmount as any),
+    }));
 
   // Mã thanh toán UNIQUE: va chạm (cực hiếm) làm hỏng transaction ⇒ tạo lại cả transaction với mã mới.
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -377,60 +401,78 @@ export async function createProductSepayCheckout(
     const qrUrl = buildVietQrUrl({ amount, content: orderCode });
     try {
       const { order, payment } = await prisma.$transaction(async (tx) => {
-        // Mỗi (người mua × sản phẩm) chỉ 1 đơn chờ: lock rồi kiểm tra lại SAU lock (request song song xếp hàng).
-        await lockUserProductOrder(tx, userId, productId);
-        const pending = await tx.productOrder.findFirst({
-          where: { userId, productId, status: "PENDING" },
-          include: { payment: true },
+        // Lock theo người mua rồi kiểm tra lại SAU lock (request song song xếp hàng).
+        await lockUserOrder(tx, userId);
+        const pending = await tx.order.findFirst({
+          where: { userId, status: "PENDING", items: { some: { productId: { in: productIds } } } },
+          include: { payment: true, items: true },
           orderBy: { createdAt: "desc" },
         });
         if (pending) {
           throw new AppError(
-            `Bạn đang có đơn chờ chuyển khoản cho "${product.name}". ` +
+            "Bạn đang có đơn chờ chuyển khoản chứa sản phẩm trong giỏ này. " +
               "Vui lòng thanh toán đơn đó, hoặc hủy đơn cũ trước nếu muốn đổi số lượng.",
             409,
             {
               code: SEPAY_PENDING_CODE,
               ...(pending.payment ? buildSepayCheckoutView(pending.payment, null) : {}),
-              productOrder: {
+              order: {
                 id: pending.id,
-                productId: pending.productId,
-                productName: product.name,
-                quantity: pending.quantity,
                 totalPrice: money(pending.totalPrice),
                 status: pending.status,
+                items: itemsView(pending.items),
               },
             }
           );
         }
 
         // Giữ hàng: điều kiện "còn đủ hàng" nằm ngay trong câu UPDATE ⇒ hai người mua cùng lúc không bán quá kho.
-        const reserved = await tx.product.updateMany({
-          where: { id: productId, isActive: true, stockQuantity: { gte: quantity } },
-          data: { stockQuantity: { decrement: quantity } },
-        });
-        if (reserved.count === 0) {
-          const fresh = await tx.product.findUnique({
-            where: { id: productId },
-            select: { stockQuantity: true },
+        // Một dòng thiếu hàng ⇒ throw ⇒ cả transaction rollback (các dòng đã trừ trước đó tự hoàn lại).
+        for (const line of lines) {
+          const reserved = await tx.product.updateMany({
+            where: { id: line.productId, isActive: true, stockQuantity: { gte: line.quantity } },
+            data: { stockQuantity: { decrement: line.quantity } },
           });
-          throw new AppError(`Not enough stock. Only ${fresh?.stockQuantity ?? 0} items left.`, 400);
+          if (reserved.count === 0) {
+            const fresh = await tx.product.findUnique({
+              where: { id: line.productId },
+              select: { stockQuantity: true },
+            });
+            throw new AppError(
+              `Not enough stock for "${line.productName}". Only ${fresh?.stockQuantity ?? 0} items left.`,
+              400
+            );
+          }
         }
 
-        const order = await tx.productOrder.create({
-          data: { productId, userId, quantity, totalPrice: amount, status: "PENDING" },
+        const order = await tx.order.create({
+          data: {
+            userId,
+            totalPrice: amount,
+            status: "PENDING",
+            items: {
+              create: lines.map((l) => ({
+                productId: l.productId,
+                quantity: l.quantity,
+                unitPrice: l.unitPrice,
+                totalAmount: l.totalAmount,
+              })),
+            },
+          },
+          include: { items: true },
         });
 
+        const summary = lines.map((l) => `${l.productName} × ${l.quantity}`).join(", ");
         const payment = await tx.payment.create({
           data: {
             memberId,
-            productOrderId: order.id,
+            orderId: order.id,
             amount,
             method: "SEPAY",
             status: "PENDING",
             transactionCode: orderCode,
             gateway: SEPAY_GATEWAY,
-            note: `Thanh toán online đơn sản phẩm ${product.name} × ${quantity} (chuyển khoản VietQR qua SePay)`,
+            note: `Thanh toán online đơn hàng ${summary} (chuyển khoản VietQR qua SePay)`,
             gatewayPayload: asJson({
               provider: SEPAY_GATEWAY,
               orderCode,
@@ -447,13 +489,11 @@ export async function createProductSepayCheckout(
 
       return {
         ...buildSepayCheckoutView(payment, null),
-        productOrder: {
+        order: {
           id: order.id,
-          productId: order.productId,
-          productName: product.name,
-          quantity: order.quantity,
           totalPrice: amount,
           status: order.status,
+          items: itemsView(order.items),
         },
       };
     } catch (err) {
@@ -502,14 +542,14 @@ export async function getSepayCheckout(userId: string, role: string, paymentId: 
   return {
     ...buildSepayCheckoutView(payment, cls),
     classId: payment.classId,
-    productOrderId: payment.productOrderId,
+    orderId: payment.orderId,
     paidAt: payment.paidAt,
   };
 }
 
 /**
  * Chỉ chủ giao dịch hoặc MANAGER được thao tác trên một giao dịch SePay.
- * - Giao dịch đơn sản phẩm: chủ = người đặt đơn (`ProductOrder.userId`, MEMBER hoặc COACH).
+ * - Giao dịch đơn sản phẩm: chủ = người đặt đơn (`Order.userId`, MEMBER hoặc COACH).
  * - Giao dịch lớp học: chủ = MEMBER sở hữu; COACH bị chặn.
  */
 async function assertSepayPaymentOperator(
@@ -517,10 +557,10 @@ async function assertSepayPaymentOperator(
   role: string,
   payment: Payment
 ): Promise<void> {
-  if (payment.productOrderId) {
+  if (payment.orderId) {
     if (role === "MANAGER") return;
-    const order = await prisma.productOrder.findUnique({
-      where: { id: payment.productOrderId },
+    const order = await prisma.order.findUnique({
+      where: { id: payment.orderId },
       select: { userId: true },
     });
     if (order && order.userId === userId) return;
@@ -744,9 +784,9 @@ export async function retrySepayActivation(managerUserId: string, paymentId: str
   if (payment.activationStatus !== "REQUIRES_REVIEW") {
     throw new AppError("Giao dịch không ở trạng thái cần xử lý (REQUIRES_REVIEW).", 400);
   }
-  if (payment.productOrderId) {
+  if (payment.orderId) {
     throw new AppError(
-      "Giao dịch đơn sản phẩm không kích hoạt lại tự động — cần đối soát/hoàn tiền thủ công.",
+      "Giao dịch đơn hàng không kích hoạt lại tự động — cần đối soát/hoàn tiền thủ công.",
       400
     );
   }
@@ -1203,11 +1243,11 @@ async function settleSepayTransfer(
     });
 
     // (8a) Đơn mua sản phẩm: chốt đơn + thông báo (không ghi danh lớp, không cộng ví HLV).
-    if (payment.productOrderId) {
-      const order = await tx.productOrder.findUnique({
-        where: { id: payment.productOrderId },
+    if (payment.orderId) {
+      const order = await tx.order.findUnique({
+        where: { id: payment.orderId },
         include: {
-          product: { select: { name: true } },
+          items: { include: { product: { select: { name: true } } } },
           user: { select: { fullName: true } },
         },
       });
@@ -1220,7 +1260,7 @@ async function settleSepayTransfer(
             paidAt: now,
             activationStatus: "REQUIRES_REVIEW",
             reviewReason: "ORDER_NOT_PENDING",
-            note: `Đã thu tiền nhưng đơn sản phẩm ${order ? `đang ở trạng thái ${order.status}` : "không còn tồn tại"} — cần đối soát/hoàn tiền (REQUIRES_REVIEW).`,
+            note: `Đã thu tiền nhưng đơn hàng ${order ? `đang ở trạng thái ${order.status}` : "không còn tồn tại"} — cần đối soát/hoàn tiền (REQUIRES_REVIEW).`,
           },
         });
         return finish({
@@ -1233,7 +1273,7 @@ async function settleSepayTransfer(
         });
       }
 
-      await tx.productOrder.update({ where: { id: order.id }, data: { status: "SUCCESS" } });
+      await tx.order.update({ where: { id: order.id }, data: { status: "SUCCESS" } });
       await tx.payment.update({
         where: { id: payment.id },
         data: { status: "SUCCESS", paidAt: now, activationStatus: "ACTIVATED" },
@@ -1243,8 +1283,8 @@ async function settleSepayTransfer(
         userId: order.userId,
         type: "PAYMENT_SUCCESS",
         title: "Thanh toán đơn hàng thành công",
-        body: `Đơn "${order.product.name}" × ${order.quantity} (${money(payment.amount).toLocaleString("vi-VN")}đ) đã được thanh toán.`,
-        metadata: { paymentId: payment.id, productOrderId: order.id },
+        body: `Đơn hàng ${order.items.map((i) => `${i.product.name} × ${i.quantity}`).join(", ")} (${money(payment.amount).toLocaleString("vi-VN")}đ) đã được thanh toán.`,
+        metadata: { paymentId: payment.id, orderId: order.id },
       });
 
       return finish({

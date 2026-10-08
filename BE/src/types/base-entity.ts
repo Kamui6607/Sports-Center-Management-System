@@ -61,7 +61,8 @@ type BaseEntityModels = {
   Refund: Models.Refund;
   Product: Models.Product;
   ProductReview: Models.ProductReview;
-  ProductOrder: Models.ProductOrder;
+  Order: Models.Order;
+  OrderItem: Models.OrderItem;
 };
 
 // ── Kiểm tra lúc biên dịch (không sinh code chạy) ────────────────────────────
