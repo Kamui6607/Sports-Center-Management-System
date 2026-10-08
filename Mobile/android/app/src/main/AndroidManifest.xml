@@ -1,6 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Gọi API Backend (bản release cũng cần). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Quét QR điểm danh (mobile_scanner), chụp ảnh đại diện (image_picker). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Lưu ảnh VietQR vào thư viện (gal) trên Android 9 trở xuống. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <application
-        android:label="sports_center_mobile"
+        android:label="Pulse"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

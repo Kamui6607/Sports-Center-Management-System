@@ -254,15 +254,92 @@ Feature ↔ module BE:
 
 - **Android Emulator** không hiểu `localhost` của máy dev (đó là chính emulator) ⇒ dùng `10.0.2.2` để trỏ về máy host.
 - **HTTP (không TLS):** Android 9+ chặn cleartext HTTP mặc định ⇒ khi dev với BE chạy `http://`, cho phép cleartext ở bản debug (`android:usesCleartextTraffic="true"` trong `android/app/src/debug/AndroidManifest.xml` hoặc network security config). iOS gặp lỗi ATS thì cấu hình `NSAppTransportSecurity` trong `ios/Runner/Info.plist` cho môi trường dev.
-- **Build release Android:** template Flutter chỉ khai báo quyền `INTERNET` ở manifest `debug`/`profile` ⇒ phải thêm `<uses-permission android:name="android.permission.INTERNET"/>` vào `android/app/src/main/AndroidManifest.xml` trước khi build release.
-- **Quyền camera / thư viện ảnh:** quét QR và `image_picker` cần khai báo quyền (Android) và `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` (iOS). `TODO:` chọn package quét QR (VD `mobile_scanner`).
+- **Build release Android:** quyền `INTERNET` đã được thêm vào `android/app/src/main/AndroidManifest.xml` (template Flutter chỉ khai báo ở `debug`/`profile`).
+- **Windows:** project (ổ D:) và pub cache (ổ C:) khác ổ đĩa làm Kotlin incremental cache lỗi ⇒ đã đặt `kotlin.incremental=false` trong `android/gradle.properties`.
+- **Quyền camera / thư viện ảnh:** đã khai báo — Android `CAMERA` (+ `WRITE_EXTERNAL_STORAGE` cho Android ≤ 9 để lưu ảnh VietQR), iOS `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` / `NSPhotoLibraryAddUsageDescription`. Quét QR dùng `mobile_scanner`.
 - **`--dart-define` được nhúng vào file build** ⇒ **không** đặt secret (JWT secret, SePay key…) vào đây; App không cần secret nào của BE.
 - **Thanh toán khi BE chạy localhost:** SePay không gọi được webhook về máy dev ⇒ dùng `SEPAY_MOCK_MODE=true` ở BE và xác nhận bằng `POST /payments/sepay/mock-confirm`, hoặc đặt `SEPAY_API_TOKEN` để BE tự đối soát khi App polling. Chi tiết ở [`BE/README.md`](../BE/README.md).
 - **Kiểm tra:**
   ```bash
+  dart format lib test   # không dùng "dart format ." — lệnh này đi vào build/ và lỗi trên Windows
   flutter analyze
   flutter test
   ```
+
+## 🧪 Giai đoạn UI — chạy với dữ liệu giả lập (mock)
+
+Hiện app **chưa nối API**: mọi màn hình chạy trên một "BE giả" trong bộ nhớ (`lib/mock/`). Kế hoạch, quyết định và tiến độ: [`Doc/MOBILE_UI_PLAN.md`](../Doc/MOBILE_UI_PLAN.md).
+
+```bash
+cd Mobile
+flutter pub get
+flutter run                       # USE_MOCK mặc định = true
+```
+
+### Tài khoản demo
+
+Màn **Đăng nhập** có chip "Tài khoản demo" (chỉ hiện khi `USE_MOCK=true`). Mật khẩu chung: `demo123`.
+
+| Email | Dùng để thử |
+|---|---|
+| `member@demo.vn` | Học viên đang học 2 khóa, có phạt chuyên cần, đơn hàng chờ thanh toán |
+| `member2@demo.vn` | Khóa sắp khai giảng (thử hủy khóa ≥ 24h ⇒ hoàn tiền) |
+| `coach@demo.vn` | HLV đã duyệt: ví, khóa chờ duyệt / bị từ chối, buổi đang diễn ra (mở QR) |
+| `coach.done@demo.vn` | HLV **đủ điều kiện** rút tiền |
+| `coach.pending@demo.vn` / `coach.rejected@demo.vn` / `coach.new@demo.vn` | Luồng nộp CV & trạng thái hồ sơ |
+| `manager@demo.vn` | Quản lý — bản rút gọn: duyệt CV, khóa học, rút tiền, hoàn tiền |
+
+Quên mật khẩu (mock): mã OTP luôn là `246810`.
+
+### Công cụ phát triển (`/dev`)
+
+Mở từ màn **Chào mừng** hoặc mục cuối của **Tài khoản** (chỉ khi mock). Gồm:
+
+- Giả lập **mất kết nối**, **lỗi 500**, **mạng chậm** ⇒ kiểm tra skeleton / màn lỗi + "Thử lại" của mọi màn.
+- Bật/tắt **tự xác nhận thanh toán** sau ~20 giây (tắt đi để thử trạng thái chờ / hết hạn; màn VietQR có nút DEV "Giả lập đã thu tiền").
+- **Gallery**: bảng màu, chữ, nút, trạng thái của design system.
+
+Dữ liệu mock **sinh theo giờ hiện tại** (luôn có buổi hôm nay / sắp tới / đã qua) và **giữ trạng thái trong phiên chạy**: mua khóa ⇒ ghi danh + cộng ví HLV, Manager duyệt ⇒ bên Coach/Member thấy ngay (đăng xuất rồi đăng nhập tài khoản khác). Khởi động lại app ⇒ dữ liệu về như ban đầu.
+
+### Cấu trúc thực tế (giai đoạn UI)
+
+```
+lib/
+├── app/            # app.dart, router/ (go_router + RouteGuard), shell/ (bottom nav theo vai trò)
+├── core/           # config/env, theme/ (token ThemeExtension), icons/ (AppIcons → Lucide),
+│                   # widgets/ (component dùng chung), utils/ (tiền, giờ VN, validators, QR),
+│                   # error/ (AppFailure), data/ (Paged, PickedFile), platform/ (lưu/chia sẻ ảnh, chọn tệp)
+├── mock/           # MockServer (độ trễ, lỗi giả lập, phiên), MockDatabase + bảng, seed/ (dữ liệu mẫu)
+└── features/<feature>/
+    ├── domain/     # entities/ + repositories/ (interface — UI chỉ phụ thuộc lớp này)
+    ├── data/       # <feature>_mock_repository.dart + <feature>_repository_provider.dart
+    └── presentation/
+```
+
+Mỗi `<feature>_repository_provider.dart` chọn nguồn dữ liệu theo `Env.useMock`. **Luật nghiệp vụ giả lập chỉ nằm trong `*_mock_repository.dart` / `lib/mock/`** (đóng vai BE); khi nối API, luật thật do BE đảm nhiệm.
+
+### Điểm cần nối API
+
+Cách nối: thêm `dio` (+ interceptor token, map lỗi BE ⇒ `AppFailure`), viết `<Feature>ApiRepository implements <Feature>Repository`, trả nó trong nhánh `else` của provider rồi chạy với `--dart-define=USE_MOCK=false`. UI không phải sửa. Endpoint ghi ngay trên từng hàm của interface; tóm tắt:
+
+| Repository (`lib/features/…/domain/repositories/`) | Endpoint BE | TODO BE |
+|---|---|---|
+| `AuthRepository` | `POST /auth/login`, `/auth/register`, `/auth/logout`, `GET /auth/me`, `PATCH /auth/me`, `PATCH /auth/me/change-password`, `POST /auth/me/avatar`, `POST /coaches/me/cv`, `POST /auth/forgot-password`, `PATCH /auth/reset-password` | BE-4 (OTP 6 số), BE-9 (đăng nhập Coach chưa duyệt) |
+| `CatalogRepository` | `GET /sports`, `GET /rooms` | — |
+| `CourseRepository` | `GET /classes`, `GET /classes/:id`, `GET /classes/:id/course-plan`, `GET /classes?createdByMe=true`, `POST /class-schedules/activity-plan` | BE-1 (Guest xem khóa), BE-2 (lưu lý do từ chối), BE-3 (Coach sửa & gửi lại) |
+| `ScheduleRepository` | `GET /enrollments/my`, `DELETE /enrollments/:id`, `POST /enrollments/:id/transfer`, `GET /class-schedules`, `GET /enrollments/schedule/:id`, `PATCH /class-schedules/:id/complete`, `POST /class-schedules/:id/cancel`, `POST/PATCH /attendance` | — |
+| `AttendanceRepository` | `POST /attendance/scan-qr`, `GET /attendance/my`, `GET /attendance/my/summary`, `POST /attendance/penalties/:id/appeal`, `POST /attendance/generate-qr`, `GET /attendance?scheduleId=` | Endpoint đọc phạt của Member |
+| `PaymentRepository` | `POST /payments/sepay/checkout`, `GET /payments/sepay/:id` (polling), `POST /payments/sepay/mock-confirm` (DEV), `GET /invoices/member/:memberId`, `GET /invoices/:id` | BE-6 (hóa đơn sản phẩm của Coach) |
+| `ProductRepository` | `GET /products`, `GET /products/:id`, `POST /products/orders`, `POST /products/orders/:id/cancel`, `GET /products/my/orders`, `POST /products/:id/reviews` | BE-6 (ảnh sản phẩm) |
+| `RefundRepository` | `POST /refunds/course-cancellation`, `GET /refunds/my`, `GET /refunds?status=`, `PATCH /refunds/:id/approve`, `PATCH /refunds/:id/reject` | — |
+| `CoachRepository` | `GET /coaches/me/wallet`, `GET /coaches/me/wallet/transactions`, `POST /coaches/me/wallet/withdraw`, `GET /members/:id` | BE-5 (điều kiện rút tiền + `blockers`) |
+| `TrainingRepository` | `GET /training-plans?memberId=`, `POST /training-plans`, `POST /training-plans/results` | — |
+| `FeedbackRepository` | `GET /feedbacks?coachId=&classId=`, `POST /feedbacks`, `DELETE /feedbacks/:id` | — |
+| `ChatRepository` | `GET /chat/conversations`, `GET /chat/contacts`, `GET /chat/messages`, `POST /chat/messages`, `PATCH /chat/messages/read`, `GET /chat/messages/unread-count`, Socket `sendMessage` / sự kiện | — |
+| `NotificationRepository` | `GET /notifications`, `GET /notifications/unread-count`, `PATCH /notifications/:id/read`, `PATCH /notifications/mark-all-read` | Realtime (BE chưa emit socket) |
+| `ManagerRepository` | `GET /coaches/cv/pending`, `PATCH /coaches/:profileId/cv/review`, `GET /classes?status=PENDING`, `PATCH /classes/:id/review`, `PATCH /coaches/wallet/transactions/:txId/review` | BE-7 (liệt kê lệnh rút), BE-8 (xem file CV) |
+
+Chi tiết các mã TODO BE: [`Doc/MOBILE_UI_PLAN.md`](../Doc/MOBILE_UI_PLAN.md) mục 0.2.
 
 ## 📐 Quy ước code
 

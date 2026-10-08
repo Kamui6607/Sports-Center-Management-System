@@ -4,9 +4,158 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/Doc/PROJECT_OVERVIEW.md" beforeDir="false" afterPath="$PROJECT_DIR$/Doc/PROJECT_OVERVIEW.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+    <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10">
+      <change afterPath="$PROJECT_DIR$/.claude/agents/impeccable-asset-producer.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/agents/impeccable-documenter.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/agents/impeccable-finish-reviewer.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/agents/impeccable-manual-edit-applier.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/agent-development/SKILL.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/agent-development/examples/agent-creation-prompt.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/agent-development/examples/complete-agent-examples.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/agent-development/references/agent-creation-system-prompt.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/agent-development/references/system-prompt-design.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/agent-development/references/triggering-examples.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/agent-development/scripts/validate-agent.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/LICENSE.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/SKILL.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/csharp/claude-api.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/curl/examples.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/curl/managed-agents.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/go/claude-api.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/go/managed-agents/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/java/claude-api.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/java/managed-agents/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/php/claude-api.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/php/managed-agents/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/python/claude-api/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/python/claude-api/batches.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/python/claude-api/files-api.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/python/claude-api/streaming.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/python/claude-api/tool-use.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/python/managed-agents/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/ruby/claude-api.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/ruby/managed-agents/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/agent-design.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/error-codes.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/live-sources.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/managed-agents-api-reference.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/managed-agents-client-patterns.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/managed-agents-core.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/managed-agents-environments.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/managed-agents-events.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/managed-agents-onboarding.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/managed-agents-overview.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/managed-agents-tools.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/model-migration.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/models.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/prompt-caching.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/shared/tool-use-concepts.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/typescript/claude-api/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/typescript/claude-api/batches.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/typescript/claude-api/files-api.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/typescript/claude-api/streaming.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/typescript/claude-api/tool-use.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/claude-api/typescript/managed-agents/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/frontend-design/LICENSE.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/frontend-design/SKILL.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/SKILL.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/adapt.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/adapt.native.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/android.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/animate.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/audit.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/audit.native.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/bolder.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/clarify.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/colorize.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/component-review.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/craft-floor.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/craft.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/critique.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/degraded/asset-producer.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/degraded/documenter.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/degraded/finish-reviewer.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/degraded/manual-edit-applier.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/delight.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/distill.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/doctor.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/document.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/extract.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/generate.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/harden.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/hooks.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/init.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/ios.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/layout.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/live-setup.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/live.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/mode-operate.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/mode-persuade.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/mode-read.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/new-work.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/onboard.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/operate.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/optimize.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/overdrive.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/polish.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/quieter.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/region-map.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/routing.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/shape.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/typeset.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/reference/visualize.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/VERSION" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/bin/windows-x64/impeccable.exe" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/command-metadata.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/data/font-index-failures.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/data/font-index.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/impeccable" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/impeccable.cmd" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/live-browser-dom.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/live-browser-ignores.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/live-browser-session.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/live-browser.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/impeccable/scripts/modern-screenshot.umd.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/memory-management/SKILL.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/plugin-structure/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/plugin-structure/SKILL.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/plugin-structure/examples/advanced-plugin.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/plugin-structure/examples/minimal-plugin.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/plugin-structure/examples/standard-plugin.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/plugin-structure/references/component-patterns.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/plugin-structure/references/manifest-reference.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/LICENSE.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/SKILL.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/agents/analyzer.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/agents/comparator.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/agents/grader.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/assets/eval_review.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/eval-viewer/generate_review.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/eval-viewer/viewer.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/references/schemas.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/scripts/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/scripts/aggregate_benchmark.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/scripts/generate_report.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/scripts/improve_description.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/scripts/package_skill.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/scripts/quick_validate.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/scripts/run_eval.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/scripts/run_loop.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-creator/scripts/utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-development/SKILL.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/skill-development/references/skill-creator-original.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/system-design/SKILL.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.claude/skills/ui-ux-pro-max/SKILL.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/analysis_options.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/analysis_options.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/android/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/android/app/src/main/AndroidManifest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/android/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/android/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/ios/Runner/Info.plist" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/ios/Runner/Info.plist" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/main.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/pubspec.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/pubspec.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/test/widget_test.dart" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -19,6 +168,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;Vu219&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/Kamui6607/Sports-Center-Management-System.git&quot;,
+    &quot;accountId&quot;: &quot;b2110c29-7de2-44a5-b839-a4426e3c72c8&quot;
+  }
+}</component>
   <component name="McpProjectServerCommands">
     <commands />
     <urls />
@@ -35,24 +196,47 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.cidr.known.project.marker": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
+    "com.google.cloudcode.ide_session_index": "20261008_0002",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "dart.analysis.tool.window.visible": "false",
     "git-widget-placeholder": "develop",
+    "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "D:/FA26/PRM/Sports-Center-Management-System",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
     "project.structure.last.edited": "Modules",
     "project.structure.proportion": "0.0",
     "project.structure.side.proportion": "0.0",
     "settings.editor.selected.configurable": "preferences.pluginManager",
-    "show.migrate.to.gradle.popup": "false"
+    "show.migrate.to.gradle.popup": "false",
+    "to.speed.mode.migration.done": "true",
+    "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\FA26\PRM\Sports-Center-Management-System" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.31033.145" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.31033.145" />
+      </set>
+    </attachedChunks>
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="" />
@@ -60,7 +244,26 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1791122768339</updated>
+      <workItem from="1791127339188" duration="14000" />
+      <workItem from="1791395480636" duration="2378000" />
+      <workItem from="1791423363035" duration="3398000" />
     </task>
+    <task id="LOCAL-00001" summary="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10">
+      <option name="closed" value="true" />
+      <created>1791124553142</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1791124553142</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10" />
   </component>
 </project>
