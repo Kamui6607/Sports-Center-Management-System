@@ -9,24 +9,19 @@ export interface SendEmailInput {
   html: string;
 }
 
-/**
- * Gửi email qua Brevo Transactional Email API (HTTPS, dùng `fetch` có sẵn — không cần thư viện).
- * - Thiếu BREVO_API_KEY/BREVO_SENDER_EMAIL: ở dev chỉ cảnh báo và bỏ qua; ở production THROW
- *   để outbox ghi lỗi và retry (không "mất" email trong im lặng).
- * - Brevo trả non-2xx ⇒ throw (outbox sẽ retry theo backoff).
- */
-export async function sendEmail({ to, subject, html }: SendEmailInput): Promise<void> {
-  if (!env.BREVO_API_KEY || !env.BREVO_SENDER_EMAIL) {
-    const msg = "Brevo chưa cấu hình (BREVO_API_KEY / BREVO_SENDER_EMAIL).";
-    if (env.NODE_ENV === "production") throw new Error(msg);
-    console.warn(`\n[WARNING] ${msg} Bỏ qua gửi email thật tới ${to} (subject: ${subject}).\n`);
-    return;
-  }
+function brevoConfigured(): boolean {
+  return Boolean(env.BREVO_API_KEY && env.BREVO_SENDER_EMAIL);
+}
 
+function smtpConfigured(): boolean {
+  return Boolean(env.SMTP_USER && env.SMTP_PASS);
+}
+
+async function sendViaBrevo({ to, subject, html }: SendEmailInput): Promise<void> {
   const res = await fetch(BREVO_URL, {
     method: "POST",
     headers: {
-      "api-key": env.BREVO_API_KEY,
+      "api-key": env.BREVO_API_KEY!,
       "content-type": "application/json",
       accept: "application/json",
     },
@@ -39,10 +34,62 @@ export async function sendEmail({ to, subject, html }: SendEmailInput): Promise<
     signal: AbortSignal.timeout(BREVO_TIMEOUT_MS),
   });
 
-  if (!res.ok) {
-    const detail = (await res.text().catch(() => "")).slice(0, 300);
-    throw new Error(`Brevo ${res.status}: ${detail}`);
+  const body = await res.text().catch(() => "");
+  if (!res.ok) throw new Error(`Brevo ${res.status}: ${body.slice(0, 300)}`);
+  // Brevo trả 201 = đã NHẬN yêu cầu, chưa chắc đã giao tới hộp thư. Tra messageId trong Brevo → Transactional → Logs.
+  console.log(`[MAIL] Brevo response ${res.status}: ${body.slice(0, 200)}`);
+}
+
+async function sendViaSmtp({ to, subject, html }: SendEmailInput): Promise<void> {
+  const nodemailer = await import("nodemailer");
+  const port = Number(env.SMTP_PORT ?? 587);
+  const transporter = nodemailer.createTransport({
+    host: env.SMTP_HOST ?? "smtp.gmail.com",
+    port,
+    secure: env.SMTP_SECURE || port === 465,
+    auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
+  });
+  await transporter.sendMail({
+    from: env.SMTP_FROM ?? `"${env.BREVO_SENDER_NAME}" <${env.SMTP_USER}>`,
+    to,
+    subject,
+    html,
+  });
+}
+
+/**
+ * Gửi email: ưu tiên Brevo (HTTPS API); không có Brevo thì dùng SMTP (nodemailer).
+ * - Không cấu hình provider nào ⇒ THROW (mọi môi trường) để outbox giữ lỗi trong `lastError` và retry,
+ *   thay vì đánh dấu SENT mà thực tế không có mail nào được gửi.
+ * - Provider trả lỗi ⇒ throw (kèm tên provider); outbox retry theo backoff.
+ */
+export async function sendEmail(input: SendEmailInput): Promise<void> {
+  const forced = env.MAIL_PROVIDER;
+  if (forced === "smtp") {
+    if (!smtpConfigured()) throw new Error("MAIL_PROVIDER=smtp nhưng thiếu SMTP_USER / SMTP_PASS.");
+    await sendViaSmtp(input);
+    console.log(`[MAIL] Đã gửi qua SMTP tới ${input.to} (subject: ${input.subject})`);
+    return;
   }
+  if (forced === "brevo" && !brevoConfigured()) {
+    throw new Error("MAIL_PROVIDER=brevo nhưng thiếu BREVO_API_KEY / BREVO_SENDER_EMAIL.");
+  }
+  if (brevoConfigured()) {
+    await sendViaBrevo(input);
+    console.log(`[MAIL] Brevo đã NHẬN yêu cầu gửi tới ${input.to} (subject: ${input.subject})`);
+    return;
+  }
+  if (smtpConfigured()) {
+    await sendViaSmtp(input);
+    console.log(`[MAIL] Đã gửi qua SMTP tới ${input.to} (subject: ${input.subject})`);
+    return;
+  }
+  throw new Error(
+    "Chưa cấu hình email: cần BREVO_API_KEY + BREVO_SENDER_EMAIL, hoặc SMTP_USER + SMTP_PASS (+ SMTP_HOST/SMTP_PORT)."
+  );
 }
 
 export function buildResetPasswordEmail(resetLink: string): { subject: string; html: string } {

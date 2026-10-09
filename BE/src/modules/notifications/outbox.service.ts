@@ -124,6 +124,9 @@ export async function flushNotificationOutbox(limit = OUTBOX_BATCH_SIZE): Promis
       sent += 1;
     } catch (err) {
       const attempts = row.attempts + 1;
+      console.error(
+        `[OUTBOX] Gửi ${row.channel} thất bại (lần ${attempts}/${OUTBOX_MAX_ATTEMPTS}, id ${row.id}): ${(err as Error).message}`
+      );
       const failed = attempts >= OUTBOX_MAX_ATTEMPTS;
       await prisma.notificationOutbox.update({
         where: { id: row.id },
