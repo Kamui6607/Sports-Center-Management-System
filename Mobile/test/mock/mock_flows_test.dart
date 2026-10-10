@@ -9,12 +9,12 @@ import 'package:sports_center_mobile/features/coach/domain/entities/wallet.dart'
 import 'package:sports_center_mobile/features/manager/data/manager_mock_repository.dart';
 import 'package:sports_center_mobile/features/payments/data/payment_mock_repository.dart';
 import 'package:sports_center_mobile/features/payments/domain/entities/payment.dart';
-import 'package:sports_center_mobile/features/products/data/product_mock_repository.dart';
-import 'package:sports_center_mobile/features/products/domain/entities/product.dart';
 import 'package:sports_center_mobile/features/refunds/data/refund_mock_repository.dart';
 import 'package:sports_center_mobile/features/refunds/domain/entities/refund.dart';
 import 'package:sports_center_mobile/features/schedule/data/schedule_mock_repository.dart';
 import 'package:sports_center_mobile/features/schedule/domain/entities/session.dart';
+import 'package:sports_center_mobile/features/shop/data/shop_mock_repository.dart';
+import 'package:sports_center_mobile/features/shop/domain/entities/shop.dart';
 import 'package:sports_center_mobile/mock/mock_server.dart';
 import 'package:sports_center_mobile/mock/seed/seed.dart';
 
@@ -185,26 +185,143 @@ void main() {
     });
   });
 
-  group('Cửa hàng (L8)', () {
-    test('đặt đơn giữ hàng, hủy đơn hoàn kho', () async {
+  group('Cửa hàng (Doc/SHOP_FLOW_DESIGN.md)', () {
+    const pickupReq = CheckoutRequest(mode: CheckoutMode.cart, fulfillmentType: FulfillmentType.pickup);
+
+    /// Đẩy hạn thanh toán về quá khứ ⇒ job cửa hàng (chạy đầu mỗi request mock) chuyển EXPIRED + nhả hàng.
+    void expire(String orderId) {
+      server.db.shopOrders.firstWhere((o) => o.id == orderId).paymentExpiresAt = server.db.now().subtract(
+        const Duration(seconds: 1),
+      );
+      server.db.runShopJobs();
+    }
+
+    test('giỏ → checkout giữ hàng → thanh toán (SALE) → sẵn sàng → mã nhận hàng → hoàn tất → đánh giá', () async {
       await login('member@demo.vn');
-      final products = ProductMockRepository(server);
-      final before = (await products.product('p-mat')).stockQuantity;
-      final checkout = await products.createOrder('p-mat', 2);
-      expect((await products.product('p-mat')).stockQuantity, before - 2);
-      await products.cancelOrder(checkout.productOrderId!);
-      expect((await products.product('p-mat')).stockQuantity, before);
-      final order = (await products.myOrders()).firstWhere((o) => o.id == checkout.productOrderId);
-      expect(order.status, OrderStatus.cancelled);
+      final shop = ShopMockRepository(server);
+      await shop.clearCart();
+      await shop.addToCart('p-mat', 2);
+      final mat = server.db.products.firstWhere((p) => p.id == 'p-mat');
+      final stock = mat.stockQuantity;
+      final preview = await shop.preview(pickupReq);
+      expect(preview.total, 840000);
+      expect(preview.canCheckout, isTrue);
+      final placed = await shop.placeOrder(pickupReq, expectedTotal: preview.total, idempotencyKey: 'k-1');
+      expect(mat.reservedStock, 2, reason: 'giữ hàng khi tạo đơn');
+      expect((await shop.cart()).isEmpty, isTrue, reason: 'đặt từ giỏ ⇒ xóa dòng đã đặt');
+      final replay = await shop.placeOrder(pickupReq, expectedTotal: preview.total, idempotencyKey: 'k-1');
+      expect(replay.orderId, placed.orderId, reason: 'cùng Idempotency-Key ⇒ cùng đơn');
+
+      await PaymentMockRepository(server).simulatePaid(placed.paymentId);
+      expect((await shop.myOrder(placed.orderId)).status, ShopOrderStatus.paid);
+      expect(mat.stockQuantity, stock - 2);
+      expect(mat.reservedStock, 0);
+
+      await login('manager@demo.vn');
+      await expectLater(
+        shop.transition(placed.orderId, ShopOrderStatus.shipping, trackingCode: 'X1'),
+        throwsA(isA<AppFailure>().having((f) => f.code, 'code', 'ORDER_INVALID_TRANSITION')),
+      );
+      await shop.transition(placed.orderId, ShopOrderStatus.readyForPickup);
+      await login('member@demo.vn');
+      final mine = await shop.myOrder(placed.orderId);
+      final code = mine.pickup!.code!;
+      expect(mine.pickup!.qrPayload, 'SCMS-PICKUP:${mine.code}:$code');
+
+      await login('manager@demo.vn');
+      final found = await shop.verifyPickup(mine.pickup!.qrPayload!);
+      expect(found.order.pickup?.code, isNull, reason: 'Manager không thấy mã');
+      await expectLater(
+        shop.confirmPickup(placed.orderId, code, '0000'),
+        throwsA(isA<AppFailure>().having((f) => f.code, 'code', 'PHONE_MISMATCH')),
+      );
+      final done = await shop.confirmPickup(placed.orderId, code, '4567');
+      expect(done.status, ShopOrderStatus.completed);
+      await expectLater(
+        shop.confirmPickup(placed.orderId, code, '4567'),
+        throwsA(isA<AppFailure>().having((f) => f.code, 'code', 'PICKUP_CODE_USED')),
+      );
+
+      await login('member@demo.vn');
+      final line = (await shop.myOrder(placed.orderId)).lines.single;
+      expect(line.canReview, isTrue);
+      await shop.reviewItem(line.id, 5, 'Tốt');
+      await expectLater(shop.reviewItem(line.id, 4, null), throwsA(isA<AppFailure>()));
     });
 
-    test('chỉ người mua thành công mới được đánh giá, 1 lần', () async {
+    test('hết hạn ⇒ nhả hàng; 3 lần/24h ⇒ khóa đặt hàng', () async {
       await login('member@demo.vn');
-      final products = ProductMockRepository(server);
-      expect(await products.canReview('p-bottle'), isTrue);
-      await products.addReview('p-bottle', 5, 'Tốt');
-      expect(await products.canReview('p-bottle'), isFalse);
-      expect(() => products.addReview('p-whey', 5, null), throwsA(isA<AppFailure>()));
+      final shop = ShopMockRepository(server);
+      const req = CheckoutRequest(
+        mode: CheckoutMode.buyNow,
+        fulfillmentType: FulfillmentType.pickup,
+        items: {'p-water': 1},
+      );
+      final water = server.db.products.firstWhere((p) => p.id == 'p-water');
+      // Seed có 1 đơn chờ (o-3) ⇒ hủy để không chạm giới hạn 2 đơn chờ.
+      await shop.cancelOrder('o-3');
+      for (var i = 0; i < 3; i++) {
+        final p = await shop.preview(req);
+        final placed = await shop.placeOrder(req, expectedTotal: p.total, idempotencyKey: 'exp-$i');
+        expect(water.reservedStock, 1);
+        expire(placed.orderId);
+        expect(server.db.shopOrders.firstWhere((o) => o.id == placed.orderId).status, ShopOrderStatus.expired);
+        expect(water.reservedStock, 0);
+      }
+      final preview = await shop.preview(req);
+      expect(preview.canCheckout, isFalse);
+      expect(preview.lockedUntil, isNotNull);
+      await expectLater(
+        shop.placeOrder(req, expectedTotal: preview.total, idempotencyKey: 'exp-x'),
+        throwsA(isA<AppFailure>().having((f) => f.code, 'code', 'CHECKOUT_LOCKED')),
+      );
+    });
+
+    test('giới hạn mỗi đơn, đơn chờ thanh toán, giá đổi', () async {
+      await login('member@demo.vn');
+      final shop = ShopMockRepository(server);
+      await expectLater(
+        shop.addToCart('p-whey', 3),
+        throwsA(isA<AppFailure>().having((f) => f.code, 'code', 'MAX_PER_ORDER_EXCEEDED')),
+      );
+      const req = CheckoutRequest(
+        mode: CheckoutMode.buyNow,
+        fulfillmentType: FulfillmentType.pickup,
+        items: {'p-cap': 1},
+      );
+      final p = await shop.preview(req);
+      await expectLater(
+        shop.placeOrder(req, expectedTotal: p.total - 1000, idempotencyKey: 'pc'),
+        throwsA(isA<AppFailure>().having((f) => f.code, 'code', 'PRICE_CHANGED')),
+      );
+      await shop.placeOrder(req, expectedTotal: p.total, idempotencyKey: 'p1'); // + o-3 seed = 2 đơn chờ
+      final blocked = await shop.preview(req);
+      expect(blocked.warnings.map((w) => w.code), contains('PENDING_ORDER_LIMIT'));
+      final cart = await shop.cart();
+      expect(cart.lines.firstWhere((l) => l.productId == 'p-bar').priceChange, isNotNull);
+    });
+
+    test('yêu cầu hoàn tiền đơn đã thanh toán ⇒ Manager duyệt ⇒ REFUNDED + trả kho', () async {
+      await login('member@demo.vn');
+      final shop = ShopMockRepository(server);
+      final o8 = await shop.requestRefund('o-8', 'Đặt nhầm');
+      expect(o8.status, ShopOrderStatus.refundRequested);
+      final electro = server.db.products.firstWhere((p) => p.id == 'p-electro');
+      final stock = electro.stockQuantity;
+      await login('manager@demo.vn');
+      final refund = server.db.refunds.firstWhere((r) => r.orderId == 'o-8');
+      final view = await RefundMockRepository(server).refund(refund.id);
+      expect(view.isOrder, isTrue);
+      await RefundMockRepository(server).approve(refund.id);
+      expect(server.db.shopOrders.firstWhere((o) => o.id == 'o-8').status, ShopOrderStatus.refunded);
+      expect(electro.stockQuantity, stock + 3);
+    });
+
+    test('IDOR: không xem/hủy được đơn của người khác', () async {
+      await login('coach@demo.vn');
+      final shop = ShopMockRepository(server);
+      await expectLater(shop.myOrder('o-1'), throwsA(isA<AppFailure>()));
+      await expectLater(shop.cancelOrder('o-3'), throwsA(isA<AppFailure>()));
     });
   });
 

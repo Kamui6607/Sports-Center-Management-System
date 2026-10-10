@@ -7,7 +7,9 @@ import '../../../../app/shell/header_actions.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../auth/domain/entities/app_user.dart';
 import '../../../auth/presentation/providers/session_provider.dart';
+import '../../../shop/presentation/widgets/cart_button.dart';
 import '../../domain/entities/product.dart';
 import '../product_labels.dart';
 import '../providers/product_providers.dart';
@@ -21,16 +23,19 @@ class ShopScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final value = ref.watch(shopProvider);
-    final loggedIn = ref.watch(currentUserProvider) != null;
+    final user = ref.watch(currentUserProvider);
+    final loggedIn = user != null;
+    final isManager = user?.role == UserRole.manager;
     return AppScaffold(
       title: 'Cửa hàng',
       actions: [
-        if (loggedIn)
+        if (loggedIn && !isManager)
           AppIconButton(
             icon: AppIcons.order,
             tooltip: 'Đơn hàng của tôi',
             onPressed: () => context.push(AppRoutes.orders),
           ),
+        const CartButton(),
         if (asTab) const HeaderActions(showChat: false),
       ],
       body: Column(

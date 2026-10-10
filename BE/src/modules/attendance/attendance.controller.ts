@@ -113,3 +113,20 @@ export const revokePenalty = async (req: Request, res: Response, next: NextFunct
     sendSuccess(res, result, "Attendance penalty revoked");
   } catch (error) { next(error); }
 };
+export const saveAttendanceBulk = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await service.saveAttendanceBulk(req.params.scheduleId as string, req.body.items, req.user);
+    sendSuccess(res, data, "Attendance saved");
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const revokeAttendanceCodes = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await service.revokeAttendanceCodes(req.params.scheduleId as string, req.user);
+    sendSuccess(res, data, "Attendance codes revoked");
+  } catch (error) {
+    next(error);
+  }
+};

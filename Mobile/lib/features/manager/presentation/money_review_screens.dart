@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../app/router/app_routes.dart';
+import '../../../core/icons/app_icons.dart';
 
 import '../../../core/theme/theme.dart';
 import '../../../core/utils/money.dart';
@@ -139,9 +143,10 @@ class RefundReviewScreen extends ConsumerWidget {
           ? null
           : ReviewActionBar(
               approveLabel: 'Đã hoàn tiền',
-              approveMessage:
-                  'Xác nhận đã chuyển ${Money.format(r.amount)} cho ${r.memberName}. Ví HLV ${r.coachName} bị trừ '
-                  '${Money.format(r.coachDebitAmount)}.',
+              approveMessage: r.isOrder
+                  ? 'Xác nhận đã chuyển ${Money.format(r.amount)} cho ${r.memberName}. Đơn hàng chuyển sang "Đã hoàn tiền".'
+                  : 'Xác nhận đã chuyển ${Money.format(r.amount)} cho ${r.memberName}. Ví HLV ${r.coachName} bị trừ '
+                        '${Money.format(r.coachDebitAmount)}.',
               approveNoteLabel: 'Ghi chú (VD mã giao dịch chuyển khoản)',
               onApprove: (note) =>
                   runReview(context, ref, () => repo.approve(refundId, note: note), 'Đã duyệt hoàn tiền.'),
@@ -159,22 +164,39 @@ class RefundReviewScreen extends ConsumerWidget {
             AppCard(
               child: Column(
                 children: [
-                  KeyValueRow(label: 'Học viên', value: r.memberName),
-                  KeyValueRow(label: 'Khóa học', value: r.className),
-                  KeyValueRow(label: 'HLV', value: r.coachName),
+                  KeyValueRow(label: r.isOrder ? 'Người mua' : 'Học viên', value: r.memberName),
+                  if (r.isOrder)
+                    KeyValueRow(label: 'Đơn hàng', value: r.orderCode ?? '')
+                  else ...[
+                    KeyValueRow(label: 'Khóa học', value: r.className),
+                    KeyValueRow(label: 'HLV', value: r.coachName),
+                  ],
                   KeyValueRow(label: 'Lý do', value: r.reason.label),
                   if (r.sessionStart != null)
                     KeyValueRow(label: 'Buổi bị hủy', value: VnTime.dateTime(r.sessionStart!)),
                   if (r.paidAmount != null) KeyValueRow(label: 'Giao dịch gốc', value: Money.format(r.paidAmount!)),
                   const Divider(),
-                  KeyValueRow(label: 'Hoàn cho học viên', value: Money.format(r.amount), emphasize: true),
-                  KeyValueRow(label: 'Trừ ví HLV (85%)', value: Money.format(r.coachDebitAmount)),
+                  KeyValueRow(
+                    label: r.isOrder ? 'Hoàn cho người mua' : 'Hoàn cho học viên',
+                    value: Money.format(r.amount),
+                    emphasize: true,
+                  ),
+                  if (!r.isOrder) KeyValueRow(label: 'Trừ ví HLV (85%)', value: Money.format(r.coachDebitAmount)),
                 ],
               ),
             ),
             if (r.note != null) ...[
               const SizedBox(height: AppSpacing.md),
-              AlertBanner.info(title: 'Ghi chú của học viên', message: r.note!),
+              AlertBanner.info(title: r.isOrder ? 'Ghi chú' : 'Ghi chú của học viên', message: r.note!),
+            ],
+            if (r.orderId != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              AppButton.outline(
+                label: 'Xem đơn hàng',
+                icon: AppIcons.order,
+                expand: true,
+                onPressed: () => context.push(AppRoutes.managerOrder(r.orderId!)),
+              ),
             ],
           ],
         ),

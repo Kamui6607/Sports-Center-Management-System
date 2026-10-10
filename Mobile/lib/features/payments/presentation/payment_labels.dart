@@ -26,7 +26,7 @@ extension PaymentMethodLabel on PaymentMethod {
 
 extension InvoiceStatusLabel on InvoiceStatus {
   StatusLabel get status => switch (this) {
-    InvoiceStatus.issued => const StatusLabel('Đã xuất', StatusTone.success),
-    InvoiceStatus.cancelled => const StatusLabel('Đã hủy', StatusTone.danger),
+    InvoiceStatus.issued => const StatusLabel('Thành công', StatusTone.success),
+    InvoiceStatus.cancelled => const StatusLabel('Đã hoàn tiền', StatusTone.info),
   };
 }

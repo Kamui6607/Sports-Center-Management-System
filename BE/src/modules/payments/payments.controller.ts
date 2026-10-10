@@ -15,6 +15,12 @@ export async function listPayments(req: Request, res: Response, next: NextFuncti
     sendSuccess(res, payments, "Payments retrieved successfully", 200, pagination);
   } catch (err) { next(err); }
 }
+export async function listMyPayments(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { payments, pagination } = await paymentsService.listMyPayments(req.user!, req.query);
+    sendSuccess(res, payments, "My payments retrieved successfully", 200, pagination);
+  } catch (err) { next(err); }
+}
 export async function getPaymentById(req: Request, res: Response, next: NextFunction) {
   try {
     const payment = await paymentsService.getPaymentById(req.params.id as string, req.user);

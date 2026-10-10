@@ -48,6 +48,14 @@ export const SepayWebhookSchema = z
 
 export type SepayWebhookBody = z.infer<typeof SepayWebhookSchema>;
 
+/** BE-6: `GET /payments/my`. */
+export const MyPaymentQuerySchema = z.object({
+  page: z.string().optional(),
+  limit: z.string().optional(),
+  type: z.enum(["CLASS", "ORDER"]).optional(),
+  status: z.enum(["PENDING", "SUCCESS", "FAILED", "REFUNDED"]).optional(),
+});
+
 export const PaymentQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),

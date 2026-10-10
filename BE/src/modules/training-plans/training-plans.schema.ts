@@ -20,6 +20,8 @@ export const ProgressMetricSchema = z.object({
   unit: z.string().trim().max(20).optional(),
   /** true ⇒ số càng nhỏ càng tốt (thời gian chạy...). Mặc định số càng lớn càng tốt. */
   lowerIsBetter: z.boolean().optional(),
+  /** L9: ghi chú chữ tùy chọn cho chỉ số (VD "cảm thấy nhẹ hơn tuần trước"). */
+  note: z.string().trim().max(200).optional(),
 });
 
 export const CreateTrainingResultSchema = z.object({

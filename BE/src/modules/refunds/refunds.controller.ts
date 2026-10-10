@@ -40,3 +40,17 @@ export async function rejectRefund(req: Request, res: Response, next: NextFuncti
     sendSuccess(res, refund, "Refund rejected");
   } catch (err) { next(err); }
 }
+
+export async function getRefundById(req: Request, res: Response, next: NextFunction) {
+  try {
+    const refund = await refundsService.getRefundById(req.params.id as string, req.user!);
+    sendSuccess(res, refund, "Refund retrieved successfully");
+  } catch (err) { next(err); }
+}
+
+export async function previewCourseRefund(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await refundsService.previewCourseRefund(req.user!.id, String(req.query.classId));
+    sendSuccess(res, result, "Course cancellation preview");
+  } catch (err) { next(err); }
+}

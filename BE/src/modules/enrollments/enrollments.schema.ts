@@ -13,6 +13,10 @@ export const TransferEnrollmentSchema = z.object({
 export const EnrollmentQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
+  /** BE-14: lọc buổi giao với khoảng [from, to) theo giờ buổi học (ISO 8601). */
+  from: z.string().datetime({ offset: true }).optional(),
+  to: z.string().datetime({ offset: true }).optional(),
+  classId: z.string().optional(),
   status: z.enum(["BOOKED", "CANCELLED", "COMPLETED"]).optional(),
   scheduleId: z.string().optional(),
   memberId: z.string().optional(),

@@ -3,9 +3,9 @@ import '../features/auth/domain/entities/app_user.dart';
 import '../features/coach/domain/entities/wallet.dart';
 import '../features/notifications/domain/entities/app_notification.dart';
 import '../features/payments/domain/entities/payment.dart';
-import '../features/products/domain/entities/product.dart';
 import '../features/refunds/domain/entities/refund.dart';
 import '../features/schedule/domain/entities/session.dart';
+import '../features/shop/domain/entities/shop.dart';
 import 'mock_database.dart';
 import 'mock_tables.dart';
 
@@ -63,21 +63,15 @@ extension MockOperations on MockDatabase {
     return p;
   }
 
-  /// Hết hạn các giao dịch PENDING quá hạn: giao dịch ⇒ FAILED, đơn sản phẩm ⇒
-  /// CANCELLED + hoàn kho (mô phỏng job của BE).
+  /// Hết hạn các giao dịch PENDING quá hạn (giao dịch ⇒ FAILED) + job cửa hàng (đơn hết hạn nhả hàng,
+  /// quá hạn nhận, tự hoàn tất) — mô phỏng worker của BE.
   void expireStalePayments() {
+    runShopJobs();
     final t = now();
-    for (final p in payments.where((p) => p.status == PaymentStatus.pending && !t.isBefore(p.expiresAt))) {
+    for (final p in payments.where(
+      (p) => p.status == PaymentStatus.pending && p.productOrderId == null && !t.isBefore(p.expiresAt),
+    )) {
       p.status = PaymentStatus.failed;
-      final orderId = p.productOrderId;
-      if (orderId != null) {
-        final o = productOrders.firstWhere((o) => o.id == orderId);
-        if (o.status == OrderStatus.pending) {
-          o.status = OrderStatus.cancelled;
-          o.cancelReason = OrderCancelReason.expired;
-          products.firstWhere((x) => x.id == o.productId).stockQuantity += o.quantity;
-        }
-      }
     }
   }
 
@@ -142,17 +136,11 @@ extension MockOperations on MockDatabase {
         metadata: {'classId': c.id},
       );
     } else if (orderId != null) {
-      final o = productOrders.firstWhere((x) => x.id == orderId);
-      o.status = OrderStatus.success;
-      final product = products.firstWhere((x) => x.id == o.productId);
-      _issueInvoice(p, product.name, CheckoutPurpose.product, o.quantity);
-      notify(
-        buyer.id,
-        NotificationType.paymentSuccess,
-        'Đơn hàng thành công',
-        'Đơn ${product.name} × ${o.quantity} đã được thanh toán.',
-        metadata: {'orderId': o.id, 'paymentId': p.id},
-      );
+      // Đơn hàng: PENDING_PAYMENT → PAID + trừ hẳn tồn (SALE); đơn đã đóng ⇒ không khôi phục.
+      final o = shopOrders.firstWhere((x) => x.id == orderId);
+      if (o.status != ShopOrderStatus.pendingPayment) return;
+      settleOrderPayment(p);
+      _issueInvoice(p, o.lines.map((l) => l.productName).join(', '), CheckoutPurpose.product, o.itemCount);
     }
   }
 

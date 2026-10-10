@@ -13,6 +13,7 @@ import '../../domain/entities/course.dart';
 import '../class_labels.dart';
 import '../providers/class_wizard_draft.dart';
 import '../providers/course_providers.dart';
+import 'sport_picker_field.dart';
 
 /// Cập nhật [WizardData] rồi vẽ lại màn wizard (truyền `setState` của màn).
 typedef WizardUpdate = void Function(VoidCallback change);
@@ -64,14 +65,12 @@ class WizardInfoStep extends ConsumerWidget {
             hint: 'Đối tượng phù hợp, nội dung, lưu ý (chống chỉ định)…',
           ),
           const SizedBox(height: AppSpacing.md),
-          SelectField<String>(
-            label: 'Bộ môn',
-            requiredField: true,
-            multiple: true,
-            options: [for (final s in sports) SelectOption(s.id, s.name)],
-            values: d.sportIds,
-            onChanged: (v) => update(() => d.sportIds = v),
-            errorText: fieldErrors['sportIds'],
+          // L3: mỗi khóa MỘT bộ môn — chọn từ danh mục hoặc nhập bộ môn mới.
+          SportPickerField(
+            sports: sports,
+            value: d.sportIds.firstOrNull,
+            onChanged: (v) => update(() => d.sportIds = [v]),
+            errorText: fieldErrors['sportIds'] ?? fieldErrors['fitness'],
           ),
           const SizedBox(height: AppSpacing.md),
           Text('Hạng khóa', style: context.text.label),
@@ -289,7 +288,7 @@ class WizardReviewStep extends ConsumerWidget {
               KeyValueRow(label: 'Tên khóa', value: d.name),
               KeyValueRow(
                 label: 'Bộ môn',
-                value: sports.where((s) => d.sportIds.contains(s.id)).map((s) => s.name).join(', '),
+                value: d.sportIds.map((id) => sports.where((s) => s.id == id).firstOrNull?.name ?? id).join(', '),
               ),
               KeyValueRow(label: 'Hạng / khu vực', value: '${d.classType.label} · ${d.areaType.label}'),
               KeyValueRow(label: 'Phòng', value: room?.name ?? '—'),

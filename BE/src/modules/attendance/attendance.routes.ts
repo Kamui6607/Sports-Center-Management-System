@@ -5,6 +5,7 @@ import { validate } from "../../middlewares/validate.js";
 import * as controller from "./attendance.controller.js";
 import {
   CreateAttendanceSchema,
+  BulkAttendanceSchema,
   UpdateAttendanceSchema,
   GenerateQrSchema,
   ScanQrSchema,
@@ -65,7 +66,7 @@ router.get(
  *     summary: "Record attendance for a member in a schedule (COACH: own classes; MANAGER: any class)"
  *     description: |
  *       **Authorization:** COACH (chỉ lớp mình phụ trách) và MANAGER ghi được `PRESENT`/`ABSENT`/`LATE`.
- *       `EXCUSED` CHỈ MANAGER xác nhận — COACH gửi EXCUSED bị 403 (enforce ở service, không chỉ controller).
+ *       `EXCUSED` (vắng có phép): MANAGER hoặc COACH phụ trách buổi học (L5) — không tính vào chuyên cần/phạt.
  *       MEMBER/STAFF không có quyền ghi attendance.
  *     tags: [Attendance]
  *     security:
@@ -89,10 +90,10 @@ router.post("/", authorize("COACH", "MANAGER"), validate(CreateAttendanceSchema)
  * @swagger
  * /attendance/{id}:
  *   patch:
- *     summary: "Update an attendance record (EXCUSED: MANAGER only)"
+ *     summary: "Update an attendance record"
  *     description: |
  *       **Authorization:** COACH (chỉ attendance thuộc lớp mình phụ trách) và MANAGER.
- *       `EXCUSED` CHỈ MANAGER — COACH gửi EXCUSED bị 403 (enforce ở service).
+ *       `EXCUSED`: MANAGER hoặc COACH phụ trách buổi (L5).
  *     tags: [Attendance]
  *     security:
  *       - BearerAuth: []
@@ -113,6 +114,48 @@ router.post("/", authorize("COACH", "MANAGER"), validate(CreateAttendanceSchema)
  *       200: { description: "Success" }
  */
 router.patch("/:id", authorize("COACH", "MANAGER"), validate(UpdateAttendanceSchema), controller.updateAttendance);
+
+/**
+ * @swagger
+ * /attendance/schedule/{scheduleId}:
+ *   put:
+ *     summary: "BE-18: Ghi điểm danh cả danh sách một buổi (COACH phụ trách / MANAGER) — 1 giao dịch"
+ *     tags: [Attendance]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     memberId: { type: string }
+ *                     status: { type: string, enum: ["PRESENT", "ABSENT", "LATE", "EXCUSED"] }
+ *                     note: { type: string }
+ *     responses:
+ *       200: { description: "Roster điểm danh sau khi ghi" }
+ *       400: { description: "MEMBER_NOT_ENROLLED / buổi đã hủy" }
+ */
+router.put("/schedule/:scheduleId", authorize("COACH", "MANAGER"), validate(BulkAttendanceSchema), controller.saveAttendanceBulk);
+
+/**
+ * @swagger
+ * /attendance/qr/{scheduleId}:
+ *   delete:
+ *     summary: "BE-18: Thu hồi mã dự phòng còn hiệu lực của buổi (QR JWT tự hết hạn theo TTL)"
+ *     tags: [Attendance]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200: { description: "{ revokedManualCodes, qrTokenTtlSeconds }" }
+ */
+router.delete("/qr/:scheduleId", authorize("COACH", "MANAGER"), controller.revokeAttendanceCodes);
 
 /**
  * @swagger

@@ -60,13 +60,3 @@ final productReviewsProvider = FutureProvider.autoDispose.family<List<ProductRev
   ref.watch(dataRevisionProvider);
   return ref.watch(productRepositoryProvider).reviews(id);
 });
-
-final canReviewProductProvider = FutureProvider.autoDispose.family<bool, String>((ref, id) {
-  ref.watch(dataRevisionProvider);
-  return ref.watch(productRepositoryProvider).canReview(id);
-});
-
-final myOrdersProvider = FutureProvider.autoDispose<List<ProductOrder>>((ref) {
-  ref.watch(dataRevisionProvider);
-  return ref.watch(productRepositoryProvider).myOrders();
-});

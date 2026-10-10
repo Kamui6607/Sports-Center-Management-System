@@ -6,6 +6,7 @@ import 'mock_tables.dart';
 
 export 'mock_mappers.dart';
 export 'mock_operations.dart';
+export 'shop_operations.dart';
 
 /// Cơ sở dữ liệu trong bộ nhớ của BE giả lập + các thao tác nghiệp vụ dùng
 /// chung giữa nhiều repository (mô phỏng service của BE).
@@ -40,7 +41,13 @@ class MockDatabase {
   final refunds = <RefundRow>[];
   final products = <ProductRow>[];
   final productReviews = <ProductReviewRow>[];
-  final productOrders = <ProductOrderRow>[];
+  final shopOrders = <ShopOrderRow>[];
+  final cartItems = <CartItemRow>[];
+  final addresses = <AddressRow>[];
+  final inventoryTxs = <InventoryTxRow>[];
+
+  /// Khóa đặt hàng do để đơn hết hạn nhiều lần (userId ⇒ mở lại lúc).
+  final checkoutLocks = <String, DateTime>{};
   final chatMessages = <ChatMessageRow>[];
 
   /// Tỷ lệ HLV nhận (85%).
@@ -79,7 +86,8 @@ class MockDatabase {
 
   Room room(String id) => rooms.firstWhere((r) => r.id == id);
 
-  Sport sport(String id) => sports.firstWhere((s) => s.id == id);
+  /// Bộ môn theo id; id lạ = bộ môn mới HLV tự nhập (L3) ⇒ dùng chính tên.
+  Sport sport(String id) => sports.where((s) => s.id == id).firstOrNull ?? Sport(id: id, name: id);
 
   List<SessionRow> sessionsOf(String classId) =>
       sessions.where((s) => s.classId == classId).toList()..sort((a, b) => a.start.compareTo(b.start));

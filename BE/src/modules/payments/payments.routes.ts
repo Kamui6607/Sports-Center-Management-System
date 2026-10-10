@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticate } from "../../middlewares/authenticate.js";
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
-import { CreatePaymentSchema, UpdatePaymentStatusSchema, PaymentQuerySchema, SepayCheckoutSchema, SepayMockConfirmSchema, SepayWebhookSchema } from "./payments.schema.js";
+import { CreatePaymentSchema, UpdatePaymentStatusSchema, PaymentQuerySchema, MyPaymentQuerySchema, SepayCheckoutSchema, SepayMockConfirmSchema, SepayWebhookSchema } from "./payments.schema.js";
 import * as paymentsController from "./payments.controller.js";
 
 const router = Router();
@@ -116,6 +116,28 @@ router.get(
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
+/**
+ * @swagger
+ * /payments/my:
+ *   get:
+ *     summary: "BE-6: Lịch sử thanh toán của tôi (MEMBER: khóa học + đơn hàng; COACH: đơn hàng)"
+ *     tags: [Payments]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: type, schema: { type: string, enum: [CLASS, ORDER] } }
+ *       - { in: query, name: status, schema: { type: string, enum: [PENDING, SUCCESS, FAILED, REFUNDED] } }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
+ *     responses:
+ *       200: { description: "[{ id, type, amount, status, paidAt, transactionCode, classId, className, orderId, items[], refundedAmount }]" }
+ */
+router.get(
+  "/my",
+  authenticate, authorize("MEMBER", "COACH"),
+  validate(MyPaymentQuerySchema, "query"),
+  paymentsController.listMyPayments
+);
+
 router.get(
   "/:id",
   authenticate,

@@ -34,6 +34,7 @@ type BaseEntityModels = {
   Role: Models.Role;
   User: Models.User;
   RefreshToken: Models.RefreshToken;
+  PasswordResetOtp: Models.PasswordResetOtp;
   MemberProfile: Models.MemberProfile;
   CoachProfile: Models.CoachProfile;
   Certification: Models.Certification;
@@ -63,6 +64,11 @@ type BaseEntityModels = {
   ProductReview: Models.ProductReview;
   Order: Models.Order;
   OrderItem: Models.OrderItem;
+  Cart: Models.Cart;
+  CartItem: Models.CartItem;
+  UserAddress: Models.UserAddress;
+  OrderStatusHistory: Models.OrderStatusHistory;
+  InventoryTransaction: Models.InventoryTransaction;
 };
 
 // ── Kiểm tra lúc biên dịch (không sinh code chạy) ────────────────────────────

@@ -20,7 +20,30 @@ class RefundMockRepository implements RefundRepository {
   static const cancelWindow = Duration(hours: 24);
 
   Refund _toRefund(MockDatabase db, RefundRow r) {
-    final c = db.classRow(r.classId);
+    final orderId = r.orderId;
+    if (orderId != null) {
+      final o = db.shopOrders.firstWhere((x) => x.id == orderId);
+      return Refund(
+        id: r.id,
+        classId: '',
+        className: 'Đơn hàng ${o.code}',
+        reason: r.reason,
+        amount: r.amount,
+        coachDebitAmount: 0,
+        status: r.status,
+        createdAt: r.createdAt,
+        memberName: db.user(o.userId).fullName,
+        coachName: '',
+        note: r.note,
+        processedAt: r.processedAt,
+        processedNote: r.processedNote,
+        rejectReason: r.rejectReason,
+        paidAmount: db.payments.firstWhere((p) => p.id == r.paymentId).amount,
+        orderId: o.id,
+        orderCode: o.code,
+      );
+    }
+    final c = db.classRow(r.classId!);
     return Refund(
       id: r.id,
       classId: c.id,
@@ -30,7 +53,7 @@ class RefundMockRepository implements RefundRepository {
       coachDebitAmount: r.coachDebitAmount,
       status: r.status,
       createdAt: r.createdAt,
-      memberName: db.userOfMember(r.memberProfileId).fullName,
+      memberName: db.userOfMember(r.memberProfileId!).fullName,
       coachName: db.userOfCoach(c.coachProfileId).fullName,
       sessionStart: r.scheduleId == null ? null : db.session(r.scheduleId!).start,
       note: r.note,
@@ -118,8 +141,12 @@ class RefundMockRepository implements RefundRepository {
   @override
   Future<List<Refund>> myRefunds() => _server.run(() {
     final db = _server.db;
-    final member = _server.requireMember();
-    return db.refunds.where((r) => r.memberProfileId == member.id).map((r) => _toRefund(db, r)).toList()
+    final u = _server.requireUser();
+    final member = db.memberOfUser(u.id);
+    return db.refunds
+        .where((r) => r.buyerUserId == u.id || (member != null && r.memberProfileId == member.id))
+        .map((r) => _toRefund(db, r))
+        .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   });
 
@@ -129,7 +156,9 @@ class RefundMockRepository implements RefundRepository {
     final u = _server.requireUser();
     final r = db.refunds.where((x) => x.id == id).firstOrNull;
     if (r == null) throw const AppFailure.notFound('Không tìm thấy yêu cầu hoàn tiền.');
-    if (u.role != UserRole.manager && db.memberOfUser(u.id)?.id != r.memberProfileId) {
+    final owner =
+        r.buyerUserId == u.id || (r.memberProfileId != null && db.memberOfUser(u.id)?.id == r.memberProfileId);
+    if (u.role != UserRole.manager && !owner) {
       throw const AppFailure.forbidden();
     }
     return _toRefund(db, r);
@@ -160,8 +189,22 @@ class RefundMockRepository implements RefundRepository {
       ..status = RefundStatus.completed
       ..processedAt = now
       ..processedNote = note?.trim().isEmpty ?? true ? null : note!.trim();
+    if (r.orderId != null) {
+      // Hoàn tiền đơn hàng: không trừ ví HLV; đơn → REFUNDED (+ trả hàng về kho nếu chưa giao).
+      db.onOrderRefundApproved(r);
+      db.notify(
+        r.buyerUserId!,
+        NotificationType.paymentRefunded,
+        'Đã hoàn tiền',
+        'Đơn hàng đã được hoàn ${Money.format(r.amount)}.',
+        metadata: {'refundId': r.id, 'orderId': r.orderId!},
+      );
+      return;
+    }
     // Trừ ví HLV đúng tỷ lệ đã nhận.
     final wallet = db.wallets.firstWhere((w) => w.id == r.walletId);
+    final classId = r.classId!;
+    final memberProfileId = r.memberProfileId!;
     wallet.balance -= r.coachDebitAmount;
     db.walletTxs.add(
       WalletTxRow(
@@ -171,12 +214,12 @@ class RefundMockRepository implements RefundRepository {
         type: WalletTxType.refundDebit,
         status: WalletTxStatus.completed,
         createdAt: now,
-        classId: r.classId,
+        classId: classId,
         paymentId: r.paymentId,
-        note: 'Hoàn tiền — ${db.userOfMember(r.memberProfileId).fullName}',
+        note: 'Hoàn tiền — ${db.userOfMember(memberProfileId).fullName}',
       ),
     );
-    final cls = db.classRow(r.classId);
+    final cls = db.classRow(classId);
     if (r.reason == RefundReason.memberCancelCourse) {
       // Hủy khóa: giao dịch REFUNDED, hóa đơn hủy, giải phóng chỗ.
       db.payments.firstWhere((p) => p.id == r.paymentId).status = PaymentStatus.refunded;
@@ -185,9 +228,9 @@ class RefundMockRepository implements RefundRepository {
       }
       for (final e in db.enrollments.where(
         (e) =>
-            e.memberProfileId == r.memberProfileId &&
+            e.memberProfileId == memberProfileId &&
             e.status == EnrollmentStatus.booked &&
-            db.session(e.sessionId).classId == r.classId,
+            db.session(e.sessionId).classId == classId,
       )) {
         e
           ..status = EnrollmentStatus.cancelled
@@ -195,7 +238,7 @@ class RefundMockRepository implements RefundRepository {
       }
     }
     db.notify(
-      db.userOfMember(r.memberProfileId).id,
+      db.userOfMember(memberProfileId).id,
       NotificationType.paymentRefunded,
       'Đã hoàn tiền',
       'Yêu cầu hoàn tiền khóa "${cls.name}" đã được duyệt: ${Money.format(r.amount)}.',
@@ -224,11 +267,23 @@ class RefundMockRepository implements RefundRepository {
       ..status = RefundStatus.rejected
       ..processedAt = db.now()
       ..rejectReason = reason.trim();
+    if (r.orderId != null) {
+      db.onOrderRefundRejected(r, reason.trim());
+      db.notify(
+        r.buyerUserId!,
+        NotificationType.paymentRefunded,
+        'Yêu cầu hoàn tiền bị từ chối',
+        'Yêu cầu hoàn tiền đơn hàng bị từ chối.',
+        metadata: {'refundId': r.id, 'orderId': r.orderId!},
+        reason: reason.trim(),
+      );
+      return;
+    }
     db.notify(
-      db.userOfMember(r.memberProfileId).id,
+      db.userOfMember(r.memberProfileId!).id,
       NotificationType.paymentRefunded,
       'Yêu cầu hoàn tiền bị từ chối',
-      'Yêu cầu hoàn tiền khóa "${db.classRow(r.classId).name}" bị từ chối.',
+      'Yêu cầu hoàn tiền khóa "${db.classRow(r.classId!).name}" bị từ chối.',
       metadata: {'refundId': r.id},
       reason: reason.trim(),
     );

@@ -1,8 +1,8 @@
 /// Trạng thái yêu cầu hoàn tiền (`RefundStatus`).
 enum RefundStatus { pending, completed, rejected }
 
-/// Lý do hoàn tiền (`RefundReason`).
-enum RefundReason { memberCancelCourse, sessionCancelled }
+/// Lý do hoàn tiền (`RefundReason`). `order*` = hoàn tiền đơn hàng của cửa hàng.
+enum RefundReason { memberCancelCourse, sessionCancelled, orderCancelled, orderNotPickedUp, orderLatePayment }
 
 /// Yêu cầu hoàn tiền (`Refund`).
 class Refund {
@@ -23,6 +23,8 @@ class Refund {
     this.processedNote,
     this.rejectReason,
     this.paidAmount,
+    this.orderId,
+    this.orderCode,
   });
 
   final String id;
@@ -53,6 +55,12 @@ class Refund {
 
   /// Số tiền giao dịch gốc.
   final int? paidAmount;
+
+  /// Hoàn tiền đơn hàng (không trừ ví HLV).
+  final String? orderId;
+  final String? orderCode;
+
+  bool get isOrder => orderId != null;
 }
 
 /// Điều kiện hủy khóa (≥ 24h trước buổi khai giảng).

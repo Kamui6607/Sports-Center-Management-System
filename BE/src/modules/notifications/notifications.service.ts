@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
+import { emitToUsers } from "../../utils/realtime.js";
 
 export type NotificationTypeEnum =
   // Tài khoản
@@ -36,6 +37,8 @@ export type NotificationTypeEnum =
   // Thanh toán
   | "PAYMENT_SUCCESS"
   | "PAYMENT_REFUNDED"
+  // Cửa hàng
+  | "ORDER_UPDATED"
   // Chung
   | "GENERAL";
 
@@ -53,7 +56,7 @@ export async function createNotification(
     metadata?: Record<string, unknown>;
   }
 ) {
-  return prisma.notification.create({
+  const notification = await prisma.notification.create({
     data: {
       userId,
       type,
@@ -63,6 +66,9 @@ export async function createNotification(
       ...(options?.metadata ? { metadata: options.metadata as object } : {}),
     },
   });
+  // Realtime (REST vẫn là nguồn chính): client cập nhật badge / danh sách khi nhận sự kiện.
+  emitToUsers([userId], "notification:new", notification);
+  return notification;
 }
 
 /**
@@ -91,6 +97,7 @@ export async function broadcastNotification(
       metadata: options?.metadata ? (options.metadata as object) : undefined,
     })),
   });
+  emitToUsers(userIds, "notification:new", { type, title, body, metadata: options?.metadata ?? null });
 }
 
 // ─── CRUD API ──────────────────────────────────────────────────────────────

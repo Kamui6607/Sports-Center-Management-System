@@ -139,10 +139,8 @@ class PaymentMockRepository implements PaymentRepository {
   static Checkout toCheckout(MockDatabase db, PaymentRow p) {
     final classId = p.classId;
     final orderId = p.productOrderId;
-    final order = orderId == null ? null : db.productOrders.firstWhere((o) => o.id == orderId);
-    final title = classId != null
-        ? db.classRow(classId).name
-        : db.products.firstWhere((x) => x.id == order!.productId).name;
+    final order = orderId == null ? null : db.shopOrders.firstWhere((o) => o.id == orderId);
+    final title = classId != null ? db.classRow(classId).name : order!.lines.map((l) => l.productName).join(', ');
     final enrolled = classId == null || p.status != PaymentStatus.success
         ? null
         : db.enrollments
@@ -168,7 +166,7 @@ class PaymentMockRepository implements PaymentRepository {
       title: title,
       classId: classId,
       productOrderId: orderId,
-      quantity: order?.quantity,
+      quantity: order?.itemCount,
       paidAt: p.paidAt,
       enrolledSessionCount: enrolled,
       invoiceId: db.invoices.where((i) => i.paymentId == p.id).firstOrNull?.id,

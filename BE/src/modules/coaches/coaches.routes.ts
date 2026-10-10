@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../../middlewares/authenticate.js";
-import { authenticateIncludingInactive } from "../../middlewares/authenticateIncludingInactive.js";
+import { authenticateRestricted } from "../../middlewares/authenticateRestricted.js";
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
 import { cvUpload } from "../../middlewares/upload.js";
@@ -183,6 +183,62 @@ router.post(
  *       403: { $ref: "#/components/responses/Forbidden" }
  *       404: { $ref: "#/components/responses/NotFound" }
  */
+/**
+ * @swagger
+ * /coaches/wallet/transactions:
+ *   get:
+ *     summary: "BE-7: MANAGER liệt kê lệnh rút tiền (kèm HLV, số dư & tiền tạm giữ của ví)"
+ *     tags: [Coaches]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: type, schema: { type: string, enum: [WITHDRAWAL, DEPOSIT, REFUND_DEBIT], default: WITHDRAWAL } }
+ *       - { in: query, name: status, schema: { type: string, enum: [PENDING, COMPLETED, REJECTED, FAILED] } }
+ *       - { in: query, name: coachId, schema: { type: string } }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
+ *     responses:
+ *       200: { description: "[{ id, amount, status, bankInfo, note, rejectReason, createdAt, coach, wallet: { balance, pendingRefundDebit, available } }]" }
+ */
+router.get(
+  "/wallet/transactions",
+  authenticate,
+  authorize("MANAGER"),
+  validate(z.object({
+    type: z.enum(["WITHDRAWAL", "DEPOSIT", "REFUND_DEBIT"]).optional(),
+    status: z.enum(["PENDING", "COMPLETED", "REJECTED", "FAILED"]).optional(),
+    coachId: z.string().optional(),
+    page: z.string().optional(),
+    limit: z.string().optional(),
+  }), "query"),
+  walletController.listWalletTransactions
+);
+
+/**
+ * @swagger
+ * /coaches/wallet/transactions/{txId}:
+ *   get:
+ *     summary: "BE-7: MANAGER xem chi tiết lệnh rút tiền"
+ *     tags: [Coaches]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "Lệnh rút + coach + wallet" }
+ *       404: { description: "Không tìm thấy" }
+ */
+router.get("/wallet/transactions/:txId", authenticate, authorize("MANAGER"), walletController.getWalletTransaction);
+
+/**
+ * @swagger
+ * /coaches/me/students/{memberId}:
+ *   get:
+ *     summary: "BE-19: Hồ sơ học viên trong các khóa của tôi + chuyên cần từng khóa + lộ trình"
+ *     tags: [Coaches]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "{ member, attendedCount, pastSessionCount, classes[], plans[] }" }
+ *       403: { description: "Học viên không thuộc khóa của tôi" }
+ */
+router.get("/me/students/:memberId", authenticate, authorize("COACH"), coachController.getMyStudent);
+
 router.patch(
   "/wallet/transactions/:txId/review",
   authenticate,
@@ -286,7 +342,7 @@ router.patch(
 );
 
 // ── Coach: Nộp CV ─────────────────────────────────────────────────────────────
-// Dùng authenticateIncludingInactive vì Coach vừa đăng ký có isActive=false
+// Dùng authenticateRestricted (BE-9) vì Coach chưa được duyệt có isActive=false
 // nhưng vẫn cần token để xác định danh tính khi nộp CV.
 
 /**
@@ -315,7 +371,7 @@ router.patch(
  */
 router.post(
   "/me/cv",
-  authenticateIncludingInactive,
+  authenticateRestricted,
   authorize("COACH"),
   cvUpload,
   coachController.submitCV
@@ -354,6 +410,20 @@ router.post(
  *       200:
  *         description: OK
  */
+/**
+ * @swagger
+ * /coaches/{profileId}/cv/file:
+ *   get:
+ *     summary: "BE-8: Tải file CV (PDF) — MANAGER hoặc chính HLV"
+ *     tags: [Coaches]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "application/pdf" }
+ *       403: { description: "Không có quyền" }
+ *       404: { description: "Chưa nộp CV / không còn file" }
+ */
+router.get("/:profileId/cv/file", authenticateRestricted, coachController.downloadCv);
+
 router.patch(
   "/:profileId/cv/review",
   authenticate,

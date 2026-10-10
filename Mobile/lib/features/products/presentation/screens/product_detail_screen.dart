@@ -6,17 +6,20 @@ import '../../../../app/router/app_routes.dart';
 import '../../../../core/data/data_revision.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
-import '../../../../core/utils/money.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../auth/domain/entities/app_user.dart';
 import '../../../auth/presentation/providers/session_provider.dart';
-import '../../data/product_repository_provider.dart';
+import '../../../shop/data/shop_repository_provider.dart';
+import '../../../shop/presentation/providers/shop_providers.dart';
+import '../../../shop/presentation/shop_labels.dart';
+import '../../../shop/presentation/widgets/cart_button.dart';
 import '../../domain/entities/product.dart';
 import '../product_labels.dart';
 import '../providers/product_providers.dart';
 
-/// S02 — Chi tiết sản phẩm + đặt mua (1 sản phẩm / đơn, không có giỏ hàng).
+/// S02 — Chi tiết sản phẩm: ảnh, tồn kho khả dụng, giới hạn mỗi đơn, "Thêm vào giỏ" + "Mua ngay".
+/// Giỏ không giữ hàng — hàng chỉ được giữ khi tạo đơn (màn Thanh toán).
 class ProductDetailScreen extends ConsumerStatefulWidget {
   const ProductDetailScreen({super.key, required this.productId});
 
@@ -28,43 +31,32 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
 
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   int _qty = 1;
-  bool _ordering = false;
+  bool _adding = false;
 
-  Future<void> _order(Product p) async {
-    final user = ref.read(currentUserProvider);
-    if (user == null) {
-      await context.push('${AppRoutes.login}?from=${Uri.encodeComponent(AppRoutes.productDetail(p.id))}');
-      return;
-    }
-    final ok = await showConfirmSheet(
-      context: context,
-      title: 'Xác nhận đặt mua',
-      message: 'Sản phẩm được giữ cho bạn ngay khi tạo đơn. Vui lòng chuyển khoản trong thời hạn để hoàn tất.',
-      confirmLabel: 'Thanh toán ${Money.format(p.price * _qty)}',
-      extra: AppCard(
-        color: context.colors.surfaceMuted,
-        child: Column(
-          children: [
-            KeyValueRow(label: 'Sản phẩm', value: p.name),
-            KeyValueRow(label: 'Đơn giá', value: Money.format(p.price)),
-            KeyValueRow(label: 'Số lượng', value: '$_qty'),
-            const Divider(),
-            KeyValueRow(label: 'Tổng tiền', value: Money.format(p.price * _qty), emphasize: true),
-          ],
-        ),
-      ),
-      warning: 'Quá hạn chưa thanh toán, đơn tự hủy và hoàn lại tồn kho.',
-    );
-    if (!ok || !mounted) return;
-    setState(() => _ordering = true);
-    final checkout = await runAction(context, () => ref.read(productRepositoryProvider).createOrder(p.id, _qty));
-    if (!mounted) return;
-    setState(() => _ordering = false);
-    if (checkout != null) {
-      ref.read(dataRevisionProvider.notifier).bump();
+  Future<bool> _requireLogin(Product p) async {
+    if (ref.read(currentUserProvider) != null) return true;
+    await context.push('${AppRoutes.login}?from=${Uri.encodeComponent(AppRoutes.productDetail(p.id))}');
+    return false;
+  }
+
+  Future<void> _addToCart(Product p) async {
+    if (!await _requireLogin(p) || !mounted) return;
+    setState(() => _adding = true);
+    try {
+      await ref.read(cartProvider.notifier).add(p.id, _qty);
+      if (!mounted) return;
+      AppSnackbar.success(context, 'Đã thêm ${p.name} × $_qty vào giỏ.');
       setState(() => _qty = 1);
-      await context.push(AppRoutes.payment(checkout.paymentId));
+    } on Object catch (e) {
+      if (mounted) AppSnackbar.error(context, ShopErrors.message(e));
+    } finally {
+      if (mounted) setState(() => _adding = false);
     }
+  }
+
+  Future<void> _buyNow(Product p) async {
+    if (!await _requireLogin(p) || !mounted) return;
+    await context.push(AppRoutes.checkoutBuyNow(p.id, _qty));
   }
 
   @override
@@ -73,29 +65,52 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     final user = ref.watch(currentUserProvider);
     final p = value.value;
     final canBuy = user == null || user.role != UserRole.manager;
+    final max = p == null ? 1 : p.maxSelectable.clamp(1, 999);
     return AppScaffold(
       title: 'Chi tiết sản phẩm',
+      actions: const [CartButton()],
       bottomBar: p == null || !canBuy
           ? null
           : StickyBottomBar(
-              child: Row(
-                children: [
-                  if (p.inStock)
-                    QuantityStepper(
-                      value: _qty.clamp(1, p.stockQuantity),
-                      max: p.stockQuantity,
-                      onChanged: (v) => setState(() => _qty = v),
+              child: !p.inStock
+                  ? AppButton(label: p.isActive ? 'Hết hàng' : 'Ngừng bán', expand: true, onPressed: null)
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Text('Số lượng', style: context.text.label),
+                            const Spacer(),
+                            QuantityStepper(
+                              value: _qty.clamp(1, max),
+                              max: max,
+                              onChanged: (v) => setState(() => _qty = v),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: AppButton.outline(
+                                label: 'Thêm vào giỏ',
+                                icon: AppIcons.cart,
+                                loading: _adding,
+                                onPressed: () => _addToCart(p),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: AppButton(
+                                label: user == null ? 'Đăng nhập để mua' : 'Mua ngay',
+                                onPressed: _adding ? null : () => _buyNow(p),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: AppButton(
-                      label: !p.inStock ? 'Hết hàng' : (user == null ? 'Đăng nhập để mua' : 'Mua ngay'),
-                      loading: _ordering,
-                      onPressed: p.inStock ? () => _order(p) : null,
-                    ),
-                  ),
-                ],
-              ),
             ),
       body: AsyncValueView(
         value: value,
@@ -131,10 +146,33 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   if (p.reviewCount > 0) RatingStars(rating: p.rating, count: p.reviewCount),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
+                    children: [
+                      StatusTag(
+                        label: 'Tối đa ${p.maxPerOrder}/đơn',
+                        tone: StatusTone.neutral,
+                        icon: AppIcons.bag,
+                        dense: true,
+                      ),
+                      StatusTag(
+                        label: 'Tối đa ${p.maxPerDay}/ngày',
+                        tone: StatusTone.neutral,
+                        icon: AppIcons.calendar,
+                        dense: true,
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: AppSpacing.md),
                   Text(p.description, style: context.text.body),
+                  const SizedBox(height: AppSpacing.md),
+                  const AlertBanner.info(
+                    message: 'Thanh toán trước bằng chuyển khoản VietQR. Nhận tại trung tâm (mang mã nhận hàng) hoặc giao tận nơi.',
+                  ),
                   const SizedBox(height: AppSpacing.lg),
-                  _Reviews(productId: p.id),
+                  _Reviews(productId: p.id, manager: user?.role == UserRole.manager),
                   const SizedBox(height: AppSpacing.xl),
                 ],
               ),
@@ -147,27 +185,37 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 }
 
 class _Reviews extends ConsumerWidget {
-  const _Reviews({required this.productId});
+  const _Reviews({required this.productId, required this.manager});
 
   final String productId;
+  final bool manager;
+
+  Future<void> _toggle(BuildContext context, WidgetRef ref, ProductReview r) async {
+    final ok = await showConfirmSheet(
+      context: context,
+      title: r.isHidden ? 'Hiện lại đánh giá?' : 'Ẩn đánh giá?',
+      message: r.isHidden
+          ? 'Đánh giá sẽ hiển thị công khai và được tính vào điểm trung bình.'
+          : 'Đánh giá sẽ bị ẩn khỏi khách hàng và không tính vào điểm trung bình.',
+      confirmLabel: r.isHidden ? 'Hiện lại' : 'Ẩn đánh giá',
+      destructive: !r.isHidden,
+    );
+    if (!ok || !context.mounted) return;
+    final done = await runAction(
+      context,
+      () => ref.read(shopRepositoryProvider).setReviewHidden(r.id, !r.isHidden).then((_) => true),
+      success: r.isHidden ? 'Đã hiện lại đánh giá.' : 'Đã ẩn đánh giá.',
+    );
+    if (done == true) ref.read(dataRevisionProvider.notifier).bump();
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reviews = ref.watch(productReviewsProvider(productId));
-    final canReview = ref.watch(canReviewProductProvider(productId)).value ?? false;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader(title: 'Đánh giá (${reviews.value?.length ?? 0})'),
-        if (canReview) ...[
-          AppButton.outline(
-            label: 'Viết đánh giá',
-            icon: AppIcons.star,
-            expand: true,
-            onPressed: () => showProductReviewSheet(context, productId: productId),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-        ],
+        SectionHeader(title: 'Đánh giá (${reviews.value?.where((r) => !r.isHidden).length ?? 0})'),
         reviews.when(
           skipLoadingOnReload: true,
           loading: () => const Shimmer(child: SkeletonBox(height: AppSpacing.xxl)),
@@ -175,7 +223,7 @@ class _Reviews extends ConsumerWidget {
               ErrorState(error: e, compact: true, onRetry: () => ref.invalidate(productReviewsProvider(productId))),
           data: (list) => list.isEmpty
               ? Text(
-                  'Chưa có đánh giá. Chỉ người đã mua thành công mới được đánh giá.',
+                  'Chưa có đánh giá. Người mua đánh giá từ màn Chi tiết đơn hàng sau khi đơn hoàn tất.',
                   style: context.text.small.copyWith(color: context.colors.textMuted),
                 )
               : AppCard(
@@ -183,29 +231,40 @@ class _Reviews extends ConsumerWidget {
                     children: [
                       for (var i = 0; i < list.length; i++) ...[
                         if (i > 0) const Divider(height: AppSpacing.lg),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            AppAvatar(name: list[i].userName, imageUrl: list[i].avatarUrl, size: AppSizes.avatarSm),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    list[i].isMine ? '${list[i].userName} (bạn)' : list[i].userName,
-                                    style: context.text.label,
-                                  ),
-                                  RatingStars(rating: list[i].rating.toDouble()),
-                                  if (list[i].comment != null) Text(list[i].comment!, style: context.text.small),
-                                  Text(
-                                    VnTime.date(list[i].createdAt),
-                                    style: context.text.caption.copyWith(color: context.colors.textMuted),
-                                  ),
-                                ],
+                        Opacity(
+                          opacity: list[i].isHidden ? 0.55 : 1,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppAvatar(name: list[i].userName, imageUrl: list[i].avatarUrl, size: AppSizes.avatarSm),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      list[i].isMine ? '${list[i].userName} (bạn)' : list[i].userName,
+                                      style: context.text.label,
+                                    ),
+                                    RatingStars(rating: list[i].rating.toDouble()),
+                                    if (list[i].comment != null) Text(list[i].comment!, style: context.text.small),
+                                    Text(
+                                      VnTime.date(list[i].createdAt),
+                                      style: context.text.caption.copyWith(color: context.colors.textMuted),
+                                    ),
+                                    if (list[i].isHidden)
+                                      const StatusTag(label: 'Đã ẩn', tone: StatusTone.neutral, dense: true),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                              if (manager)
+                                AppIconButton(
+                                  icon: list[i].isHidden ? AppIcons.eye : AppIcons.eyeOff,
+                                  tooltip: list[i].isHidden ? 'Hiện đánh giá' : 'Ẩn đánh giá',
+                                  onPressed: () => _toggle(context, ref, list[i]),
+                                ),
+                            ],
+                          ),
                         ),
                       ],
                     ],
@@ -215,57 +274,4 @@ class _Reviews extends ConsumerWidget {
       ],
     );
   }
-}
-
-/// S04 — Viết đánh giá sản phẩm (1 lần / sản phẩm, sau khi mua thành công).
-Future<void> showProductReviewSheet(BuildContext context, {required String productId, String? productName}) =>
-    showAppBottomSheet<void>(
-      context: context,
-      title: productName == null ? 'Đánh giá sản phẩm' : 'Đánh giá $productName',
-      builder: (_) => _ReviewForm(productId: productId),
-    );
-
-class _ReviewForm extends ConsumerStatefulWidget {
-  const _ReviewForm({required this.productId});
-
-  final String productId;
-
-  @override
-  ConsumerState<_ReviewForm> createState() => _ReviewFormState();
-}
-
-class _ReviewFormState extends ConsumerState<_ReviewForm> with SubmittingState {
-  int _rating = 0;
-  final _comment = TextEditingController();
-
-  @override
-  void dispose() {
-    _comment.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    var ok = false;
-    await submit(() async {
-      await ref.read(productRepositoryProvider).addReview(widget.productId, _rating, _comment.text);
-      ok = true;
-    });
-    if (!ok || !mounted) return;
-    ref.read(dataRevisionProvider.notifier).bump();
-    Navigator.of(context).pop();
-    AppSnackbar.success(context, 'Cảm ơn bạn đã đánh giá!');
-  }
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      RatingInput(value: _rating, onChanged: (v) => setState(() => _rating = v)),
-      const SizedBox(height: AppSpacing.md),
-      AppTextField(label: 'Nhận xét (không bắt buộc)', controller: _comment, maxLines: 3, maxLength: 500),
-      if (formError != null) ...[const SizedBox(height: AppSpacing.xs), AlertBanner.error(message: formError!)],
-      const SizedBox(height: AppSpacing.md),
-      AppButton(label: 'Gửi đánh giá', expand: true, loading: submitting, onPressed: _rating == 0 ? null : _submit),
-    ],
-  );
 }

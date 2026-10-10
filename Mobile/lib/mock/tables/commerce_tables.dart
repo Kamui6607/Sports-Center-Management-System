@@ -3,8 +3,8 @@
 
 import '../../features/coach/domain/entities/wallet.dart';
 import '../../features/payments/domain/entities/payment.dart';
-import '../../features/products/domain/entities/product.dart';
 import '../../features/refunds/domain/entities/refund.dart';
+import '../../features/shop/domain/entities/shop.dart';
 
 class PaymentRow {
   PaymentRow({
@@ -102,13 +102,15 @@ class RefundRow {
   RefundRow({
     required this.id,
     required this.paymentId,
-    required this.memberProfileId,
-    required this.classId,
     required this.reason,
     required this.amount,
-    required this.coachDebitAmount,
-    required this.walletId,
     required this.createdAt,
+    this.memberProfileId,
+    this.classId,
+    this.coachDebitAmount = 0,
+    this.walletId,
+    this.orderId,
+    this.buyerUserId,
     this.scheduleId,
     this.note,
     this.status = RefundStatus.pending,
@@ -116,13 +118,21 @@ class RefundRow {
 
   final String id;
   final String paymentId;
-  final String memberProfileId;
-  final String classId;
+
+  /// Null khi người mua đơn hàng là HLV.
+  final String? memberProfileId;
+
+  /// Null với hoàn tiền đơn hàng.
+  final String? classId;
   final String? scheduleId;
   final RefundReason reason;
   final int amount;
   final int coachDebitAmount;
-  final String walletId;
+  final String? walletId;
+
+  /// Hoàn tiền đơn hàng (lý do ORDER_*).
+  final String? orderId;
+  final String? buyerUserId;
   final String? note;
   final DateTime createdAt;
   RefundStatus status;
@@ -138,13 +148,29 @@ class ProductRow {
     required this.description,
     required this.price,
     required this.stockQuantity,
+    this.reservedStock = 0,
+    this.maxPerOrder = 10,
+    this.maxPerDay = 20,
+    this.lowStockThreshold = 5,
+    this.isActive = true,
+    this.imageUrl,
   });
 
   final String id;
   final String name;
   final String description;
-  final int price;
+  int price;
+
+  /// Tồn thực tế; có thể bán = [stockQuantity] − [reservedStock].
   int stockQuantity;
+  int reservedStock;
+  int maxPerOrder;
+  int maxPerDay;
+  int lowStockThreshold;
+  bool isActive;
+  String? imageUrl;
+
+  int get available => (stockQuantity - reservedStock).clamp(0, 1 << 30);
 }
 
 class ProductReviewRow {
@@ -155,6 +181,7 @@ class ProductReviewRow {
     required this.rating,
     required this.createdAt,
     this.comment,
+    this.orderLineId,
   });
 
   final String id;
@@ -163,25 +190,147 @@ class ProductReviewRow {
   final int rating;
   final String? comment;
   final DateTime createdAt;
+
+  /// Dòng đơn được đánh giá (null với dữ liệu cũ).
+  final String? orderLineId;
+  bool isHidden = false;
 }
 
-class ProductOrderRow {
-  ProductOrderRow({
+/// Dòng giỏ hàng (giỏ không giữ hàng).
+class CartItemRow {
+  CartItemRow({required this.userId, required this.productId, required this.quantity, required this.priceSnapshot});
+
+  final String userId;
+  final String productId;
+  int quantity;
+  int priceSnapshot;
+}
+
+class AddressRow {
+  AddressRow({
+    required this.id,
+    required this.userId,
+    required this.recipientName,
+    required this.phone,
+    required this.province,
+    required this.district,
+    required this.street,
+    this.ward,
+    this.isDefault = false,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String userId;
+  String recipientName;
+  String phone;
+  String province;
+  String district;
+  String? ward;
+  String street;
+  bool isDefault;
+  final DateTime createdAt;
+}
+
+class OrderLineRow {
+  OrderLineRow({
     required this.id,
     required this.productId,
-    required this.userId,
+    required this.productName,
     required this.quantity,
-    required this.totalPrice,
-    required this.createdAt,
-    this.status = OrderStatus.pending,
+    required this.unitPrice,
   });
 
   final String id;
   final String productId;
-  final String userId;
+  final String productName;
   final int quantity;
-  final int totalPrice;
+  final int unitPrice;
+
+  int get total => quantity * unitPrice;
+}
+
+class OrderHistoryRow {
+  OrderHistoryRow({required this.to, required this.at, this.from, this.actorId, this.reason});
+
+  final ShopOrderStatus? from;
+  final ShopOrderStatus to;
+  final String? actorId;
+  final String? reason;
+  final DateTime at;
+}
+
+/// Đơn hàng (`Order` + `OrderItem` + `OrderStatusHistory`).
+class ShopOrderRow {
+  ShopOrderRow({
+    required this.id,
+    required this.code,
+    required this.userId,
+    required this.fulfillmentType,
+    required this.lines,
+    required this.shippingFee,
+    required this.createdAt,
+    required this.paymentExpiresAt,
+    this.status = ShopOrderStatus.pendingPayment,
+    this.recipientName,
+    this.recipientPhone,
+    this.shippingAddress,
+    this.note,
+    this.idempotencyKey,
+  });
+
+  final String id;
+  final String code;
+  final String userId;
+  final FulfillmentType fulfillmentType;
+  final List<OrderLineRow> lines;
+  final int shippingFee;
   final DateTime createdAt;
-  OrderStatus status;
-  OrderCancelReason? cancelReason;
+  DateTime paymentExpiresAt;
+  ShopOrderStatus status;
+  final String? recipientName;
+  final String? recipientPhone;
+  final String? shippingAddress;
+  final String? note;
+  final String? idempotencyKey;
+  String? trackingCode;
+  String? carrier;
+  String? pickupCode;
+  DateTime? pickupDeadline;
+  int pickupFailedAttempts = 0;
+  DateTime? pickupLockedUntil;
+  DateTime? deliveredAt;
+  DateTime? expiredAt;
+  String? cancelNote;
+  final history = <OrderHistoryRow>[];
+
+  int get subtotal => lines.fold(0, (s, l) => s + l.total);
+
+  int get total => subtotal + shippingFee;
+
+  int get itemCount => lines.fold(0, (s, l) => s + l.quantity);
+}
+
+class InventoryTxRow {
+  InventoryTxRow({
+    required this.id,
+    required this.productId,
+    required this.type,
+    required this.quantity,
+    required this.stockAfter,
+    required this.reservedAfter,
+    required this.createdAt,
+    this.orderId,
+    this.note,
+  });
+
+  final String id;
+  final String productId;
+  final InventoryTxType type;
+  final int quantity;
+  final int stockAfter;
+  final int reservedAfter;
+  final DateTime createdAt;
+  final String? orderId;
+  final String? note;
 }

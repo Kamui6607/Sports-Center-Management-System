@@ -85,7 +85,7 @@ class CourseClass {
   /// Chỗ trống ít nhất trong các buổi sắp tới (null nếu không còn buổi).
   final int? minRemainingSlots;
 
-  /// Lý do bị từ chối (TODO BE-2: BE chưa lưu).
+  /// Lý do bị từ chối (BE-2).
   final String? rejectReason;
 
   /// Doanh thu HLV nhận được (85%) — chỉ có ở góc nhìn Coach.

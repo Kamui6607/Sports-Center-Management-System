@@ -248,6 +248,13 @@ export async function getMyEnrollments(userId: string, query: any) {
   const skip = (page - 1) * limit;
   const where: any = { memberId: memberProfile.id };
   if (query.status) where.status = query.status;
+  // BE-14: lọc theo thời gian buổi học (giao khoảng) và theo khóa.
+  const schedule: any = {};
+  if (query.from) schedule.endTime = { gt: new Date(query.from) };
+  if (query.to) schedule.startTime = { lt: new Date(query.to) };
+  if (query.classId) schedule.classId = query.classId;
+  if (Object.keys(schedule).length > 0) where.schedule = schedule;
+  const byTime = Boolean(query.from || query.to);
 
   const [total, enrollments] = await Promise.all([
     prisma.enrollment.count({ where }),
@@ -255,10 +262,25 @@ export async function getMyEnrollments(userId: string, query: any) {
       where, skip, take: limit,
       include: {
         schedule: {
-          include: { class: true, room: true },
+          include: {
+            // BE-14: kèm HLV của khóa (tên, avatar) — client không phải tra thêm.
+            class: {
+              include: {
+                coach: {
+                  select: {
+                    id: true,
+                    userId: true,
+                    specialization: true,
+                    user: { select: { id: true, fullName: true, avatarUrl: true } },
+                  },
+                },
+              },
+            },
+            room: true,
+          },
         },
       },
-      orderBy: { bookedAt: "desc" },
+      orderBy: byTime ? { schedule: { startTime: "asc" } } : { bookedAt: "desc" },
     }),
   ]);
   return { enrollments, pagination: buildPaginationMeta(total, page, limit) };

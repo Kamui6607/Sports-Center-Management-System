@@ -66,6 +66,7 @@ class CoachWallet {
     required this.pendingRefundHold,
     required this.checks,
     this.pendingWithdrawal,
+    this.availableOverride,
   });
 
   final int balance;
@@ -75,8 +76,11 @@ class CoachWallet {
   final List<WithdrawCheck> checks;
   final WalletTransaction? pendingWithdrawal;
 
-  /// Số dư khả dụng = số dư − tiền đang giữ.
-  int get available => (balance - pendingRefundHold).clamp(0, balance);
+  /// Số dư khả dụng do BE tính (L4: chỉ tiền của khóa đã kết thúc, trừ tạm giữ và lệnh rút đang chờ).
+  final int? availableOverride;
+
+  /// Số dư khả dụng = theo BE nếu có, ngược lại số dư − tiền đang giữ (mock).
+  int get available => availableOverride ?? (balance - pendingRefundHold).clamp(0, balance);
 
   bool get canWithdraw => checks.every((c) => c.passed);
 }

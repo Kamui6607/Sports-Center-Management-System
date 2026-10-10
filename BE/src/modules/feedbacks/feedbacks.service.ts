@@ -118,12 +118,12 @@ export async function listFeedbacksForCoach(query: FeedbackQueryInput, actorId?:
     return { ...rest, memberId, member, isOwn };
   });
 
-  // Tính điểm trung bình
-  const avgResult = await prisma.coachFeedback.aggregate({
-    where: { coachId },
-    _avg: { rating: true },
-    _count: { rating: true },
-  });
+  // Tính điểm trung bình (toàn HLV — giữ nguyên cho Web) + BE-22: phân bố sao, thống kê riêng khóa.
+  const [avgResult, coachDistribution, classSummary] = await Promise.all([
+    prisma.coachFeedback.aggregate({ where: { coachId }, _avg: { rating: true }, _count: { rating: true } }),
+    ratingDistribution({ coachId }),
+    classId ? summarize({ coachId, classId }) : Promise.resolve(null),
+  ]);
 
   return {
     feedbacks: sanitized,
@@ -131,6 +131,8 @@ export async function listFeedbacksForCoach(query: FeedbackQueryInput, actorId?:
     summary: {
       averageRating: avgResult._avg.rating ? Math.round(avgResult._avg.rating * 10) / 10 : null,
       totalFeedbacks: avgResult._count.rating,
+      distribution: coachDistribution,
+      classSummary,
     },
   };
 }
@@ -172,4 +174,26 @@ export async function deleteFeedbackByManager(feedbackId: string) {
   if (!feedback) throw new AppError("Feedback not found", 404);
   await prisma.coachFeedback.delete({ where: { id: feedbackId } });
   return { message: "Feedback đã được xóa bởi quản lý." };
+}
+
+/** BE-22: số đánh giá theo từng mức sao `{ "1": n, ..., "5": n }`. */
+async function ratingDistribution(where: { coachId?: string; classId?: string }) {
+  const rows = await prisma.coachFeedback.groupBy({ by: ["rating"], where, _count: { rating: true } });
+  const result: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+  for (const r of rows) result[String(r.rating)] = r._count.rating;
+  return result;
+}
+
+/** BE-22: thống kê đánh giá trong phạm vi một khóa. */
+async function summarize(where: { coachId?: string; classId: string }) {
+  const [agg, distribution] = await Promise.all([
+    prisma.coachFeedback.aggregate({ where, _avg: { rating: true }, _count: { rating: true } }),
+    ratingDistribution(where),
+  ]);
+  return {
+    classId: where.classId,
+    averageRating: agg._avg.rating ? Math.round(agg._avg.rating * 10) / 10 : null,
+    totalFeedbacks: agg._count.rating,
+    distribution,
+  };
 }

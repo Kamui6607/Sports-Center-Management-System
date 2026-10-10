@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../../middlewares/authenticate.js";
+import { optionalAuthenticate } from "../../middlewares/optionalAuthenticate.js";
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
 import {
@@ -69,7 +70,8 @@ router.get("/", validate(ProductQuerySchema, "query"), productsController.listPr
  *       200:
  *         description: OK
  */
-router.get("/:id", productsController.getProductById);
+// Đăng nhập (tùy chọn) để Manager thấy cả đánh giá đã ẩn.
+router.get("/:id", optionalAuthenticate, productsController.getProductById);
 
 /**
  * @swagger
@@ -77,11 +79,12 @@ router.get("/:id", productsController.getProductById);
  *   post:
  *     summary: Create an order (multiple products) and its SePay (VietQR) payment
  *     description: |
- *       Chỉ MEMBER hoặc COACH. Giữ hàng (trừ kho từng sản phẩm) ngay khi tạo đơn; `totalAmount` mỗi dòng = quantity × unitPrice, `totalPrice` đơn = tổng các `totalAmount`; đơn ở trạng thái PENDING và trả về
+ *       (API cũ — giữ tương thích; app mới dùng `POST /shop/checkout`.) Chỉ MEMBER hoặc COACH. Tạo đơn NHẬN TẠI QUẦY,
+ *       giữ hàng (`reservedStock`) ngay khi tạo đơn; `totalAmount` mỗi dòng = quantity × unitPrice, `totalPrice` đơn = tổng các `totalAmount`; đơn ở trạng thái PENDING_PAYMENT và trả về
  *       thông tin QR chuyển khoản (giống `POST /payments/sepay/checkout`). FE polling
  *       `GET /payments/sepay/{paymentId}` để biết khi nào đơn được thanh toán.
- *       - SePay báo đã thu tiền ⇒ đơn SUCCESS + thông báo.
- *       - Hủy (`POST /products/orders/{id}/cancel`) hoặc quá hạn chờ chuyển khoản ⇒ đơn CANCELLED, hoàn kho.
+ *       - SePay báo đã thu tiền ⇒ đơn PAID + thông báo (xử lý tiếp theo máy trạng thái — Doc/SHOP_FLOW_DESIGN.md).
+ *       - Hủy (`POST /products/orders/{id}/cancel`) ⇒ CANCELLED; quá hạn chờ chuyển khoản ⇒ EXPIRED; cả hai nhả hàng giữ.
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
@@ -105,7 +108,7 @@ router.get("/:id", productsController.getProductById);
  *                     quantity: { type: integer, minimum: 1 }
  *     responses:
  *       201:
- *         description: Đơn PENDING + thông tin QR (paymentId, orderCode, amount, qrUrl, expiresAt, order{ id, totalPrice, status, items[{ productId, productName, quantity, unitPrice, totalAmount }] })
+ *         description: Đơn PENDING_PAYMENT + thông tin QR (paymentId, orderCode, amount, qrUrl, expiresAt, order{ id, totalPrice, status, items[{ productId, productName, quantity, unitPrice, totalAmount }] })
  *       400: { $ref: "#/components/responses/BadRequest" }
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       403: { $ref: "#/components/responses/Forbidden" }
@@ -125,7 +128,7 @@ router.post(
  * @swagger
  * /products/orders/{id}/cancel:
  *   post:
- *     summary: Cancel a PENDING order (restores stock)
+ *     summary: Cancel a PENDING_PAYMENT order (releases reserved stock)
  *     description: Người đặt đơn hoặc MANAGER. Chỉ hủy được đơn chưa thanh toán; đơn đã thu tiền ⇒ 409.
  *     tags: [Products]
  *     security:

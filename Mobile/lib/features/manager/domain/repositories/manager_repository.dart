@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../classes/domain/entities/coach_class.dart';
 import '../../../classes/domain/entities/course.dart';
 import '../../../coach/domain/entities/wallet.dart';
@@ -12,6 +14,9 @@ abstract interface class ManagerRepository {
 
   Future<CvApplication> cv(String coachProfileId);
 
+  /// BE-8: `GET /coaches/:profileId/cv/file` — nội dung PDF CV (có xác thực).
+  Future<Uint8List> cvFile(String coachProfileId);
+
   /// `PATCH /coaches/:profileId/cv/review { action, reason }`.
   Future<void> reviewCv(String coachProfileId, {required bool approve, String? reason});
 
@@ -23,7 +28,7 @@ abstract interface class ManagerRepository {
   /// `PATCH /classes/:id/review { action, reason }`.
   Future<void> reviewClass(String classId, {required bool approve, String? reason});
 
-  /// Lệnh rút tiền (TODO BE-7).
+  /// `GET /coaches/wallet/transactions?type=WITHDRAWAL&status=` (BE-7).
   Future<List<WithdrawalRequest>> withdrawals({WalletTxStatus? status});
 
   Future<WithdrawalRequest> withdrawal(String transactionId);

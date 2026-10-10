@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticate } from "../../middlewares/authenticate.js";
+import { authenticateRestricted } from "../../middlewares/authenticateRestricted.js";
 import { validate } from "../../middlewares/validate.js";
 import { avatarUpload } from "../../middlewares/upload.js";
 import {
@@ -96,7 +96,7 @@ router.post("/login", validate(LoginSchema), authController.login);
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.post("/logout", authenticate, authController.logout);
+router.post("/logout", authenticateRestricted, authController.logout);
 
 /**
  * @swagger
@@ -176,7 +176,7 @@ router.patch("/reset-password", validate(ResetPasswordSchema), authController.re
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.get("/me", authenticate, authController.getMe);
+router.get("/me", authenticateRestricted, authController.getMe);
 
 /**
  * @swagger
@@ -205,7 +205,7 @@ router.get("/me", authenticate, authController.getMe);
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.patch("/me", authenticate, validate(UpdateProfileSchema), authController.updateMe);
+router.patch("/me", authenticateRestricted, validate(UpdateProfileSchema), authController.updateMe);
 
 /**
  * @swagger
@@ -240,7 +240,7 @@ router.patch("/me", authenticate, validate(UpdateProfileSchema), authController.
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.post("/me/avatar", authenticate, avatarUpload, authController.uploadAvatar);
+router.post("/me/avatar", authenticateRestricted, avatarUpload, authController.uploadAvatar);
 
 /**
  * @swagger
@@ -267,7 +267,7 @@ router.post("/me/avatar", authenticate, avatarUpload, authController.uploadAvata
  */
 router.patch(
   "/me/change-password",
-  authenticate,
+  authenticateRestricted,
   validate(ChangePasswordSchema),
   authController.changePassword
 );

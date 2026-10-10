@@ -13,4 +13,7 @@ abstract interface class NotificationRepository {
 
   /// `PATCH /notifications/mark-all-read`.
   Future<void> markAllRead();
+
+  /// Báo có thông báo mới (Socket.IO `notification:new`) — REST vẫn là nguồn dữ liệu.
+  Stream<void> changes();
 }

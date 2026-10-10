@@ -92,15 +92,25 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
   );
 }
 
-export function buildResetPasswordEmail(resetLink: string): { subject: string; html: string } {
+/**
+ * Email đặt lại mật khẩu: mã OTP 6 số (nhập trong app Mobile) + liên kết (Web). Cả hai hết hạn sau 15 phút.
+ */
+export function buildResetPasswordEmail(resetLink: string, otp?: string): { subject: string; html: string } {
+  const otpBlock = otp
+    ? `
+      <p>Mã xác nhận của bạn (nhập trong ứng dụng Pulse):</p>
+      <p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:12px 0;">${otp}</p>
+      <p>Hoặc mở liên kết dưới đây trên trình duyệt:</p>`
+    : `<p>Mở liên kết dưới đây để đặt lại mật khẩu:</p>`;
   return {
-    subject: "Reset Your Password - Gym Center",
+    subject: "Đặt lại mật khẩu - Pulse Sports Center",
     html: `
-      <h2>Reset Your Password</h2>
-      <p>You requested a password reset for your Gym Center account.</p>
-      <p>Click the link below to reset it (this link is valid for 15 minutes):</p>
-      <a href="${resetLink}" style="display:inline-block;padding:10px 20px;background:#007bff;color:#fff;text-decoration:none;border-radius:5px;">Reset Password</a>
-      <p>If you didn't request this, you can safely ignore this email.</p>
+      <h2>Đặt lại mật khẩu</h2>
+      <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản Pulse Sports Center.</p>
+      ${otpBlock}
+      <a href="${resetLink}" style="display:inline-block;padding:10px 20px;background:#203D31;color:#fff;text-decoration:none;border-radius:5px;">Đặt lại mật khẩu</a>
+      <p>Mã và liên kết có hiệu lực trong 15 phút. Không chia sẻ mã này với bất kỳ ai.</p>
+      <p>Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
     `,
   };
 }

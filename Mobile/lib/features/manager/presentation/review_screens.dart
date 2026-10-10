@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/icons/app_icons.dart';
+import '../../../core/platform/media_service.dart';
 import '../../../core/theme/theme.dart';
 import '../../../core/utils/vn_time.dart';
 import '../../../core/widgets/widgets.dart';
@@ -89,8 +90,17 @@ class CvReviewScreen extends ConsumerWidget {
                     ),
                   ),
                   TextButton(
-                    // TODO BE-8: endpoint tải file CV có xác thực ⇒ mở trình xem PDF.
-                    onPressed: () => AppSnackbar.info(context, 'Xem PDF sẽ khả dụng khi nối API (TODO BE-8).'),
+                    // BE-8: tải PDF có xác thực rồi mở bằng ứng dụng xem PDF của máy (bảng chia sẻ).
+                    onPressed: () => runAction(context, () async {
+                      final bytes = await ref.read(managerRepositoryProvider).cvFile(cv.coachProfileId);
+                      await ref
+                          .read(mediaServiceProvider)
+                          .shareFile(
+                            bytes,
+                            fileName: cv.certification.fileName ?? 'CV.pdf',
+                            mimeType: 'application/pdf',
+                          );
+                    }),
                     child: const Text('Xem CV'),
                   ),
                 ],

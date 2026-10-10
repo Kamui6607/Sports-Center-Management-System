@@ -6,6 +6,15 @@ export const CreateProductSchema = z.object({
   price: z.number().min(0),
   stockQuantity: z.number().int().min(0),
   isActive: z.boolean().default(true),
+  /** BE-6: ảnh sản phẩm (URL http/https). */
+  imageUrl: z.string().trim().url().max(500).nullable().optional(),
+  /** Bộ ảnh phụ. */
+  imageUrls: z.array(z.string().trim().url().max(500)).max(10).optional(),
+  /** Giới hạn chống gom hàng: tối đa mỗi đơn / mỗi người mỗi ngày. */
+  maxPerOrder: z.number().int().min(1).max(999).optional(),
+  maxPerDay: z.number().int().min(1).max(9999).optional(),
+  /** Ngưỡng cảnh báo sắp hết hàng. */
+  lowStockThreshold: z.number().int().min(0).max(100000).optional(),
 });
 
 export const UpdateProductSchema = CreateProductSchema.partial();
@@ -30,4 +39,6 @@ export const CreateOrderSchema = z.object({
 export const CreateProductReviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
   comment: z.string().optional(),
+  /** Dòng đơn COMPLETED cần đánh giá (bỏ trống ⇒ tự chọn dòng cũ nhất chưa đánh giá). */
+  orderItemId: z.string().min(1).optional(),
 });

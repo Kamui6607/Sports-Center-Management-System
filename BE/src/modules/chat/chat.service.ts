@@ -263,18 +263,69 @@ export const chatService = {
     });
   },
 
-  async getContacts(role: string) {
-    // Logic: 
-    // STAFF -> MANAGER, COACH
-    // MEMBER -> COACH
-    // COACH -> MEMBER, MANAGER
-    // MANAGER -> STAFF, COACH
-    const allowedRoles = allowedContacts[role] ?? [];
+  /**
+   * L10: danh bạ theo QUAN HỆ KHÓA HỌC (nghiệp vụ §3.6: Member ↔ Coach trao đổi về khóa đang học):
+   * - MEMBER: HLV của các khóa mình đang/đã giữ chỗ.
+   * - COACH: học viên đang/đã giữ chỗ trong khóa của mình + mọi MANAGER.
+   * - MANAGER: mọi HLV đang hoạt động (như cũ).
+   * Người đã từng nhắn tin với mình vẫn nằm trong danh bạ (không mất hội thoại cũ).
+   */
+  async getContacts(user: { id: string; role: string }) {
+    const allowedRoles = allowedContacts[user.role] ?? [];
+    const related: { id: { in: string[] } }[] = [];
+    if (user.role === "MEMBER") {
+      const coaches = await prisma.coachProfile.findMany({
+        where: {
+          classes: {
+            some: {
+              schedules: {
+                some: {
+                  enrollments: { some: { member: { userId: user.id }, status: { in: ["BOOKED", "COMPLETED"] } } },
+                },
+              },
+            },
+          },
+        },
+        select: { userId: true },
+      });
+      related.push({ id: { in: coaches.map((c) => c.userId) } });
+    } else if (user.role === "COACH") {
+      const members = await prisma.memberProfile.findMany({
+        where: {
+          enrollments: {
+            some: {
+              status: { in: ["BOOKED", "COMPLETED"] },
+              schedule: { class: { coach: { userId: user.id } } },
+            },
+          },
+        },
+        select: { userId: true },
+      });
+      related.push({ id: { in: members.map((m) => m.userId) } });
+    }
+    const partners = await prisma.chatMessage.findMany({
+      where: { OR: [{ senderId: user.id }, { receiverId: user.id }], receiverId: { not: null } },
+      select: { senderId: true, receiverId: true },
+      distinct: ["senderId", "receiverId"],
+    });
+    const partnerIds = partners
+      .flatMap((m) => [m.senderId, m.receiverId])
+      .filter((id): id is string => !!id && id !== user.id);
 
     const contacts = await prisma.user.findMany({
       where: {
         role: { name: { in: allowedRoles } },
         isActive: true,
+        id: { not: user.id },
+        ...(user.role === "MANAGER"
+          ? {}
+          : {
+              OR: [
+                ...related,
+                { id: { in: partnerIds } },
+                ...(user.role === "COACH" ? [{ role: { name: "MANAGER" } }] : []),
+              ],
+            }),
       },
       select: {
         id: true,

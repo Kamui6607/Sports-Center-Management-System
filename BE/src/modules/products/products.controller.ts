@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import * as productsService from "./products.service.js";
-import { createOrderSepayCheckout } from "../payments/sepay-payments.service.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
 
 export async function createProduct(req: Request, res: Response, next: NextFunction) {
@@ -23,7 +22,7 @@ export async function listProducts(req: Request, res: Response, next: NextFuncti
 
 export async function getProductById(req: Request, res: Response, next: NextFunction) {
   try {
-    const product = await productsService.getProductById(req.params.id as string);
+    const product = await productsService.getProductById(req.params.id as string, req.user);
     sendSuccess(res, product, "Product retrieved successfully");
   } catch (err) {
     next(err);
@@ -32,7 +31,7 @@ export async function getProductById(req: Request, res: Response, next: NextFunc
 
 export async function updateProduct(req: Request, res: Response, next: NextFunction) {
   try {
-    const product = await productsService.updateProduct(req.params.id as string, req.body);
+    const product = await productsService.updateProduct(req.params.id as string, req.body, req.user?.id);
     sendSuccess(res, product, "Product updated successfully");
   } catch (err) {
     next(err);
@@ -52,7 +51,7 @@ export async function deleteProduct(req: Request, res: Response, next: NextFunct
 
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
-    const checkout = await createOrderSepayCheckout(req.user!.id, req.user!.role, req.body.items);
+    const checkout = await productsService.createLegacyOrder(req.user!, req.body.items, req.header("Idempotency-Key") ?? undefined);
     sendCreated(res, checkout, "Order created — waiting for SePay transfer");
   } catch (err) {
     next(err);

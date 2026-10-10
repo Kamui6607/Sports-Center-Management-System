@@ -10,10 +10,14 @@ import { createNotification } from "../notifications/notifications.service.js";
 import { computeAttendanceBuckets } from "./attendance-analytics.service.js";
 import { expireStalePenalties } from "./attendance-penalties.service.js";
 
-/** §5: MEMBER không có quyền ghi attendance; COACH không được tự set EXCUSED — chỉ MANAGER. */
+/**
+ * §5 + L5: MEMBER không có quyền ghi attendance. `EXCUSED` (vắng có phép) do MANAGER hoặc COACH
+ * PHỤ TRÁCH buổi học xác nhận (quyền theo buổi đã kiểm ở `verifyCoachAccess`). EXCUSED không tính vào
+ * tỷ lệ chuyên cần / phạt (xem `computeAttendanceBuckets`).
+ */
 function assertCanSetExcused(status: unknown, user: any) {
-  if (status === "EXCUSED" && user?.role !== "MANAGER") {
-    throw new AppError("Forbidden: chỉ MANAGER được xác nhận vắng có phép (EXCUSED)", 403);
+  if (status === "EXCUSED" && user?.role !== "MANAGER" && user?.role !== "COACH") {
+    throw new AppError("Forbidden: chỉ HLV phụ trách hoặc MANAGER được xác nhận vắng có phép (EXCUSED)", 403);
   }
 }
 
@@ -499,3 +503,61 @@ export async function scanAttendanceWarnings(classId?: string, now = new Date())
 
   return { checked: buckets.length, warnBuckets: warnBuckets.length, sent, skippedDuplicate };
 }
+// ─── BE-18: ĐIỂM DANH HÀNG LOẠT + THU HỒI MÃ ───────────────────────────────
+
+/**
+ * `PUT /attendance/schedule/:scheduleId` — ghi điểm danh cả danh sách trong MỘT giao dịch
+ * (tạo mới hoặc cập nhật theo (scheduleId, memberId)). Mọi học viên phải đang giữ chỗ buổi này;
+ * một dòng sai ⇒ không dòng nào được ghi.
+ */
+export const saveAttendanceBulk = async (
+  scheduleId: string,
+  items: { memberId: string; status: "PRESENT" | "ABSENT" | "LATE" | "EXCUSED"; note?: string | null }[],
+  user: any
+) => {
+  await verifyCoachAccess(scheduleId, user);
+  for (const item of items) assertCanSetExcused(item.status, user);
+
+  const schedule = await prisma.classSchedule.findUnique({ where: { id: scheduleId }, select: { status: true } });
+  if (!schedule) throw new AppError("Schedule not found", 404);
+  if (schedule.status === "CANCELLED") throw new AppError("Buổi học đã bị hủy, không thể điểm danh.", 400);
+
+  const memberIds = [...new Set(items.map((i) => i.memberId))];
+  const enrolled = await prisma.enrollment.findMany({
+    where: { scheduleId, memberId: { in: memberIds }, status: { in: ["BOOKED", "COMPLETED"] } },
+    select: { memberId: true },
+  });
+  const enrolledIds = new Set(enrolled.map((e) => e.memberId));
+  const missing = memberIds.filter((id) => !enrolledIds.has(id));
+  if (missing.length > 0) {
+    throw new AppError("Member is not actively enrolled in this schedule", 400, {
+      code: "MEMBER_NOT_ENROLLED",
+      memberIds: missing,
+    });
+  }
+
+  await prisma.$transaction(
+    items.map((item) =>
+      prisma.attendance.upsert({
+        where: { scheduleId_memberId: { scheduleId, memberId: item.memberId } },
+        create: { scheduleId, memberId: item.memberId, status: item.status, note: item.note ?? null },
+        update: { status: item.status, note: item.note ?? null },
+      })
+    )
+  );
+  return getAttendancesBySchedule(scheduleId, user);
+};
+
+/**
+ * `DELETE /attendance/qr/:scheduleId` — HLV đóng màn QR ⇒ thu hồi NGAY mọi mã dự phòng còn hiệu lực
+ * của buổi. Mã QR (JWT) không lưu trạng thái nên tự hết hạn theo TTL (`ATTENDANCE.QR_TTL_SECONDS`).
+ */
+export const revokeAttendanceCodes = async (scheduleId: string, user: any) => {
+  await verifyCoachAccess(scheduleId, user);
+  const now = new Date();
+  const revoked = await prisma.attendanceManualCode.updateMany({
+    where: { scheduleId, revokedAt: null, expiresAt: { gt: now } },
+    data: { revokedAt: now },
+  });
+  return { revokedManualCodes: revoked.count, qrTokenTtlSeconds: ATTENDANCE.QR_TTL_SECONDS };
+};

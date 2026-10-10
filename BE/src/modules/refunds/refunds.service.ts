@@ -6,6 +6,7 @@ import { lockPaymentWebhook } from "../../utils/dbLocks.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { enqueueNotification, flushNotificationOutbox } from "../notifications/outbox.service.js";
 import type { RefundQueryInput } from "./refunds.schema.js";
+import { onOrderRefundApprovedTx, onOrderRefundRejectedTx } from "../shop/orders.service.js";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
@@ -25,13 +26,31 @@ const refundInclude = {
   member: {
     select: { id: true, user: { select: { id: true, fullName: true, email: true, phone: true } } },
   },
-  class: { select: { id: true, name: true } },
+  class: {
+    select: { id: true, name: true, coach: { select: { id: true, user: { select: { id: true, fullName: true } } } } },
+  },
   schedule: { select: { id: true, startTime: true, endTime: true } },
   payment: {
     select: { id: true, amount: true, method: true, status: true, transactionCode: true, paidAt: true },
   },
   processedBy: { select: { id: true, fullName: true } },
+  // Hoàn tiền đơn hàng (lý do ORDER_*): mã đơn + người mua (HLV mua hàng không có `member`).
+  order: {
+    select: {
+      id: true,
+      code: true,
+      status: true,
+      fulfillmentType: true,
+      totalPrice: true,
+      user: { select: { id: true, fullName: true, email: true, phone: true } },
+    },
+  },
 } satisfies Prisma.RefundInclude;
+
+/** Người nhận tiền hoàn: hội viên (khóa học) hoặc người mua đơn hàng. */
+function refundRecipientUserId(refund: { member: { userId: string } | null; order: { userId: string } | null }): string | null {
+  return refund.member?.userId ?? refund.order?.userId ?? null;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -176,6 +195,7 @@ export async function requestCourseRefund(userId: string, classId: string, note?
         coachWalletId: debit.coachWalletId,
         coachDebitAmount: debit.coachDebitAmount,
         note: note ?? null,
+        memberNote: note ?? null,
         requestedById: userId,
       },
       include: refundInclude,
@@ -242,7 +262,7 @@ export async function createSessionRefundsTx(
       },
       select: { id: true, memberId: true },
     });
-    created.push({ id: refund.id, memberId: refund.memberId, amount });
+    created.push({ id: refund.id, memberId: refund.memberId!, amount });
   }
   return created;
 }
@@ -264,7 +284,12 @@ export async function approveRefund(refundId: string, managerUserId: string, not
 
     const refund = await tx.refund.findUnique({
       where: { id: refundId },
-      include: { member: { select: { userId: true } }, class: { select: { name: true } } },
+      include: {
+        member: { select: { userId: true } },
+        class: { select: { name: true } },
+        order: { select: { userId: true, code: true } },
+        payment: { select: { amount: true, status: true } },
+      },
     });
     if (!refund) throw new AppError("Refund not found", 404);
     if (refund.status !== "PENDING") {
@@ -299,9 +324,17 @@ export async function approveRefund(refundId: string, managerUserId: string, not
       });
     }
 
+    // Hoàn tiền đơn hàng: đơn → REFUNDED (+ trả hàng về kho nếu chưa giao); hoàn toàn bộ ⇒ giao dịch REFUNDED.
+    if (refund.orderId) {
+      await onOrderRefundApprovedTx(tx, refund, managerUserId);
+      if (refund.payment.status === "SUCCESS" && amount >= money(refund.payment.amount)) {
+        await tx.payment.update({ where: { id: refund.paymentId }, data: { status: "REFUNDED" } });
+      }
+    }
+
     if (refund.reason === "MEMBER_CANCEL_COURSE") {
       await tx.payment.update({ where: { id: refund.paymentId }, data: { status: "REFUNDED" } });
-      if (refund.classId) {
+      if (refund.classId && refund.memberId) {
         await tx.enrollment.updateMany({
           where: { memberId: refund.memberId, schedule: { classId: refund.classId }, status: "BOOKED" },
           data: { status: "CANCELLED", cancelledAt: new Date() },
@@ -315,21 +348,25 @@ export async function approveRefund(refundId: string, managerUserId: string, not
         status: "COMPLETED",
         processedById: managerUserId,
         processedAt: new Date(),
-        ...(note ? { note } : {}),
+        ...(note ? { note, managerNote: note } : {}),
       },
       include: refundInclude,
     });
 
-    await enqueueNotification(tx, {
-      userId: refund.member.userId,
-      type: "PAYMENT_REFUNDED",
-      title: "Bạn đã được hoàn tiền",
-      body:
-        refund.reason === "MEMBER_CANCEL_COURSE"
-          ? `Yêu cầu hủy khóa "${className}" đã được duyệt. ${vnd(amount)} đã được hoàn cho bạn.`
-          : `Buổi học bị hủy của lớp "${className}" đã được hoàn ${vnd(amount)} cho bạn.`,
-      metadata: { refundId: refund.id, paymentId: refund.paymentId, classId: refund.classId },
-    });
+    const recipient = refundRecipientUserId(refund);
+    if (recipient) {
+      await enqueueNotification(tx, {
+        userId: recipient,
+        type: "PAYMENT_REFUNDED",
+        title: "Bạn đã được hoàn tiền",
+        body: refund.order
+          ? `Đơn hàng ${refund.order.code} đã được hoàn ${vnd(amount)} cho bạn.`
+          : refund.reason === "MEMBER_CANCEL_COURSE"
+            ? `Yêu cầu hủy khóa "${className}" đã được duyệt. ${vnd(amount)} đã được hoàn cho bạn.`
+            : `Buổi học bị hủy của lớp "${className}" đã được hoàn ${vnd(amount)} cho bạn.`,
+        metadata: { refundId: refund.id, paymentId: refund.paymentId, classId: refund.classId, orderId: refund.orderId },
+      });
+    }
 
     return updated;
   });
@@ -347,7 +384,7 @@ export async function rejectRefund(refundId: string, managerUserId: string, reas
 
     const refund = await tx.refund.findUnique({
       where: { id: refundId },
-      include: { member: { select: { userId: true } }, class: { select: { name: true } } },
+      include: { member: { select: { userId: true } }, class: { select: { name: true } }, order: { select: { userId: true, code: true } } },
     });
     if (!refund) throw new AppError("Refund not found", 404);
     if (refund.status !== "PENDING") {
@@ -368,14 +405,22 @@ export async function rejectRefund(refundId: string, managerUserId: string, reas
       include: refundInclude,
     });
 
-    await enqueueNotification(tx, {
-      userId: refund.member.userId,
-      type: "GENERAL",
-      title: "Yêu cầu hoàn tiền bị từ chối",
-      body: `Yêu cầu hoàn tiền cho lớp "${refund.class?.name ?? "khóa học"}" đã bị từ chối.`,
-      reason,
-      metadata: { refundId: refund.id, paymentId: refund.paymentId, classId: refund.classId },
-    });
+    // Từ chối hủy đơn đã thanh toán ⇒ đơn quay lại trạng thái trước đó để Trung tâm xử lý tiếp.
+    if (refund.orderId) await onOrderRefundRejectedTx(tx, refund, managerUserId, reason);
+
+    const recipient = refundRecipientUserId(refund);
+    if (recipient) {
+      await enqueueNotification(tx, {
+        userId: recipient,
+        type: "GENERAL",
+        title: "Yêu cầu hoàn tiền bị từ chối",
+        body: refund.order
+          ? `Yêu cầu hoàn tiền cho đơn hàng ${refund.order.code} đã bị từ chối.`
+          : `Yêu cầu hoàn tiền cho lớp "${refund.class?.name ?? "khóa học"}" đã bị từ chối.`,
+        reason,
+        metadata: { refundId: refund.id, paymentId: refund.paymentId, classId: refund.classId, orderId: refund.orderId },
+      });
+    }
 
     return updated;
   });
@@ -392,6 +437,7 @@ function buildRefundWhere(query: RefundQueryInput): Prisma.RefundWhereInput {
   if (query.reason) where.reason = query.reason;
   if (query.memberId) where.memberId = query.memberId;
   if (query.classId) where.classId = query.classId;
+  if (query.orderId) where.orderId = query.orderId;
   return where;
 }
 
@@ -416,9 +462,80 @@ export async function listRefunds(query: RefundQueryInput) {
   return paginateRefunds(buildRefundWhere(query), query);
 }
 
-/** MEMBER: yêu cầu hoàn tiền của chính mình. */
+/** MEMBER/COACH: yêu cầu hoàn tiền của chính mình (khóa học theo hồ sơ hội viên + đơn hàng mình mua). */
 export async function listMyRefunds(userId: string, query: RefundQueryInput) {
   const memberProfile = await prisma.memberProfile.findUnique({ where: { userId }, select: { id: true } });
+  const owner: Prisma.RefundWhereInput[] = [{ order: { userId } }];
+  if (memberProfile) owner.push({ memberId: memberProfile.id });
+  return paginateRefunds({ AND: [buildRefundWhere(query), { OR: owner }] }, query);
+}
+
+/** BE-17: một yêu cầu hoàn tiền — MANAGER xem mọi bản ghi; MEMBER chỉ xem của mình. */
+export async function getRefundById(id: string, actor: { id: string; role: string }) {
+  const refund = await prisma.refund.findUnique({ where: { id }, include: refundInclude });
+  if (!refund) throw new AppError("Refund not found", 404);
+  const ownerId = refund.member?.user.id ?? refund.order?.user.id ?? null;
+  if (actor.role !== "MANAGER" && ownerId !== actor.id) throw new AppError("Forbidden", 403);
+  return refund;
+}
+
+/**
+ * BE-16: xem trước điều kiện hủy khóa (cùng luật với `requestCourseRefund`, KHÔNG ghi dữ liệu):
+ * hạn hủy = buổi chính đầu tiên chưa hủy − 24h; tiền hoàn = đã trả − các yêu cầu không bị từ chối.
+ */
+export async function previewCourseRefund(userId: string, classId: string, now = new Date()) {
+  const memberProfile = await prisma.memberProfile.findUnique({ where: { userId }, select: { id: true } });
   if (!memberProfile) throw new AppError("Member profile not found", 404);
-  return paginateRefunds({ ...buildRefundWhere(query), memberId: memberProfile.id }, query);
+  const cls = await prisma.class.findUnique({ where: { id: classId }, select: { id: true } });
+  if (!cls) throw new AppError("Class not found", 404);
+
+  const [firstSession, payment] = await Promise.all([
+    prisma.classSchedule.findFirst({
+      where: { classId, makeupForId: null, status: { not: "CANCELLED" } },
+      orderBy: { startTime: "asc" },
+      select: { startTime: true },
+    }),
+    findPaidClassPayment(prisma, memberProfile.id, classId),
+  ]);
+  const deadline = firstSession
+    ? new Date(firstSession.startTime.getTime() - COURSE_CANCEL_MIN_HOURS_BEFORE_START * 3_600_000)
+    : null;
+  const paidAmount = payment ? money(payment.amount) : 0;
+  const refundableAmount = payment ? Math.max(0, await remainingRefundable(prisma, payment)) : 0;
+  const existing = payment
+    ? await prisma.refund.findFirst({
+        where: { paymentId: payment.id, reason: "MEMBER_CANCEL_COURSE", status: { not: "REJECTED" } },
+        select: { id: true, status: true },
+      })
+    : null;
+
+  let blockReason: string | null = null;
+  let blockMessage: string | null = null;
+  if (!payment) {
+    blockReason = "PAID_PAYMENT_NOT_FOUND";
+    blockMessage = "Bạn chưa có giao dịch thanh toán thành công cho khóa học này.";
+  } else if (existing) {
+    blockReason = "REFUND_ALREADY_REQUESTED";
+    blockMessage =
+      existing.status === "PENDING"
+        ? "Bạn đã gửi yêu cầu hủy khóa này, đang chờ Quản lý duyệt."
+        : "Khóa học này đã được hoàn tiền.";
+  } else if (deadline && now >= deadline) {
+    blockReason = "COURSE_CANCEL_TOO_LATE";
+    blockMessage = `Đã quá hạn hủy khóa (phải trước giờ khai giảng ít nhất ${COURSE_CANCEL_MIN_HOURS_BEFORE_START} giờ).`;
+  } else if (refundableAmount <= 0) {
+    blockReason = "NOTHING_TO_REFUND";
+    blockMessage = "Giao dịch này không còn số tiền nào để hoàn.";
+  }
+
+  return {
+    allowed: blockReason === null,
+    deadline,
+    firstSessionStart: firstSession?.startTime ?? null,
+    paidAmount,
+    refundableAmount,
+    blockReason,
+    blockMessage,
+    existingRefundId: existing?.id ?? null,
+  };
 }

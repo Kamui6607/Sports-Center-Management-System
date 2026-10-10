@@ -238,4 +238,17 @@ router.delete("/results/:id", authorize("COACH"), controller.deleteResult);
  */
 router.get("/:id/progress", controller.getPlanProgress);
 
+/**
+ * @swagger
+ * /training-plans/{id}:
+ *   get:
+ *     summary: "BE-17: Một lộ trình kèm kết quả (MEMBER chủ plan / COACH phụ trách / MANAGER)"
+ *     tags: [Training]
+ *     responses:
+ *       200: { description: "TrainingPlan + coach.user + member.user + results[]" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.get("/:id", controller.getPlanById);
+
 export default router;

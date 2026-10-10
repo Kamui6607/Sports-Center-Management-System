@@ -20,10 +20,17 @@ final unreadMessagesProvider = FutureProvider.autoDispose<int>((ref) {
   return ref.watch(chatRepositoryProvider).unreadCount();
 });
 
-/// Nối sự kiện realtime (tin nhắn mới) ⇒ làm mới badge & danh sách.
+/// Nối sự kiện realtime (tin nhắn mới, thông báo mới) ⇒ làm mới badge & danh sách.
 final realtimeBridgeProvider = Provider.autoDispose<void>((ref) {
-  final sub = ref.watch(chatRepositoryProvider).events().listen((e) {
+  final chat = ref.watch(chatRepositoryProvider).events().listen((e) {
     if (e is ChatMessageEvent) ref.read(dataRevisionProvider.notifier).bump();
   });
-  ref.onDispose(sub.cancel);
+  final notifications = ref
+      .watch(notificationRepositoryProvider)
+      .changes()
+      .listen((_) => ref.read(dataRevisionProvider.notifier).bump());
+  ref.onDispose(() {
+    chat.cancel();
+    notifications.cancel();
+  });
 });

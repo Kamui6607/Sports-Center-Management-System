@@ -19,6 +19,9 @@ enum NotificationType {
   attendancePenaltyRevoked,
   paymentSuccess,
   paymentRefunded,
+
+  /// Cửa hàng: đơn hàng đổi trạng thái.
+  orderUpdated,
   general,
 }
 

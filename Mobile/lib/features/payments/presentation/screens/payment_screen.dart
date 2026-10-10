@@ -135,8 +135,13 @@ class _PendingViewState extends ConsumerState<_PendingView> {
   Future<void> _renew() async {
     final classId = c.classId;
     if (classId == null) {
-      // Đơn sản phẩm: quay lại sản phẩm để đặt đơn mới.
-      context.pop();
+      // Đơn hàng: xem chi tiết đơn (trạng thái hết hạn/hủy, đặt lại từ cửa hàng).
+      final orderId = c.productOrderId;
+      if (orderId != null) {
+        context.pushReplacement(AppRoutes.order(orderId));
+      } else {
+        context.pop();
+      }
       return;
     }
     setState(() => _renewing = true);
@@ -181,7 +186,8 @@ class _PendingViewState extends ConsumerState<_PendingView> {
                   title: 'Đang chờ ngân hàng xác nhận',
                   message: 'Mở app ngân hàng, quét mã QR hoặc chuyển khoản đúng số tiền và nội dung. Trạng thái tự cập nhật sau khi nhận tiền. Nếu đã chuyển, KHÔNG chuyển lại.',
                 ),
-                if (Env.useMock) ...[
+                // API thật (dev): BE hỗ trợ `POST /payments/sepay/mock-confirm` khi SEPAY_MOCK_MODE=true.
+                if (Env.useMock || Env.environment == AppEnvironment.dev) ...[
                   const SizedBox(height: AppSpacing.sm),
                   AppButton.ghost(
                     label: 'DEV: Giả lập SePay đã thu tiền',
@@ -205,7 +211,7 @@ class _PendingViewState extends ConsumerState<_PendingView> {
                   onPressed: _checkNow,
                 )
               : AppButton(
-                  label: c.classId != null ? 'Tạo đơn mới' : 'Quay lại sản phẩm',
+                  label: c.classId != null ? 'Tạo đơn mới' : 'Xem đơn hàng',
                   icon: AppIcons.refresh,
                   expand: true,
                   loading: _renewing,

@@ -38,7 +38,7 @@ class CvApplication {
   final Certification certification;
 }
 
-/// Lệnh rút tiền chờ duyệt (TODO BE-7: chưa có endpoint liệt kê).
+/// Lệnh rút tiền chờ duyệt (`GET /coaches/wallet/transactions` — BE-7).
 class WithdrawalRequest {
   const WithdrawalRequest({
     required this.transaction,

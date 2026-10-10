@@ -6,7 +6,7 @@ enum FailureType { network, validation, unauthorized, forbidden, notFound, confl
 /// Tương ứng body lỗi của BE: `{ success:false, message, errors:[{field,message}] }`
 /// hoặc `errors: { code, ... }` cho lỗi nghiệp vụ (VD `CLASS_NOT_COMPLETED`).
 class AppFailure implements Exception {
-  const AppFailure(this.type, this.message, {this.code, this.fieldErrors = const {}});
+  const AppFailure(this.type, this.message, {this.code, this.fieldErrors = const {}, this.details});
 
   const AppFailure.network() : this(FailureType.network, 'Không có kết nối mạng. Vui lòng thử lại.');
 
@@ -27,6 +27,10 @@ class AppFailure implements Exception {
   const AppFailure.validation(String message, {Map<String, String> fieldErrors = const {}})
     : this(FailureType.validation, message, fieldErrors: fieldErrors);
 
+  /// Chức năng Backend chưa hỗ trợ (API thiếu/lệch — xem `Doc/MOBILE_API_INTEGRATION.md`).
+  const AppFailure.unsupported([String message = 'Chức năng này chưa được máy chủ hỗ trợ.'])
+    : this(FailureType.business, message, code: 'API_NOT_SUPPORTED');
+
   final FailureType type;
   final String message;
 
@@ -35,6 +39,9 @@ class AppFailure implements Exception {
 
   /// Lỗi theo từng field của form.
   final Map<String, String> fieldErrors;
+
+  /// Dữ liệu kèm lỗi nghiệp vụ của BE (`errors` dạng object), VD QR của giao dịch đang chờ.
+  final Object? details;
 
   bool get isRetryable => type == FailureType.network || type == FailureType.server;
 

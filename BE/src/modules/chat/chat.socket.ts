@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma.js";
 import { verifyAccessToken } from "../../utils/jwt.js";
 import { chatService } from "./chat.service.js";
 import { ROLE_NAME_SELECT } from "../../utils/roles.js";
+import { setRealtimeServer } from "../../utils/realtime.js";
 
 type SocketUser = { id: string; role: string };
 type Ack = (result: { ok: boolean; message?: unknown; error?: string }) => void;
@@ -39,6 +40,7 @@ function announcePresence(io: Server, userId: string, online: boolean) {
 
 export const setupSocket = (io: Server) => {
   ioInstance = io;
+  setRealtimeServer(io);
   io.use(async (socket, next) => {
     try {
       const payload = verifyAccessToken(tokenFrom(socket));

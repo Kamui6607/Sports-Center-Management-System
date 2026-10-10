@@ -4,7 +4,8 @@ import { sendSuccess, sendCreated } from "../../utils/response.js";
 
 export async function listSchedules(req: Request, res: Response, next: NextFunction) {
   try {
-    const { schedules, pagination } = await schedulesService.listSchedules(req.query);
+    const actor = req.user ? { id: req.user.id, role: req.user.role } : undefined;
+    const { schedules, pagination } = await schedulesService.listSchedules(req.query, actor);
     sendSuccess(res, schedules, "Schedules retrieved successfully", 200, pagination);
   } catch (err) { next(err); }
 }

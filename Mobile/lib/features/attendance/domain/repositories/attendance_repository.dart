@@ -14,7 +14,7 @@ abstract interface class AttendanceRepository {
   /// `GET /attendance/my/summary`.
   Future<List<ClassAttendanceStat>> mySummary();
 
-  /// Phạt chuyên cần của tôi (TODO BE: endpoint đọc phạt cho Member).
+  /// Phạt chuyên cần của tôi (`GET /attendance/my/summary` → `penalties`).
   Future<List<AttendancePenalty>> myPenalties();
 
   /// `POST /attendance/penalties/:id/appeal`.

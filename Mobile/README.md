@@ -273,7 +273,7 @@ Hiện app **chưa nối API**: mọi màn hình chạy trên một "BE giả" t
 ```bash
 cd Mobile
 flutter pub get
-flutter run                       # USE_MOCK mặc định = true
+flutter run --dart-define=USE_MOCK=true   # dữ liệu giả lập (mặc định app gọi API thật)
 ```
 
 ### Tài khoản demo
@@ -320,7 +320,7 @@ Mỗi `<feature>_repository_provider.dart` chọn nguồn dữ liệu theo `Env.
 
 ### Điểm cần nối API
 
-Cách nối: thêm `dio` (+ interceptor token, map lỗi BE ⇒ `AppFailure`), viết `<Feature>ApiRepository implements <Feature>Repository`, trả nó trong nhánh `else` của provider rồi chạy với `--dart-define=USE_MOCK=false`. UI không phải sửa. Endpoint ghi ngay trên từng hàm của interface; tóm tắt:
+**Đã nối API thật (10/10/2026), mặc định `USE_MOCK=false`:** mỗi feature có `data/<x>_api_repository.dart` (Dio + `lib/core/network/`, realtime qua `socket_io_client`). Chạy bằng dữ liệu giả lập: `--dart-define=USE_MOCK=true` (hoặc từng chức năng: `MOCK_FEATURES=chat,training`). Cấu hình base URL, tài khoản test, trạng thái từng endpoint: [`Doc/MOBILE_API_INTEGRATION.md`](../Doc/MOBILE_API_INTEGRATION.md). Bảng dưới là endpoint dự kiến ban đầu (giai đoạn UI):
 
 | Repository (`lib/features/…/domain/repositories/`) | Endpoint BE | TODO BE |
 |---|---|---|

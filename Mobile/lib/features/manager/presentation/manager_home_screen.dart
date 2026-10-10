@@ -9,6 +9,7 @@ import '../../../core/theme/theme.dart';
 import '../../../core/utils/vn_time.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../auth/presentation/providers/session_provider.dart';
+import '../../shop/presentation/providers/shop_providers.dart';
 import 'manager_providers.dart';
 
 /// R01 — Tổng quan Quản lý: số việc chờ duyệt theo loại.
@@ -75,6 +76,8 @@ class ManagerHomeScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
+            const _ShopSection(),
+            const SizedBox(height: AppSpacing.lg),
             const AlertBanner.info(
               title: 'Quy trình tiền',
               message:
@@ -89,7 +92,7 @@ class ManagerHomeScreen extends ConsumerWidget {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
-                      'Quản lý phòng tập, bộ môn, sản phẩm, báo cáo… vui lòng dùng trang quản trị Web.',
+                      'Quản lý phòng tập, bộ môn, thêm/sửa sản phẩm, báo cáo… vui lòng dùng trang quản trị Web.',
                       style: context.text.small,
                     ),
                   ),
@@ -99,6 +102,63 @@ class ManagerHomeScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Cửa hàng: đơn cần xử lý, chờ nhận tại quầy, sắp hết hàng + lối tắt quét mã nhận hàng.
+class _ShopSection extends ConsumerWidget {
+  const _ShopSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summary = ref.watch(shopSummaryProvider).value;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(
+          title: 'Cửa hàng',
+          actionLabel: 'Tất cả đơn',
+          onAction: () => context.push(AppRoutes.managerOrders),
+        ),
+        KpiGrid(
+          children: [
+            KpiTile(
+              icon: AppIcons.order,
+              label: 'Đơn cần chuẩn bị',
+              value: '${summary?.toPrepare ?? 0}',
+              highlight: (summary?.toPrepare ?? 0) > 0,
+              onTap: () => context.push(AppRoutes.managerOrders),
+            ),
+            KpiTile(
+              icon: AppIcons.shop,
+              label: 'Chờ nhận tại quầy',
+              value: '${summary?.readyForPickup ?? 0}',
+              onTap: () => context.push(AppRoutes.managerOrders),
+            ),
+            KpiTile(
+              icon: AppIcons.truck,
+              label: 'Đang giao',
+              value: '${summary?.shipping ?? 0}',
+              onTap: () => context.push(AppRoutes.managerOrders),
+            ),
+            KpiTile(
+              icon: AppIcons.inventory,
+              label: 'Sắp hết hàng',
+              value: '${summary?.lowStockProducts ?? 0}',
+              highlight: (summary?.lowStockProducts ?? 0) > 0,
+              onTap: () => context.push(AppRoutes.inventory),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        AppButton.outline(
+          label: 'Quét mã nhận hàng',
+          icon: AppIcons.scan,
+          expand: true,
+          onPressed: () => context.push(AppRoutes.pickupScan),
+        ),
+      ],
     );
   }
 }

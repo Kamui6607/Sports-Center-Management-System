@@ -216,6 +216,8 @@ export const ScheduleQuerySchema = z.object({
   // Legacy date/startAfter/startBefore vẫn là start-time filtering.
   from: z.string().min(1).optional(),
   to: z.string().min(1).optional(),
+  /** BE-15: "true" ⇒ chỉ buổi của tôi (COACH: khóa mình dạy; MEMBER: buổi mình giữ chỗ). */
+  mine: z.enum(["true", "false"]).optional(),
   // Lọc theo thứ trong tuần (giờ VN, tính trên startTime).
   // weekday: 1 giá trị; weekdays: nhiều giá trị. Cả 2 đều hợp nhất.
   weekday: WeekdayArraySchema,

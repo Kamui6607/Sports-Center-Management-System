@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import * as classesService from "./classes.service.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
+import { resubmitActivityPlan } from "../class-schedules/class-schedules.service.js";
+import { getClassStudents } from "./class-summary.service.js";
 
 export async function listClasses(req: Request, res: Response, next: NextFunction) {
   try {
@@ -26,7 +28,7 @@ export async function reviewClass(req: Request, res: Response, next: NextFunctio
 }
 export async function getClassById(req: Request, res: Response, next: NextFunction) {
   try {
-    const cls = await classesService.getClassById(req.params.id as string);
+    const cls = await classesService.getClassById(req.params.id as string, req.user);
     sendSuccess(res, cls, "Class retrieved successfully");
   } catch (err) { next(err); }
 }
@@ -47,5 +49,24 @@ export async function deleteClass(req: Request, res: Response, next: NextFunctio
   try {
     const cls = await classesService.deleteClass(req.params.id as string);
     sendSuccess(res, cls, "Class deactivated successfully");
+  } catch (err) { next(err); }
+}
+export async function listFitness(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const fitness = await classesService.listFitness();
+    sendSuccess(res, fitness, "Fitness list retrieved successfully");
+  } catch (err) { next(err); }
+}
+export async function resubmitClass(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = { id: req.user!.id, role: req.user!.role };
+    const result = await resubmitActivityPlan(req.params.id as string, req.body, actor);
+    sendSuccess(res, result, "Class resubmitted for review");
+  } catch (err) { next(err); }
+}
+export async function listClassStudents(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await getClassStudents(req.params.id as string, req.user!);
+    sendSuccess(res, result, "Class students retrieved successfully");
   } catch (err) { next(err); }
 }

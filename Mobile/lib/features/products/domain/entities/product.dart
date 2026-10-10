@@ -8,27 +8,44 @@ class Product {
     required this.stockQuantity,
     required this.rating,
     required this.reviewCount,
+    int? availableStock,
+    this.maxPerOrder = 10,
+    this.maxPerDay = 20,
     this.imageUrl,
-  });
+    this.isActive = true,
+  }) : availableStock = availableStock ?? stockQuantity;
 
   final String id;
   final String name;
   final String description;
   final int price;
+
+  /// Tồn thực tế trên kệ.
   final int stockQuantity;
+
+  /// Có thể bán = tồn − đang giữ cho đơn chờ thanh toán.
+  final int availableStock;
+
+  /// Tối đa mỗi đơn / mỗi người mỗi ngày (chống gom hàng).
+  final int maxPerOrder;
+  final int maxPerDay;
   final double rating;
   final int reviewCount;
+  final bool isActive;
 
-  /// TODO BE-6: BE chưa có trường ảnh ⇒ luôn null, hiển thị placeholder.
+  /// Ảnh sản phẩm (BE-6); null ⇒ hiển thị placeholder.
   final String? imageUrl;
 
-  bool get inStock => stockQuantity > 0;
+  bool get inStock => isActive && availableStock > 0;
 
   /// Ngưỡng hiển thị "Sắp hết hàng".
-  bool get lowStock => stockQuantity > 0 && stockQuantity <= 5;
+  bool get lowStock => availableStock > 0 && availableStock <= 5;
+
+  /// Số lượng tối đa chọn được trong một đơn.
+  int get maxSelectable => availableStock < maxPerOrder ? availableStock : maxPerOrder;
 }
 
-/// Đánh giá sản phẩm (`ProductReview`).
+/// Đánh giá sản phẩm (`ProductReview`) — viết từ dòng đơn đã hoàn tất.
 class ProductReview {
   const ProductReview({
     required this.id,
@@ -38,6 +55,7 @@ class ProductReview {
     this.comment,
     this.avatarUrl,
     this.isMine = false,
+    this.isHidden = false,
   });
 
   final String id;
@@ -47,45 +65,7 @@ class ProductReview {
   final String? comment;
   final DateTime createdAt;
   final bool isMine;
-}
 
-/// Trạng thái đơn hàng (`ProductOrderStatus`).
-enum OrderStatus { pending, success, cancelled }
-
-/// Lý do đơn bị hủy (suy từ BE: người mua hủy / quá hạn chờ thanh toán).
-enum OrderCancelReason { byBuyer, expired }
-
-/// Đơn mua sản phẩm (`ProductOrder`) — 1 sản phẩm / đơn, không có giỏ hàng.
-class ProductOrder {
-  const ProductOrder({
-    required this.id,
-    required this.productId,
-    required this.productName,
-    required this.unitPrice,
-    required this.quantity,
-    required this.totalPrice,
-    required this.status,
-    required this.createdAt,
-    this.paymentId,
-    this.expiresAt,
-    this.cancelReason,
-    this.invoiceId,
-    this.reviewed = false,
-  });
-
-  final String id;
-  final String productId;
-  final String productName;
-  final int unitPrice;
-  final int quantity;
-  final int totalPrice;
-  final OrderStatus status;
-  final DateTime createdAt;
-  final String? paymentId;
-  final DateTime? expiresAt;
-  final OrderCancelReason? cancelReason;
-  final String? invoiceId;
-
-  /// Người mua đã đánh giá sản phẩm này.
-  final bool reviewed;
+  /// Quản lý đã ẩn (chỉ Quản lý thấy).
+  final bool isHidden;
 }

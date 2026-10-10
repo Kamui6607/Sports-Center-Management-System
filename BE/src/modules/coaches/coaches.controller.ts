@@ -3,6 +3,7 @@ import path from "path";
 import * as coachService from "./coaches.service.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
 import type { CoachQueryInput, UpdateCoachInput } from "./coaches.schema.js";
+import { getCvFile, getMyStudent as getMyStudentService } from "./coach-students.service.js";
 
 export async function listCoaches(req: Request, res: Response, next: NextFunction) {
   try {
@@ -65,6 +66,29 @@ export async function listPendingCoachCVs(req: Request, res: Response, next: Nex
   try {
     const { coaches, pagination } = await coachService.listPendingCoachCVs(req.query as any);
     sendSuccess(res, coaches, "Coach CVs retrieved successfully", 200, pagination);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** BE-8: tải file CV (PDF) có xác thực. */
+export async function downloadCv(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { filePath, fileName } = await getCvFile(req.params.profileId as string, req.user!);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.sendFile(filePath);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** BE-19: hồ sơ học viên trong các khóa của HLV đang đăng nhập. */
+export async function getMyStudent(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await getMyStudentService(req.user!.id, req.params.memberId as string);
+    sendSuccess(res, result, "Student retrieved successfully");
   } catch (err) {
     next(err);
   }

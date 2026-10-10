@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Chỉ bản debug: cho phép HTTP tới BE local (http://10.0.2.2:8080). Release dùng HTTPS. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

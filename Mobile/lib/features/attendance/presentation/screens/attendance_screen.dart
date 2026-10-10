@@ -162,13 +162,16 @@ class _PenaltyCard extends ConsumerWidget {
     final p = penalty;
     final now = DateTime.now();
     final active = p.status == PenaltyStatus.applied && (p.blockedUntil?.isAfter(now) ?? false);
+    final pending = p.status == PenaltyStatus.pending;
     return AlertBanner(
-      tone: active ? StatusTone.danger : StatusTone.neutral,
+      tone: pending ? StatusTone.warning : (active ? StatusTone.danger : StatusTone.neutral),
       icon: AppIcons.ban,
-      title: active ? 'Phạt chuyên cần · ${p.className}' : 'Phạt đã hết hiệu lực · ${p.className}',
+      title: pending
+          ? 'Đang chờ áp dụng · ${p.className}'
+          : (active ? 'Phạt chuyên cần · ${p.className}' : 'Phạt đã hết hiệu lực · ${p.className}'),
       message: [
         p.reason,
-        'Đã thu hồi ${p.releasedCount} buổi sắp tới.',
+        if (!pending) 'Đã thu hồi ${p.releasedCount} buổi sắp tới.',
         if (p.blockedUntil != null) 'Chặn đặt lại đến ${VnTime.date(p.blockedUntil!)}.',
         if (p.appealedAt != null) 'Đã gửi khiếu nại lúc ${VnTime.dateTime(p.appealedAt!)} — chờ Quản lý xem xét.',
       ].join('\n'),

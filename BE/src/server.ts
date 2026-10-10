@@ -11,9 +11,9 @@ import {
   flushNotificationOutbox,
   OUTBOX_FLUSH_INTERVAL_MS,
 } from "./modules/notifications/outbox.service.js";
-import { expireStaleOrders } from "./modules/products/products.service.js";
+import { runShopMaintenance } from "./modules/shop/orders.service.js";
 
-/** Nhịp quét đơn sản phẩm quá hạn chờ chuyển khoản (ms). */
+/** Nhịp job cửa hàng: đơn hết hạn thanh toán, quá hạn nhận tại quầy, tự hoàn tất (ms). */
 const PRODUCT_ORDER_EXPIRY_INTERVAL_MS = 60_000;
 
 async function main() {
@@ -48,10 +48,11 @@ async function main() {
   }, OUTBOX_FLUSH_INTERVAL_MS);
   outboxTimer.unref();
 
-  // Đơn sản phẩm PENDING quá hạn chờ chuyển khoản ⇒ hủy + hoàn kho (giữ hàng không bị treo mãi).
+  // Cửa hàng (Doc/SHOP_FLOW_DESIGN.md): đơn hết hạn ⇒ EXPIRED + nhả hàng; quá hạn nhận ⇒ NOT_PICKED_UP + hoàn tiền;
+  // DELIVERED lâu ⇒ COMPLETED. Idempotent, an toàn khi nhiều instance cùng chạy.
   const productOrderTimer = setInterval(() => {
-    void expireStaleOrders().catch((err: any) =>
-      console.warn("[PRODUCT ORDER] quét đơn hết hạn lỗi:", (err as Error).message)
+    void runShopMaintenance().catch((err: any) =>
+      console.warn("[SHOP] job cửa hàng lỗi:", (err as Error).message)
     );
   }, PRODUCT_ORDER_EXPIRY_INTERVAL_MS);
   productOrderTimer.unref();

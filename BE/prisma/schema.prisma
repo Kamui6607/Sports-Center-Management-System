@@ -60,6 +60,12 @@ enum ScheduleStatus {
   COMPLETED
 }
 
+/// Phương án xử lý khi hủy buổi đã có học viên đặt chỗ (BE-20).
+enum ScheduleCancelResolution {
+  MAKEUP
+  REFUND
+}
+
 enum EnrollmentStatus {
   BOOKED
   CANCELLED
@@ -139,6 +145,8 @@ model User {
   roleId      String
   role        Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
   isActive    Boolean   @default(true)
+  /// Cửa hàng: tạm khóa đặt hàng tới thời điểm này (để đơn hết hạn quá nhiều lần) — null = không khóa.
+  checkoutLockedUntil DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @default(now()) @updatedAt
 
@@ -146,6 +154,7 @@ model User {
   coachProfile               CoachProfile?
   managerProfile             ManagerProfile?
   refreshTokens              RefreshToken[]
+  passwordResetOtp           PasswordResetOtp?
   createdPayments            Payment[]              @relation("PaymentCreatedBy")
   sentMessages               ChatMessage[]          @relation("SentMessages")
   receivedMessages           ChatMessage[]          @relation("ReceivedMessages")
@@ -159,8 +168,25 @@ model User {
   orders                     Order[]                @relation("OrderUser")
   refundsRequested           Refund[]               @relation("RefundRequestedBy")
   refundsProcessed           Refund[]               @relation("RefundProcessedBy")
+  cart                       Cart?
+  addresses                  UserAddress[]
 
   @@index([roleId])
+}
+
+/// Mã OTP 6 số đặt lại mật khẩu (Mobile). Mỗi user tối đa 1 mã đang hiệu lực — gửi lại ⇒ ghi đè.
+/// Chỉ lưu HASH (bcrypt); hết hạn 15 phút; sai quá 5 lần ⇒ mã bị khóa; gửi lại tối thiểu sau 60 giây.
+model PasswordResetOtp {
+  id         String    @id @default(uuid())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpHash    String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  lastSentAt DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
 }
 
 model RefreshToken {
@@ -289,6 +315,8 @@ model Class {
 
   price       Decimal             @default(0) @db.Decimal(12, 2)
   status      ClassApprovalStatus @default(PENDING)
+  /// BE-2: lý do Manager từ chối (xóa khi Coach gửi lại — BE-3).
+  rejectReason String?
   /// HLV tạo và phụ trách lớp — mỗi lớp đúng 1 HLV (nhận 85% doanh thu). Chỉ Coach được tạo lớp.
   coachId     String
   coach       CoachProfile        @relation(fields: [coachId], references: [id])
@@ -320,6 +348,9 @@ model ClassSchedule {
   startTime DateTime
   endTime   DateTime
   status    ScheduleStatus @default(SCHEDULED)
+  /// BE-20: lý do & phương án khi buổi bị hủy (null nếu chưa hủy / hủy khi chưa ai đặt chỗ).
+  cancelReason     String?
+  cancelResolution ScheduleCancelResolution?
   /// Buổi DẠY BÙ: trỏ tới buổi bị hủy mà buổi này thay thế (NULL = buổi chính của lớp).
   /// Tiền 1 buổi khi hoàn = tiền lớp ÷ số buổi CHÍNH (không tính buổi bù).
   makeupForId String?        @unique
@@ -728,6 +759,8 @@ enum NotificationType {
   // ── Thanh toán ──
   PAYMENT_SUCCESS // Thanh toán thành công
   PAYMENT_REFUNDED // Hoàn tiền
+  // ── Cửa hàng ──
+  ORDER_UPDATED // Đơn hàng đổi trạng thái (đã thanh toán, sẵn sàng nhận, đang giao, hết hạn…)
   // ── Chung ──
   GENERAL
 }
@@ -810,6 +843,9 @@ model WalletTransaction {
 enum RefundReason {
   MEMBER_CANCEL_COURSE // Hội viên hủy khóa trước khai giảng ≥ 24h — hoàn phần còn lại của giao dịch
   SESSION_CANCELLED // Buổi học bị hủy và chọn hoàn tiền (không dạy bù) — hoàn tiền 1 buổi
+  ORDER_CANCELLED // Đơn hàng đã thanh toán bị hủy (khách yêu cầu / trung tâm hủy) — hoàn toàn bộ
+  ORDER_NOT_PICKED_UP // Khách không đến lấy hàng đúng hạn — hoàn theo chính sách (SHOP_NOT_PICKED_UP_REFUND_PERCENT)
+  ORDER_LATE_PAYMENT // Tiền về sau khi đơn đã hết hạn/hủy — không khôi phục đơn, hoàn lại tiền
 }
 
 enum RefundStatus {
@@ -824,8 +860,12 @@ model Refund {
   id               String        @id @default(uuid())
   paymentId        String
   payment          Payment       @relation(fields: [paymentId], references: [id])
-  memberId         String
-  member           MemberProfile @relation(fields: [memberId], references: [id])
+  /// Hội viên nhận hoàn (null khi người mua đơn hàng là HLV — người nhận lấy từ `order.userId`).
+  memberId         String?
+  member           MemberProfile? @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  /// Đơn hàng được hoàn (lý do ORDER_*); null với hoàn tiền khóa học.
+  orderId          String?
+  order            Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
   classId          String?
   class            Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
   /// Buổi bị hủy (chỉ với SESSION_CANCELLED).
@@ -839,6 +879,10 @@ model Refund {
   coachWalletId    String?
   coachWallet      CoachWallet?  @relation(fields: [coachWalletId], references: [id], onDelete: SetNull)
   note             String?
+  /// L8: ghi chú của Member khi gửi yêu cầu (cột `note` cũ giữ cho Web).
+  memberNote       String?
+  /// L8: ghi chú của Manager khi duyệt (VD mã giao dịch chuyển khoản hoàn tiền).
+  managerNote      String?
   status           RefundStatus  @default(PENDING)
   requestedById    String?
   requestedBy      User?         @relation("RefundRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
@@ -854,16 +898,32 @@ model Refund {
   @@index([status])
   @@index([memberId])
   @@index([coachWalletId, status])
+  @@index([orderId])
 }
 
-// ?? S?n ph?m (Product) ????????????????????????????????????????????????????????
+// ─────────────────────────────────────────
+// CỬA HÀNG (Product, Cart, Order…) — xem Doc/SHOP_FLOW_DESIGN.md
+// ─────────────────────────────────────────
 
 model Product {
   id            String          @id @default(uuid())
   name          String
   description   String
   price         Decimal         @db.Decimal(12, 2)
+  /// Tồn THỰC TẾ trên kệ. Có thể bán = `stockQuantity − reservedStock` (API trả `availableStock`).
   stockQuantity Int             @default(0)
+  /// Số lượng đang GIỮ cho đơn chờ thanh toán (PENDING_PAYMENT) — nhả khi hết hạn/hủy, trừ hẳn khi PAID.
+  reservedStock Int             @default(0)
+  /// BE-6: ảnh sản phẩm (URL tuyệt đối hoặc đường dẫn tĩnh).
+  imageUrl      String?
+  /// Bộ ảnh phụ (ảnh đầu tiên trùng `imageUrl` nếu có).
+  imageUrls     String[]        @default([])
+  /// Số lượng tối đa của sản phẩm trong MỘT đơn.
+  maxPerOrder   Int             @default(10)
+  /// Số lượng tối đa MỘT người được đặt trong một ngày (giờ VN, không tính đơn hết hạn/đã hủy).
+  maxPerDay     Int             @default(20)
+  /// Ngưỡng cảnh báo sắp hết hàng (theo số có thể bán).
+  lowStockThreshold Int         @default(5)
   rating        Decimal         @default(0) @db.Decimal(3, 2)
   reviewCount   Int             @default(0)
   isActive      Boolean         @default(true)
@@ -874,29 +934,131 @@ model Product {
 
   reviews       ProductReview[]
   orderItems    OrderItem[]
+  cartItems     CartItem[]
+  inventoryTransactions InventoryTransaction[]
 }
 
+/// Đánh giá sản phẩm: chỉ cho dòng đơn (OrderItem) thuộc đơn COMPLETED, mỗi dòng tối đa 1 đánh giá.
+/// Đánh giá cũ (trước luồng mới) có `orderItemId = null`.
 model ProductReview {
-  id        String   @id @default(uuid())
-  productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation("ProductReviewUser", fields: [userId], references: [id], onDelete: Cascade)
-  rating    Int      
-  comment   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  id           String     @id @default(uuid())
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation("ProductReviewUser", fields: [userId], references: [id], onDelete: Cascade)
+  orderItemId  String?    @unique
+  orderItem    OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  rating       Int
+  comment      String?
+  /// Manager ẩn đánh giá (không hiển thị công khai, không tính điểm trung bình).
+  isHidden     Boolean    @default(false)
+  hiddenReason String?
+  hiddenById   String?
+  hiddenAt     DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
 
-  @@unique([productId, userId])
+  @@index([productId, isHidden])
+  @@index([userId])
+}
+
+/// Giỏ hàng lưu ở server (một giỏ / người). Giỏ KHÔNG giữ tồn kho.
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now()) @updatedAt
+
+  items     CartItem[]
+}
+
+model CartItem {
+  id                String   @id @default(uuid())
+  cartId            String
+  cart              Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity          Int
+  /// Giá lúc thêm vào giỏ — khác giá hiện tại ⇒ cảnh báo PRICE_CHANGED (giá thanh toán luôn do server tính).
+  unitPriceSnapshot Decimal  @db.Decimal(12, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  @@unique([cartId, productId])
+  @@index([productId])
+}
+
+/// Sổ địa chỉ giao hàng của người dùng (đơn DELIVERY lưu SNAPSHOT địa chỉ, không trỏ bảng này).
+model UserAddress {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientName String
+  phone         String
+  province      String
+  district      String
+  ward          String?
+  street        String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@index([userId])
+}
+
+enum FulfillmentType {
+  PICKUP // Nhận tại quầy trung tâm (mã nhận hàng)
+  DELIVERY // Giao tận nơi (mã vận đơn)
 }
 
 model Order {
   id          String      @id @default(uuid())
+  /// Mã đơn dễ đọc, duy nhất (VD DH241011-7KQ3XM) — KHÁC mã chuyển khoản SePay (`Payment.transactionCode`).
+  code        String      @unique
   userId      String
   user        User        @relation("OrderUser", fields: [userId], references: [id])
-  /// Tổng tiền đơn = tổng `OrderItem.totalAmount` của các dòng hàng.
+  fulfillmentType FulfillmentType @default(PICKUP)
+  /// Tạm tính = Σ `OrderItem.totalAmount` (server tính).
+  subtotal    Decimal     @db.Decimal(12, 2)
+  shippingFee Decimal     @default(0) @db.Decimal(12, 2)
+  /// Tổng phải trả = subtotal + shippingFee — cũng là số tiền của Payment / mã QR.
   totalPrice  Decimal     @db.Decimal(12, 2)
-  status      OrderStatus @default(PENDING)
+  status      OrderStatus @default(PENDING_PAYMENT)
+  /// Snapshot người nhận (cả PICKUP — đối chiếu 4 số cuối SĐT khi nhận hàng).
+  recipientName    String?
+  recipientPhone   String?
+  /// Snapshot địa chỉ giao (DELIVERY).
+  shippingAddress  String?
+  shippingProvince String?
+  note        String?
+  /// Hạn chuyển khoản; quá hạn ⇒ job chuyển EXPIRED + nhả hàng.
+  paymentExpiresAt DateTime?
+  /// Mã nhận hàng (PICKUP, sinh khi READY_FOR_PICKUP): chỉ lưu SHA-256; mã hiển thị = HMAC(secret, id:nonce).
+  pickupCodeHash       String?  @unique
+  pickupCodeNonce      String?
+  pickupDeadline       DateTime?
+  pickupFailedAttempts Int      @default(0)
+  pickupLockedUntil    DateTime?
+  trackingCode String?
+  carrier      String?
+  /// BE-21: lý do đơn bị hủy (null khi chưa hủy).
+  cancelReason OrderCancelReason?
+  cancelNote   String?
+  cancelledById String?
+  /// Chống tạo đơn trùng (header Idempotency-Key) — `idempotencyHash` = hash nội dung request.
+  idempotencyKey  String?
+  idempotencyHash String?
+  paidAt        DateTime?
+  processingAt  DateTime?
+  readyAt       DateTime?
+  shippedAt     DateTime?
+  deliveredAt   DateTime?
+  completedAt   DateTime?
+  cancelledAt   DateTime?
+  expiredAt     DateTime?
+  notPickedUpAt DateTime?
+  refundedAt    DateTime?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @default(now()) @updatedAt
 
@@ -904,6 +1066,15 @@ model Order {
   items       OrderItem[]
   /// Giao dịch thanh toán của đơn (SePay). PENDING = đang giữ hàng chờ chuyển khoản.
   payment     Payment?
+  history     OrderStatusHistory[]
+  refunds     Refund[]
+  inventoryTransactions InventoryTransaction[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status])
+  @@index([status, paymentExpiresAt])
+  @@index([status, pickupDeadline])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -912,6 +1083,9 @@ model OrderItem {
   order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId   String
   product     Product  @relation(fields: [productId], references: [id])
+  /// Snapshot tên/ảnh sản phẩm lúc đặt.
+  productName     String?
+  productImageUrl String?
   quantity    Int
   /// Đơn giá tại thời điểm đặt (snapshot — đổi giá sản phẩm sau này không ảnh hưởng đơn cũ).
   unitPrice   Decimal  @db.Decimal(12, 2)
@@ -920,12 +1094,76 @@ model OrderItem {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
+  review      ProductReview?
+
   @@unique([orderId, productId])
   @@index([productId])
 }
 
+/// Lịch sử chuyển trạng thái đơn (actorId null = hệ thống: webhook, job).
+model OrderStatusHistory {
+  id         String       @id @default(uuid())
+  orderId    String
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  actorId    String?
+  reason     String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @default(now()) @updatedAt
+
+  @@index([orderId, createdAt])
+}
+
+enum InventoryTransactionType {
+  IN // Nhập hàng (+stock)
+  RESERVE // Giữ hàng khi tạo đơn (+reserved)
+  RELEASE // Nhả hàng khi đơn hết hạn/hủy trước khi thanh toán (−reserved)
+  SALE // Thanh toán thành công: hàng thuộc khách (−stock, −reserved)
+  RETURN // Hoàn tiền đơn đã thanh toán mà hàng còn ở trung tâm (+stock)
+  ADJUST // Điều chỉnh kiểm kê/hư hỏng (±stock)
+}
+
+/// Nhật ký kho bất biến — mọi thay đổi `stockQuantity` / `reservedStock` đều có một dòng.
+model InventoryTransaction {
+  id            String                   @id @default(uuid())
+  productId     String
+  product       Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type          InventoryTransactionType
+  /// Số lượng (dương); riêng ADJUST có thể âm.
+  quantity      Int
+  stockAfter    Int
+  reservedAfter Int
+  orderId       String?
+  order         Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  actorId       String?
+  note          String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @default(now()) @updatedAt
+
+  @@index([productId, createdAt])
+  @@index([orderId])
+}
+
+/// Ai/điều gì hủy đơn: người mua, hết hạn chờ chuyển khoản, hay Manager (BE-21).
+enum OrderCancelReason {
+  BUYER
+  EXPIRED
+  MANAGER
+}
+
+/// Xem máy trạng thái ở Doc/SHOP_FLOW_DESIGN.md §3.
 enum OrderStatus {
-  PENDING
-  SUCCESS
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  READY_FOR_PICKUP
+  SHIPPING
+  DELIVERED
+  COMPLETED
+  EXPIRED
   CANCELLED
+  NOT_PICKED_UP
+  REFUND_REQUESTED
+  REFUNDED
 }

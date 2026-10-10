@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../core/error/app_failure.dart';
 import '../../../core/utils/money.dart';
 import '../../../mock/mock_server.dart';
@@ -82,6 +84,10 @@ class ManagerMockRepository implements ManagerRepository {
   });
 
   @override
+  Future<Uint8List> cvFile(String coachProfileId) =>
+      _server.run(() => throw const AppFailure.unsupported('Chế độ demo không có tệp CV thật.'));
+
+  @override
   Future<void> reviewCv(String coachProfileId, {required bool approve, String? reason}) => _server.run(() {
     final db = _server.db;
     _requireManager();
@@ -148,7 +154,7 @@ class ManagerMockRepository implements ManagerRepository {
     } else {
       c
         ..status = ClassStatus.rejected
-        ..rejectReason = reason?.trim(); // TODO BE-2: BE chưa lưu lý do.
+        ..rejectReason = reason?.trim(); // BE-2: lưu lý do từ chối.
       db.notify(
         coachUser.id,
         NotificationType.classRejected,

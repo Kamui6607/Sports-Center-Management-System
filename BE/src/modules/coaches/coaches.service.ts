@@ -155,7 +155,7 @@ export async function updateCoach(id: string, data: UpdateCoachInput, actor?: { 
 /**
  * Coach upload CV (PDF) — lưu file ở uploads/cvs/, đường dẫn ghi vào `Certification.fileUrl`.
  * Mỗi coach có đúng 1 Certification: nộp lại ⇒ GHI ĐÈ file, status về PENDING, xóa kết quả duyệt cũ.
- * Coach mới đăng ký (isActive=false) vẫn gọi được nhờ middleware `authenticateIncludingInactive`.
+ * Coach mới đăng ký (isActive=false) vẫn gọi được nhờ middleware `authenticateRestricted` (phiên giới hạn, BE-9).
  */
 export async function submitCV(coachUserId: string, cvFilePath: string) {
   const coachProfile = await prisma.coachProfile.findUnique({
@@ -164,7 +164,7 @@ export async function submitCV(coachUserId: string, cvFilePath: string) {
   if (!coachProfile) throw new AppError("Coach profile not found", 404);
 
   const now = new Date();
-  await prisma.certification.upsert({
+  const certification = await prisma.certification.upsert({
     where: { coachId: coachProfile.id },
     create: { coachId: coachProfile.id, fileUrl: cvFilePath, status: "PENDING", submittedAt: now },
     update: {
@@ -191,7 +191,8 @@ export async function submitCV(coachUserId: string, cvFilePath: string) {
     ).catch(() => {});
   }
 
-  return { message: "CV submitted successfully. Waiting for Manager review." };
+  // Kèm hồ sơ vừa lưu để client hiển thị trạng thái mà không phải tải lại (chỉ THÊM field).
+  return { message: "CV submitted successfully. Waiting for Manager review.", certification };
 }
 
 // ── Manager duyệt hoặc từ chối CV ────────────────────────────────────────────

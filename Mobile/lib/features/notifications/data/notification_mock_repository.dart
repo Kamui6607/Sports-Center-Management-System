@@ -44,6 +44,10 @@ class NotificationMockRepository implements NotificationRepository {
     }
   });
 
+  /// Mock: thông báo mới đã đi kèm `dataRevision` sau mỗi thao tác ⇒ không cần luồng riêng.
+  @override
+  Stream<void> changes() => const Stream.empty();
+
   @override
   Future<void> markAllRead() => _server.run(() {
     final u = _server.requireUser();

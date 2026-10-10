@@ -5,6 +5,7 @@ import { chatService } from "./chat.service.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { CHAT_UPLOAD_DIR } from "../../middlewares/upload.js";
 import { sniffMimeFromFile } from "../../utils/fileSignature.js";
+import { emitToUsers } from "../../utils/realtime.js";
 
 export const getMessages = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -110,6 +111,8 @@ export const markAsRead = async (req: Request, res: Response, next: NextFunction
     const userId = (req as any).user.id;
 
     await chatService.markAsRead(userId, targetId);
+    // Báo người gửi biết tin đã được đọc (đồng bộ với sự kiện socket `markAsRead`).
+    if (targetId) emitToUsers([targetId], "messagesRead", { byUserId: userId, targetId });
     res.json({ success: true, message: "Messages marked as read" });
   } catch (error) {
     next(error);
@@ -138,8 +141,7 @@ export const getConversations = async (req: Request, res: Response, next: NextFu
 
 export const getContacts = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const role = (req as any).user.role;
-    const contacts = await chatService.getContacts(role);
+    const contacts = await chatService.getContacts(req.user!);
     res.json({ success: true, data: contacts });
   } catch (error) {
     next(error);

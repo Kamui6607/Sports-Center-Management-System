@@ -8,6 +8,7 @@ import {
   ApproveRefundSchema,
   RejectRefundSchema,
   RefundQuerySchema,
+  CourseRefundPreviewSchema,
 } from "./refunds.schema.js";
 import * as refundsController from "./refunds.controller.js";
 
@@ -76,7 +77,8 @@ router.post(
 router.get(
   "/my",
   authenticate,
-  authorize("MEMBER"),
+  // HLV mua hàng cũng có yêu cầu hoàn tiền đơn hàng (ORDER_*).
+  authorize("MEMBER", "COACH"),
   validate(RefundQuerySchema, "query"),
   refundsController.listMyRefunds
 );
@@ -132,6 +134,46 @@ router.get(
  *       404: { $ref: "#/components/responses/NotFound" }
  *       409: { $ref: "#/components/responses/Conflict" }
  */
+/**
+ * @swagger
+ * /refunds/course-cancellation/preview:
+ *   get:
+ *     summary: "BE-16: Xem trước điều kiện hủy khóa (MEMBER) — không ghi dữ liệu"
+ *     tags: [Refunds]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: classId, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: "{ allowed, deadline, firstSessionStart, paidAmount, refundableAmount, blockReason, blockMessage, existingRefundId }" }
+ */
+router.get(
+  "/course-cancellation/preview",
+  authenticate,
+  authorize("MEMBER"),
+  validate(CourseRefundPreviewSchema, "query"),
+  refundsController.previewCourseRefund
+);
+
+/**
+ * @swagger
+ * /refunds/{id}:
+ *   get:
+ *     summary: "BE-17: Chi tiết yêu cầu hoàn tiền (MANAGER: mọi bản ghi; MEMBER: của mình)"
+ *     tags: [Refunds]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "Refund kèm member, class (+coach), schedule, payment" }
+ *       403: { description: "Không phải của mình" }
+ *       404: { description: "Không tìm thấy" }
+ */
+router.get(
+  "/:id",
+  authenticate,
+  authorize("MEMBER", "COACH", "MANAGER"),
+  validate(RefundIdSchema, "params"),
+  refundsController.getRefundById
+);
+
 router.patch(
   "/:id/approve",
   authenticate,

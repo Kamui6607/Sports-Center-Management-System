@@ -60,10 +60,23 @@ export const ForgotPasswordSchema = z.object({
   email: z.string().email("Invalid email address").transform(v => v.toLowerCase().trim()),
 });
 
-export const ResetPasswordSchema = z.object({
-  token: z.string().min(1, "Token is required"),
-  newPassword: z.string().min(6, "New password must be at least 6 characters"),
-});
+/**
+ * Hai cách đặt lại (chọn MỘT):
+ * - Web: `{ token, newPassword }` — token trong liên kết email (giữ nguyên).
+ * - Mobile: `{ email, otp, newPassword }` — mã 6 số trong cùng email.
+ */
+export const ResetPasswordSchema = z
+  .object({
+    token: z.string().min(1, "Token is required").optional(),
+    email: z.string().email("Invalid email address").transform(v => v.toLowerCase().trim()).optional(),
+    otp: z.string().trim().regex(/^\d{6}$/, "OTP must be 6 digits").optional(),
+    newPassword: z.string().min(6, "New password must be at least 6 characters"),
+  })
+  .superRefine((d, ctx) => {
+    if (d.token) return;
+    if (!d.email) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["email"], message: "Email is required" });
+    if (!d.otp) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["otp"], message: "OTP is required" });
+  });
 
 export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;

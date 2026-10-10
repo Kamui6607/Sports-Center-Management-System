@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
 import { env } from "../config/env.js";
 
 export interface JwtPayload {
@@ -15,6 +16,9 @@ export function signAccessToken(payload: JwtPayload): string {
 export function signRefreshToken(payload: JwtPayload): string {
   return jwt.sign(payload, env.JWT_REFRESH_SECRET, {
     expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions["expiresIn"],
+    // `jti` ngẫu nhiên: hai lần đăng nhập trong cùng một giây không sinh token trùng
+    // (RefreshToken.token là UNIQUE — trước đây gây 409 khi đăng ký Coach rồi đăng nhập ngay).
+    jwtid: randomUUID(),
   });
 }
 

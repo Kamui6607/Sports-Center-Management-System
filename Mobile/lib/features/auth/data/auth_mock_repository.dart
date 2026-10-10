@@ -32,7 +32,7 @@ class AuthMockRepository implements AuthRepository {
     if (u == null || u.password != password) {
       throw const AppFailure(FailureType.unauthorized, 'Email hoặc mật khẩu không đúng.');
     }
-    // TODO BE-9: BE chặn đăng nhập tài khoản inactive ⇒ cần trả phiên giới hạn
+    // BE-9: Coach chưa duyệt đăng nhập với phiên giới hạn (`restricted:true`)
     // + trạng thái CV cho Coach chưa duyệt. Mock cho phép để vào màn onboarding.
     _server.currentUserId = u.id;
     return _session(u);

@@ -54,3 +54,11 @@ export const updatePlanCoach = async (req: Request, res: Response, next: NextFun
     sendSuccess(res, plan, "Training plan coach updated successfully");
   } catch (error) { next(error); }
 };
+export const getPlanById = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const plan = await service.getPlanById(req.params.id as string, req.user!);
+    sendSuccess(res, plan, "Training plan retrieved");
+  } catch (error) {
+    next(error);
+  }
+};

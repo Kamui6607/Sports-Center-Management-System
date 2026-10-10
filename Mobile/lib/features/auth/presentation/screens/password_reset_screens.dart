@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/config/env.dart';
+import '../../../../core/error/app_failure.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/validators.dart';
@@ -11,7 +14,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../../mock/demo_accounts.dart';
 import '../../data/auth_repository_provider.dart';
 
-/// A05 — Quên mật khẩu: nhập email để nhận mã OTP (TODO BE-4).
+/// A05 — Quên mật khẩu: nhập email để nhận mã OTP 6 số (BE gửi kèm liên kết cho Web).
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -89,17 +92,54 @@ class ResetPasswordScreen extends ConsumerStatefulWidget {
 }
 
 class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> with SubmittingState {
+  /// BE chỉ cho gửi lại mã sau 60 giây (`resendAfterSeconds`).
+  static const resendCooldown = 60;
+
   final _form = GlobalKey<FormState>();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
   String _otp = '';
   String? _otpError;
+  int _resendIn = resendCooldown;
+  bool _resending = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startCountdown();
+  }
 
   @override
   void dispose() {
+    _timer?.cancel();
     _password.dispose();
     _confirm.dispose();
     super.dispose();
+  }
+
+  void _startCountdown() {
+    _timer?.cancel();
+    setState(() => _resendIn = resendCooldown);
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      setState(() => _resendIn--);
+      if (_resendIn <= 0) t.cancel();
+    });
+  }
+
+  Future<void> _resend() async {
+    setState(() => _resending = true);
+    try {
+      await ref.read(authRepositoryProvider).requestPasswordReset(widget.email);
+      if (!mounted) return;
+      AppSnackbar.success(context, 'Đã gửi lại mã xác nhận.');
+      _startCountdown();
+    } on Object catch (e) {
+      if (mounted) AppSnackbar.error(context, AppFailure.from(e));
+    } finally {
+      if (mounted) setState(() => _resending = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -166,13 +206,8 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> with 
             const SizedBox(height: AppSpacing.lg),
             AppButton(label: 'Đặt lại mật khẩu', expand: true, loading: submitting, onPressed: _submit),
             TextButton(
-              onPressed: submitting
-                  ? null
-                  : () => ref
-                        .read(authRepositoryProvider)
-                        .requestPasswordReset(widget.email)
-                        .then((_) => context.mounted ? AppSnackbar.info(context, 'Đã gửi lại mã xác nhận.') : null),
-              child: const Text('Gửi lại mã'),
+              onPressed: submitting || _resending || _resendIn > 0 ? null : _resend,
+              child: Text(_resendIn > 0 ? 'Gửi lại mã sau ${_resendIn}s' : 'Gửi lại mã'),
             ),
           ],
         ),

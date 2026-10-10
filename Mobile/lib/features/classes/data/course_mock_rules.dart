@@ -78,7 +78,7 @@ void validateClassDraft(MockServer server, ClassDraft d, {String? ignoreClassId}
   final coach = server.requireCoach();
   final errors = <String, String>{};
   if (d.name.trim().length < 2) errors['name'] = 'Tên khóa tối thiểu 2 ký tự';
-  if (d.sportIds.isEmpty) errors['sportIds'] = 'Chọn ít nhất 1 bộ môn';
+  if (d.sportIds.isEmpty) errors['sportIds'] = 'Chọn hoặc nhập bộ môn';
   if (d.capacity < 1 || d.capacity > 200) errors['capacity'] = 'Sức chứa từ 1 đến 200';
   if (d.price < 0) errors['price'] = 'Giá không hợp lệ';
   if (errors.isNotEmpty) throw AppFailure.validation('Thông tin khóa học chưa hợp lệ.', fieldErrors: errors);

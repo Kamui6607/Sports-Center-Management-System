@@ -4,7 +4,7 @@ import '../entities/course.dart';
 
 /// Khóa học — module `classes` (+ `course-plan`, `class-schedules/activity-plan`).
 abstract interface class CourseRepository {
-  /// `GET /classes` — Member/Guest chỉ thấy `APPROVED` (Guest: TODO BE-1).
+  /// `GET /classes` — Member/Guest chỉ thấy `APPROVED` (Guest không cần token — BE-1).
   Future<Paged<CourseClass>> browse(ClassQuery query);
 
   /// `GET /classes/:id` + `GET /classes/:id/course-plan`.
@@ -25,6 +25,6 @@ abstract interface class CourseRepository {
   /// Bản nháp từ khóa có sẵn (để sửa & gửi lại).
   Future<ClassDraft> draftOf(String classId);
 
-  /// Sửa & gửi lại khóa bị từ chối ⇒ `PENDING` (TODO BE-3).
+  /// `PATCH /classes/:id/resubmit` — sửa & gửi lại khóa bị từ chối ⇒ `PENDING` (BE-3).
   Future<CourseClass> resubmitClass(String classId, ClassDraft draft);
 }

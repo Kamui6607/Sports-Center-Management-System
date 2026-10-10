@@ -54,6 +54,8 @@ export const createPlan = async (data: Prisma.TrainingPlanUncheckedCreateInput, 
 /** Field an toàn trả về cho HTTP — TUYỆT ĐỐI không include password/secret của user. */
 const planInclude = {
   coach: { include: { user: { select: { id: true, fullName: true } } } },
+  // BE-17: kèm tên học viên để client không phải tra thêm.
+  member: { include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } },
   results: { orderBy: { date: "asc" } },
 } satisfies Prisma.TrainingPlanInclude;
 
@@ -330,4 +332,20 @@ export const updatePlanCoach = async (planId: string, coachId: string, user: any
   ).catch(() => {});
 
   return updated;
+};
+/**
+ * BE-17: `GET /training-plans/:id` — một lộ trình kèm kết quả (cùng quyền với `/:id/progress`):
+ * MEMBER chủ plan, COACH phụ trách plan, MANAGER.
+ */
+export const getPlanById = async (planId: string, actor: { id: string; role: string }) => {
+  const plan = await prisma.trainingPlan.findUnique({ where: { id: planId }, include: planInclude });
+  if (!plan) throw new AppError("Training plan not found", 404);
+  if (actor.role === "MEMBER" && plan.member.userId !== actor.id) {
+    throw new AppError("Forbidden: You can only view your own training plans", 403);
+  }
+  if (actor.role === "COACH" && plan.coach.userId !== actor.id) {
+    throw new AppError("Forbidden: You can only manage your own training plans", 403);
+  }
+  if (!["MEMBER", "COACH", "MANAGER"].includes(actor.role)) throw new AppError("Forbidden", 403);
+  return plan;
 };

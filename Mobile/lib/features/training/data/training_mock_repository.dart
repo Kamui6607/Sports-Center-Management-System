@@ -101,7 +101,10 @@ class TrainingMockRepository implements TrainingRepository {
         id: db.nextId('tr'),
         planId: planId,
         date: d.date,
-        metrics: d.metrics,
+        metrics: {
+          for (final m in d.metrics)
+            m.name: [m.display, if (m.value != null && (m.note?.isNotEmpty ?? false)) m.note!].join(' — '),
+        },
         coachNote: d.coachNote?.trim().isEmpty ?? true ? null : d.coachNote!.trim(),
       ),
     );

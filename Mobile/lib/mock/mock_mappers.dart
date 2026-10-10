@@ -140,8 +140,27 @@ extension MockEntityMappers on MockDatabase {
     results:
         trainingResults
             .where((r) => r.planId == p.id)
-            .map((r) => TrainingResult(id: r.id, date: r.date, metrics: r.metrics, coachNote: r.coachNote))
+            .map(
+              (r) => TrainingResult(
+                id: r.id,
+                date: r.date,
+                metrics: [for (final e in r.metrics.entries) metricFromText(e.key, e.value)],
+                coachNote: r.coachNote,
+              ),
+            )
             .toList()
           ..sort((a, b) => b.date.compareTo(a.date)),
+  );
+}
+
+/// Chỉ số mẫu dạng chữ ("57.6 kg", "Cách 8 cm") ⇒ [TrainingMetric] (không phải số ⇒ ghi chú).
+TrainingMetric metricFromText(String name, String text) {
+  final m = RegExp(r'^\s*(-?\d+(?:[.,]\d+)?)\s*(.*)$').firstMatch(text);
+  if (m == null) return TrainingMetric(name: name, note: text);
+  final unit = m.group(2)!.trim();
+  return TrainingMetric(
+    name: name,
+    value: double.parse(m.group(1)!.replaceAll(',', '.')),
+    unit: unit.isEmpty ? null : unit,
   );
 }

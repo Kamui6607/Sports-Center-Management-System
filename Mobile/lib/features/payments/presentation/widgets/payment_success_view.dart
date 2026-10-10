@@ -9,7 +9,7 @@ import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../domain/entities/payment.dart';
 
-/// Màn kết quả khi thanh toán thành công (khóa học ⇒ xem lịch, sản phẩm ⇒ xem hóa đơn).
+/// Màn kết quả khi thanh toán thành công (khóa học ⇒ xem lịch, sản phẩm ⇒ xem chi tiết thanh toán).
 class PaymentSuccessView extends StatelessWidget {
   const PaymentSuccessView({super.key, required this.checkout});
 
@@ -45,7 +45,7 @@ class PaymentSuccessView extends StatelessWidget {
               Text(
                 isCourse
                     ? 'Bạn đã được ghi danh vào ${c.enrolledSessionCount ?? 0} buổi sắp diễn ra của khóa "${c.title}".'
-                    : 'Đơn "${c.title}" đã được thanh toán. Hóa đơn đã được xuất.',
+                    : 'Đơn "${c.title}" đã được thanh toán thành công.',
                 textAlign: TextAlign.center,
                 style: context.text.body.copyWith(color: col.textMuted),
               ),
@@ -91,12 +91,14 @@ class PaymentSuccessView extends StatelessWidget {
                   label: 'Xem đơn hàng',
                   icon: AppIcons.order,
                   expand: true,
-                  onPressed: () => context.pushReplacement(AppRoutes.orders),
+                  onPressed: () => context.pushReplacement(
+                    c.productOrderId == null ? AppRoutes.orders : AppRoutes.order(c.productOrderId!),
+                  ),
                 ),
                 if (c.invoiceId != null) ...[
                   const SizedBox(height: AppSpacing.xs),
                   AppButton.outline(
-                    label: 'Xem hóa đơn',
+                    label: 'Chi tiết thanh toán',
                     icon: AppIcons.invoice,
                     expand: true,
                     onPressed: () => context.pushReplacement(AppRoutes.invoice(c.invoiceId!)),

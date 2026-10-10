@@ -20,10 +20,10 @@ abstract interface class AuthRepository {
   /// `GET /auth/me` (+ trạng thái CV với Coach).
   Future<AuthSession> refreshMe();
 
-  /// `POST /auth/forgot-password` — gửi OTP 6 số qua email (TODO BE-4).
+  /// `POST /auth/forgot-password` — gửi OTP 6 số qua email (hết hạn 15 phút, gửi lại sau 60 giây).
   Future<void> requestPasswordReset(String email);
 
-  /// `PATCH /auth/reset-password` với `{ email, otp, newPassword }` (TODO BE-4).
+  /// `PATCH /auth/reset-password` với `{ email, otp, newPassword }` (sai quá 5 lần ⇒ cần mã mới).
   Future<void> resetPassword({required String email, required String otp, required String newPassword});
 
   /// `PATCH /auth/me` (+ `PATCH /coaches/:id` cho hồ sơ chuyên môn).

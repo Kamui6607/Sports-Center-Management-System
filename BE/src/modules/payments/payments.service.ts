@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
@@ -226,4 +227,66 @@ export async function updatePaymentStatus(id: string, status: string) {
   });
 
   return getPaymentById(id, { role: "MANAGER" });
+}
+
+/**
+ * BE-6: Lịch sử thanh toán của CHÍNH người dùng (thay cho hóa đơn đã bỏ).
+ * - MEMBER: giao dịch mua khóa học + đơn sản phẩm của mình.
+ * - COACH: đơn sản phẩm của mình.
+ * `type=CLASS|ORDER` lọc theo loại; mỗi bản ghi kèm tên khóa / dòng sản phẩm và số tiền đã hoàn.
+ */
+export async function listMyPayments(user: { id: string; role: string }, query: any) {
+  const page = Math.max(1, parseInt(query.page ?? "1") || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
+  const member = await prisma.memberProfile.findUnique({ where: { userId: user.id }, select: { id: true } });
+
+  const owner: Prisma.PaymentWhereInput[] = [{ order: { userId: user.id } }];
+  if (member) owner.push({ memberId: member.id });
+  const where: Prisma.PaymentWhereInput = { OR: owner };
+  if (query.type === "CLASS") where.classId = { not: null };
+  if (query.type === "ORDER") where.orderId = { not: null };
+  if (query.status) where.status = query.status;
+
+  const [total, rows] = await Promise.all([
+    prisma.payment.count({ where }),
+    prisma.payment.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        class: { select: { id: true, name: true } },
+        order: {
+          include: { items: { include: { product: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } } },
+        },
+        refunds: { where: { status: { not: "REJECTED" } }, select: { id: true, amount: true, status: true } },
+      },
+    }),
+  ]);
+
+  const payments = rows.map((p) => ({
+    id: p.id,
+    type: p.orderId ? "ORDER" : "CLASS",
+    amount: p.amount,
+    status: p.status,
+    method: p.method,
+    transactionCode: p.transactionCode,
+    paidAt: p.paidAt,
+    createdAt: p.createdAt,
+    classId: p.classId,
+    className: p.classNameSnapshot ?? p.class?.name ?? null,
+    orderId: p.orderId,
+    orderStatus: p.order?.status ?? null,
+    items:
+      p.order?.items.map((i) => ({
+        productId: i.productId,
+        productName: i.product.name,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        totalAmount: i.totalAmount,
+      })) ?? [],
+    refundedAmount: p.refunds.filter((r) => r.status === "COMPLETED").reduce((sum, r) => sum + Number(r.amount), 0),
+    pendingRefundAmount: p.refunds.filter((r) => r.status === "PENDING").reduce((sum, r) => sum + Number(r.amount), 0),
+  }));
+  return { payments, pagination: buildPaginationMeta(total, page, limit) };
 }

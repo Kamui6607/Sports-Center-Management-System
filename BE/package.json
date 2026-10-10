@@ -6,10 +6,13 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:local": "node scripts/with-local-env.mjs tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "db:migrate:local": "node scripts/with-local-env.mjs prisma migrate deploy",
+    "db:seed:local": "node scripts/with-local-env.mjs tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
@@ -20,7 +23,10 @@
     "test:e2e:chat": "tsx tests/chat-attachments.e2e.ts",
     "test:sepay:smoke": "tsx tests/sepay-smoke.ts",
     "test:cloudinary:check": "tsx tests/cloudinary-check.ts",
-    "test:e2e:all": "npm run test:e2e && npm run test:e2e:attendance && npm run test:e2e:course && npm run test:e2e:sepay && npm run test:e2e:chat"
+    "test:e2e:all": "npm run test:e2e && npm run test:e2e:attendance && npm run test:e2e:course && npm run test:e2e:sepay && npm run test:e2e:chat",
+    "test:local": "node scripts/with-local-env.mjs node scripts/run-e2e.mjs",
+    "test:smoke:local": "node scripts/with-local-env.mjs tsx tests/smoke-mobile.local.ts",
+    "test:smoke:shop:local": "node scripts/with-local-env.mjs tsx tests/smoke-shop.local.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

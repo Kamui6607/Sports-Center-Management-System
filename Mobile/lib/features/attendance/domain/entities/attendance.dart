@@ -2,7 +2,8 @@
 enum AttendanceStatus { present, absent, late, excused }
 
 /// Trạng thái phạt chuyên cần (`AttendancePenaltyStatus`).
-enum PenaltyStatus { applied, revoked, expired }
+/// `pending` = Quản lý đã xem trước nhưng chưa áp dụng (L13: Member chỉ xem).
+enum PenaltyStatus { pending, applied, revoked, expired }
 
 /// Bản ghi điểm danh của Member (`GET /attendance/my`).
 class AttendanceRecord {

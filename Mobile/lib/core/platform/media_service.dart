@@ -26,6 +26,16 @@ class MediaService {
     }
   }
 
+  /// Mở bảng chia sẻ của hệ thống cho một tệp (VD PDF CV ⇒ người dùng chọn ứng dụng xem PDF).
+  Future<void> shareFile(Uint8List bytes, {required String fileName, required String mimeType}) async {
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile.fromData(bytes, mimeType: mimeType, name: fileName)],
+        fileNameOverrides: [fileName],
+      ),
+    );
+  }
+
   Future<void> shareImage(Uint8List bytes, {required String fileName, String? text}) async {
     await SharePlus.instance.share(
       ShareParams(

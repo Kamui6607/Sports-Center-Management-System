@@ -83,7 +83,11 @@ class AccountScreen extends ConsumerWidget {
                 title: 'Mua sắm & thanh toán',
                 items: [
                   MenuItemData(icon: AppIcons.order, label: 'Đơn hàng', onTap: () => go(AppRoutes.orders)),
-                  MenuItemData(icon: AppIcons.invoice, label: 'Hóa đơn', onTap: () => go(AppRoutes.invoices)),
+                  MenuItemData(
+                    icon: AppIcons.invoice,
+                    label: 'Lịch sử thanh toán',
+                    onTap: () => go(AppRoutes.invoices),
+                  ),
                   MenuItemData(
                     icon: AppIcons.refund,
                     label: 'Hủy khóa & hoàn tiền',

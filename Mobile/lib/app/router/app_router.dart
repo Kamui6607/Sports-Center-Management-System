@@ -36,7 +36,6 @@ import '../../features/manager/presentation/review_screens.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/payments/presentation/screens/invoice_screens.dart';
 import '../../features/payments/presentation/screens/payment_screen.dart';
-import '../../features/products/presentation/screens/orders_screen.dart';
 import '../../features/products/presentation/screens/product_detail_screen.dart';
 import '../../features/products/presentation/screens/shop_screen.dart';
 import '../../features/profile/presentation/account_screen.dart';
@@ -48,6 +47,14 @@ import '../../features/schedule/presentation/screens/manual_attendance_screen.da
 import '../../features/schedule/presentation/screens/member_schedule_screen.dart';
 import '../../features/schedule/presentation/screens/my_session_screen.dart';
 import '../../features/schedule/presentation/screens/teaching_session_screen.dart';
+import '../../features/shop/presentation/screens/address_screens.dart';
+import '../../features/shop/presentation/screens/cart_screen.dart';
+import '../../features/shop/presentation/screens/checkout_screen.dart';
+import '../../features/shop/presentation/screens/inventory_screens.dart';
+import '../../features/shop/presentation/screens/manager_order_screens.dart';
+import '../../features/shop/presentation/screens/order_detail_screen.dart';
+import '../../features/shop/presentation/screens/orders_screen.dart';
+import '../../features/shop/presentation/screens/pickup_scan_screen.dart';
 import '../../features/training/presentation/training_screens.dart';
 import '../shell/role_shell.dart';
 import 'app_routes.dart';
@@ -76,7 +83,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final session = ref.read(sessionProvider);
       return RouteGuard.redirect(
-        loading: session.isLoading && !session.hasValue,
+        // Lỗi mạng khi khôi phục phiên ⇒ ở lại Splash (hiển thị "Thử lại").
+        loading: (session.isLoading || session.hasError) && !session.hasValue,
         session: session.value,
         location: state.matchedLocation,
         from: state.uri.queryParameters['from'],
@@ -105,6 +113,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       page(AppRoutes.profileEdit, (_) => const EditProfileScreen()),
       page(AppRoutes.changePassword, (_) => const ChangePasswordScreen()),
       page(AppRoutes.orders, (_) => const OrdersScreen()),
+      page('/orders/:id', (s) => OrderDetailScreen(orderId: s.pathParameters['id']!)),
+      page(AppRoutes.cart, (_) => const CartScreen()),
+      page(AppRoutes.checkout, (s) {
+        final q = s.uri.queryParameters;
+        return CheckoutScreen(
+          cartProductIds: (q['ids'] ?? '').split(',').where((e) => e.isNotEmpty).toList(),
+          buyNowProductId: q['buy'],
+          buyNowQuantity: int.tryParse(q['qty'] ?? '') ?? 1,
+        );
+      }),
+      page(AppRoutes.addresses, (_) => const AddressesScreen()),
       page(AppRoutes.invoices, (_) => const InvoicesScreen()),
       page('/invoices/:id', (s) => InvoiceDetailScreen(invoiceId: s.pathParameters['id']!)),
       page(AppRoutes.devTools, (_) => const DevToolsScreen()),
@@ -177,6 +196,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       page('/manager/classes/:id', (s) => ClassReviewScreen(classId: s.pathParameters['id']!)),
       page('/manager/withdrawals/:id', (s) => WithdrawalReviewScreen(transactionId: s.pathParameters['id']!)),
       page('/manager/refunds/:id', (s) => RefundReviewScreen(refundId: s.pathParameters['id']!)),
+      page(AppRoutes.managerOrders, (_) => const ManagerOrdersScreen()),
+      page('/manager/orders/:id', (s) => ManagerOrderDetailScreen(orderId: s.pathParameters['id']!)),
+      page(AppRoutes.pickupScan, (_) => const PickupScanScreen()),
+      page(AppRoutes.inventory, (_) => const InventoryScreen()),
+      page('/manager/inventory/:id', (s) => InventoryItemScreen(productId: s.pathParameters['id']!)),
     ],
     errorBuilder: (context, state) => const _NotFoundScreen(),
   );

@@ -24,6 +24,7 @@ import '../domain/entities/app_notification.dart';
   NotificationType.attendancePenaltyRevoked => (AppIcons.verified, StatusTone.success),
   NotificationType.paymentSuccess => (AppIcons.payment, StatusTone.success),
   NotificationType.paymentRefunded => (AppIcons.refund, StatusTone.info),
+  NotificationType.orderUpdated => (AppIcons.order, StatusTone.brand),
   NotificationType.memberRegistered || NotificationType.general => (AppIcons.notification, StatusTone.neutral),
 };
 
@@ -34,15 +35,16 @@ String? notificationTarget(AppNotification n, UserRole role) {
   switch (role) {
     case UserRole.member:
       if (m['senderId'] != null) return AppRoutes.chatRoom(m['senderId']!);
+      if (m['orderId'] != null) return AppRoutes.order(m['orderId']!);
       if (m['refundId'] != null) return AppRoutes.refunds;
       if (m['penaltyId'] != null || n.type == NotificationType.attendanceWarning) return AppRoutes.attendance;
       if (m['planId'] != null) return AppRoutes.trainingPlan(m['planId']!);
-      if (m['orderId'] != null) return AppRoutes.orders;
       if (m['scheduleId'] != null) return AppRoutes.mySession(m['scheduleId']!);
       if (n.type == NotificationType.newClass && classId != null) return AppRoutes.classDetail(classId);
       if (classId != null) return AppRoutes.myCourse(classId);
     case UserRole.coach:
       if (m['senderId'] != null) return AppRoutes.chatRoom(m['senderId']!);
+      if (m['orderId'] != null) return AppRoutes.order(m['orderId']!);
       if (n.type == NotificationType.withdrawalApproved || n.type == NotificationType.withdrawalRejected) {
         return AppRoutes.coachWallet;
       }
@@ -51,6 +53,7 @@ String? notificationTarget(AppNotification n, UserRole role) {
       if (m['coachProfileId'] != null) return AppRoutes.reviewCv(m['coachProfileId']!);
       if (m['refundId'] != null) return AppRoutes.reviewRefund(m['refundId']!);
       if (m['transactionId'] != null) return AppRoutes.reviewWithdrawal(m['transactionId']!);
+      if (m['orderId'] != null) return AppRoutes.managerOrder(m['orderId']!);
       if (classId != null) return AppRoutes.reviewClass(classId);
       return AppRoutes.managerApprovals;
   }

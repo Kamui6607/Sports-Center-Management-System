@@ -1,7 +1,9 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { createNotification } from "../notifications/notifications.service.js";
+import { computeWithdrawEligibility } from "./wallet-eligibility.service.js";
 
 /** Số ngày tối đa từ khi class COMPLETED mà coach được phép rút tiền. 0 = không giới hạn. */
 const WITHDRAWAL_ALLOWED_AFTER_CLASS_COMPLETED = true;
@@ -20,16 +22,22 @@ export async function getMyWallet(coachUserId: string) {
   });
   if (!coachProfile) throw new AppError("Coach profile not found", 404);
 
-  if (!coachProfile.wallet) {
-    const wallet = await prisma.coachWallet.create({
-      data: { coachId: coachProfile.id, balance: 0 },
-    });
-    return { wallet, coach: { fullName: coachProfile.user.fullName, email: coachProfile.user.email } };
-  }
+  const wallet =
+    coachProfile.wallet ?? (await prisma.coachWallet.create({ data: { coachId: coachProfile.id, balance: 0 } }));
+  // BE-5 / L4: tiền tạm giữ, số dư khả dụng và điều kiện rút theo từng khóa.
+  const eligibility = await computeWithdrawEligibility(prisma, wallet);
 
   return {
-    wallet: coachProfile.wallet,
+    wallet,
     coach: { fullName: coachProfile.user.fullName, email: coachProfile.user.email },
+    pendingRefundDebit: eligibility.pendingRefundDebit,
+    pendingWithdrawal: eligibility.pendingWithdrawal,
+    available: eligibility.available,
+    withdrawEligibility: {
+      eligible: eligibility.eligible,
+      blockers: eligibility.blockers,
+      classes: eligibility.classes,
+    },
   };
 }
 
@@ -54,10 +62,12 @@ export async function getMyWalletTransactions(coachUserId: string, query: any) {
     where: { userId: coachUserId },
     include: { wallet: true },
   });
-  if (!coachProfile || !coachProfile.wallet) throw new AppError("Coach wallet not found", 404);
+  if (!coachProfile) throw new AppError("Coach profile not found", 404);
 
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
+  // HLV chưa có ví (chưa tạo khóa nào) ⇒ danh sách rỗng thay vì 404 (đồng nhất với GET /me/wallet tự tạo ví).
+  if (!coachProfile.wallet) return { transactions: [], pagination: buildPaginationMeta(0, page, limit) };
   const skip = (page - 1) * limit;
 
   const where: any = { walletId: coachProfile.wallet.id };
@@ -112,39 +122,8 @@ export async function requestWithdrawal(coachUserId: string, data: {
     );
   }
 
-  // Tiền đang bị giữ cho các yêu cầu hoàn tiền chờ duyệt (sẽ bị trừ khỏi ví khi Manager duyệt).
-  const held = await prisma.refund.aggregate({
-    where: { coachWalletId: wallet.id, status: "PENDING" },
-    _sum: { coachDebitAmount: true },
-  });
-  const pendingRefundDebit = Number(held._sum.coachDebitAmount ?? 0);
-  const available = Number(wallet.balance) - pendingRefundDebit;
-  if (data.amount > available) {
-    throw new AppError(
-      `Số dư khả dụng chỉ còn ${Math.max(0, available).toLocaleString("vi-VN")}đ ` +
-        `(đang giữ ${pendingRefundDebit.toLocaleString("vi-VN")}đ cho các yêu cầu hoàn tiền chờ duyệt).`,
-      400,
-      { code: "BALANCE_HELD_FOR_REFUND", balance: Number(wallet.balance), pendingRefundDebit, available }
-    );
-  }
-
-  // Kiểm tra: tất cả class mà coach nhận thu nhập đã COMPLETED chưa?
-  const pendingClasses = await prisma.class.count({
-    where: {
-      coachId: coachProfile.id,
-      status: { in: ["PENDING", "APPROVED"] },
-    },
-  });
-
-  if (pendingClasses > 0) {
-    throw new AppError(
-      `Bạn còn ${pendingClasses} khóa học chưa hoàn thành. Vui lòng chờ tất cả khóa học kết thúc (status COMPLETED) mới được rút tiền.`,
-      400,
-      { code: "CLASS_NOT_COMPLETED", pendingClasses }
-    );
-  }
-
-  // Không có yêu cầu PENDING chưa xử lý
+  // L4: chỉ tiền của các khóa ĐÃ KẾT THÚC (không còn hoàn tiền chờ duyệt) mới rút được.
+  const eligibility = await computeWithdrawEligibility(prisma, wallet);
   const pendingWithdrawal = await prisma.walletTransaction.findFirst({
     where: { walletId: wallet.id, type: "WITHDRAWAL", status: "PENDING" },
   });
@@ -153,6 +132,28 @@ export async function requestWithdrawal(coachUserId: string, data: {
       "Bạn đang có yêu cầu rút tiền chờ xử lý. Vui lòng chờ Manager duyệt trước khi tạo yêu cầu mới.",
       409,
       { code: "WITHDRAWAL_PENDING", transactionId: pendingWithdrawal.id }
+    );
+  }
+  if (!eligibility.classes.some((c) => c.withdrawable)) {
+    const blocker = eligibility.blockers.find((b) => b.code !== "WITHDRAWAL_PENDING");
+    throw new AppError(
+      blocker?.message ?? "Chưa có khóa học nào kết thúc để rút tiền.",
+      400,
+      { code: blocker?.code ?? "CLASS_NOT_COMPLETED", classes: eligibility.classes }
+    );
+  }
+  if (data.amount > eligibility.available) {
+    const held = eligibility.pendingRefundDebit > 0;
+    throw new AppError(
+      `Số tiền rút được hiện chỉ còn ${eligibility.available.toLocaleString("vi-VN")}đ` +
+        (held ? ` (đang tạm giữ ${eligibility.pendingRefundDebit.toLocaleString("vi-VN")}đ cho yêu cầu hoàn tiền chờ duyệt).` : "."),
+      400,
+      {
+        code: held ? "BALANCE_HELD_FOR_REFUND" : "AMOUNT_EXCEEDS_AVAILABLE",
+        balance: eligibility.balance,
+        pendingRefundDebit: eligibility.pendingRefundDebit,
+        available: eligibility.available,
+      }
     );
   }
 
@@ -253,4 +254,65 @@ export async function reviewWithdrawal(
 
     return db.walletTransaction.findUnique({ where: { id: transactionId } });
   });
+}
+
+const WITHDRAWAL_INCLUDE = {
+  class: { select: { id: true, name: true } },
+  wallet: {
+    include: { coach: { include: { user: { select: { id: true, fullName: true, email: true, phone: true } } } } },
+  },
+} satisfies Prisma.WalletTransactionInclude;
+
+type WithdrawalRow = Prisma.WalletTransactionGetPayload<{ include: typeof WITHDRAWAL_INCLUDE }>;
+
+/** Lệnh rút + thông tin HLV + số dư/tạm giữ hiện tại của ví (để Manager đối chiếu trước khi duyệt). */
+async function toWithdrawalView(row: WithdrawalRow) {
+  const eligibility = await computeWithdrawEligibility(prisma, row.wallet);
+  const { wallet, ...tx } = row;
+  return {
+    ...tx,
+    rejectReason: tx.status === "REJECTED" ? tx.note?.replace(/^Bị từ chối:?\s*/, "") ?? null : null,
+    coach: {
+      id: wallet.coach.id,
+      userId: wallet.coach.user.id,
+      fullName: wallet.coach.user.fullName,
+      email: wallet.coach.user.email,
+      phone: wallet.coach.user.phone,
+    },
+    wallet: {
+      id: wallet.id,
+      balance: wallet.balance,
+      pendingRefundDebit: eligibility.pendingRefundDebit,
+      available: eligibility.available,
+    },
+  };
+}
+
+/** BE-7: `GET /coaches/wallet/transactions?type=WITHDRAWAL&status=PENDING` (MANAGER). */
+export async function listWalletTransactionsForManager(query: any) {
+  const page = Math.max(1, parseInt(query.page ?? "1") || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
+  const where: Prisma.WalletTransactionWhereInput = { type: query.type ?? "WITHDRAWAL" };
+  if (query.status) where.status = query.status;
+  if (query.coachId) where.wallet = { coachId: query.coachId };
+
+  const [total, rows] = await Promise.all([
+    prisma.walletTransaction.count({ where }),
+    prisma.walletTransaction.findMany({
+      where,
+      include: WITHDRAWAL_INCLUDE,
+      orderBy: { createdAt: query.status === "PENDING" ? "asc" : "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ]);
+  const transactions = await Promise.all(rows.map(toWithdrawalView));
+  return { transactions, pagination: buildPaginationMeta(total, page, limit) };
+}
+
+/** BE-7: `GET /coaches/wallet/transactions/:txId` (MANAGER). */
+export async function getWalletTransactionForManager(txId: string) {
+  const row = await prisma.walletTransaction.findUnique({ where: { id: txId }, include: WITHDRAWAL_INCLUDE });
+  if (!row) throw new AppError("Wallet transaction not found", 404);
+  return toWithdrawalView(row);
 }

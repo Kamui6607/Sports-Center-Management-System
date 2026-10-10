@@ -19,6 +19,14 @@ abstract final class AppRoutes {
   static const profileEdit = '/profile/edit';
   static const changePassword = '/profile/password';
   static const orders = '/orders';
+  static String order(String id) => '/orders/$id';
+  static const cart = '/cart';
+
+  /// Thanh toán: từ giỏ (`?ids=a,b`) hoặc mua ngay (`?buy=<productId>&qty=<n>`).
+  static const checkout = '/checkout';
+  static String checkoutCart(Iterable<String> productIds) => '/checkout?ids=${productIds.join(',')}';
+  static String checkoutBuyNow(String productId, int quantity) => '/checkout?buy=$productId&qty=$quantity';
+  static const addresses = '/addresses';
   static const invoices = '/invoices';
   static String invoice(String id) => '/invoices/$id';
   static const devTools = '/dev';
@@ -75,4 +83,9 @@ abstract final class AppRoutes {
   static String reviewClass(String classId) => '/manager/classes/$classId';
   static String reviewWithdrawal(String txId) => '/manager/withdrawals/$txId';
   static String reviewRefund(String refundId) => '/manager/refunds/$refundId';
+  static const managerOrders = '/manager/orders';
+  static String managerOrder(String id) => '/manager/orders/$id';
+  static const pickupScan = '/manager/pickup-scan';
+  static const inventory = '/manager/inventory';
+  static String inventoryItem(String productId) => '/manager/inventory/$productId';
 }

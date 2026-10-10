@@ -32,3 +32,19 @@ export async function reviewWithdrawal(req: Request, res: Response, next: NextFu
     sendSuccess(res, result, msg);
   } catch (err) { next(err); }
 }
+
+/** BE-7: Manager liệt kê lệnh rút tiền (mặc định type=WITHDRAWAL). */
+export async function listWalletTransactions(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { transactions, pagination } = await walletService.listWalletTransactionsForManager(req.query);
+    sendSuccess(res, transactions, "Wallet transactions retrieved successfully", 200, pagination);
+  } catch (err) { next(err); }
+}
+
+/** BE-7: Manager xem chi tiết một lệnh rút tiền. */
+export async function getWalletTransaction(req: Request, res: Response, next: NextFunction) {
+  try {
+    const tx = await walletService.getWalletTransactionForManager(req.params.txId as string);
+    sendSuccess(res, tx, "Wallet transaction retrieved successfully");
+  } catch (err) { next(err); }
+}

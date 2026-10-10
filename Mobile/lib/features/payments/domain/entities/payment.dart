@@ -72,7 +72,18 @@ class Checkout {
 
 enum InvoiceStatus { issued, cancelled }
 
-/// Hóa đơn (`Invoice`) — dữ liệu snapshot tại thời điểm xuất.
+/// Một dòng sản phẩm của đơn (đơn có thể nhiều dòng — L7).
+class InvoiceLine {
+  const InvoiceLine({required this.name, required this.quantity, required this.unitPrice, required this.total});
+
+  final String name;
+  final int quantity;
+  final int unitPrice;
+  final int total;
+}
+
+/// Chi tiết thanh toán (L6 — BE đã bỏ bảng Invoice; dựng từ `GET /payments/my`):
+/// giao dịch thành công (`issued`) hoặc đã hoàn tiền toàn bộ (`cancelled`).
 class Invoice {
   const Invoice({
     required this.id,
@@ -89,6 +100,8 @@ class Invoice {
     this.quantity,
     this.transactionCode,
     this.paidAt,
+    this.lines = const [],
+    this.refundedAmount = 0,
   });
 
   final String id;
@@ -105,4 +118,10 @@ class Invoice {
   final int? quantity;
   final String? transactionCode;
   final DateTime? paidAt;
+
+  /// Các dòng sản phẩm (đơn hàng); rỗng với giao dịch khóa học.
+  final List<InvoiceLine> lines;
+
+  /// Số tiền đã được hoàn (hoàn một phần khi buổi học bị hủy).
+  final int refundedAmount;
 }

@@ -3,10 +3,14 @@ import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { broadcastNotification, createNotification } from "../notifications/notifications.service.js";
 import { evaluateCourseEligibility } from "../enrollments/course-enrollment.service.js";
+import { getMemberPurchase, withClassSummaries } from "./class-summary.service.js";
+
+/** Người gọi API (null = Guest — BE-1). */
+type Actor = { id: string; role: string } | undefined;
 
 /** HLV phụ trách lớp (mỗi lớp đúng 1 HLV — Class.coachId). */
 const CLASS_COACH_INCLUDE = {
-  include: { user: { select: { id: true, fullName: true, email: true } } },
+  include: { user: { select: { id: true, fullName: true, email: true, avatarUrl: true } } },
 };
 
 const classInclude = {
@@ -37,7 +41,7 @@ async function withEnrollmentCountOne<T extends { id: string; _count: { schedule
   return withEnrollmentCount(cls, await countEnrollmentsByClass([cls.id]));
 }
 
-export async function listClasses(query: any, actor?: { id: string; role: string }) {
+export async function listClasses(query: any, actor?: Actor) {
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
   const skip = (page - 1) * limit;
@@ -63,6 +67,11 @@ export async function listClasses(query: any, actor?: { id: string; role: string
   } else if (actor?.role === "MEMBER" && !query.status) {
     // Member chỉ thấy class APPROVED
     where.status = "APPROVED";
+  } else if (!actor) {
+    // BE-1: Guest chỉ thấy khóa đang mở bán (bỏ qua mọi tham số status/createdByMe/isActive).
+    where.status = "APPROVED";
+    where.isActive = true;
+    delete where.coachId;
   }
 
   const [total, classes] = await Promise.all([
@@ -74,7 +83,12 @@ export async function listClasses(query: any, actor?: { id: string; role: string
     }),
   ]);
   const counts = await countEnrollmentsByClass(classes.map((c) => c.id));
-  return { classes: classes.map((c) => withEnrollmentCount(c, counts)), pagination: buildPaginationMeta(total, page, limit) };
+  // BE-12: kèm `summary` (lịch, chỗ trống, học viên) + điểm HLV; Guest không thấy email HLV.
+  const withSummary = await withClassSummaries(
+    classes.map((c) => withEnrollmentCount(c, counts)),
+    { hideCoachEmail: !actor }
+  );
+  return { classes: withSummary, pagination: buildPaginationMeta(total, page, limit) };
 }
 
 /**
@@ -139,7 +153,8 @@ export async function reviewClass(classId: string, action: "APPROVE" | "REJECT",
   const newStatus = action === "APPROVE" ? "APPROVED" : "REJECTED";
   const updated = await prisma.class.update({
     where: { id: classId },
-    data: { status: newStatus },
+    // BE-2: lưu lý do từ chối để Coach xem & sửa (xóa khi duyệt).
+    data: { status: newStatus, rejectReason: action === "REJECT" ? reason?.trim() || null : null },
     include: classInclude,
   });
 
@@ -177,7 +192,7 @@ export async function reviewClass(classId: string, action: "APPROVE" | "REJECT",
 }
 
 
-export async function getClassById(id: string) {
+export async function getClassById(id: string, actor?: Actor) {
   const cls = await prisma.class.findUnique({
     where: { id },
     include: {
@@ -191,7 +206,28 @@ export async function getClassById(id: string) {
     },
   });
   if (!cls) throw new AppError("Class not found", 404);
-  return withEnrollmentCountOne(cls);
+  // BE-1: Guest chỉ xem được khóa đang mở bán.
+  if (!actor && (cls.status !== "APPROVED" || !cls.isActive)) throw new AppError("Class not found", 404);
+  const [withSummary] = await withClassSummaries([await withEnrollmentCountOne(cls)], { hideCoachEmail: !actor });
+  return withSummary;
+}
+
+/**
+ * BE-11: danh mục bộ môn = các giá trị `Class.fitness` (không trùng, bỏ hoa/thường) của khóa đã duyệt.
+ * Công khai (Guest dùng để lọc khóa học; Coach chọn khi tạo khóa hoặc nhập bộ môn mới).
+ */
+export async function listFitness() {
+  const rows = await prisma.class.findMany({
+    where: { status: { in: ["APPROVED", "COMPLETED"] }, isActive: true },
+    select: { fitness: true },
+    distinct: ["fitness"],
+  });
+  const byKey = new Map<string, string>();
+  for (const r of rows) {
+    const name = r.fitness.trim();
+    if (name && !byKey.has(name.toLowerCase())) byKey.set(name.toLowerCase(), name);
+  }
+  return [...byKey.values()].sort((a, b) => a.localeCompare(b, "vi"));
 }
 
 export async function updateClass(id: string, data: any, actor?: { id: string; role: string }) {
@@ -350,9 +386,12 @@ export async function getClassCoursePlan(
       areaType: true,
       capacity: true,
       isActive: true,
+      status: true,
     },
   });
   if (!cls) throw new AppError("Class not found", 404);
+  // BE-1: Guest chỉ xem lộ trình của khóa đang mở bán.
+  if (!actor && (cls.status !== "APPROVED" || !cls.isActive)) throw new AppError("Class not found", 404);
 
   // Khóa học = toàn bộ buổi SCHEDULED chưa bắt đầu, sắp theo thời gian.
   const schedules = await prisma.classSchedule.findMany({
@@ -474,6 +513,9 @@ export async function getClassCoursePlan(
     (s) => s.myEnrollmentStatus === "BOOKED" || s.myEnrollmentStatus === "COMPLETED"
   ).length;
 
+  // BE-13: tình trạng mua của Member (đã mua / đang chờ thanh toán / chưa mua).
+  const purchase = memberProfile ? await getMemberPurchase(memberProfile.id, cls.id, now) : null;
+
   const firstSession = sessions[0];
   const lastSession = sessions[sessions.length - 1];
 
@@ -522,8 +564,11 @@ export async function getClassCoursePlan(
       ? {
           eligible: (eligibility?.blockers.length ?? 0) === 0,
           blockers: eligibility?.blockers ?? [],
+          /** @deprecated L14 — gói hội viên đã bỏ (BE trả "gói ảo PREMIUM"); giữ vì Web còn đọc. */
           subscription: eligibility?.subscription ?? null,
+          /** @deprecated L14 — xem `subscription`. */
           quota: eligibility?.quota ?? null,
+          purchase,
           penalty: eligibility?.penalty ?? null,
           registeredSessions: registeredCount,
           remainingSessionsToRegister: sessions.length - registeredCount,

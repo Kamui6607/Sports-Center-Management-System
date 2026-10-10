@@ -72,3 +72,16 @@ export const PenaltyRevokeSchema = z.object({
   reason: z.string().max(500).optional(),
   restoreSlots: z.boolean().optional(),
 });
+/** BE-18: `PUT /attendance/schedule/:scheduleId`. */
+export const BulkAttendanceSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        memberId: z.string().uuid(),
+        status: z.enum(["PRESENT", "ABSENT", "LATE", "EXCUSED"]),
+        note: z.string().max(500).nullable().optional(),
+      })
+    )
+    .min(1)
+    .max(200),
+});

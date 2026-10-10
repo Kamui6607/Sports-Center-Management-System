@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/data/data_revision.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/realtime_client.dart';
 import '../../data/auth_repository_provider.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/auth_models.dart';
@@ -11,7 +13,16 @@ final sessionProvider = AsyncNotifierProvider<SessionNotifier, AuthSession?>(Ses
 
 class SessionNotifier extends AsyncNotifier<AuthSession?> {
   @override
-  Future<AuthSession?> build() => ref.read(authRepositoryProvider).restoreSession();
+  Future<AuthSession?> build() {
+    // Refresh token thất bại / tài khoản bị khóa ⇒ xóa phiên, router đưa về Đăng nhập.
+    ref.listen(sessionExpiredProvider, (_, _) {
+      if (state.value != null) {
+        state = const AsyncData(null);
+        ref.read(dataRevisionProvider.notifier).bump();
+      }
+    });
+    return ref.read(authRepositoryProvider).restoreSession();
+  }
 
   Future<AuthSession> login(String email, String password) async {
     final session = await ref.read(authRepositoryProvider).login(email, password);
@@ -31,6 +42,8 @@ class SessionNotifier extends AsyncNotifier<AuthSession?> {
     try {
       await ref.read(authRepositoryProvider).logout();
     } finally {
+      // Đóng kết nối realtime của phiên cũ (không còn token).
+      ref.read(realtimeClientProvider).disconnect();
       state = const AsyncData(null);
       ref.read(dataRevisionProvider.notifier).bump();
     }

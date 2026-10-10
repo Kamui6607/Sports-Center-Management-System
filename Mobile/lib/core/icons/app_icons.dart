@@ -71,6 +71,9 @@ abstract final class AppIcons {
   static const IconData bank = LucideIcons.landmark;
   static const IconData order = LucideIcons.package;
   static const IconData bag = LucideIcons.shoppingBag;
+  static const IconData cart = LucideIcons.shoppingCart;
+  static const IconData truck = LucideIcons.truck;
+  static const IconData inventory = LucideIcons.warehouse;
   static const IconData star = LucideIcons.star;
 
   /// Sao đặc cho hiển thị điểm đánh giá (Lucide chỉ có sao viền).

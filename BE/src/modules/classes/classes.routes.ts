@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../../middlewares/authenticate.js";
+import { optionalAuthenticate } from "../../middlewares/optionalAuthenticate.js";
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
 import {
@@ -8,6 +9,7 @@ import {
   ApproveClassSchema,
   ClassQuerySchema,
 } from "./classes.schema.js";
+import { CreateActivityPlanSchema } from "../class-schedules/class-schedules.schema.js";
 import * as classesController from "./classes.controller.js";
 
 const router = Router();
@@ -76,10 +78,22 @@ const router = Router();
  */
 router.get(
   "/",
-  authenticate,
+  optionalAuthenticate,
   validate(ClassQuerySchema, "query"),
   classesController.listClasses
 );
+
+/**
+ * @swagger
+ * /classes/fitness:
+ *   get:
+ *     summary: "BE-11: Danh mục bộ môn (distinct Class.fitness của khóa đã duyệt) — công khai"
+ *     tags: [Classes]
+ *     security: []
+ *     responses:
+ *       200: { description: "data: string[]" }
+ */
+router.get("/fitness", classesController.listFitness);
 
 /**
  * @swagger
@@ -100,7 +114,7 @@ router.get(
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.get("/:id", authenticate, classesController.getClassById);
+router.get("/:id", optionalAuthenticate, classesController.getClassById);
 
 /**
  * @swagger
@@ -138,7 +152,20 @@ router.get("/:id", authenticate, classesController.getClassById);
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.get("/:id/course-plan", authenticate, classesController.getClassCoursePlan);
+router.get("/:id/course-plan", optionalAuthenticate, classesController.getClassCoursePlan);
+
+/**
+ * @swagger
+ * /classes/{id}/students:
+ *   get:
+ *     summary: "L12: Học viên của khóa + chuyên cần + doanh thu thật (COACH chủ khóa / MANAGER)"
+ *     tags: [Classes]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "{ students[], grossRevenue, refundedAmount, coachRevenue }" }
+ *       403: { description: "Không phải khóa của mình" }
+ */
+router.get("/:id/students", authenticate, authorize("COACH", "MANAGER"), classesController.listClassStudents);
 
 /**
  * @swagger
@@ -298,6 +325,31 @@ router.patch(
  *       404: { $ref: "#/components/responses/NotFound" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
+/**
+ * @swagger
+ * /classes/{id}/resubmit:
+ *   patch:
+ *     summary: "BE-3: Coach sửa & gửi lại khóa PENDING/REJECTED (kèm lịch) ⇒ PENDING"
+ *     tags: [Classes]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { type: object, description: "Giống body POST /class-schedules/activity-plan: { class, roomId, schedules[] }" }
+ *     responses:
+ *       200: { description: "{ class, schedulesCreated, status: PENDING }" }
+ *       400: { description: "Khóa không ở trạng thái PENDING/REJECTED" }
+ *       403: { description: "Không phải HLV của khóa" }
+ *       409: { description: "ROOM_CONFLICT / COACH_CONFLICT" }
+ */
+router.patch(
+  "/:id/resubmit",
+  authenticate,
+  authorize("COACH"),
+  validate(CreateActivityPlanSchema),
+  classesController.resubmitClass
+);
+
 router.patch(
   "/:id",
   authenticate,

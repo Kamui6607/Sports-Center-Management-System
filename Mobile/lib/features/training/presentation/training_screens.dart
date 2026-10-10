@@ -10,6 +10,7 @@ import '../../../core/utils/vn_time.dart';
 import '../../../core/widgets/widgets.dart';
 import '../data/training_repository_provider.dart';
 import '../domain/entities/training.dart';
+import 'result_form.dart';
 
 final myPlansProvider = FutureProvider.autoDispose<List<TrainingPlan>>((ref) {
   ref.watch(dataRevisionProvider);
@@ -172,8 +173,13 @@ class TrainingPlanScreen extends ConsumerWidget {
                               spacing: AppSpacing.xs,
                               runSpacing: AppSpacing.xs,
                               children: [
-                                for (final e in r.metrics.entries)
-                                  StatusLabel('${e.key}: ${e.value}', StatusTone.neutral).tag(),
+                                for (final m in r.metrics)
+                                  StatusLabel(
+                                    m.value != null && (m.note?.isNotEmpty ?? false)
+                                        ? '${m.name}: ${m.display} — ${m.note}'
+                                        : '${m.name}: ${m.display}',
+                                    StatusTone.neutral,
+                                  ).tag(),
                               ],
                             ),
                           if (r.coachNote != null) ...[
@@ -205,98 +211,4 @@ class TrainingPlanScreen extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// HLV ghi kết quả buổi tập: ngày, chỉ số (tên–giá trị), nhận xét.
-class ResultForm extends ConsumerStatefulWidget {
-  const ResultForm({super.key, required this.plan});
-
-  final TrainingPlan plan;
-
-  @override
-  ConsumerState<ResultForm> createState() => _ResultFormState();
-}
-
-class _ResultFormState extends ConsumerState<ResultForm> with SubmittingState {
-  DateTime _date = DateTime.now();
-  final _note = TextEditingController();
-  final _metrics = <(TextEditingController, TextEditingController)>[(TextEditingController(), TextEditingController())];
-
-  @override
-  void dispose() {
-    _note.dispose();
-    for (final (k, v) in _metrics) {
-      k.dispose();
-      v.dispose();
-    }
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final metrics = {
-      for (final (k, v) in _metrics)
-        if (k.text.trim().isNotEmpty && v.text.trim().isNotEmpty) k.text.trim(): v.text.trim(),
-    };
-    var ok = false;
-    await submit(() async {
-      await ref
-          .read(trainingRepositoryProvider)
-          .addResult(widget.plan.id, ResultDraft(date: _date, metrics: metrics, coachNote: _note.text));
-      ok = true;
-    });
-    if (!ok || !mounted) return;
-    ref.read(dataRevisionProvider.notifier).bump();
-    Navigator.of(context).pop();
-    AppSnackbar.success(context, 'Đã lưu kết quả.');
-  }
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      DateTimeField(
-        label: 'Ngày tập',
-        value: _date,
-        firstDate: VnTime.wall(widget.plan.startDate),
-        lastDate: DateTime.now(),
-        onChanged: (v) => setState(() => _date = v),
-      ),
-      const SizedBox(height: AppSpacing.md),
-      Text('Chỉ số', style: context.text.label),
-      const SizedBox(height: AppSpacing.xs),
-      for (final (k, v) in _metrics)
-        Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: k,
-                  decoration: const InputDecoration(hintText: 'VD: Cân nặng'),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: TextField(
-                  controller: v,
-                  decoration: const InputDecoration(hintText: 'VD: 58 kg'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          onPressed: () => setState(() => _metrics.add((TextEditingController(), TextEditingController()))),
-          icon: const Icon(AppIcons.add, size: AppSizes.iconSm),
-          label: const Text('Thêm chỉ số'),
-        ),
-      ),
-      AppTextField(label: 'Nhận xét của HLV', controller: _note, maxLines: 3, maxLength: 500),
-      if (formError != null) ...[const SizedBox(height: AppSpacing.xs), AlertBanner.error(message: formError!)],
-      const SizedBox(height: AppSpacing.md),
-      AppButton(label: 'Lưu kết quả', expand: true, loading: submitting, onPressed: _save),
-    ],
-  );
 }
