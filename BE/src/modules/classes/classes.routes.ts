@@ -335,9 +335,9 @@ router.patch(
  *     requestBody:
  *       content:
  *         application/json:
- *           schema: { type: object, description: "Giống body POST /class-schedules/activity-plan: { class, roomId, schedules[] }" }
+ *           schema: { type: object, description: "Giống body POST /class-schedules/activity-plan: { class, roomId, schedules[] } hoặc { class, roomId, recurrence }" }
  *     responses:
- *       200: { description: "{ class, schedulesCreated, status: PENDING }" }
+ *       200: { description: "{ class, schedulesCreated, startDate, endDate, totalSessions, status: PENDING }" }
  *       400: { description: "Khóa không ở trạng thái PENDING/REJECTED" }
  *       403: { description: "Không phải HLV của khóa" }
  *       409: { description: "ROOM_CONFLICT / COACH_CONFLICT" }

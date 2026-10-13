@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authenticate } from "../../middlewares/authenticate.js";
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
+import { planAttachmentUploadSingle } from "../../middlewares/upload.js";
 import * as controller from "./training-plans.controller.js";
 import { CreateTrainingPlanSchema, CreateTrainingResultSchema, UpdateTrainingPlanSchema, UpdateTrainingResultSchema } from "./training-plans.schema.js";
 
@@ -215,6 +216,76 @@ router.patch("/results/:id", authorize("COACH"), validate(UpdateTrainingResultSc
  *       404: { $ref: "#/components/responses/NotFound" }
  */
 router.delete("/results/:id", authorize("COACH"), controller.deleteResult);
+
+/**
+ * @swagger
+ * /training-plans/{id}/attachments:
+ *   post:
+ *     summary: Coach attaches a PDF/Excel file to a training plan
+ *     description: |
+ *       multipart/form-data, field `file`. Chấp nhận `.pdf`, `.xlsx`, `.xls` ≤10MB; nội dung được kiểm tra bằng magic bytes
+ *       (sai → 400 INVALID_FILE_CONTENT). Tối đa 20 tệp/lộ trình. Chỉ Coach phụ trách của lộ trình.
+ *       Tệp không được phục vụ tĩnh — tải qua `GET /training-plans/{id}/attachments/{attachmentId}`.
+ *     tags: [Training Plans]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       201: { description: Uploaded }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *   get:
+ *     summary: List attachments of a training plan (plan's Coach, plan's Member, Manager)
+ *     tags: [Training Plans]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: OK }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ * /training-plans/{id}/attachments/{attachmentId}:
+ *   get:
+ *     summary: Download an attachment (authenticated)
+ *     tags: [Training Plans]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *       - { in: path, name: attachmentId, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: File }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *   delete:
+ *     summary: Delete an attachment (plan's Coach only)
+ *     tags: [Training Plans]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *       - { in: path, name: attachmentId, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Deleted }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.post("/:id/attachments", authorize("COACH"), planAttachmentUploadSingle("file"), controller.addPlanAttachment);
+router.get("/:id/attachments", controller.listPlanAttachments);
+router.get("/:id/attachments/:attachmentId", controller.downloadPlanAttachment);
+router.delete("/:id/attachments/:attachmentId", authorize("COACH"), controller.deletePlanAttachment);
 
 /**
  * @swagger

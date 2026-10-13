@@ -43,7 +43,8 @@ const router = Router();
  *               classId: { type: string }
  *               note: { type: string, maxLength: 500, description: "Lý do hủy (tuỳ chọn)" }
  *     responses:
- *       201: { description: Yêu cầu hoàn tiền đã được tạo (PENDING) }
+ *       201: { description: Đã tạo yêu cầu hoàn 100% (PENDING) }
+ *       200: { description: Đã hủy ngay, không hoàn tiền (hủy trong vòng 3 ngày trước khai giảng) }
  *       400: { $ref: "#/components/responses/BadRequest" }
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       403: { $ref: "#/components/responses/Forbidden" }
@@ -66,7 +67,7 @@ router.post(
  *     summary: MEMBER xem các yêu cầu hoàn tiền của mình
  *     tags: [Refunds]
  *     parameters:
- *       - { in: query, name: status, schema: { type: string, enum: [PENDING, COMPLETED, REJECTED] } }
+ *       - { in: query, name: status, schema: { type: string, enum: [PENDING, COMPLETED, REJECTED, CANCELLED] } }
  *       - { in: query, name: page, schema: { type: integer } }
  *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
@@ -90,8 +91,8 @@ router.get(
  *     summary: MANAGER xem danh sách yêu cầu hoàn tiền
  *     tags: [Refunds]
  *     parameters:
- *       - { in: query, name: status, schema: { type: string, enum: [PENDING, COMPLETED, REJECTED] } }
- *       - { in: query, name: reason, schema: { type: string, enum: [MEMBER_CANCEL_COURSE, SESSION_CANCELLED] } }
+ *       - { in: query, name: status, schema: { type: string, enum: [PENDING, COMPLETED, REJECTED, CANCELLED] } }
+ *       - { in: query, name: reason, schema: { type: string, enum: [MEMBER_CANCEL_COURSE, MEMBER_CANCEL_SESSION, SESSION_CANCELLED, ORDER_CANCELLED, ORDER_NOT_PICKED_UP, ORDER_LATE_PAYMENT] } }
  *       - { in: query, name: memberId, schema: { type: string } }
  *       - { in: query, name: classId, schema: { type: string } }
  *       - { in: query, name: page, schema: { type: integer } }
@@ -144,7 +145,7 @@ router.get(
  *     parameters:
  *       - { in: query, name: classId, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: "{ allowed, deadline, firstSessionStart, paidAmount, refundableAmount, blockReason, blockMessage, existingRefundId }" }
+ *       200: { description: "{ allowed, mode, refundPercent, fullRefundDeadline, deadline, firstSessionStart, paidAmount, refundableAmount, estimatedRefundAmount, futureBookedSessions, blockReason, blockMessage, existingRefundId }" }
  */
 router.get(
   "/course-cancellation/preview",
@@ -208,6 +209,36 @@ router.patch(
  *       404: { $ref: "#/components/responses/NotFound" }
  *       409: { $ref: "#/components/responses/Conflict" }
  */
+/**
+ * @swagger
+ * /refunds/{id}/cancel:
+ *   patch:
+ *     summary: MEMBER/COACH tự hủy yêu cầu hoàn tiền của mình khi còn PENDING
+ *     description: |
+ *       Chỉ hủy được yêu cầu do chính mình gửi (hủy khóa, hủy buổi lẻ, hủy đơn hàng đã thanh toán) và còn PENDING.
+ *       - Hủy khóa: khóa học tiếp tục bình thường (chỗ đặt chưa bị hủy vì Manager chưa duyệt).
+ *       - Đơn hàng: đơn quay về trạng thái trước khi xin hủy.
+ *       - Đã xử lý (COMPLETED/REJECTED/CANCELLED) ⇒ 409 `REFUND_ALREADY_PROCESSED`; hoàn tiền do hệ thống tạo ⇒ 400.
+ *     tags: [Refunds]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: "Refund với status CANCELLED" }
+ *       400: { $ref: "#/components/responses/BadRequest" }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *       409: { $ref: "#/components/responses/Conflict" }
+ */
+router.patch(
+  "/:id/cancel",
+  authenticate,
+  authorize("MEMBER", "COACH"),
+  validate(RefundIdSchema, "params"),
+  refundsController.cancelMyRefund
+);
+
 router.patch(
   "/:id/reject",
   authenticate,

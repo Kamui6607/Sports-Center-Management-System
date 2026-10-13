@@ -116,6 +116,12 @@ async function allocateBankTransaction(
   return updated > 0;
 }
 
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  SEPAY: "Chuyển khoản VietQR (SePay)",
+  BANK_TRANSFER: "Chuyển khoản ngân hàng",
+  CASH: "Tiền mặt",
+};
+
 export interface SepayCheckoutView {
   paymentId: string;
   /** Mã đơn = mã thanh toán SePay bóc tách từ nội dung CK (VD SEVQR12345678). */
@@ -124,6 +130,11 @@ export interface SepayCheckoutView {
   currency: "VND";
   status: string;
   gateway: typeof SEPAY_GATEWAY;
+  /** Phương thức thanh toán (enum PaymentMethod) + nhãn tiếng Việt để hiện ở màn "thanh toán thành công". */
+  method: string;
+  methodLabel: string;
+  /** Thời điểm thu tiền (chỉ có khi status = SUCCESS). */
+  paidAt: Date | null;
   expiresAt: Date;
   /** Ảnh VietQR động: đã kèm số tài khoản, số tiền và nội dung chuyển khoản. */
   qrUrl: string;
@@ -163,6 +174,9 @@ export function buildSepayCheckoutView(payment: Payment, cls: any, expiresAtOver
     currency: "VND",
     status: payment.status,
     gateway: SEPAY_GATEWAY,
+    method: payment.method,
+    methodLabel: PAYMENT_METHOD_LABEL[payment.method] ?? payment.method,
+    paidAt: payment.paidAt ?? null,
     expiresAt: expiresAtOverride ?? sepayExpiresAt(payment, cfg.ttlMinutes),
     qrUrl: buildVietQrUrl({ amount, content: orderCode }),
     transferContent: orderCode,

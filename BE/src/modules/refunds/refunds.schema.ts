@@ -4,7 +4,7 @@ export const RefundIdSchema = z.object({
   id: z.string().min(1),
 });
 
-/** MEMBER xin hủy khóa học (trước khai giảng ≥ 24h) ⇒ tạo yêu cầu hoàn tiền chờ Manager duyệt. */
+/** MEMBER hủy khóa học: ≥ 3 ngày trước khai giảng ⇒ yêu cầu hoàn 100% chờ Manager duyệt; muộn hơn ⇒ hủy ngay, không hoàn. */
 export const RequestCourseRefundSchema = z.object({
   classId: z.string().min(1),
   note: z.string().trim().max(500).optional(),
@@ -27,9 +27,9 @@ export const RejectRefundSchema = z.object({
 export const RefundQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
-  status: z.enum(["PENDING", "COMPLETED", "REJECTED"]).optional(),
+  status: z.enum(["PENDING", "COMPLETED", "REJECTED", "CANCELLED"]).optional(),
   reason: z
-    .enum(["MEMBER_CANCEL_COURSE", "SESSION_CANCELLED", "ORDER_CANCELLED", "ORDER_NOT_PICKED_UP", "ORDER_LATE_PAYMENT"])
+    .enum(["MEMBER_CANCEL_COURSE", "MEMBER_CANCEL_SESSION", "SESSION_CANCELLED", "ORDER_CANCELLED", "ORDER_NOT_PICKED_UP", "ORDER_LATE_PAYMENT"])
     .optional(),
   memberId: z.string().min(1).optional(),
   /** Lọc hoàn tiền của một đơn hàng. */

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticate } from "../../middlewares/authenticate.js";
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
-import { CreateEnrollmentSchema, TransferEnrollmentSchema, EnrollmentQuerySchema, EnrollWholeCourseSchema } from "./enrollments.schema.js";
+import { CreateEnrollmentSchema, TransferEnrollmentSchema, EnrollmentQuerySchema, EnrollWholeCourseSchema, MyCoursesQuerySchema, TransferOptionsQuerySchema } from "./enrollments.schema.js";
 import * as enrollmentsController from "./enrollments.controller.js";
 
 const router = Router();
@@ -105,6 +105,39 @@ router.get(
   authenticate, authorize("MEMBER"),
   validate(EnrollmentQuerySchema, "query"),
   enrollmentsController.getMyEnrollments
+);
+
+/**
+ * @swagger
+ * /enrollments/my/courses:
+ *   get:
+ *     summary: My courses — in-payment / ongoing at the top, purchase history below (Member only)
+ *     description: |
+ *       Mỗi dòng là 1 khóa (Class) với `courseStatus`: PENDING_PAYMENT, UPCOMING, ONGOING, COMPLETED, CANCELLED, PAID_NOT_ENROLLED.
+ *       - `group=active` → PENDING_PAYMENT + UPCOMING + ONGOING (khu vực ở đầu màn Khóa học).
+ *       - `group=history` → COMPLETED + CANCELLED + PAID_NOT_ENROLLED (lịch sử mua).
+ *       - `status=A,B` (CSV) lọc tự do. Không truyền gì → tất cả, `active` xếp trước.
+ *       Mỗi dòng có `payment` (method, gateway, amount, paidAt, pendingExpiresAt), `startDate`, `endDate`, `totalSessions`,
+ *       `completedSessions`, `nextSession`, `pendingRefund`, `canReview` (đã học xong + đã thanh toán), `myRating`.
+ *     tags: [Enrollments]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: query, name: group, schema: { type: string, enum: [active, history] } }
+ *       - { in: query, name: status, schema: { type: string }, example: "ONGOING,UPCOMING" }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
+ *     responses:
+ *       200: { description: OK }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.get(
+  "/my/courses",
+  authenticate, authorize("MEMBER"),
+  validate(MyCoursesQuerySchema, "query"),
+  enrollmentsController.getMyCourses
 );
 
 /**
@@ -267,9 +300,40 @@ router.get(
 
 /**
  * @swagger
+ * /enrollments/{id}/transfer-options:
+ *   get:
+ *     summary: Sessions of the same course a booking can be moved to (free slots, weekday, room, conflicts)
+ *     description: |
+ *       Trả các buổi SCHEDULED, chưa bắt đầu, CÙNG khóa với chỗ đặt hiện tại: `weekday` (1=Thứ 2…7=CN), `date`,
+ *       `startClock/endClock` (giờ VN), `room`, `remainingSlots`, `isFull`, `sameDay` (cùng ngày với buổi hiện tại),
+ *       `conflictWith` (trùng giờ buổi khác của hội viên), `canSelect`.
+ *       `canTransfer=false` + `blockReason` khi buổi hiện tại còn <24h (ENROLLMENT_TRANSFER_TOO_LATE) hoặc đã bắt đầu.
+ *       Lọc: `?date=YYYY-MM-DD` (đổi trong ngày) hoặc `?weekday=1..7`. Chọn xong gọi `POST /enrollments/{id}/transfer`.
+ *     tags: [Enrollments]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *       - { in: query, name: date, schema: { type: string }, example: "2026-10-20" }
+ *       - { in: query, name: weekday, schema: { type: integer, minimum: 1, maximum: 7 } }
+ *     responses:
+ *       200: { description: OK }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.get(
+  "/:id/transfer-options",
+  authenticate, authorize("MEMBER", "MANAGER"),
+  validate(TransferOptionsQuerySchema, "query"),
+  enrollmentsController.getTransferOptions
+);
+
+/**
+ * @swagger
  * /enrollments/{id}:
  *   delete:
- *     summary: Cancel an enrollment
+ *     summary: Cancel an enrollment (Member cancelling ≥24h before start → 80% session refund request)
+ *     description: Member hủy trước giờ học ≥24h → tự tạo yêu cầu hoàn 80% tiền buổi (Refund PENDING, `refund` trong response). <24h → hủy nhưng không hoàn.
  *     tags: [Enrollments]
  *     parameters:
  *       - in: path

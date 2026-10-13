@@ -54,6 +54,7 @@ type BaseEntityModels = {
   AttendanceManualCodeAttempt: Models.AttendanceManualCodeAttempt;
   AttendancePenalty: Models.AttendancePenalty;
   TrainingPlan: Models.TrainingPlan;
+  TrainingPlanAttachment: Models.TrainingPlanAttachment;
   TrainingResult: Models.TrainingResult;
   CoachFeedback: Models.CoachFeedback;
   Notification: Models.Notification;

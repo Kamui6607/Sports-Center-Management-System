@@ -24,6 +24,15 @@ export async function getCoachById(req: Request, res: Response, next: NextFuncti
   }
 }
 
+export async function getCoachUpcomingSessions(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { sessions, pagination } = await coachService.getCoachUpcomingSessions(req.params.id as string, req.query as any);
+    sendSuccess(res, sessions, "Coach upcoming sessions retrieved successfully", 200, pagination);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function updateCoach(req: Request, res: Response, next: NextFunction) {
   try {
     const data = req.body as UpdateCoachInput;

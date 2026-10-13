@@ -7,6 +7,8 @@ import { enqueueNotification, flushNotificationOutbox } from "../notifications/o
 import { lockMemberClass, lockMemberQuota, lockSchedule } from "../../utils/dbLocks.js";
 import { findActivePenalty } from "../attendance/attendance-penalties.service.js";
 import { ROLE_NAME_SELECT } from "../../utils/roles.js";
+import { findSessionsBlockedByRefund, throwSessionRefundedError, createMemberSessionRefundTx, notifyManagersNewRefunds, SESSION_REFUND_MIN_HOURS } from "../refunds/refunds.service.js";
+import { vnClock, vnDateKey, vnWeekdayIso, vnWeekdayLabel } from "../../utils/vnTime.js";
 
 type BookableSchedule = {
   id: string;
@@ -65,6 +67,10 @@ async function assertCanBook(
   });
   if (bookedCount >= schedule.class.capacity)
     throw new AppError("This class is full", 409);
+
+  // Buổi đã hủy kèm hoàn tiền thì không đặt lại được.
+  const blocked = await findSessionsBlockedByRefund(tx, memberProfileId, [schedule.id]);
+  if (blocked.length > 0) throwSessionRefundedError(blocked);
 
   // Duplicate check (BR-07: cho phép kích hoạt lại enrollment đã CANCELLED).
   const existing = await tx.enrollment.findUnique({
@@ -220,10 +226,29 @@ export async function cancelEnrollment(
   if (enrollment.schedule.startTime <= new Date())
     throw new AppError("Cannot cancel enrollment for a past or ongoing class", 400);
 
-  const cancelled = await prisma.enrollment.update({
-    where: { id: enrollmentId },
-    data: { status: "CANCELLED", cancelledAt: new Date() },
-    include: { member: { select: { id: true, userId: true } }, schedule: { include: { class: true } } },
+  // Hủy chỗ + (nếu là MEMBER, hủy trước ≥24h) tạo yêu cầu hoàn 80% tiền buổi — cùng 1 transaction.
+  const { cancelled, refund } = await prisma.$transaction(async (tx) => {
+    await lockMemberClass(tx, enrollment.memberId, enrollment.schedule.classId);
+    const res = await tx.enrollment.updateMany({
+      where: { id: enrollmentId, status: "BOOKED" },
+      data: { status: "CANCELLED", cancelledAt: new Date() },
+    });
+    if (res.count !== 1) throw new AppError("Only BOOKED enrollments can be cancelled", 409);
+    const updated = await tx.enrollment.findUniqueOrThrow({
+      where: { id: enrollmentId },
+      include: { member: { select: { id: true, userId: true } }, schedule: { include: { class: true } } },
+    });
+    const created =
+      role === "MEMBER"
+        ? await createMemberSessionRefundTx(tx, {
+            memberId: enrollment.memberId,
+            userId,
+            classId: enrollment.schedule.classId,
+            scheduleId: enrollment.scheduleId,
+            startTime: enrollment.schedule.startTime,
+          })
+        : null;
+    return { cancelled: updated, refund: created };
   });
 
   // Notify member — fire-and-forget
@@ -232,11 +257,19 @@ export async function cancelEnrollment(
     cancelled.member.userId,
     "ENROLLMENT_CANCELLED",
     `Đã hủy đặt lớp: ${cancelled.schedule.class.name}`,
-    `Lịch học "${cancelled.schedule.class.name}" vào lúc ${startStr} đã được hủy thành công.`,
-    { metadata: { enrollmentId, scheduleId: cancelled.scheduleId } }
+    refund
+      ? `Lịch học "${cancelled.schedule.class.name}" vào lúc ${startStr} đã được hủy. Yêu cầu hoàn ${Number(refund.amount).toLocaleString("vi-VN")}đ (80% tiền buổi) đang chờ Quản lý xử lý.`
+      : `Lịch học "${cancelled.schedule.class.name}" vào lúc ${startStr} đã được hủy thành công.`,
+    { metadata: { enrollmentId, scheduleId: cancelled.scheduleId, refundId: refund?.id ?? null } }
   ).catch(() => {});
+  if (refund) {
+    void notifyManagersNewRefunds(
+      `Hội viên hủy 1 buổi "${cancelled.schedule.class.name}" — cần hoàn ${Number(refund.amount).toLocaleString("vi-VN")}đ.`,
+      { refundId: refund.id, classId: cancelled.schedule.classId, scheduleId: cancelled.scheduleId }
+    );
+  }
 
-  return cancelled;
+  return { ...cancelled, refund };
 }
 
 export async function getMyEnrollments(userId: string, query: any) {
@@ -364,6 +397,18 @@ export async function transferEnrollment(
   if (enrollment.schedule.startTime <= new Date())
     throw new AppError("Cannot transfer enrollment for a past or ongoing class", 400);
 
+  // Hội viên chỉ được đổi buổi khi buổi hiện tại còn ≥24h (Manager không bị giới hạn).
+  if (
+    role === "MEMBER" &&
+    enrollment.schedule.startTime.getTime() - Date.now() < SESSION_REFUND_MIN_HOURS * 3_600_000
+  ) {
+    throw new AppError(
+      `Chỉ được đổi buổi trước giờ học ít nhất ${SESSION_REFUND_MIN_HOURS} giờ.`,
+      400,
+      { code: "ENROLLMENT_TRANSFER_TOO_LATE", minHours: SESSION_REFUND_MIN_HOURS }
+    );
+  }
+
   const target = await prisma.classSchedule.findUnique({
     where: { id: targetScheduleId },
     include: { class: true },
@@ -454,4 +499,95 @@ export async function transferEnrollment(
 
     return transferred;
   });
+}
+
+/**
+ * Các buổi mà hội viên có thể ĐỔI SANG (cùng khóa, còn SCHEDULED, chưa bắt đầu).
+ * Mỗi buổi có thứ/giờ (giờ VN), phòng, chỗ trống, cùng-ngày hay không, và xung đột với buổi khác của hội viên.
+ * `date=YYYY-MM-DD` (tùy chọn) lọc theo ngày; `weekday=1..7` (ISO, tùy chọn) lọc theo thứ.
+ */
+export async function getTransferOptions(
+  enrollmentId: string,
+  userId: string,
+  role: string,
+  filter: { date?: string; weekday?: number } = {}
+) {
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    include: { member: true, schedule: { include: { class: true, room: true } } },
+  });
+  if (!enrollment) throw new AppError("Enrollment not found", 404);
+  if (role === "MEMBER" && enrollment.member.userId !== userId)
+    throw new AppError("Forbidden: You can only view your own enrollments", 403);
+  if (role === "COACH") throw new AppError("Forbidden", 403);
+
+  const now = new Date();
+  const hoursLeft = (enrollment.schedule.startTime.getTime() - now.getTime()) / 3_600_000;
+  let canTransfer = true;
+  let blockReason: string | null = null;
+  if (enrollment.status !== "BOOKED") { canTransfer = false; blockReason = "ENROLLMENT_NOT_BOOKED"; }
+  else if (hoursLeft <= 0) { canTransfer = false; blockReason = "SESSION_ALREADY_STARTED"; }
+  else if (role === "MEMBER" && hoursLeft < SESSION_REFUND_MIN_HOURS) { canTransfer = false; blockReason = "ENROLLMENT_TRANSFER_TOO_LATE"; }
+
+  const classId = enrollment.schedule.classId;
+  const [targets, mine] = await Promise.all([
+    prisma.classSchedule.findMany({
+      where: { classId, status: "SCHEDULED", startTime: { gt: now }, id: { not: enrollment.scheduleId } },
+      include: {
+        room: { select: { id: true, name: true } },
+        _count: { select: { enrollments: { where: { status: { in: ["BOOKED", "COMPLETED"] } } } } },
+      },
+      orderBy: { startTime: "asc" },
+    }),
+    prisma.enrollment.findMany({
+      where: { memberId: enrollment.memberId, status: { in: ["BOOKED", "COMPLETED"] }, id: { not: enrollment.id }, schedule: { status: "SCHEDULED", startTime: { gt: now } } },
+      select: { schedule: { select: { id: true, startTime: true, endTime: true, class: { select: { name: true } } } } },
+    }),
+  ]);
+
+  const capacity = enrollment.schedule.class.capacity;
+  const curKey = vnDateKey(enrollment.schedule.startTime);
+  const options = targets
+    .map((t) => {
+      const booked = t._count.enrollments;
+      const alreadyMine = mine.some((m) => m.schedule.id === t.id);
+      const conflict = mine.find((m) => m.schedule.startTime < t.endTime && m.schedule.endTime > t.startTime);
+      const isFull = booked >= capacity;
+      return {
+        scheduleId: t.id,
+        date: vnDateKey(t.startTime),
+        weekday: vnWeekdayIso(t.startTime),
+        weekdayLabel: vnWeekdayLabel(vnWeekdayIso(t.startTime)),
+        startClock: vnClock(t.startTime),
+        endClock: vnClock(t.endTime),
+        startTime: t.startTime,
+        endTime: t.endTime,
+        room: t.room,
+        capacity,
+        bookedCount: booked,
+        remainingSlots: Math.max(0, capacity - booked),
+        isFull,
+        sameDay: vnDateKey(t.startTime) === curKey,
+        isMakeup: !!t.makeupForId,
+        conflictWith: conflict ? { scheduleId: conflict.schedule.id, className: conflict.schedule.class.name } : null,
+        canSelect: canTransfer && !isFull && !alreadyMine && !conflict,
+      };
+    })
+    .filter((o) => (filter.date ? o.date === filter.date : true) && (filter.weekday ? o.weekday === filter.weekday : true));
+
+  return {
+    enrollmentId,
+    canTransfer,
+    blockReason,
+    minHoursBefore: SESSION_REFUND_MIN_HOURS,
+    current: {
+      scheduleId: enrollment.scheduleId,
+      date: curKey,
+      weekdayLabel: vnWeekdayLabel(vnWeekdayIso(enrollment.schedule.startTime)),
+      startClock: vnClock(enrollment.schedule.startTime),
+      endClock: vnClock(enrollment.schedule.endTime),
+      room: enrollment.schedule.room ? { id: enrollment.schedule.room.id, name: enrollment.schedule.room.name } : null,
+    },
+    options,
+  };
 }

@@ -77,7 +77,7 @@ const router = Router();
  *                 coach: { user: { fullName: "Nguyễn Văn A" } }
  *                 class: { name: "Morning Yoga" }
  *       403:
- *         description: Member chưa từng học với HLV này
+ *         description: "Chưa học xong khóa (code COURSE_NOT_COMPLETED) — chỉ đánh giá khi mọi buổi chính đã kết thúc và đã thanh toán"
  *         content:
  *           application/json:
  *             schema:

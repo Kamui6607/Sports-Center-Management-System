@@ -13,10 +13,6 @@ export const TransferEnrollmentSchema = z.object({
 export const EnrollmentQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
-  /** BE-14: lọc buổi giao với khoảng [from, to) theo giờ buổi học (ISO 8601). */
-  from: z.string().datetime({ offset: true }).optional(),
-  to: z.string().datetime({ offset: true }).optional(),
-  classId: z.string().optional(),
   status: z.enum(["BOOKED", "CANCELLED", "COMPLETED"]).optional(),
   scheduleId: z.string().optional(),
   memberId: z.string().optional(),
@@ -28,3 +24,17 @@ export const EnrollWholeCourseSchema = z.object({
   memberId: z.string().optional(), // required when staff/manager enrolls for a member
 });
 
+
+// GET /enrollments/my/courses — "Khóa học của tôi": đang thanh toán / đang học (group=active) và lịch sử (group=history).
+export const MyCoursesQuerySchema = z.object({
+  group: z.enum(["active", "history"]).optional(),
+  status: z.string().optional(), // CSV: PENDING_PAYMENT,UPCOMING,ONGOING,COMPLETED,CANCELLED,PAID_NOT_ENROLLED
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+// GET /enrollments/:id/transfer-options
+export const TransferOptionsQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  weekday: z.string().regex(/^[1-7]$/).optional(),
+});

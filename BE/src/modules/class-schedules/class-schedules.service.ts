@@ -7,6 +7,7 @@ import { ATTENDANCE } from "../../config/attendance.js";
 import { scanAttendanceWarnings } from "../attendance/attendance.service.js";
 import { lockSchedule } from "../../utils/dbLocks.js";
 import { createSessionRefundsTx, notifyManagersNewRefunds } from "../refunds/refunds.service.js";
+import { addDaysToDateKey, vnDateKey, vnDateTime, weekdayIsoOfDateKey } from "../../utils/vnTime.js";
 import {
   
 } from "../attendance/attendance-analytics.service.js";
@@ -371,14 +372,57 @@ type ActivityPlanInput = {
     name: string;
     fitness: string;
     description?: string;
+    goal?: string;
     capacity: number;
     classType: "REGULAR" | "PREMIUM";
     areaType: "POOL" | "INDOOR" | "OUTDOOR";
     price?: number;
   };
   roomId: string;
-  schedules: { startTime: string; endTime: string }[];
+  schedules?: { startTime: string; endTime: string }[];
+  recurrence?: {
+    startDate: string;
+    weekdays: number[];
+    startTime: string;
+    endTime: string;
+    totalSessions: number;
+  };
 };
+
+/**
+ * Sinh các buổi từ lịch lặp: duyệt từng ngày từ startDate, lấy ngày có thứ nằm trong `weekdays`
+ * cho tới khi đủ `totalSessions`. Giờ theo múi giờ Việt Nam.
+ */
+export function expandRecurrence(r: NonNullable<ActivityPlanInput["recurrence"]>): { startTime: Date; endTime: Date }[] {
+  const days = new Set(r.weekdays);
+  const out: { startTime: Date; endTime: Date }[] = [];
+  let key = r.startDate;
+  for (let guard = 0; out.length < r.totalSessions && guard < 3700; guard += 1) {
+    if (days.has(weekdayIsoOfDateKey(key))) {
+      out.push({ startTime: vnDateTime(key, r.startTime), endTime: vnDateTime(key, r.endTime) });
+    }
+    key = addDaysToDateKey(key, 1);
+  }
+  return out;
+}
+
+/** Danh sách buổi của kế hoạch (từ `schedules` hoặc `recurrence`), sắp theo thời gian. */
+function resolvePlanSlots(data: ActivityPlanInput) {
+  const slots = data.recurrence
+    ? expandRecurrence(data.recurrence)
+    : (data.schedules ?? []).map((s) => ({ startTime: new Date(s.startTime), endTime: new Date(s.endTime) }));
+  if (slots.length === 0) throw new AppError("Kế hoạch phải có ít nhất 1 buổi", 400);
+  return slots.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+}
+
+/** Tóm tắt lịch: ngày bắt đầu / kết thúc (ngày VN) và số buổi. */
+function planScheduleSummary(slots: { startTime: Date; endTime: Date }[]) {
+  return {
+    startDate: vnDateKey(slots[0].startTime),
+    endDate: vnDateKey(slots[slots.length - 1].startTime),
+    totalSessions: slots.length,
+  };
+}
 
 /** Phòng của kế hoạch: đang hoạt động, đúng khu vực, đủ sức chứa. */
 async function assertPlanRoom(tx: Prisma.TransactionClient, data: ActivityPlanInput) {
@@ -399,11 +443,9 @@ async function persistPlanSchedules(
   classId: string,
   coachId: string,
   data: ActivityPlanInput
-): Promise<number> {
+) {
   await lockScheduleResources(tx, [data.roomId], [coachId]);
-  const slots = data.schedules
-    .map((s) => ({ startTime: new Date(s.startTime), endTime: new Date(s.endTime) }))
-    .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+  const slots = resolvePlanSlots(data);
   for (const slot of slots) {
     assertStartsInFuture(slot.startTime);
     await checkConflicts(tx, data.roomId, classId, slot.startTime, slot.endTime);
@@ -411,7 +453,7 @@ async function persistPlanSchedules(
   const created = await tx.classSchedule.createMany({
     data: slots.map((slot) => ({ classId, roomId: data.roomId, ...slot, status: "SCHEDULED" as const })),
   });
-  return created.count;
+  return { count: created.count, ...planScheduleSummary(slots) };
 }
 
 function planClassData(data: ActivityPlanInput) {
@@ -419,6 +461,7 @@ function planClassData(data: ActivityPlanInput) {
     name: data.class.name,
     fitness: data.class.fitness.trim(),
     description: data.class.description || null,
+    goal: data.class.goal?.trim() || null,
     capacity: data.class.capacity,
     classType: data.class.classType,
     areaType: data.class.areaType,
@@ -456,7 +499,7 @@ export async function createActivityPlan(data: ActivityPlanInput, actor: { id: s
     const cls = await tx.class.create({
       data: { ...planClassData(data), status: "PENDING", coachId: coachProfile.id },
     });
-    const schedulesCreated = await persistPlanSchedules(tx, cls.id, coachProfile.id, data);
+    const planned = await persistPlanSchedules(tx, cls.id, coachProfile.id, data);
 
     // Đảm bảo CoachWallet tồn tại cho HLV của lớp
     await tx.coachWallet.upsert({
@@ -465,7 +508,7 @@ export async function createActivityPlan(data: ActivityPlanInput, actor: { id: s
       update: {},
     });
 
-    return { class: cls, schedulesCreated, status: "PENDING" as const };
+    return { class: cls, schedulesCreated: planned.count, startDate: planned.startDate, endDate: planned.endDate, totalSessions: planned.totalSessions, status: "PENDING" as const };
   }, { timeout: 30_000 });
 
   void notifyManagersClassToReview(result.class.name, result.class.id, false);
@@ -498,8 +541,8 @@ export async function resubmitActivityPlan(classId: string, data: ActivityPlanIn
       where: { id: classId },
       data: { ...planClassData(data), status: "PENDING", rejectReason: null },
     });
-    const schedulesCreated = await persistPlanSchedules(tx, classId, cls.coachId, data);
-    return { class: updated, schedulesCreated, status: "PENDING" as const };
+    const planned = await persistPlanSchedules(tx, classId, cls.coachId, data);
+    return { class: updated, schedulesCreated: planned.count, startDate: planned.startDate, endDate: planned.endDate, totalSessions: planned.totalSessions, status: "PENDING" as const };
   }, { timeout: 30_000 });
 
   void notifyManagersClassToReview(result.class.name, classId, true);

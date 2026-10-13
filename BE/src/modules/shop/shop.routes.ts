@@ -160,12 +160,12 @@ router.post("/cart/accept-prices", ...buyer, cartLimit, c.acceptCartPrices);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [recipientName, phone, province, district, street]
+ *             required: [recipientName, phone, province, street]
  *             properties:
  *               recipientName: { type: string }
  *               phone: { type: string, example: "0901234567" }
  *               province: { type: string, example: "Hồ Chí Minh" }
- *               district: { type: string }
+ *               district: { type: string, description: "Không bắt buộc (địa giới 2 cấp)" }
  *               ward: { type: string }
  *               street: { type: string }
  *               isDefault: { type: boolean }

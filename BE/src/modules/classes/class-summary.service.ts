@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma.js";
+import { vnDateKey, vnWeekdayIso } from "../../utils/vnTime.js";
 import { sepayConfig } from "../../config/sepay.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 
@@ -19,6 +20,11 @@ export interface ClassSummary {
   minRemainingSlots: number | null;
   /** Số học viên (khác nhau) đang/đã giữ chỗ trong khóa. */
   studentCount: number;
+  /** Ngày bắt đầu / kết thúc khóa (YYYY-MM-DD, giờ VN) — kết thúc = ngày buổi cuối chưa hủy. */
+  startDate: string | null;
+  endDate: string | null;
+  /** Các thứ trong tuần có buổi chính (ISO 1=T2..7=CN), tăng dần. */
+  weekdays: number[];
 }
 
 const ACTIVE_ENROLLMENT = { status: { in: ["BOOKED", "COMPLETED"] as ("BOOKED" | "COMPLETED")[] } };
@@ -73,6 +79,9 @@ export async function buildClassSummaries(
       lastSessionEnd: live.length ? live.reduce((m, s) => (s.endTime > m ? s.endTime : m), live[0].endTime) : null,
       minRemainingSlots: remaining.length ? Math.min(...remaining) : null,
       studentCount: students.get(cls.id)?.size ?? 0,
+      startDate: (main[0] ?? live[0]) ? vnDateKey((main[0] ?? live[0]).startTime) : null,
+      endDate: live.length ? vnDateKey(live.reduce((m, s) => (s.startTime > m ? s.startTime : m), live[0].startTime)) : null,
+      weekdays: [...new Set(main.map((s) => vnWeekdayIso(s.startTime)))].sort((a, b) => a - b),
     });
   }
   return result;
@@ -141,7 +150,7 @@ export async function getMemberPurchase(memberId: string, classId: string, now =
   let refunds: { status: string; amount: unknown; reason: string }[] = [];
   if (paid) {
     refunds = await prisma.refund.findMany({
-      where: { paymentId: paid.id, status: { not: "REJECTED" } },
+      where: { paymentId: paid.id, status: { notIn: ["REJECTED", "CANCELLED"] } },
       select: { status: true, amount: true, reason: true },
     });
   }

@@ -9,6 +9,7 @@ import {
   findActiveSubscription,
   getMemberConcurrentClassQuota,
 } from "./enrollment-quota.service.js";
+import { findSessionsBlockedByRefund, throwSessionRefundedError } from "../refunds/refunds.service.js";
 import { ROLE_NAME_SELECT } from "../../utils/roles.js";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
@@ -427,6 +428,9 @@ export async function enrollWholeCourse(classId: string, memberProfileId: string
           }
         );
       }
+
+      const blockedByRefund = await findSessionsBlockedByRefund(tx, memberProfileId, sessions.map((x) => x.id));
+      if (blockedByRefund.length > 0) throwSessionRefundedError(blockedByRefund);
 
       const now = new Date();
       const results: WholeCourseSessionResult[] = [];

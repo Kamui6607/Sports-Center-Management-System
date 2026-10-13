@@ -2,7 +2,7 @@ import { Prisma, type Payment } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
-import { lockPaymentWebhook } from "../../utils/dbLocks.js";
+import { lockMemberClass, lockPaymentWebhook } from "../../utils/dbLocks.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { enqueueNotification, flushNotificationOutbox } from "../notifications/outbox.service.js";
 import type { RefundQueryInput } from "./refunds.schema.js";
@@ -10,8 +10,18 @@ import { onOrderRefundApprovedTx, onOrderRefundRejectedTx } from "../shop/orders
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
-/** Hội viên chỉ được tự hủy khóa học nếu còn ít nhất ngần này giờ trước buổi khai giảng. */
-export const COURSE_CANCEL_MIN_HOURS_BEFORE_START = 24;
+/** Hủy khóa trước buổi khai giảng ≥ ngần này giờ (3 ngày) ⇒ hoàn 100%; muộn hơn vẫn hủy được nhưng KHÔNG hoàn tiền. */
+export const COURSE_FULL_REFUND_MIN_HOURS = 72;
+/** Hủy MỘT buổi lẻ trước giờ học ≥ ngần này giờ ⇒ hoàn `SESSION_REFUND_PERCENT`% tiền của buổi đó. */
+export const SESSION_REFUND_MIN_HOURS = 24;
+export const SESSION_REFUND_PERCENT = 80;
+
+/** Tỷ lệ hoàn khi hủy khóa: 100 nếu còn ≥ 72h trước buổi khai giảng (hoặc khóa chưa có lịch), ngược lại 0. */
+export function courseRefundPercent(firstSessionStart: Date | null, now = new Date()): 100 | 0 {
+  if (!firstSessionStart) return 100;
+  const hoursLeft = (firstSessionStart.getTime() - now.getTime()) / 3_600_000;
+  return hoursLeft >= COURSE_FULL_REFUND_MIN_HOURS ? 100 : 0;
+}
 
 /** Số tiền VND (số nguyên) — Decimal của Prisma trả về object/string. */
 function money(value: unknown): number {
@@ -65,7 +75,7 @@ async function findPaidClassPayment(db: DbClient, memberId: string, classId: str
 /** Số tiền còn hoàn được = đã trả − tổng các yêu cầu hoàn chưa bị từ chối của cùng giao dịch. */
 async function remainingRefundable(db: DbClient, payment: { id: string; amount: Prisma.Decimal }) {
   const agg = await db.refund.aggregate({
-    where: { paymentId: payment.id, status: { not: "REJECTED" } },
+    where: { paymentId: payment.id, status: { notIn: ["REJECTED", "CANCELLED"] } },
     _sum: { amount: true },
   });
   return money(payment.amount) - money(agg._sum.amount ?? 0);
@@ -121,11 +131,11 @@ export async function notifyManagersNewRefunds(body: string, metadata: Record<st
 // ── Hội viên hủy khóa học ────────────────────────────────────────────────────
 
 /**
- * MEMBER xin hủy khóa học ⇒ tạo yêu cầu hoàn tiền PENDING (chờ Manager chuyển khoản tay rồi duyệt).
- *
- * - Chỉ khi còn ≥ 24h trước buổi khai giảng (buổi CHÍNH sớm nhất chưa bị hủy); lớp chưa có buổi nào thì cho hủy.
- * - Hoàn phần CÒN LẠI của giao dịch (đã trừ các khoản hoàn buổi lẻ trước đó) = 100% nếu chưa có khoản nào.
- * - Chỗ đã đặt vẫn giữ tới khi Manager duyệt; duyệt xong mới hủy chỗ + đổi Payment sang REFUNDED.
+ * MEMBER hủy khóa học. Luật hoàn tiền theo thời điểm hủy so với buổi khai giảng (buổi CHÍNH sớm nhất chưa hủy):
+ * - Còn ≥ 72h (3 ngày) ⇒ tạo yêu cầu hoàn 100% phần còn lại của giao dịch (PENDING, chờ Manager chuyển khoản tay
+ *   rồi duyệt). Chỗ đã đặt giữ tới khi Manager duyệt; duyệt xong mới hủy chỗ + Payment → REFUNDED.
+ * - Muộn hơn (hoặc khóa đã khai giảng) ⇒ vẫn hủy được NGAY nhưng KHÔNG hoàn tiền: các chỗ đặt trong tương lai của
+ *   hội viên trong khóa chuyển CANCELLED, giao dịch giữ SUCCESS, ví HLV không bị trừ.
  */
 export async function requestCourseRefund(userId: string, classId: string, note?: string) {
   const memberProfile = await prisma.memberProfile.findUnique({
@@ -137,23 +147,15 @@ export async function requestCourseRefund(userId: string, classId: string, note?
   const cls = await prisma.class.findUnique({ where: { id: classId }, select: { id: true, name: true } });
   if (!cls) throw new AppError("Class not found", 404);
 
+  const now = new Date();
   const firstSession = await prisma.classSchedule.findFirst({
     where: { classId, makeupForId: null, status: { not: "CANCELLED" } },
     orderBy: { startTime: "asc" },
     select: { startTime: true },
   });
-  if (firstSession) {
-    const hoursLeft = (firstSession.startTime.getTime() - Date.now()) / 3_600_000;
-    if (hoursLeft < COURSE_CANCEL_MIN_HOURS_BEFORE_START) {
-      throw new AppError(
-        `Chỉ được hủy khóa học trước giờ khai giảng ít nhất ${COURSE_CANCEL_MIN_HOURS_BEFORE_START} giờ.`,
-        400,
-        { code: "COURSE_CANCEL_TOO_LATE", firstSessionAt: firstSession.startTime }
-      );
-    }
-  }
+  const percent = courseRefundPercent(firstSession?.startTime ?? null, now);
 
-  const refund = await prisma.$transaction(async (tx) => {
+  const outcome = await prisma.$transaction(async (tx) => {
     const found = await findPaidClassPayment(tx, memberProfile.id, classId);
     if (!found) {
       throw new AppError("Bạn chưa có giao dịch thanh toán thành công cho khóa học này.", 404, {
@@ -168,7 +170,7 @@ export async function requestCourseRefund(userId: string, classId: string, note?
     }
 
     const existing = await tx.refund.findFirst({
-      where: { paymentId: payment.id, reason: "MEMBER_CANCEL_COURSE", status: { not: "REJECTED" } },
+      where: { paymentId: payment.id, reason: "MEMBER_CANCEL_COURSE", status: { notIn: ["REJECTED", "CANCELLED"] } },
       select: { id: true, status: true },
     });
     if (existing) {
@@ -179,34 +181,198 @@ export async function requestCourseRefund(userId: string, classId: string, note?
       });
     }
 
-    const amount = await remainingRefundable(tx, payment);
-    if (amount <= 0) {
-      throw new AppError("Giao dịch này không còn số tiền nào để hoàn.", 400);
+    if (percent === 100) {
+      const amount = await remainingRefundable(tx, payment);
+      if (amount <= 0) {
+        throw new AppError("Giao dịch này không còn số tiền nào để hoàn.", 400);
+      }
+      const debit = await computeCoachDebit(tx, payment, amount);
+      const refund = await tx.refund.create({
+        data: {
+          paymentId: payment.id,
+          memberId: memberProfile.id,
+          classId,
+          reason: "MEMBER_CANCEL_COURSE",
+          amount,
+          coachWalletId: debit.coachWalletId,
+          coachDebitAmount: debit.coachDebitAmount,
+          note: note ?? null,
+          memberNote: note ?? null,
+          requestedById: userId,
+        },
+        include: refundInclude,
+      });
+      return { refund, cancelledEnrollments: 0 };
     }
-    const debit = await computeCoachDebit(tx, payment, amount);
 
-    return tx.refund.create({
-      data: {
-        paymentId: payment.id,
+    // < 72h: hủy ngay, không hoàn tiền. Thứ tự lock: payment → member-class (khớp luồng webhook ghi danh).
+    await lockMemberClass(tx, memberProfile.id, classId);
+    const cancelled = await tx.enrollment.updateMany({
+      where: {
         memberId: memberProfile.id,
-        classId,
-        reason: "MEMBER_CANCEL_COURSE",
-        amount,
-        coachWalletId: debit.coachWalletId,
-        coachDebitAmount: debit.coachDebitAmount,
-        note: note ?? null,
-        memberNote: note ?? null,
-        requestedById: userId,
+        status: "BOOKED",
+        schedule: { classId, startTime: { gt: now } },
       },
-      include: refundInclude,
+      data: { status: "CANCELLED", cancelledAt: now },
     });
+    if (cancelled.count === 0) {
+      throw new AppError("Bạn không còn buổi học nào sắp tới trong khóa này để hủy.", 400, {
+        code: "NO_ACTIVE_BOOKINGS",
+      });
+    }
+    return { refund: null, cancelledEnrollments: cancelled.count };
   });
 
-  void notifyManagersNewRefunds(
-    `Hội viên ${memberProfile.user.fullName} xin hủy khóa "${cls.name}" — cần hoàn ${vnd(money(refund.amount))}.`,
-    { refundId: refund.id, classId }
+  if (outcome.refund) {
+    void notifyManagersNewRefunds(
+      `Hội viên ${memberProfile.user.fullName} xin hủy khóa "${cls.name}" — cần hoàn ${vnd(money(outcome.refund.amount))}.`,
+      { refundId: outcome.refund.id, classId }
+    );
+  } else {
+    createNotification(
+      userId,
+      "ENROLLMENT_CANCELLED",
+      `Đã hủy khóa: ${cls.name}`,
+      `Bạn đã hủy ${outcome.cancelledEnrollments} buổi sắp tới của khóa "${cls.name}". Do hủy trong vòng 3 ngày trước khai giảng nên không được hoàn tiền.`,
+      { metadata: { classId } }
+    ).catch(() => {});
+  }
+  return {
+    mode: percent === 100 ? ("REFUND_REQUESTED" as const) : ("CANCELLED_NO_REFUND" as const),
+    refundPercent: percent,
+    refundAmount: outcome.refund ? money(outcome.refund.amount) : 0,
+    cancelledEnrollments: outcome.cancelledEnrollments,
+    refund: outcome.refund,
+  };
+}
+
+// ── Hội viên hủy MỘT buổi lẻ: hoàn 80% nếu hủy trước ≥ 24h ───────────────────
+
+/**
+ * Gọi TRONG transaction hủy chỗ của `enrollments.cancelEnrollment`. Hủy buổi lẻ trước giờ học ≥ 24h ⇒ tạo yêu cầu
+ * hoàn `SESSION_REFUND_PERCENT`% tiền của buổi đó (= đã trả ÷ số buổi CHÍNH, tối đa bằng phần còn hoàn được).
+ * Trả `null` (không hoàn) khi: hủy muộn < 24h, không có giao dịch lớp đã thu tiền, buổi này đã có khoản hoàn,
+ * hoặc không còn tiền để hoàn. Mỗi (giao dịch × buổi) chỉ một khoản hoàn.
+ */
+export async function createMemberSessionRefundTx(
+  tx: Prisma.TransactionClient,
+  params: { memberId: string; userId: string; classId: string; scheduleId: string; startTime: Date; now?: Date }
+) {
+  const now = params.now ?? new Date();
+  const hoursLeft = (params.startTime.getTime() - now.getTime()) / 3_600_000;
+  if (hoursLeft < SESSION_REFUND_MIN_HOURS) return null;
+
+  const found = await findPaidClassPayment(tx, params.memberId, params.classId);
+  if (!found) return null;
+  await lockPaymentWebhook(tx, found.id);
+  const payment = await tx.payment.findUnique({ where: { id: found.id } });
+  if (!payment || payment.status !== "SUCCESS") return null;
+
+  const dup = await tx.refund.findUnique({
+    where: { paymentId_scheduleId: { paymentId: payment.id, scheduleId: params.scheduleId } },
+    select: { id: true },
+  });
+  if (dup) return null;
+
+  const mainSessions = await tx.classSchedule.count({ where: { classId: params.classId, makeupForId: null } });
+  const perSession = Number(payment.amount) / Math.max(1, mainSessions);
+  const amount = Math.min(money((perSession * SESSION_REFUND_PERCENT) / 100), await remainingRefundable(tx, payment));
+  if (amount <= 0) return null;
+  const debit = await computeCoachDebit(tx, payment, amount);
+
+  return tx.refund.create({
+    data: {
+      paymentId: payment.id,
+      memberId: params.memberId,
+      classId: params.classId,
+      scheduleId: params.scheduleId,
+      reason: "MEMBER_CANCEL_SESSION",
+      amount,
+      coachWalletId: debit.coachWalletId,
+      coachDebitAmount: debit.coachDebitAmount,
+      note: `Hội viên hủy 1 buổi trước ${SESSION_REFUND_MIN_HOURS}h — hoàn ${SESSION_REFUND_PERCENT}% tiền buổi học.`,
+      requestedById: params.userId,
+    },
+    include: refundInclude,
+  });
+}
+
+/**
+ * Buổi mà hội viên đã hủy và ĐÃ/ĐANG được hoàn tiền (MEMBER_CANCEL_SESSION, PENDING hoặc COMPLETED)
+ * thì không được đặt lại — tránh hoàn 80% rồi vẫn đi học. Hủy yêu cầu hoàn / bị từ chối ⇒ đặt lại được.
+ * Trả danh sách scheduleId bị chặn.
+ */
+export async function findSessionsBlockedByRefund(
+  tx: Prisma.TransactionClient,
+  memberId: string,
+  scheduleIds: string[]
+): Promise<string[]> {
+  if (scheduleIds.length === 0) return [];
+  const rows = await tx.refund.findMany({
+    where: {
+      memberId,
+      scheduleId: { in: scheduleIds },
+      reason: "MEMBER_CANCEL_SESSION",
+      status: { in: ["PENDING", "COMPLETED"] },
+    },
+    select: { scheduleId: true },
+  });
+  return rows.map((r) => r.scheduleId as string);
+}
+
+export function throwSessionRefundedError(scheduleIds: string[]): never {
+  throw new AppError(
+    "Bạn đã hủy buổi này và được tạo yêu cầu hoàn tiền nên không thể đặt lại. Hãy hủy yêu cầu hoàn tiền trước nếu muốn giữ buổi.",
+    409,
+    { code: "SESSION_CANCELLED_WITH_REFUND", scheduleIds }
   );
-  return refund;
+}
+
+// ── Hội viên / người mua tự hủy yêu cầu hoàn tiền đang chờ ────────────────────
+
+/** Lý do hoàn tiền do CHÍNH người dùng gửi — chỉ những loại này mới được tự hủy. */
+const SELF_CANCELLABLE_REASONS = ["MEMBER_CANCEL_COURSE", "MEMBER_CANCEL_SESSION", "ORDER_CANCELLED"];
+
+/**
+ * MEMBER/COACH hủy yêu cầu hoàn tiền của mình khi còn PENDING (Manager chưa xử lý): status → CANCELLED.
+ * - Hủy khóa: chỗ đặt vẫn giữ (chưa bị hủy vì chưa duyệt) ⇒ khóa học tiếp tục bình thường.
+ * - Hoàn tiền đơn hàng: đơn quay về trạng thái ngay trước khi xin hủy (cùng luật Manager từ chối).
+ * - Đã duyệt / từ chối / đã hủy ⇒ 409 `REFUND_ALREADY_PROCESSED`.
+ */
+export async function cancelMyRefund(refundId: string, actor: { id: string; role: string }) {
+  const cancelled = await prisma.$transaction(async (tx) => {
+    const current = await tx.refund.findUnique({ where: { id: refundId }, select: { paymentId: true } });
+    if (!current) throw new AppError("Refund not found", 404);
+    await lockPaymentWebhook(tx, current.paymentId);
+
+    const refund = await tx.refund.findUnique({
+      where: { id: refundId },
+      include: { member: { select: { userId: true } }, order: { select: { userId: true } } },
+    });
+    if (!refund) throw new AppError("Refund not found", 404);
+    const ownerId = refund.member?.userId ?? refund.order?.userId ?? null;
+    if (ownerId !== actor.id) throw new AppError("Forbidden: You can only cancel your own refund requests", 403);
+    if (!SELF_CANCELLABLE_REASONS.includes(refund.reason)) {
+      throw new AppError("Yêu cầu hoàn tiền này do hệ thống tạo — không thể tự hủy.", 400, {
+        code: "REFUND_NOT_SELF_CANCELLABLE",
+      });
+    }
+    if (refund.status !== "PENDING") {
+      throw new AppError("Yêu cầu hoàn tiền đã được xử lý.", 409, {
+        code: "REFUND_ALREADY_PROCESSED",
+        status: refund.status,
+      });
+    }
+
+    const updated = await tx.refund.update({
+      where: { id: refund.id },
+      data: { status: "CANCELLED", processedAt: new Date() },
+      include: refundInclude,
+    });
+    if (refund.orderId) await onOrderRefundRejectedTx(tx, refund, actor.id, "Khách hủy yêu cầu hoàn tiền");
+    return updated;
+  });
+  return cancelled;
 }
 
 // ── Buổi học bị hủy (chọn hoàn tiền thay vì dạy bù) ──────────────────────────
@@ -319,7 +485,9 @@ export async function approveRefund(refundId: string, managerUserId: string, not
           note:
             refund.reason === "MEMBER_CANCEL_COURSE"
               ? `Trừ ví do hội viên hủy khóa "${className}" (hoàn ${vnd(amount)}) — refund ${refund.id}`
-              : `Trừ ví do hủy 1 buổi lớp "${className}" không dạy bù (hoàn ${vnd(amount)}) — refund ${refund.id}`,
+              : refund.reason === "MEMBER_CANCEL_SESSION"
+                ? `Trừ ví do hội viên hủy 1 buổi lớp "${className}" (hoàn ${vnd(amount)}) — refund ${refund.id}`
+                : `Trừ ví do hủy 1 buổi lớp "${className}" không dạy bù (hoàn ${vnd(amount)}) — refund ${refund.id}`,
         },
       });
     }
@@ -363,7 +531,9 @@ export async function approveRefund(refundId: string, managerUserId: string, not
           ? `Đơn hàng ${refund.order.code} đã được hoàn ${vnd(amount)} cho bạn.`
           : refund.reason === "MEMBER_CANCEL_COURSE"
             ? `Yêu cầu hủy khóa "${className}" đã được duyệt. ${vnd(amount)} đã được hoàn cho bạn.`
-            : `Buổi học bị hủy của lớp "${className}" đã được hoàn ${vnd(amount)} cho bạn.`,
+            : refund.reason === "MEMBER_CANCEL_SESSION"
+              ? `Buổi học bạn đã hủy của lớp "${className}" đã được hoàn ${vnd(amount)} cho bạn.`
+              : `Buổi học bị hủy của lớp "${className}" đã được hoàn ${vnd(amount)} cho bạn.`,
         metadata: { refundId: refund.id, paymentId: refund.paymentId, classId: refund.classId, orderId: refund.orderId },
       });
     }
@@ -481,7 +651,8 @@ export async function getRefundById(id: string, actor: { id: string; role: strin
 
 /**
  * BE-16: xem trước điều kiện hủy khóa (cùng luật với `requestCourseRefund`, KHÔNG ghi dữ liệu):
- * hạn hủy = buổi chính đầu tiên chưa hủy − 24h; tiền hoàn = đã trả − các yêu cầu không bị từ chối.
+ * - `refundPercent` 100 nếu còn ≥ 72h trước buổi chính đầu tiên chưa hủy, ngược lại 0 (hủy được nhưng không hoàn tiền).
+ * - `mode`: REFUND (tạo yêu cầu hoàn) | CANCEL_NO_REFUND (hủy ngay, không hoàn).
  */
 export async function previewCourseRefund(userId: string, classId: string, now = new Date()) {
   const memberProfile = await prisma.memberProfile.findUnique({ where: { userId }, select: { id: true } });
@@ -489,22 +660,30 @@ export async function previewCourseRefund(userId: string, classId: string, now =
   const cls = await prisma.class.findUnique({ where: { id: classId }, select: { id: true } });
   if (!cls) throw new AppError("Class not found", 404);
 
-  const [firstSession, payment] = await Promise.all([
+  const [firstSession, payment, futureBooked] = await Promise.all([
     prisma.classSchedule.findFirst({
       where: { classId, makeupForId: null, status: { not: "CANCELLED" } },
       orderBy: { startTime: "asc" },
       select: { startTime: true },
     }),
     findPaidClassPayment(prisma, memberProfile.id, classId),
+    prisma.enrollment.count({
+      where: { memberId: memberProfile.id, status: "BOOKED", schedule: { classId, startTime: { gt: now } } },
+    }),
   ]);
-  const deadline = firstSession
-    ? new Date(firstSession.startTime.getTime() - COURSE_CANCEL_MIN_HOURS_BEFORE_START * 3_600_000)
+  const refundPercent = courseRefundPercent(firstSession?.startTime ?? null, now);
+  const fullRefundDeadline = firstSession
+    ? new Date(firstSession.startTime.getTime() - COURSE_FULL_REFUND_MIN_HOURS * 3_600_000)
     : null;
   const paidAmount = payment ? money(payment.amount) : 0;
   const refundableAmount = payment ? Math.max(0, await remainingRefundable(prisma, payment)) : 0;
   const existing = payment
     ? await prisma.refund.findFirst({
-        where: { paymentId: payment.id, reason: "MEMBER_CANCEL_COURSE", status: { not: "REJECTED" } },
+        where: {
+          paymentId: payment.id,
+          reason: "MEMBER_CANCEL_COURSE",
+          status: { notIn: ["REJECTED", "CANCELLED"] },
+        },
         select: { id: true, status: true },
       })
     : null;
@@ -520,20 +699,28 @@ export async function previewCourseRefund(userId: string, classId: string, now =
       existing.status === "PENDING"
         ? "Bạn đã gửi yêu cầu hủy khóa này, đang chờ Quản lý duyệt."
         : "Khóa học này đã được hoàn tiền.";
-  } else if (deadline && now >= deadline) {
-    blockReason = "COURSE_CANCEL_TOO_LATE";
-    blockMessage = `Đã quá hạn hủy khóa (phải trước giờ khai giảng ít nhất ${COURSE_CANCEL_MIN_HOURS_BEFORE_START} giờ).`;
-  } else if (refundableAmount <= 0) {
+  } else if (refundPercent === 100 && refundableAmount <= 0) {
     blockReason = "NOTHING_TO_REFUND";
     blockMessage = "Giao dịch này không còn số tiền nào để hoàn.";
+  } else if (refundPercent === 0 && futureBooked === 0) {
+    blockReason = "NO_ACTIVE_BOOKINGS";
+    blockMessage = "Bạn không còn buổi học nào sắp tới trong khóa này để hủy.";
   }
 
   return {
     allowed: blockReason === null,
-    deadline,
+    mode: refundPercent === 100 ? ("REFUND" as const) : ("CANCEL_NO_REFUND" as const),
+    refundPercent,
+    /** Hạn cuối để hủy mà vẫn được hoàn 100% (buổi khai giảng − 72h); null nếu khóa chưa có lịch. */
+    fullRefundDeadline,
+    /** Giữ tên cũ cho FE đang dùng: trùng `fullRefundDeadline`. */
+    deadline: fullRefundDeadline,
     firstSessionStart: firstSession?.startTime ?? null,
     paidAmount,
     refundableAmount,
+    /** Số tiền sẽ được hoàn nếu hủy ngay bây giờ. */
+    estimatedRefundAmount: Math.round((refundableAmount * refundPercent) / 100),
+    futureBookedSessions: futureBooked,
     blockReason,
     blockMessage,
     existingRefundId: existing?.id ?? null,

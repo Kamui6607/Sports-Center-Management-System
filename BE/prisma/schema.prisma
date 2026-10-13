@@ -170,6 +170,7 @@ model User {
   refundsProcessed           Refund[]               @relation("RefundProcessedBy")
   cart                       Cart?
   addresses                  UserAddress[]
+  trainingPlanAttachments    TrainingPlanAttachment[] @relation("TrainingPlanAttachmentUploader")
 
   @@index([roleId])
 }
@@ -683,10 +684,32 @@ model TrainingPlan {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @default(now()) @updatedAt
 
-  results TrainingResult[]
+  results     TrainingResult[]
+  /// Tệp (PDF/Excel) Coach đính kèm vào lộ trình cho học viên.
+  attachments TrainingPlanAttachment[]
 
   @@index([memberId])
   @@index([coachId])
+}
+
+/// Tệp PDF/Excel đính kèm lộ trình tập luyện. Lưu RIÊNG trên disk (`uploads/plans`, không phục vụ tĩnh) —
+/// chỉ tải qua API có kiểm tra quyền (Coach của kế hoạch, Member của kế hoạch, Manager).
+model TrainingPlanAttachment {
+  id           String       @id @default(uuid())
+  planId       String
+  plan         TrainingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   User         @relation("TrainingPlanAttachmentUploader", fields: [uploadedById], references: [id])
+  /// Tên file gốc người dùng thấy (đã làm sạch); KHÔNG dùng để lưu trên disk.
+  originalName String
+  /// Tên file trên disk do SERVER sinh.
+  storedName   String
+  mimeType     String
+  size         Int
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @default(now()) @updatedAt
+
+  @@index([planId])
 }
 
 model TrainingResult {
@@ -841,7 +864,8 @@ model WalletTransaction {
 // ─────────────────────────────────────────
 
 enum RefundReason {
-  MEMBER_CANCEL_COURSE // Hội viên hủy khóa trước khai giảng ≥ 24h — hoàn phần còn lại của giao dịch
+  MEMBER_CANCEL_COURSE // Hội viên hủy khóa trước khai giảng ≥ 3 ngày — hoàn 100% phần còn lại của giao dịch (hủy muộn hơn: không hoàn, không tạo Refund)
+  MEMBER_CANCEL_SESSION // Hội viên hủy MỘT buổi lẻ trước giờ học ≥ 24h — hoàn 80% tiền của buổi đó
   SESSION_CANCELLED // Buổi học bị hủy và chọn hoàn tiền (không dạy bù) — hoàn tiền 1 buổi
   ORDER_CANCELLED // Đơn hàng đã thanh toán bị hủy (khách yêu cầu / trung tâm hủy) — hoàn toàn bộ
   ORDER_NOT_PICKED_UP // Khách không đến lấy hàng đúng hạn — hoàn theo chính sách (SHOP_NOT_PICKED_UP_REFUND_PERCENT)
@@ -852,6 +876,7 @@ enum RefundStatus {
   PENDING // Chờ Manager chuyển khoản tay rồi duyệt
   COMPLETED // Đã hoàn: ví HLV đã bị trừ, hội viên đã nhận tiền
   REJECTED // Manager từ chối (kèm lý do)
+  CANCELLED // Người gửi tự hủy yêu cầu khi còn PENDING
 }
 
 /// Yêu cầu hoàn tiền cho hội viên. SePay không có API hoàn ⇒ Manager chuyển khoản tay rồi duyệt;
@@ -997,7 +1022,8 @@ model UserAddress {
   recipientName String
   phone         String
   province      String
-  district      String
+  /// Không bắt buộc: địa giới 2 cấp (Tỉnh → Phường/Xã) không còn Quận/Huyện.
+  district      String?
   ward          String?
   street        String
   isDefault     Boolean  @default(false)

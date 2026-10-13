@@ -27,6 +27,7 @@ import notificationRoutes from "./modules/notifications/notifications.routes.js"
 import feedbackRoutes from "./modules/feedbacks/feedbacks.routes.js";
 import refundRoutes from "./modules/refunds/refunds.routes.js";
 import shopRoutes from "./modules/shop/shop.routes.js";
+import locationRoutes from "./modules/locations/locations.routes.js";
 
 const app = express();
 
@@ -94,6 +95,7 @@ app.use(`${v1}/notifications`, notificationRoutes);
 app.use(`${v1}/feedbacks`, feedbackRoutes);
 app.use(`${v1}/refunds`, refundRoutes);
 app.use(`${v1}/shop`, shopRoutes);
+app.use(`${v1}/locations`, locationRoutes);
 
 // Static files for uploads
 // D03: CHỈ avatar là tài nguyên công khai (hiển thị qua <img src>). File chat riêng tư nằm ở

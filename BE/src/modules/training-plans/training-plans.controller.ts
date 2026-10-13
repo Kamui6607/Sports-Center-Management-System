@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as service from "./training-plans.service.js";
+import * as attachments from "./plan-attachments.service.js";
 import { sendSuccess } from "../../utils/response.js";
 
 export const createPlan = async (req: Request, res: Response, next: NextFunction) => {
@@ -61,4 +62,36 @@ export const getPlanById = async (req: Request, res: Response, next: NextFunctio
   } catch (error) {
     next(error);
   }
+};
+
+// ── Tệp đính kèm lộ trình (PDF/Excel) ─────────────────────────
+
+export const addPlanAttachment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await attachments.addAttachment(req.params.id as string, req.file, req.user!);
+    res.status(201).json({ success: true, message: "Attachment uploaded successfully", data });
+  } catch (error) { next(error); }
+};
+
+export const listPlanAttachments = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    sendSuccess(res, await attachments.listAttachments(req.params.id as string, req.user!), "Attachments retrieved successfully");
+  } catch (error) { next(error); }
+};
+
+export const downloadPlanAttachment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const f = await attachments.getAttachmentForDownload(req.params.id as string, req.params.attachmentId as string, req.user!);
+    res.setHeader("Content-Type", f.mimeType);
+    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(f.originalName)}`);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.sendFile(f.filePath);
+  } catch (error) { next(error); }
+};
+
+export const deletePlanAttachment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await attachments.deleteAttachment(req.params.id as string, req.params.attachmentId as string, req.user!);
+    sendSuccess(res, null, "Attachment deleted successfully");
+  } catch (error) { next(error); }
 };

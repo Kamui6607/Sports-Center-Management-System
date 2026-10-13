@@ -5,8 +5,12 @@ import type { RefundQueryInput } from "./refunds.schema.js";
 
 export async function requestCourseRefund(req: Request, res: Response, next: NextFunction) {
   try {
-    const refund = await refundsService.requestCourseRefund(req.user!.id, req.body.classId, req.body.note);
-    sendCreated(res, refund, "Course cancellation requested — waiting for manager approval");
+    const result = await refundsService.requestCourseRefund(req.user!.id, req.body.classId, req.body.note);
+    if (result.refund) {
+      sendCreated(res, result, "Course cancellation requested — waiting for manager approval");
+    } else {
+      sendSuccess(res, result, "Course cancelled — no refund (cancelled within 3 days before the start date)");
+    }
   } catch (err) { next(err); }
 }
 
@@ -52,5 +56,12 @@ export async function previewCourseRefund(req: Request, res: Response, next: Nex
   try {
     const result = await refundsService.previewCourseRefund(req.user!.id, String(req.query.classId));
     sendSuccess(res, result, "Course cancellation preview");
+  } catch (err) { next(err); }
+}
+
+export async function cancelMyRefund(req: Request, res: Response, next: NextFunction) {
+  try {
+    const refund = await refundsService.cancelMyRefund(req.params.id as string, req.user!);
+    sendSuccess(res, refund, "Refund request cancelled");
   } catch (err) { next(err); }
 }

@@ -9,7 +9,7 @@ function view(a: Awaited<ReturnType<typeof prisma.userAddress.findFirstOrThrow>>
   return { ...a, fullAddress: formatAddress(a), deliverable: isDeliverableProvince(a.province) };
 }
 
-export function formatAddress(a: { street: string; ward?: string | null; district: string; province: string }): string {
+export function formatAddress(a: { street: string; ward?: string | null; district?: string | null; province: string }): string {
   return [a.street, a.ward, a.district, a.province].filter((p) => p && p.trim()).join(", ");
 }
 

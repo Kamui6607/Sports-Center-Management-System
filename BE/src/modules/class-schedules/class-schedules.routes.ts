@@ -21,7 +21,10 @@ const router = Router();
  *     summary: Coach tạo nhanh lớp học (có phòng) — lớp PENDING chờ Manager duyệt
  *     description: |
  *       CHỈ COACH. Coach gọi API là HLV phụ trách lớp (`Class.coachId`); không nhận `primaryCoachId`/`supportCoachId`.
- *       Lớp PENDING nên chưa tạo buổi học — thêm lịch bằng `POST /class-schedules` sau khi lớp được duyệt.
+ *       Gửi ĐÚNG MỘT trong hai cách đặt lịch:
+ *       - `schedules[]`: từng buổi `{startTime,endTime}` (ISO có offset).
+ *       - `recurrence`: `{ startDate:"2026-11-02", weekdays:[1,3,5] (1=T2..7=CN), startTime:"18:00", endTime:"19:30", totalSessions:12 }` — hệ thống tự sinh buổi, trả `startDate`, `endDate` (ngày buổi cuối), `totalSessions`.
+ *       Có thể kèm `class.goal` (mục tiêu khóa học).
  *     tags: [Class Schedules]
  *     requestBody:
  *       required: true

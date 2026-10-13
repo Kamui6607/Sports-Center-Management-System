@@ -128,11 +128,27 @@ const PlannerScheduleSchema = z.object({
   path: ["endTime"],
 });
 
+const HHmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Giờ phải có dạng HH:mm (VD 18:00)");
+
+/**
+ * Lịch lặp: hệ thống tự sinh buổi từ ngày bắt đầu + các thứ trong tuần + số buổi.
+ * `weekdays` theo ISO: 1=Thứ 2 … 6=Thứ 7, 7=CN. Giờ theo múi giờ Việt Nam (UTC+7).
+ * Buổi đầu là ngày đầu tiên >= startDate trùng một trong các thứ; ngày kết thúc khóa = ngày buổi cuối.
+ */
+export const PlanRecurrenceSchema = z.object({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "startDate phải có dạng YYYY-MM-DD"),
+  weekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7),
+  startTime: HHmm,
+  endTime: HHmm,
+  totalSessions: z.number().int().min(1).max(200),
+}).refine((d) => d.endTime > d.startTime, { message: "endTime must be after startTime", path: ["endTime"] });
+
 export const CreateActivityPlanSchema = z.object({
   class: z.object({
     name: z.string().trim().min(2),
     fitness: z.string().trim().min(2).max(60),
     description: z.string().trim().optional(),
+    goal: z.string().trim().max(1000).optional(),
     capacity: z.number().int().positive().max(200),
     classType: z.enum(["REGULAR", "PREMIUM"]),
     areaType: z.enum(["POOL", "INDOOR", "OUTDOOR"]),
@@ -140,8 +156,19 @@ export const CreateActivityPlanSchema = z.object({
   }),
   // HLV của lớp là chính Coach gọi API (mỗi lớp đúng 1 HLV) — không nhận coachId từ client.
   roomId: z.string().min(1),
-  schedules: z.array(PlannerScheduleSchema).min(1).max(500),
+  // Gửi ĐÚNG MỘT trong hai: `schedules` (từng buổi) hoặc `recurrence` (tự sinh từ thứ + số buổi).
+  schedules: z.array(PlannerScheduleSchema).min(1).max(500).optional(),
+  recurrence: PlanRecurrenceSchema.optional(),
 }).superRefine((data, ctx) => {
+  if (!!data.schedules === !!data.recurrence) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["schedules"],
+      message: "Gửi đúng một trong `schedules` hoặc `recurrence`",
+    });
+    return;
+  }
+  if (!data.schedules) return;
 
   const ordered = data.schedules
     .map((schedule, index) => ({

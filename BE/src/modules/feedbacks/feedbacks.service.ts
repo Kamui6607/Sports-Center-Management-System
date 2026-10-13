@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
+import { hasMemberCompletedClass, listMemberCompletedClassIds } from "../enrollments/my-courses.service.js";
 import type { CreateFeedbackInput, UpdateFeedbackInput, FeedbackQueryInput } from "./feedbacks.schema.js";
 
 const feedbackInclude = {
@@ -12,7 +13,7 @@ const feedbackInclude = {
 /**
  * Member tạo feedback cho Coach.
  * Business rules:
- *  - Member phải đã từng BOOKED hoặc COMPLETED ít nhất 1 buổi của Coach đó.
+ *  - Member phải HỌC XONG khóa (mọi buổi chính đã kết thúc + đã thanh toán) mới được đánh giá.
  *  - Nếu truyền classId: phải thuộc lớp có Coach đó.
  *  - Mỗi (memberId, coachId, classId) chỉ được feedback 1 lần (upsert cho phép sửa).
  */
@@ -28,26 +29,32 @@ export async function createFeedback(data: CreateFeedbackInput, userId: string) 
   });
   if (!coachProfile || !coachProfile.user.isActive) throw new AppError("Coach not found or inactive", 404);
 
-  // Kiểm tra member có từng học với coach này chưa
-  const hasAttended = await prisma.enrollment.findFirst({
-    where: {
-      memberId: memberProfile.id,
-      status: { in: ["BOOKED", "COMPLETED"] },
-      schedule: {
-        class: { coachId: data.coachId },
-      },
-    },
-  });
-  if (!hasAttended) {
-    throw new AppError("Bạn chỉ có thể đánh giá HLV mà bạn đã hoặc đang học cùng.", 403);
-  }
-
-  // Kiểm tra classId nếu có
+  // Kiểm tra classId (nếu có) thuộc HLV này
   if (data.classId) {
     const classExists = await prisma.class.findFirst({
       where: { id: data.classId, coachId: data.coachId },
     });
     if (!classExists) throw new AppError("Lớp học này không thuộc HLV được chỉ định.", 400);
+  }
+
+  // Chỉ được đánh giá SAU KHI học xong khóa: mọi buổi chính đã kết thúc + đã thanh toán.
+  if (data.classId) {
+    if (!(await hasMemberCompletedClass(memberProfile.id, data.classId))) {
+      throw new AppError(
+        "Bạn chỉ có thể đánh giá sau khi hoàn thành khóa học (mọi buổi đã kết thúc và đã thanh toán).",
+        403,
+        { code: "COURSE_NOT_COMPLETED", classId: data.classId }
+      );
+    }
+  } else {
+    const done = await listMemberCompletedClassIds(memberProfile.id, data.coachId);
+    if (done.length === 0) {
+      throw new AppError(
+        "Bạn chỉ có thể đánh giá HLV sau khi hoàn thành một khóa học của HLV này.",
+        403,
+        { code: "COURSE_NOT_COMPLETED" }
+      );
+    }
   }
 
   // Upsert: cho phép sửa nếu đã feedback rồi

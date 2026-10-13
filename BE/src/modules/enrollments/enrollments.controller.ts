@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import * as enrollmentsService from "./enrollments.service.js";
 import * as quotaService from "./enrollment-quota.service.js";
+import * as myCoursesService from "./my-courses.service.js";
 import * as courseEnrollmentService from "./course-enrollment.service.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
 import { AppError } from "../../middlewares/errorHandler.js";
@@ -111,5 +112,23 @@ export async function getMyQuota(req: Request, res: Response, next: NextFunction
   try {
     const quota = await quotaService.getMyConcurrentClassQuota(req.user!.id);
     sendSuccess(res, quota, "Concurrent class quota retrieved successfully");
+  } catch (err) { next(err); }
+}
+
+export async function getMyCourses(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { courses, pagination } = await myCoursesService.getMyCourses(req.user!.id, req.query as any);
+    sendSuccess(res, courses, "My courses retrieved successfully", 200, pagination);
+  } catch (err) { next(err); }
+}
+
+export async function getTransferOptions(req: Request, res: Response, next: NextFunction) {
+  try {
+    const q = req.query as { date?: string; weekday?: string };
+    const data = await enrollmentsService.getTransferOptions(req.params.id as string, req.user!.id, req.user!.role, {
+      date: q.date,
+      weekday: q.weekday ? Number(q.weekday) : undefined,
+    });
+    sendSuccess(res, data, "Transfer options retrieved successfully");
   } catch (err) { next(err); }
 }

@@ -160,3 +160,40 @@ export function cvUpload(req: Request, res: Response, next: NextFunction) {
     return next(err as Error);
   });
 }
+// ── Tệp đính kèm lộ trình tập luyện (PDF / Excel) ─────────────
+/** Lưu riêng `uploads/plans`, KHÔNG phục vụ tĩnh — chỉ tải qua API có phân quyền. */
+export const PLAN_UPLOAD_DIR = path.join(uploadDir, "plans");
+fs.mkdirSync(PLAN_UPLOAD_DIR, { recursive: true });
+
+const PLAN_ALLOWED_EXT = new Set([".pdf", ".xlsx", ".xls"]);
+
+const planUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, PLAN_UPLOAD_DIR),
+    // Tên trên disk do server sinh (UUID); đuôi được chuẩn hóa lại sau khi xác thực signature.
+    filename: (_req, _file, cb) => cb(null, `${randomUUID()}.upload`),
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!PLAN_ALLOWED_EXT.has(ext)) {
+      cb(new AppError("Chỉ nhận tệp PDF hoặc Excel (.pdf, .xlsx, .xls).", 400));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+export function planAttachmentUploadSingle(field: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    planUpload.single(field)(req, res, (err: unknown) => {
+      if (!err) return next();
+      if (err instanceof AppError) return next(err);
+      if (err instanceof multer.MulterError) {
+        const message = err.code === "LIMIT_FILE_SIZE" ? "Tệp đính kèm tối đa 10MB." : `Tải tệp thất bại: ${err.message}`;
+        return next(new AppError(message, 400));
+      }
+      return next(err as Error);
+    });
+  };
+}

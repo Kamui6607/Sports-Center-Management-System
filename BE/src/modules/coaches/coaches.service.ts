@@ -3,6 +3,7 @@ import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import type { CoachQueryInput, UpdateCoachInput } from "./coaches.schema.js";
 import { ROLE_NAME_SELECT, flattenRole } from "../../utils/roles.js";
+import { vnClock, vnDateKey, vnWeekdayIso, vnWeekdayLabel } from "../../utils/vnTime.js";
 import { COACH_PROFILE_WITH_CERT, withCvFields, withUserCvFields } from "../../utils/certification.js";
 
 export async function listCoaches(query: CoachQueryInput) {
@@ -89,6 +90,52 @@ export async function getCoachById(id: string) {
   }
 
   return withUserCvFields(flattenRole(user));
+}
+
+/**
+ * Các buổi SẮP DIỄN RA của HLV (id = userId của HLV) — màn "bấm vào buổi sắp tới để xem danh sách buổi".
+ * Chỉ các lớp đang mở (không DRAFT/CANCELLED). Lọc `classId` để xem riêng 1 khóa.
+ */
+export async function getCoachUpcomingSessions(coachUserId: string, query: { classId?: string; page?: string; limit?: string }) {
+  const profile = await prisma.coachProfile.findFirst({ where: { userId: coachUserId }, select: { id: true } });
+  if (!profile) throw new AppError("Coach not found", 404);
+  const page = Math.max(1, parseInt(query.page ?? "1") || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(query.limit ?? "10") || 10));
+  const where: any = {
+    status: "SCHEDULED",
+    startTime: { gt: new Date() },
+    class: { coachId: profile.id, status: "APPROVED", isActive: true, ...(query.classId ? { id: query.classId } : {}) },
+  };
+  const [total, rows] = await Promise.all([
+    prisma.classSchedule.count({ where }),
+    prisma.classSchedule.findMany({
+      where,
+      orderBy: { startTime: "asc" },
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        room: { select: { id: true, name: true } },
+        class: { select: { id: true, name: true, capacity: true, classType: true, goal: true } },
+        _count: { select: { enrollments: { where: { status: { in: ["BOOKED", "COMPLETED"] } } } } },
+      },
+    }),
+  ]);
+  const sessions = rows.map((r) => ({
+    scheduleId: r.id,
+    class: r.class,
+    room: r.room,
+    date: vnDateKey(r.startTime),
+    weekday: vnWeekdayIso(r.startTime),
+    weekdayLabel: vnWeekdayLabel(vnWeekdayIso(r.startTime)),
+    startClock: vnClock(r.startTime),
+    endClock: vnClock(r.endTime),
+    startTime: r.startTime,
+    endTime: r.endTime,
+    bookedCount: r._count.enrollments,
+    remainingSlots: Math.max(0, r.class.capacity - r._count.enrollments),
+    isMakeup: !!r.makeupForId,
+  }));
+  return { sessions, pagination: buildPaginationMeta(total, page, limit) };
 }
 
 export async function updateCoach(id: string, data: UpdateCoachInput, actor?: { id: string; role: string }) {

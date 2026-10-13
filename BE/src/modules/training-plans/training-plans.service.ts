@@ -57,6 +57,10 @@ const planInclude = {
   // BE-17: kèm tên học viên để client không phải tra thêm.
   member: { include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } },
   results: { orderBy: { date: "asc" } },
+  attachments: {
+    orderBy: { createdAt: "desc" },
+    select: { id: true, originalName: true, mimeType: true, size: true, createdAt: true },
+  },
 } satisfies Prisma.TrainingPlanInclude;
 
 /**

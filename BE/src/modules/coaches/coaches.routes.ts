@@ -298,6 +298,27 @@ router.get("/:id", authenticate, coachController.getCoachById);
 
 /**
  * @swagger
+ * /coaches/{id}/upcoming-sessions:
+ *   get:
+ *     summary: Upcoming sessions of a coach (for the coach info panel in course detail)
+ *     description: Các buổi SCHEDULED sắp diễn ra của HLV, kèm thứ/giờ VN, phòng, chỗ trống. `?classId=` xem riêng 1 khóa.
+ *     tags: [Coaches]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string }, description: Coach user ID }
+ *       - { in: query, name: classId, schema: { type: string } }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
+ *     responses:
+ *       200: { description: OK }
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.get("/:id/upcoming-sessions", authenticate, coachController.getCoachUpcomingSessions);
+
+/**
+ * @swagger
  * /coaches/{id}:
  *   patch:
  *     summary: Update coach profile (Manager update any; Coach updates own profile)

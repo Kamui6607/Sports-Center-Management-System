@@ -21,7 +21,7 @@ export const AddressSchema = z.object({
   recipientName: z.string().trim().min(2).max(100),
   phone,
   province: z.string().trim().min(2).max(100),
-  district: z.string().trim().min(2).max(100),
+  district: z.string().trim().max(100).nullable().optional(),
   ward: z.string().trim().max(100).nullable().optional(),
   street: z.string().trim().min(3).max(255),
   isDefault: z.boolean().optional(),
