@@ -1,5 +1,22 @@
+/// Tài khoản nhận hoàn tiền do học viên cung cấp khi hủy khóa (`bankInfo`).
+class RefundBankInfo {
+  const RefundBankInfo({
+    required this.bankName,
+    required this.accountNumber,
+    required this.accountName,
+    this.vietQrUrl,
+  });
+
+  final String bankName;
+  final String accountNumber;
+  final String accountName;
+
+  /// Ảnh VietQR để Quản lý quét chuyển khoản.
+  final String? vietQrUrl;
+}
+
 /// Trạng thái yêu cầu hoàn tiền (`RefundStatus`).
-enum RefundStatus { pending, completed, rejected }
+enum RefundStatus { pending, completed, rejected, cancelled }
 
 /// Lý do hoàn tiền (`RefundReason`). `order*` = hoàn tiền đơn hàng của cửa hàng.
 enum RefundReason { memberCancelCourse, sessionCancelled, orderCancelled, orderNotPickedUp, orderLatePayment }
@@ -25,6 +42,7 @@ class Refund {
     this.paidAmount,
     this.orderId,
     this.orderCode,
+    this.bankInfo,
   });
 
   final String id;
@@ -59,6 +77,9 @@ class Refund {
   /// Hoàn tiền đơn hàng (không trừ ví HLV).
   final String? orderId;
   final String? orderCode;
+
+  /// `null` nếu học viên không cung cấp tài khoản.
+  final RefundBankInfo? bankInfo;
 
   bool get isOrder => orderId != null;
 }

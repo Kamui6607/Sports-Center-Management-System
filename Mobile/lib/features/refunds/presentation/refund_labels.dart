@@ -7,8 +7,10 @@ extension RefundStatusLabel on RefundStatus {
     RefundStatus.pending => const StatusLabel('Chờ duyệt', StatusTone.warning),
     RefundStatus.completed => const StatusLabel('Đã hoàn tiền', StatusTone.success),
     RefundStatus.rejected => const StatusLabel('Bị từ chối', StatusTone.danger),
+    RefundStatus.cancelled => const StatusLabel('Đã hủy', StatusTone.neutral),
   };
 }
+
 
 extension RefundReasonLabel on RefundReason {
   String get label => switch (this) {

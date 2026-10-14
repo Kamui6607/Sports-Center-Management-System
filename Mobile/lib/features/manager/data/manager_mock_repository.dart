@@ -56,13 +56,15 @@ class ManagerMockRepository implements ManagerRepository {
   Future<ApprovalCounts> counts() => _server.run(() {
     final db = _server.db;
     _requireManager();
+    final pendingRefunds = db.refunds.where((r) => r.status == RefundStatus.pending).toList();
     return ApprovalCounts(
       cvs: db.certifications.where((c) => c.status == CoachApprovalStatus.pending).length,
       classes: db.classes.where((c) => c.status == ClassStatus.pending).length,
       withdrawals: db.walletTxs
           .where((t) => t.type == WalletTxType.withdrawal && t.status == WalletTxStatus.pending)
           .length,
-      refunds: db.refunds.where((r) => r.status == RefundStatus.pending).length,
+      refunds: pendingRefunds.length,
+      refundPendingAmount: pendingRefunds.fold(0, (sum, r) => sum + r.amount),
     );
   });
 

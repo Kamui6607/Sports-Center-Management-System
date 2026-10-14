@@ -206,20 +206,40 @@ class _RefundList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final value = ref.watch(managerRefundsProvider(status));
+    final pendingAmount = ref.watch(approvalCountsProvider).value?.refundPendingAmount ?? 0;
     return AsyncValueView(
       value: value,
       onRetry: () => ref.invalidate(managerRefundsProvider(status)),
       isEmpty: (l) => l.isEmpty,
       empty: const EmptyState(icon: AppIcons.refund, title: 'Không có yêu cầu hoàn tiền'),
-      data: (list) => RefreshableList(
-        onRefresh: () => ref.refresh(managerRefundsProvider(status).future),
-        itemCount: list.length,
-        itemBuilder: (context, i) => RefundCard(
-          refund: list[i],
-          showMember: true,
-          onTap: () => context.push(AppRoutes.reviewRefund(list[i].id)),
-        ),
+      data: (list) => Column(
+        children: [
+          if (status == RefundStatus.pending && pendingAmount > 0)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                context.screenPadding,
+                AppSpacing.xs,
+                context.screenPadding,
+                0,
+              ),
+              child: AlertBanner.info(
+                message: 'Tổng tiền chờ hoàn: ${Money.format(pendingAmount)}',
+              ),
+            ),
+          Expanded(
+            child: RefreshableList(
+              onRefresh: () => ref.refresh(managerRefundsProvider(status).future),
+              itemCount: list.length,
+              itemBuilder: (context, i) => RefundCard(
+                refund: list[i],
+                showMember: true,
+                onTap: () => context.push(AppRoutes.reviewRefund(list[i].id)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+

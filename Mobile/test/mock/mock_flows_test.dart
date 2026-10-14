@@ -94,7 +94,7 @@ void main() {
       await login('manager@demo.vn');
       final refunds = RefundMockRepository(server);
       final balanceBefore = server.db.walletOf('cp-1').balance;
-      await refunds.approve('rf-c2-mp-8', note: 'FT123');
+      await refunds.approve('rf-c2-mp-8', transactionRef: 'FT123');
       final p = server.db.payments.firstWhere((p) => p.id == 'pay-c2-mp-8');
       expect(p.status, PaymentStatus.refunded);
       expect(balanceBefore - server.db.walletOf('cp-1').balance, (2400000 * 0.85).round());

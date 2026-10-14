@@ -147,9 +147,13 @@ class RefundReviewScreen extends ConsumerWidget {
                   ? 'Xác nhận đã chuyển ${Money.format(r.amount)} cho ${r.memberName}. Đơn hàng chuyển sang "Đã hoàn tiền".'
                   : 'Xác nhận đã chuyển ${Money.format(r.amount)} cho ${r.memberName}. Ví HLV ${r.coachName} bị trừ '
                         '${Money.format(r.coachDebitAmount)}.',
-              approveNoteLabel: 'Ghi chú (VD mã giao dịch chuyển khoản)',
-              onApprove: (note) =>
-                  runReview(context, ref, () => repo.approve(refundId, note: note), 'Đã duyệt hoàn tiền.'),
+              approveNoteLabel: 'Mã giao dịch FT (tuỳ chọn)',
+              onApprove: (transactionRef) => runReview(
+                context,
+                ref,
+                () => repo.approve(refundId, transactionRef: transactionRef),
+                'Đã duyệt hoàn tiền.',
+              ),
               onReject: (reason) => runReview(context, ref, () => repo.reject(refundId, reason), 'Đã từ chối yêu cầu.'),
             ),
       body: AsyncValueView(
@@ -185,6 +189,48 @@ class RefundReviewScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            const SizedBox(height: AppSpacing.md),
+            if (r.bankInfo case final bank?)
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Tài khoản nhận hoàn tiền', style: context.text.label),
+                    const SizedBox(height: AppSpacing.sm),
+                    CopyableField(label: 'Ngân hàng', value: bank.bankName),
+                    const Divider(),
+                    CopyableField(label: 'Số tài khoản', value: bank.accountNumber, emphasize: true),
+                    const Divider(),
+                    CopyableField(label: 'Chủ tài khoản', value: bank.accountName),
+                    if (bank.vietQrUrl != null) ...[
+                      const Divider(),
+                      const SizedBox(height: AppSpacing.sm),
+                      Center(
+                        child: SizedBox.square(
+                          dimension: 200,
+                          child: AppNetworkImage(
+                            url: bank.vietQrUrl,
+                            placeholderIcon: AppIcons.qr,
+                            seed: r.id,
+                            semanticLabel: 'Mã VietQR chuyển khoản hoàn tiền',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Quét mã QR để chuyển khoản nhanh',
+                        textAlign: TextAlign.center,
+                        style: context.text.caption.copyWith(color: context.colors.textMuted),
+                      ),
+                    ],
+                  ],
+                ),
+              )
+            else if (!r.isOrder)
+              const AlertBanner.warning(
+                title: 'Chưa có thông tin ngân hàng',
+                message: 'Học viên chưa cung cấp tài khoản nhận tiền. Liên hệ trực tiếp để xác nhận.',
+              ),
             if (r.note != null) ...[
               const SizedBox(height: AppSpacing.md),
               AlertBanner.info(title: r.isOrder ? 'Ghi chú' : 'Ghi chú của học viên', message: r.note!),

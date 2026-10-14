@@ -29,9 +29,16 @@ class ManagerApiRepository implements ManagerRepository {
       _total('/coaches/cv/pending', {'status': 'PENDING'}),
       _total('/classes', {'status': 'PENDING'}),
       _total('/coaches/wallet/transactions', {'type': 'WITHDRAWAL', 'status': 'PENDING'}),
-      _total('/refunds', {'status': 'PENDING'}),
+      _api.get('/refunds/summary'),
     ]);
-    return ApprovalCounts(cvs: results[0], classes: results[1], withdrawals: results[2], refunds: results[3]);
+    final summary = (results[3] as ApiResponse).json;
+    return ApprovalCounts(
+      cvs: results[0] as int,
+      classes: results[1] as int,
+      withdrawals: results[2] as int,
+      refunds: summary.integer('pending'),
+      refundPendingAmount: summary.money('totalPendingAmount'),
+    );
   }
 
   static CvApplication _cv(Json p) {

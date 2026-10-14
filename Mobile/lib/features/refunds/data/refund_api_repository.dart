@@ -15,6 +15,7 @@ class RefundApiRepository implements RefundRepository {
     final legacy = r.strOrNull('note');
     // Hoàn tiền đơn hàng: không có lớp/HLV; người nhận là người mua đơn (HLV mua hàng không có `member`).
     final order = r.objOrNull('order');
+    final bi = r.objOrNull('bankInfo');
     return Refund(
       id: r.str('id'),
       classId: r.str('classId', r.obj('class').str('id')),
@@ -35,6 +36,16 @@ class RefundApiRepository implements RefundRepository {
       processedNote: r.strOrNull('managerNote') ?? (status == RefundStatus.completed ? legacy : null),
       rejectReason: r.strOrNull('rejectReason'),
       paidAmount: r.objOrNull('payment')?.money('amount'),
+      bankInfo: bi == null ||
+              bi.str('bankName').isEmpty ||
+              bi.str('bankAccountNumber').isEmpty
+          ? null
+          : RefundBankInfo(
+              bankName: bi.str('bankName'),
+              accountNumber: bi.str('bankAccountNumber'),
+              accountName: bi.str('bankAccountName'),
+              vietQrUrl: bi.strOrNull('vietQrUrl'),
+            ),
     );
   }
 
@@ -52,11 +63,22 @@ class RefundApiRepository implements RefundRepository {
   }
 
   @override
-  Future<Refund> requestCancellation(String classId, {String? note}) async {
-    final trimmed = note?.trim();
+  Future<Refund> requestCancellation(
+    String classId, {
+    String? note,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+  }) async {
     final res = await _api.post(
       '/refunds/course-cancellation',
-      body: {'classId': classId, if (trimmed != null && trimmed.isNotEmpty) 'note': trimmed},
+      body: {
+        'classId': classId,
+        if (note?.trim().isNotEmpty ?? false) 'note': note!.trim(),
+        if (bankName?.trim().isNotEmpty ?? false) 'bankName': bankName!.trim(),
+        if (bankAccountNumber?.trim().isNotEmpty ?? false) 'bankAccountNumber': bankAccountNumber!.trim(),
+        if (bankAccountName?.trim().isNotEmpty ?? false) 'bankAccountName': bankAccountName!.trim(),
+      },
     );
     return _refund(res.json);
   }
@@ -68,13 +90,19 @@ class RefundApiRepository implements RefundRepository {
   Future<Refund> refund(String id) async => _refund((await _api.get('/refunds/$id')).json);
 
   @override
+  Future<void> cancelRequest(String refundId) => _api.patch('/refunds/$refundId/cancel');
+
+  @override
   Future<List<Refund>> all({RefundStatus? status}) async =>
       (await _api.getAll('/refunds', query: {'status': status})).map(_refund).toList();
 
   @override
-  Future<void> approve(String id, {String? note}) {
-    final trimmed = note?.trim();
-    return _api.patch('/refunds/$id/approve', body: {if (trimmed != null && trimmed.isNotEmpty) 'note': trimmed});
+  Future<void> approve(String id, {String? transactionRef}) {
+    final trimmed = transactionRef?.trim();
+    return _api.patch(
+      '/refunds/$id/approve',
+      body: {if (trimmed != null && trimmed.isNotEmpty) 'transactionRef': trimmed},
+    );
   }
 
   @override

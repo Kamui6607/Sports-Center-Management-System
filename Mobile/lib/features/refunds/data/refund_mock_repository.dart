@@ -41,6 +41,7 @@ class RefundMockRepository implements RefundRepository {
         paidAmount: db.payments.firstWhere((p) => p.id == r.paymentId).amount,
         orderId: o.id,
         orderCode: o.code,
+        bankInfo: null,
       );
     }
     final c = db.classRow(r.classId!);
@@ -61,6 +62,7 @@ class RefundMockRepository implements RefundRepository {
       processedNote: r.processedNote,
       rejectReason: r.rejectReason,
       paidAmount: db.payments.firstWhere((p) => p.id == r.paymentId).amount,
+      bankInfo: null,
     );
   }
 
@@ -102,7 +104,13 @@ class RefundMockRepository implements RefundRepository {
       _server.run(() => _eligibility(_server.db, _server.requireMember().id, classId));
 
   @override
-  Future<Refund> requestCancellation(String classId, {String? note}) => _server.run(() {
+  Future<Refund> requestCancellation(
+    String classId, {
+    String? note,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+  }) => _server.run(() {
     final db = _server.db;
     final member = _server.requireMember();
     final e = _eligibility(db, member.id, classId);
@@ -165,6 +173,21 @@ class RefundMockRepository implements RefundRepository {
   });
 
   @override
+  Future<void> cancelRequest(String refundId) => _server.run(() {
+    final db = _server.db;
+    final u = _server.requireUser();
+    final r = db.refunds.where((x) => x.id == refundId).firstOrNull;
+    if (r == null) throw const AppFailure.notFound('Không tìm thấy yêu cầu hoàn tiền.');
+    final member = db.memberOfUser(u.id);
+    final isOwner = r.buyerUserId == u.id || (member != null && r.memberProfileId == member.id);
+    if (!isOwner) throw const AppFailure.forbidden();
+    if (r.status != RefundStatus.pending) {
+      throw const AppFailure.business('Chỉ có thể hủy yêu cầu đang chờ duyệt.');
+    }
+    r.status = RefundStatus.cancelled;
+  });
+
+  @override
   Future<List<Refund>> all({RefundStatus? status}) => _server.run(() {
     final db = _server.db;
     _server.requireRole(UserRole.manager);
@@ -181,14 +204,14 @@ class RefundMockRepository implements RefundRepository {
   }
 
   @override
-  Future<void> approve(String id, {String? note}) => _server.run(() {
+  Future<void> approve(String id, {String? transactionRef}) => _server.run(() {
     final db = _server.db;
     final r = _pending(id);
     final now = db.now();
     r
       ..status = RefundStatus.completed
       ..processedAt = now
-      ..processedNote = note?.trim().isEmpty ?? true ? null : note!.trim();
+      ..processedNote = transactionRef?.trim().isEmpty ?? true ? null : transactionRef!.trim();
     if (r.orderId != null) {
       // Hoàn tiền đơn hàng: không trừ ví HLV; đơn → REFUNDED (+ trả hàng về kho nếu chưa giao).
       db.onOrderRefundApproved(r);

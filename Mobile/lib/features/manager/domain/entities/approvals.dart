@@ -3,12 +3,21 @@ import '../../../coach/domain/entities/wallet.dart';
 
 /// Số việc chờ duyệt (Tổng quan Manager).
 class ApprovalCounts {
-  const ApprovalCounts({required this.cvs, required this.classes, required this.withdrawals, required this.refunds});
+  const ApprovalCounts({
+    required this.cvs,
+    required this.classes,
+    required this.withdrawals,
+    required this.refunds,
+    this.refundPendingAmount = 0,
+  });
 
   final int cvs;
   final int classes;
   final int withdrawals;
   final int refunds;
+
+  /// Tổng tiền hoàn đang chờ duyệt (từ `GET /refunds/summary`).
+  final int refundPendingAmount;
 
   int get total => cvs + classes + withdrawals + refunds;
 }
