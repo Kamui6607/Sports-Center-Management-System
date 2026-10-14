@@ -78,7 +78,15 @@ export const OrderQuerySchema = z.object({
 
 export const CancelOrderSchema = z.object({ reason: z.string().trim().max(500).optional() });
 
-export const RequestRefundSchema = z.object({ reason: z.string().trim().min(3).max(500) });
+export const RequestRefundSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+  /** Tên hoặc mã ngân hàng nhận tiền hoàn (VD: MBBank, VCB, Techcombank...). */
+  bankName: z.string().trim().max(100).optional(),
+  /** Số tài khoản ngân hàng nhận tiền hoàn. */
+  bankAccountNumber: z.string().trim().max(50).optional(),
+  /** Tên chủ tài khoản ngân hàng (không dấu hoặc có dấu). */
+  bankAccountName: z.string().trim().max(100).optional(),
+});
 
 export const ReviewOrderItemSchema = z.object({
   rating: z.number().int().min(1).max(5),

@@ -73,7 +73,15 @@ export const cancelMyOrder = wrap(async (req, res) =>
   sendSuccess(res, await orders.cancelMyOrder(req.user!.id, id(req), req.body?.reason), "Order cancelled")
 );
 export const requestRefund = wrap(async (req, res) =>
-  sendSuccess(res, await orders.requestOrderRefund(req.user!.id, id(req), req.body.reason), "Refund requested")
+  sendSuccess(
+    res,
+    await orders.requestOrderRefund(req.user!.id, id(req), req.body.reason, {
+      bankName: req.body.bankName,
+      bankAccountNumber: req.body.bankAccountNumber,
+      bankAccountName: req.body.bankAccountName,
+    }),
+    "Refund requested"
+  )
 );
 export const confirmReceived = wrap(async (req, res) =>
   sendSuccess(res, await orders.confirmReceived(req.user!.id, id(req)), "Order completed")
