@@ -359,11 +359,15 @@ export async function getSepayCheckout(userId: string, role: string, paymentId: 
       })
     : null;
 
+  const { membershipPlanNameOf } = await import("../memberships/memberships.service.js");
+  const membershipPlanName = await membershipPlanNameOf(payment);
+
   return {
     ...buildSepayCheckoutView(payment, cls, order?.paymentExpiresAt ?? undefined),
     classId: payment.classId,
     orderId: payment.orderId,
     paidAt: payment.paidAt,
+    ...(membershipPlanName ? { membership: { planName: membershipPlanName } } : {}),
     ...(order
       ? {
           order: {
@@ -630,6 +634,39 @@ export async function retrySepayActivation(managerUserId: string, paymentId: str
       "Giao dịch đơn hàng không kích hoạt lại tự động — cần đối soát/hoàn tiền thủ công.",
       400
     );
+  }
+
+  const memberships = await import("../memberships/memberships.service.js");
+  if (memberships.isMembershipPayment(payment)) {
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        await lockPaymentWebhook(tx, payment.id);
+        const fresh = await tx.payment.findUnique({ where: { id: payment.id } });
+        if (!fresh || fresh.status !== "SUCCESS" || fresh.activationStatus !== "REQUIRES_REVIEW") {
+          throw new AppError("Giao dịch đã được xử lý bởi thao tác khác, vui lòng tải lại.", 409, {
+            code: "SEPAY_ALREADY_HANDLED",
+            gateway: SEPAY_GATEWAY,
+          });
+        }
+        await memberships.activateMembership(tx, fresh, {
+          reviewReason: null,
+          reviewedAt: new Date(),
+          reviewedById: managerUserId,
+        });
+        return { payment: await tx.payment.findUniqueOrThrow({ where: { id: fresh.id } }) };
+      });
+      await flushNotificationOutbox().catch(() => {});
+      return result;
+    } catch (err) {
+      if (!(err instanceof AppError) || (err.errors as { code?: string } | undefined)?.code === "SEPAY_ALREADY_HANDLED") {
+        throw err;
+      }
+      await prisma.payment.update({ where: { id: payment.id }, data: { reviewReason: err.message } });
+      throw new AppError(`Không kích hoạt được gói thành viên: ${err.message}`, 409, {
+        code: "SEPAY_ACTIVATION_REJECTED",
+        gateway: SEPAY_GATEWAY,
+      });
+    }
   }
 
   const cls = payment.classId
@@ -1106,6 +1143,42 @@ async function settleSepayTransfer(
         });
         const refund = await createLatePaymentRefundTx(tx, payment, money(body.transferAmount));
         if (refund) lateRefunds.push({ id: refund.id, amount: money(refund.amount) });
+        return finish({
+          status: "PROCESSED",
+          reason: "ACTIVATION_REJECTED",
+          paymentId: payment.id,
+          memberId: payment.memberId,
+          paymentStatus: "SUCCESS",
+          processed: true,
+        });
+      }
+      return finish({
+        status: "PROCESSED",
+        paymentId: payment.id,
+        memberId: payment.memberId,
+        paymentStatus: "SUCCESS",
+        processed: true,
+      });
+    }
+
+    // (8b) Gói thành viên (note `MEMBERSHIP_PLAN:<planId>`): tạo Membership + chốt tiền.
+    // `payment` là bản đọc TRƯỚC bước (8) nên note/gatewayPayload gốc vẫn còn để tra gói.
+    const memberships = await import("../memberships/memberships.service.js");
+    if (memberships.isMembershipPayment(payment)) {
+      try {
+        await memberships.activateMembership(tx, payment);
+      } catch (err) {
+        if (!(err instanceof AppError)) throw err;
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: "SUCCESS",
+            paidAt: payment.paidAt ?? now,
+            activationStatus: "REQUIRES_REVIEW",
+            reviewReason: err.message,
+            note: `${payment.note ?? ""} | Đã thu tiền nhưng KHÔNG cấp được gói: ${err.message} — cần đối soát (REQUIRES_REVIEW).`,
+          },
+        });
         return finish({
           status: "PROCESSED",
           reason: "ACTIVATION_REJECTED",

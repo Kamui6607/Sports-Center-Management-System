@@ -124,7 +124,7 @@ router.get(
  *     tags: [Payments]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
- *       - { in: query, name: type, schema: { type: string, enum: [CLASS, ORDER] } }
+ *       - { in: query, name: type, schema: { type: string, enum: [CLASS, ORDER, MEMBERSHIP] } }
  *       - { in: query, name: status, schema: { type: string, enum: [PENDING, SUCCESS, FAILED, REFUNDED] } }
  *       - { in: query, name: page, schema: { type: integer } }
  *       - { in: query, name: limit, schema: { type: integer } }

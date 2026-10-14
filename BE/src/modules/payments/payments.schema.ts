@@ -52,7 +52,7 @@ export type SepayWebhookBody = z.infer<typeof SepayWebhookSchema>;
 export const MyPaymentQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
-  type: z.enum(["CLASS", "ORDER"]).optional(),
+  type: z.enum(["CLASS", "ORDER", "MEMBERSHIP"]).optional(),
   status: z.enum(["PENDING", "SUCCESS", "FAILED", "REFUNDED"]).optional(),
 });
 

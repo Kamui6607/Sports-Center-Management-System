@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { createNotification } from "../notifications/notifications.service.js";
+import { isMembershipPayment, MEMBERSHIP_NOTE_PREFIX } from "../memberships/memberships.service.js";
 
 /** Tỷ lệ chia doanh thu: Coach nhận 85%, hệ thống giữ 15% */
 const COACH_REVENUE_SHARE = 0.85;
@@ -245,6 +246,14 @@ export async function listMyPayments(user: { id: string; role: string }, query: 
   const where: Prisma.PaymentWhereInput = { OR: owner };
   if (query.type === "CLASS") where.classId = { not: null };
   if (query.type === "ORDER") where.orderId = { not: null };
+  if (query.type === "MEMBERSHIP") {
+    where.AND = {
+      OR: [
+        { membership: { isNot: null } },
+        { classId: null, orderId: null, note: { startsWith: MEMBERSHIP_NOTE_PREFIX } },
+      ],
+    };
+  }
   if (query.status) where.status = query.status;
 
   const [total, rows] = await Promise.all([
@@ -260,13 +269,14 @@ export async function listMyPayments(user: { id: string; role: string }, query: 
           include: { items: { include: { product: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } } },
         },
         refunds: { where: { status: { not: "REJECTED" } }, select: { id: true, amount: true, status: true } },
+        membership: { select: { id: true, plan: { select: { name: true } } } },
       },
     }),
   ]);
 
   const payments = rows.map((p) => ({
     id: p.id,
-    type: p.orderId ? "ORDER" : "CLASS",
+    type: p.orderId ? "ORDER" : p.membership || isMembershipPayment(p) ? "MEMBERSHIP" : "CLASS",
     amount: p.amount,
     status: p.status,
     method: p.method,
@@ -277,6 +287,8 @@ export async function listMyPayments(user: { id: string; role: string }, query: 
     className: p.classNameSnapshot ?? p.class?.name ?? null,
     orderId: p.orderId,
     orderStatus: p.order?.status ?? null,
+    membershipId: p.membership?.id ?? null,
+    membershipPlanName: p.membership?.plan.name ?? null,
     items:
       p.order?.items.map((i) => ({
         productId: i.productId,

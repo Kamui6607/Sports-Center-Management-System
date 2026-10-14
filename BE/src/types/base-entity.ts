@@ -70,6 +70,8 @@ type BaseEntityModels = {
   UserAddress: Models.UserAddress;
   OrderStatusHistory: Models.OrderStatusHistory;
   InventoryTransaction: Models.InventoryTransaction;
+  MembershipPlan: Models.MembershipPlan;
+  Membership: Models.Membership;
 };
 
 // ── Kiểm tra lúc biên dịch (không sinh code chạy) ────────────────────────────

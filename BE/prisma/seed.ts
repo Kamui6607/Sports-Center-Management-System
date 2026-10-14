@@ -376,6 +376,17 @@ async function main() {
   }
   console.log("Products created");
 
+  // ─── MEMBERSHIP PLANS (gói tập gym tự do) ─────────────
+  const membershipPlans = [
+    { id: "mbp-1m", name: "Gói 1 tháng", durationDays: 30, price: 500000, description: "Tập tự do không giới hạn trong 30 ngày." },
+    { id: "mbp-3m", name: "Gói 3 tháng", durationDays: 90, price: 1200000, description: "Tiết kiệm 20% so với gói tháng." },
+    { id: "mbp-6m", name: "Gói 6 tháng", durationDays: 180, price: 2000000, description: "Tiết kiệm hơn 30% so với gói tháng." },
+  ];
+  for (const p of membershipPlans) {
+    await prisma.membershipPlan.upsert({ where: { id: p.id }, update: {}, create: p });
+  }
+  console.log("Membership plans created");
+
   console.log("  SePay:    sepay.test@example.com   / Member@123");
 }
 

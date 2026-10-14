@@ -225,6 +225,7 @@ model MemberProfile {
   penalties          AttendancePenalty[]
   manualCodeAttempts AttendanceManualCodeAttempt[]
   refunds            Refund[]
+  memberships        Membership[]
 }
 
 enum CoachApprovalStatus {
@@ -440,6 +441,8 @@ model Payment {
   bankTransactions   SepayBankTransaction[]
   refunds            Refund[]
   walletTransactions WalletTransaction[]
+  /// Gói thành viên được cấp khi giao dịch mua gói (note `MEMBERSHIP_PLAN:<planId>`) thu tiền thành công.
+  membership         Membership?
 
   @@index([memberId])
   @@index([status])
@@ -1198,4 +1201,48 @@ enum OrderStatus {
   NOT_PICKED_UP
   REFUND_REQUESTED
   REFUNDED
+}
+
+// ── Gói thành viên (tập gym tự do, không qua lớp/HLV) ────────────────────────
+
+/// Gói thành viên theo thời gian do Manager cấu hình.
+model MembershipPlan {
+  id           String       @id @default(uuid())
+  /// VD: "Gói 1 tháng", "Gói 3 tháng".
+  name         String
+  /// Số ngày hiệu lực (30, 90, 180…).
+  durationDays Int
+  price        Decimal      @db.Decimal(12, 2)
+  description  String?
+  /// Manager bật/tắt gói (gói tắt không bán nữa, membership đã mua vẫn giữ).
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @default(now()) @updatedAt
+  memberships  Membership[]
+}
+
+/// Một lần mua gói thành viên — tạo khi SePay xác nhận đã thu tiền.
+/// Mua tiếp khi còn hạn ⇒ gói mới bắt đầu ngay sau ngày hết hạn gói hiện tại (cộng dồn).
+model Membership {
+  id        String           @id @default(uuid())
+  memberId  String
+  member    MemberProfile    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      MembershipPlan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+  paymentId String?          @unique
+  payment   Payment?         @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  startDate DateTime
+  endDate   DateTime
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
+
+  @@index([memberId])
+  @@index([status])
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
 }
