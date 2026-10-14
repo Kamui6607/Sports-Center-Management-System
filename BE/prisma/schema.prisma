@@ -908,6 +908,12 @@ model Refund {
   memberNote       String?
   /// L8: ghi chú của Manager khi duyệt (VD mã giao dịch chuyển khoản hoàn tiền).
   managerNote      String?
+  /// Ngân hàng nhận tiền hoàn (tên hoặc mã, VD: MBBank, VCB). Null với hoàn tiền đơn hàng.
+  bankName         String?
+  /// Số tài khoản nhận tiền hoàn.
+  bankAccountNumber String?
+  /// Tên chủ tài khoản nhận tiền hoàn (in hoa).
+  bankAccountName  String?
   status           RefundStatus  @default(PENDING)
   requestedById    String?
   requestedBy      User?         @relation("RefundRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)

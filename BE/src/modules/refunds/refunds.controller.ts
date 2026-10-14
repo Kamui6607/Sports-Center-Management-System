@@ -5,7 +5,12 @@ import type { RefundQueryInput } from "./refunds.schema.js";
 
 export async function requestCourseRefund(req: Request, res: Response, next: NextFunction) {
   try {
-    const result = await refundsService.requestCourseRefund(req.user!.id, req.body.classId, req.body.note);
+    const { classId, note, bankName, bankAccountNumber, bankAccountName } = req.body;
+    const result = await refundsService.requestCourseRefund(req.user!.id, classId, note, {
+      bankName,
+      bankAccountNumber,
+      bankAccountName,
+    });
     if (result.refund) {
       sendCreated(res, result, "Course cancellation requested — waiting for manager approval");
     } else {
@@ -31,9 +36,21 @@ export async function listRefunds(req: Request, res: Response, next: NextFunctio
   } catch (err) { next(err); }
 }
 
+export async function getRefundSummary(req: Request, res: Response, next: NextFunction) {
+  try {
+    const summary = await refundsService.getRefundSummary();
+    sendSuccess(res, summary, "Refund summary retrieved successfully");
+  } catch (err) { next(err); }
+}
+
 export async function approveRefund(req: Request, res: Response, next: NextFunction) {
   try {
-    const refund = await refundsService.approveRefund(req.params.id as string, req.user!.id, req.body.note);
+    const refund = await refundsService.approveRefund(
+      req.params.id as string,
+      req.user!.id,
+      req.body.note,
+      req.body.transactionRef
+    );
     sendSuccess(res, refund, "Refund approved");
   } catch (err) { next(err); }
 }

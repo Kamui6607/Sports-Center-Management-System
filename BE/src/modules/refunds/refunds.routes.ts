@@ -42,6 +42,9 @@ const router = Router();
  *             properties:
  *               classId: { type: string }
  *               note: { type: string, maxLength: 500, description: "Lý do hủy (tuỳ chọn)" }
+ *               bankName: { type: string, maxLength: 100, description: "Tên ngân hàng (VD: MBBank, VCB, Techcombank)" }
+ *               bankAccountNumber: { type: string, maxLength: 50, description: "Số tài khoản nhận tiền" }
+ *               bankAccountName: { type: string, maxLength: 100, description: "Tên chủ tài khoản" }
  *     responses:
  *       201: { description: Đã tạo yêu cầu hoàn 100% (PENDING) }
  *       200: { description: Đã hủy ngay, không hoàn tiền (hủy trong vòng 3 ngày trước khai giảng) }
@@ -127,7 +130,8 @@ router.get(
  *           schema:
  *             type: object
  *             properties:
- *               note: { type: string, maxLength: 500, description: "VD mã giao dịch chuyển khoản hoàn tiền" }
+ *               note: { type: string, maxLength: 500, description: "Ghi chú duyệt hoàn tiền" }
+ *               transactionRef: { type: string, maxLength: 100, description: "Mã giao dịch ngân hàng thực tế (FT code)" }
  *     responses:
  *       200: { description: Đã duyệt }
  *       401: { $ref: "#/components/responses/Unauthorized" }
@@ -135,6 +139,26 @@ router.get(
  *       404: { $ref: "#/components/responses/NotFound" }
  *       409: { $ref: "#/components/responses/Conflict" }
  */
+/**
+ * @swagger
+ * /refunds/summary:
+ *   get:
+ *     summary: Thống kê số lượng & số tiền hoàn theo trạng thái và lý do (MANAGER)
+ *     tags: [Refunds]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: "{ totalCount, pending: {count, amount}, completed: {count, amount}, rejected: {count, amount}, cancelled: {count, amount}, byReason: {...} }"
+ *       401: { $ref: "#/components/responses/Unauthorized" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ */
+router.get(
+  "/summary",
+  authenticate,
+  authorize("MANAGER"),
+  refundsController.getRefundSummary
+);
+
 /**
  * @swagger
  * /refunds/course-cancellation/preview:

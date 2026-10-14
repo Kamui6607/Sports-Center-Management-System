@@ -5,7 +5,7 @@ import { AppError } from "../../middlewares/errorHandler.js";
 import { lockPaymentWebhook } from "../../utils/dbLocks.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { enqueueNotification, flushNotificationOutbox } from "../notifications/outbox.service.js";
-import { notifyManagersNewRefunds } from "../refunds/refunds.service.js";
+import { notifyManagersNewRefunds, type PayoutBankDetails } from "../refunds/refunds.service.js";
 import { applyInventory, availableOf } from "./inventory.js";
 import { MANAGER_TRANSITIONS, ORDER_STATUS_LABEL, transitionOrderTx } from "./order-state.js";
 import {
@@ -179,7 +179,8 @@ async function createOrderRefundTx(
   reason: "ORDER_CANCELLED" | "ORDER_NOT_PICKED_UP" | "ORDER_LATE_PAYMENT",
   amount: number,
   requestedById: string | null,
-  note: string | null
+  note: string | null,
+  bankInfo?: PayoutBankDetails
 ) {
   const existing = await tx.refund.findFirst({
     where: { orderId: order.id, reason, status: { not: "REJECTED" } },
@@ -202,6 +203,10 @@ async function createOrderRefundTx(
       coachDebitAmount: 0,
       note,
       memberNote: requestedById ? note : null,
+      // Lưu bank info vào cột riêng nếu có.
+      bankName: bankInfo?.bankName?.trim() || null,
+      bankAccountNumber: bankInfo?.bankAccountNumber?.trim() || null,
+      bankAccountName: bankInfo?.bankAccountName?.trim().toUpperCase() || null,
       requestedById,
     },
   });
@@ -211,7 +216,12 @@ async function createOrderRefundTx(
  * Khách yêu cầu hoàn tiền đơn ĐÃ THANH TOÁN (PAID, Trung tâm chưa xử lý): đơn → REFUND_REQUESTED +
  * Refund PENDING (Manager chuyển khoản tay rồi duyệt ở luồng hoàn tiền có sẵn). Hàng vẫn ở kho tới khi duyệt.
  */
-export async function requestOrderRefund(userId: string, orderId: string, reason: string) {
+export async function requestOrderRefund(
+  userId: string,
+  orderId: string,
+  reason: string,
+  bankInfo?: PayoutBankDetails
+) {
   const owned = await ownOrder(userId, orderId);
   if (owned.status !== "PAID") {
     throw new AppError(
@@ -228,7 +238,7 @@ export async function requestOrderRefund(userId: string, orderId: string, reason
     await lockPaymentWebhook(tx, payment.id);
     const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
     await transitionOrderTx(tx, order, "REFUND_REQUESTED", { actorId: userId, reason, notify: false });
-    return createOrderRefundTx(tx, order, payment, "ORDER_CANCELLED", money(payment.amount), userId, reason);
+    return createOrderRefundTx(tx, order, payment, "ORDER_CANCELLED", money(payment.amount), userId, reason ?? null, bankInfo);
   });
   void notifyManagersNewRefunds(`Khách yêu cầu hủy đơn ${owned.code} — cần hoàn ${money(refund.amount).toLocaleString("vi-VN")}đ.`, {
     refundId: refund.id,

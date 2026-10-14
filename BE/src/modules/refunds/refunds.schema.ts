@@ -8,6 +8,12 @@ export const RefundIdSchema = z.object({
 export const RequestCourseRefundSchema = z.object({
   classId: z.string().min(1),
   note: z.string().trim().max(500).optional(),
+  /** Tên hoặc mã ngân hàng nhận tiền hoàn (VD: MBBank, VCB, Techcombank...). */
+  bankName: z.string().trim().max(100).optional(),
+  /** Số tài khoản ngân hàng nhận tiền hoàn. */
+  bankAccountNumber: z.string().trim().max(50).optional(),
+  /** Tên chủ tài khoản ngân hàng (không dấu hoặc có dấu). */
+  bankAccountName: z.string().trim().max(100).optional(),
 });
 
 /** BE-16: `GET /refunds/course-cancellation/preview?classId=`. */
@@ -16,8 +22,10 @@ export const CourseRefundPreviewSchema = z.object({
 });
 
 export const ApproveRefundSchema = z.object({
-  /** Ghi chú của Manager (VD mã giao dịch chuyển khoản hoàn tiền). */
+  /** Ghi chú của Manager (VD ghi chú nội bộ). */
   note: z.string().trim().max(500).optional(),
+  /** Mã giao dịch chuyển khoản ngân hàng thực tế (FT code / Ref code) để đối soát. */
+  transactionRef: z.string().trim().max(100).optional(),
 });
 
 export const RejectRefundSchema = z.object({

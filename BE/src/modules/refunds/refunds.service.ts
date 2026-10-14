@@ -62,6 +62,54 @@ function refundRecipientUserId(refund: { member: { userId: string } | null; orde
   return refund.member?.userId ?? refund.order?.userId ?? null;
 }
 
+// ── Bank Details & VietQR Helpers ─────────────────────────────────────────────
+
+export interface PayoutBankDetails {
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountName?: string;
+}
+
+export interface RefundBankInfo {
+  bankName: string | null;
+  bankAccountNumber: string | null;
+  bankAccountName: string | null;
+  vietQrUrl: string | null;
+}
+
+/** Xây dựng VietQR URL từ thông tin ngân hàng đã có. */
+function buildVietQrUrl(bankName: string, bankAccountNumber: string, bankAccountName: string | null, amount: number, refundId: string): string {
+  const cleanBank = bankName.replace(/\s+/g, "").toUpperCase();
+  const cleanAcc = bankAccountNumber.replace(/\s+/g, "");
+  const desc = encodeURIComponent(`HOANTIEN ${refundId.slice(0, 8).toUpperCase()}`);
+  const accName = bankAccountName ? encodeURIComponent(bankAccountName.toUpperCase()) : "";
+  return `https://img.vietqr.io/image/${cleanBank}-${cleanAcc}-compact2.png?amount=${amount}&addInfo=${desc}&accountName=${accName}`;
+}
+
+/** Đọc bank info trực tiếp từ các cột riêng trong DB (không còn parse string). */
+export function withBankInfo<T extends {
+  id: string;
+  amount: unknown;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankAccountName?: string | null;
+}>(refund: T): T & { bankInfo: RefundBankInfo | null } {
+  const bankAccountNumber = refund.bankAccountNumber?.trim() || null;
+  const bankName = refund.bankName?.trim() || null;
+  const bankAccountName = refund.bankAccountName?.trim() || null;
+
+  if (!bankAccountNumber) return { ...refund, bankInfo: null };
+
+  const vietQrUrl = bankName
+    ? buildVietQrUrl(bankName, bankAccountNumber, bankAccountName, money(refund.amount), refund.id)
+    : null;
+
+  return {
+    ...refund,
+    bankInfo: { bankName, bankAccountNumber, bankAccountName, vietQrUrl },
+  };
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Giao dịch lớp học ĐÃ THU TIỀN gần nhất của hội viên (chưa bị hoàn toàn bộ). */
@@ -137,7 +185,7 @@ export async function notifyManagersNewRefunds(body: string, metadata: Record<st
  * - Muộn hơn (hoặc khóa đã khai giảng) ⇒ vẫn hủy được NGAY nhưng KHÔNG hoàn tiền: các chỗ đặt trong tương lai của
  *   hội viên trong khóa chuyển CANCELLED, giao dịch giữ SUCCESS, ví HLV không bị trừ.
  */
-export async function requestCourseRefund(userId: string, classId: string, note?: string) {
+export async function requestCourseRefund(userId: string, classId: string, note?: string, bankInfo?: PayoutBankDetails) {
   const memberProfile = await prisma.memberProfile.findUnique({
     where: { userId },
     select: { id: true, user: { select: { fullName: true } } },
@@ -187,6 +235,7 @@ export async function requestCourseRefund(userId: string, classId: string, note?
         throw new AppError("Giao dịch này không còn số tiền nào để hoàn.", 400);
       }
       const debit = await computeCoachDebit(tx, payment, amount);
+      const memberNote = note?.trim() || null;
       const refund = await tx.refund.create({
         data: {
           paymentId: payment.id,
@@ -196,8 +245,12 @@ export async function requestCourseRefund(userId: string, classId: string, note?
           amount,
           coachWalletId: debit.coachWalletId,
           coachDebitAmount: debit.coachDebitAmount,
-          note: note ?? null,
-          memberNote: note ?? null,
+          note: memberNote,
+          memberNote,
+          // Lưu bank info vào cột riêng (không nhét vào note nữa).
+          bankName: bankInfo?.bankName?.trim() || null,
+          bankAccountNumber: bankInfo?.bankAccountNumber?.trim() || null,
+          bankAccountName: bankInfo?.bankAccountName?.trim().toUpperCase() || null,
           requestedById: userId,
         },
         include: refundInclude,
@@ -242,7 +295,7 @@ export async function requestCourseRefund(userId: string, classId: string, note?
     refundPercent: percent,
     refundAmount: outcome.refund ? money(outcome.refund.amount) : 0,
     cancelledEnrollments: outcome.cancelledEnrollments,
-    refund: outcome.refund,
+    refund: outcome.refund ? withBankInfo(outcome.refund) : null,
   };
 }
 
@@ -372,7 +425,7 @@ export async function cancelMyRefund(refundId: string, actor: { id: string; role
     if (refund.orderId) await onOrderRefundRejectedTx(tx, refund, actor.id, "Khách hủy yêu cầu hoàn tiền");
     return updated;
   });
-  return cancelled;
+  return withBankInfo(cancelled);
 }
 
 // ── Buổi học bị hủy (chọn hoàn tiền thay vì dạy bù) ──────────────────────────
@@ -442,7 +495,7 @@ export async function createSessionRefundsTx(
  * - Hủy khóa học: Payment → REFUNDED, hủy mọi chỗ đang giữ của hội viên trong lớp.
  * - Hoàn buổi lẻ: Payment giữ SUCCESS (báo cáo trừ riêng khoản hoàn này).
  */
-export async function approveRefund(refundId: string, managerUserId: string, note?: string) {
+export async function approveRefund(refundId: string, managerUserId: string, note?: string, transactionRef?: string) {
   const approved = await prisma.$transaction(async (tx) => {
     const current = await tx.refund.findUnique({ where: { id: refundId }, select: { paymentId: true } });
     if (!current) throw new AppError("Refund not found", 404);
@@ -510,13 +563,17 @@ export async function approveRefund(refundId: string, managerUserId: string, not
       }
     }
 
+    const finalNote = transactionRef?.trim()
+      ? (note?.trim() ? `${note.trim()} [Mã GD: ${transactionRef.trim()}]` : `[Mã GD: ${transactionRef.trim()}]`)
+      : (note?.trim() || null);
+
     const updated = await tx.refund.update({
       where: { id: refund.id },
       data: {
         status: "COMPLETED",
         processedById: managerUserId,
         processedAt: new Date(),
-        ...(note ? { note, managerNote: note } : {}),
+        ...(finalNote ? { note: finalNote, managerNote: finalNote } : {}),
       },
       include: refundInclude,
     });
@@ -542,7 +599,7 @@ export async function approveRefund(refundId: string, managerUserId: string, not
   });
 
   await flushNotificationOutbox().catch(() => {});
-  return approved;
+  return withBankInfo(approved);
 }
 
 /** Manager TỪ CHỐI (kèm lý do): không trừ ví, không đổi giao dịch; hội viên được thông báo. */
@@ -596,7 +653,7 @@ export async function rejectRefund(refundId: string, managerUserId: string, reas
   });
 
   await flushNotificationOutbox().catch(() => {});
-  return rejected;
+  return withBankInfo(rejected);
 }
 
 // ── Danh sách ────────────────────────────────────────────────────────────────
@@ -624,7 +681,7 @@ async function paginateRefunds(where: Prisma.RefundWhereInput, query: RefundQuer
       take: limit,
     }),
   ]);
-  return { refunds, pagination: buildPaginationMeta(total, page, limit) };
+  return { refunds: refunds.map(withBankInfo), pagination: buildPaginationMeta(total, page, limit) };
 }
 
 /** MANAGER: mọi yêu cầu hoàn tiền (lọc theo trạng thái / lý do / hội viên / lớp). */
@@ -646,7 +703,60 @@ export async function getRefundById(id: string, actor: { id: string; role: strin
   if (!refund) throw new AppError("Refund not found", 404);
   const ownerId = refund.member?.user.id ?? refund.order?.user.id ?? null;
   if (actor.role !== "MANAGER" && ownerId !== actor.id) throw new AppError("Forbidden", 403);
-  return refund;
+  return withBankInfo(refund);
+}
+
+/** Thống kê hoàn tiền dành cho Dashboard của MANAGER: số lượng, số tiền theo trạng thái và theo lý do. */
+export async function getRefundSummary() {
+  const [statusAgg, reasonAgg] = await Promise.all([
+    prisma.refund.groupBy({
+      by: ["status"],
+      _count: { _all: true },
+      _sum: { amount: true },
+    }),
+    prisma.refund.groupBy({
+      by: ["reason"],
+      _count: { _all: true },
+      _sum: { amount: true },
+    }),
+  ]);
+
+  const summary = {
+    totalCount: 0,
+    pending: { count: 0, amount: 0 },
+    completed: { count: 0, amount: 0 },
+    rejected: { count: 0, amount: 0 },
+    cancelled: { count: 0, amount: 0 },
+    byReason: {
+      MEMBER_CANCEL_COURSE: { count: 0, amount: 0 },
+      MEMBER_CANCEL_SESSION: { count: 0, amount: 0 },
+      SESSION_CANCELLED: { count: 0, amount: 0 },
+      ORDER_CANCELLED: { count: 0, amount: 0 },
+      ORDER_NOT_PICKED_UP: { count: 0, amount: 0 },
+      ORDER_LATE_PAYMENT: { count: 0, amount: 0 },
+    } as Record<string, { count: number; amount: number }>,
+  };
+
+  for (const s of statusAgg) {
+    const c = s._count._all;
+    const a = money(s._sum.amount ?? 0);
+    summary.totalCount += c;
+    if (s.status === "PENDING") summary.pending = { count: c, amount: a };
+    else if (s.status === "COMPLETED") summary.completed = { count: c, amount: a };
+    else if (s.status === "REJECTED") summary.rejected = { count: c, amount: a };
+    else if (s.status === "CANCELLED") summary.cancelled = { count: c, amount: a };
+  }
+
+  for (const r of reasonAgg) {
+    if (summary.byReason[r.reason]) {
+      summary.byReason[r.reason] = {
+        count: r._count._all,
+        amount: money(r._sum.amount ?? 0),
+      };
+    }
+  }
+
+  return summary;
 }
 
 /**
