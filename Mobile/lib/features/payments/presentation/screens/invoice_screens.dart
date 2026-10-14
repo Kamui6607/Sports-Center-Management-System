@@ -50,7 +50,7 @@ class _InvoiceCard extends StatelessWidget {
     onTap: () => context.push(AppRoutes.invoice(invoice.id)),
     child: Row(
       children: [
-        IconTile(invoice.purpose == CheckoutPurpose.course ? AppIcons.course : AppIcons.order, large: true),
+        IconTile(invoice.purpose.icon, large: true),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Column(
@@ -120,10 +120,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
                   KeyValueRow(label: 'Phương thức', value: inv.paymentMethod.label),
                   if (inv.transactionCode != null) KeyValueRow(label: 'Mã giao dịch', value: inv.transactionCode!),
                   const Divider(height: AppSpacing.xl),
-                  Text(
-                    inv.purpose == CheckoutPurpose.course ? 'Khóa học' : 'Sản phẩm',
-                    style: context.text.caption.copyWith(color: context.colors.textMuted),
-                  ),
+                  Text(inv.purpose.label, style: context.text.caption.copyWith(color: context.colors.textMuted)),
                   if (inv.lines.length > 1)
                     // L7: đơn nhiều sản phẩm ⇒ hiển thị từng dòng.
                     for (final line in inv.lines)

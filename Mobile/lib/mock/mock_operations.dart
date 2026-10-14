@@ -46,6 +46,7 @@ extension MockOperations on MockDatabase {
     required int amount,
     String? classId,
     String? productOrderId,
+    String? membershipPlanId,
   }) {
     final p = PaymentRow(
       id: nextId('pay'),
@@ -58,6 +59,7 @@ extension MockOperations on MockDatabase {
       expiresAt: now().add(const Duration(minutes: Env.sepayTtlMinutes)),
       classId: classId,
       productOrderId: productOrderId,
+      membershipPlanId: membershipPlanId,
     );
     payments.add(p);
     return p;
@@ -141,6 +143,9 @@ extension MockOperations on MockDatabase {
       if (o.status != ShopOrderStatus.pendingPayment) return;
       settleOrderPayment(p);
       _issueInvoice(p, o.lines.map((l) => l.productName).join(', '), CheckoutPurpose.product, o.itemCount);
+    } else if (p.membershipPlanId != null) {
+      activateMembership(p);
+      _issueInvoice(p, membershipPlan(p.membershipPlanId!)!.name, CheckoutPurpose.membership, null);
     }
   }
 

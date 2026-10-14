@@ -31,6 +31,9 @@ abstract final class AppRoutes {
   static String invoice(String id) => '/invoices/$id';
   static const devTools = '/dev';
 
+  /// HLV / Quản lý quét QR thẻ thành viên của hội viên.
+  static const membershipScanner = '/membership/scan';
+
   // Coach onboarding
   static const onboardingCv = '/onboarding/cv';
   static const onboardingStatus = '/onboarding/status';
@@ -52,6 +55,8 @@ abstract final class AppRoutes {
   static const attendance = '/member/attendance';
   static const training = '/member/training';
   static String trainingPlan(String planId) => '/member/training/$planId';
+  static const membershipPlans = '/member/membership';
+  static const membershipCard = '/member/membership/card';
 
   // Coach — tab
   static const coachHome = '/c/home';

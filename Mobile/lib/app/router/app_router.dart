@@ -33,6 +33,7 @@ import '../../features/manager/presentation/approvals_screen.dart';
 import '../../features/manager/presentation/manager_home_screen.dart';
 import '../../features/manager/presentation/money_review_screens.dart';
 import '../../features/manager/presentation/review_screens.dart';
+import '../../features/membership/presentation/screens/membership_screens.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/payments/presentation/screens/invoice_screens.dart';
 import '../../features/payments/presentation/screens/payment_screen.dart';
@@ -127,6 +128,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       page(AppRoutes.invoices, (_) => const InvoicesScreen()),
       page('/invoices/:id', (s) => InvoiceDetailScreen(invoiceId: s.pathParameters['id']!)),
       page(AppRoutes.devTools, (_) => const DevToolsScreen()),
+      page(AppRoutes.membershipScanner, (_) => const MembershipScannerScreen()),
 
       // ── Coach onboarding ─────────────────────────────────────────────
       page(AppRoutes.onboardingCv, (_) => const CvUploadScreen()),
@@ -152,6 +154,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       page(AppRoutes.attendance, (_) => const AttendanceScreen()),
       page(AppRoutes.training, (_) => const TrainingPlansScreen()),
       page('/member/training/:id', (s) => TrainingPlanScreen(planId: s.pathParameters['id']!)),
+      page(AppRoutes.membershipPlans, (_) => const MembershipPlansScreen()),
+      page(AppRoutes.membershipCard, (_) => const MembershipCardScreen()),
 
       // ── Coach ────────────────────────────────────────────────────────
       StatefulShellRoute.indexedStack(

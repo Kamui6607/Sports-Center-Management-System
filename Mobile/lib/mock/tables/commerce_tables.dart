@@ -18,6 +18,7 @@ class PaymentRow {
     this.memberProfileId,
     this.classId,
     this.productOrderId,
+    this.membershipPlanId,
     this.method = PaymentMethod.sepay,
     this.paidAt,
   });
@@ -29,6 +30,9 @@ class PaymentRow {
   final PaymentMethod method;
   final String? classId;
   final String? productOrderId;
+
+  /// Giao dịch mua gói thành viên (không có classId / productOrderId).
+  final String? membershipPlanId;
   PaymentStatus status;
   final String orderCode;
   final DateTime createdAt;

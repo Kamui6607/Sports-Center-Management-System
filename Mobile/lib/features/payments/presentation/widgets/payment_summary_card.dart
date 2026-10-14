@@ -41,7 +41,7 @@ class PaymentSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xxs),
           Text(
-            '${c.purpose == CheckoutPurpose.course ? 'Khóa học' : 'Đơn sản phẩm'} · Mã đơn ${c.orderCode}',
+            '${c.purpose == CheckoutPurpose.product ? 'Đơn sản phẩm' : c.purpose.label} · Mã đơn ${c.orderCode}',
             style: context.text.caption.copyWith(color: col.textMuted),
           ),
           const SizedBox(height: AppSpacing.md),

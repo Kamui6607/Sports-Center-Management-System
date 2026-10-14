@@ -1,3 +1,6 @@
+import 'package:flutter/widgets.dart';
+
+import '../../../core/icons/app_icons.dart';
 import '../../../core/theme/status_colors.dart';
 import '../../../core/widgets/status_tag.dart';
 import '../domain/entities/payment.dart';
@@ -21,6 +24,20 @@ extension PaymentMethodLabel on PaymentMethod {
     PaymentMethod.cash => 'Tiền mặt',
     PaymentMethod.bankTransfer => 'Chuyển khoản',
     PaymentMethod.sepay => 'VietQR (SePay)',
+  };
+}
+
+extension CheckoutPurposeLabel on CheckoutPurpose {
+  String get label => switch (this) {
+    CheckoutPurpose.course => 'Khóa học',
+    CheckoutPurpose.product => 'Sản phẩm',
+    CheckoutPurpose.membership => 'Gói thành viên',
+  };
+
+  IconData get icon => switch (this) {
+    CheckoutPurpose.course => AppIcons.course,
+    CheckoutPurpose.product => AppIcons.order,
+    CheckoutPurpose.membership => AppIcons.membership,
   };
 }
 

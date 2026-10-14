@@ -65,6 +65,11 @@ class AccountScreen extends ConsumerWidget {
               MenuList(
                 title: 'Tập luyện',
                 items: [
+                  MenuItemData(
+                    icon: AppIcons.membership,
+                    label: 'Thẻ thành viên',
+                    onTap: () => go(AppRoutes.membershipCard),
+                  ),
                   MenuItemData(icon: AppIcons.course, label: 'Khóa học của tôi', onTap: () => go(AppRoutes.myCourses)),
                   MenuItemData(
                     icon: AppIcons.training,
@@ -106,6 +111,11 @@ class AccountScreen extends ConsumerWidget {
                     onTap: () => go(AppRoutes.coachFeedback),
                   ),
                   MenuItemData(icon: AppIcons.add, label: 'Tạo khóa học mới', onTap: () => go(AppRoutes.createClass)),
+                  MenuItemData(
+                    icon: AppIcons.scan,
+                    label: 'Quét thẻ thành viên',
+                    onTap: () => go(AppRoutes.membershipScanner),
+                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),

@@ -4,5 +4,6 @@
 
 export 'tables/class_tables.dart';
 export 'tables/commerce_tables.dart';
+export 'tables/membership_tables.dart';
 export 'tables/people_tables.dart';
 export 'tables/social_tables.dart';

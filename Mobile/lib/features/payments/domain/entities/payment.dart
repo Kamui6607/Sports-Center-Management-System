@@ -3,8 +3,8 @@ enum PaymentStatus { pending, success, failed, refunded }
 
 enum PaymentMethod { cash, bankTransfer, sepay }
 
-/// Mục đích giao dịch: mua khóa học hoặc đơn sản phẩm.
-enum CheckoutPurpose { course, product }
+/// Mục đích giao dịch: mua khóa học, đơn sản phẩm hoặc gói thành viên.
+enum CheckoutPurpose { course, product, membership }
 
 /// Tài khoản nhận tiền của trung tâm (SePay).
 class BankAccount {

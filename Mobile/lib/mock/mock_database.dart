@@ -4,6 +4,7 @@ import '../features/refunds/domain/entities/refund.dart';
 import '../features/schedule/domain/entities/session.dart';
 import 'mock_tables.dart';
 
+export 'membership_operations.dart';
 export 'mock_mappers.dart';
 export 'mock_operations.dart';
 export 'shop_operations.dart';
@@ -45,6 +46,8 @@ class MockDatabase {
   final cartItems = <CartItemRow>[];
   final addresses = <AddressRow>[];
   final inventoryTxs = <InventoryTxRow>[];
+  final membershipPlans = <MembershipPlanRow>[];
+  final memberships = <MembershipRow>[];
 
   /// Khóa đặt hàng do để đơn hết hạn nhiều lần (userId ⇒ mở lại lúc).
   final checkoutLocks = <String, DateTime>{};

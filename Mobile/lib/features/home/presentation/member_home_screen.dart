@@ -13,6 +13,8 @@ import '../../auth/presentation/providers/session_provider.dart';
 import '../../classes/domain/entities/course.dart';
 import '../../classes/presentation/providers/course_providers.dart';
 import '../../classes/presentation/screens/my_courses_screen.dart';
+import '../../membership/presentation/providers/membership_providers.dart';
+import '../../membership/presentation/screens/membership_screens.dart';
 import '../../notifications/presentation/notification_tile.dart';
 import '../../notifications/presentation/providers/notification_providers.dart';
 import '../../schedule/domain/entities/session.dart';
@@ -28,7 +30,8 @@ class MemberHomeScreen extends ConsumerWidget {
       ..invalidate(myCoursesProvider)
       ..invalidate(myAttendanceSummaryProvider)
       ..invalidate(myPenaltiesProvider)
-      ..invalidate(notificationsProvider);
+      ..invalidate(notificationsProvider)
+      ..invalidate(myMembershipProvider);
     ref.invalidate(myAllSessionsProvider);
     await ref.read(myAllSessionsProvider.future);
   }
@@ -48,6 +51,8 @@ class MemberHomeScreen extends ConsumerWidget {
             '${VnTime.weekdayOf(now)}, ${VnTime.date(now)}',
             style: context.text.small.copyWith(color: context.colors.textMuted),
           ),
+          const SizedBox(height: AppSpacing.xs),
+          const MembershipStatusChip(),
           const SizedBox(height: AppSpacing.md),
           const _NextSessionCard(),
           const SizedBox(height: AppSpacing.md),

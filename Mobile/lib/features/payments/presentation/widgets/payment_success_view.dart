@@ -21,6 +21,7 @@ class PaymentSuccessView extends StatelessWidget {
     final col = context.colors;
     final success = context.tones.of(StatusTone.success);
     final isCourse = c.purpose == CheckoutPurpose.course;
+    final isMembership = c.purpose == CheckoutPurpose.membership;
     return Column(
       children: [
         Expanded(
@@ -45,6 +46,8 @@ class PaymentSuccessView extends StatelessWidget {
               Text(
                 isCourse
                     ? 'Bạn đã được ghi danh vào ${c.enrolledSessionCount ?? 0} buổi sắp diễn ra của khóa "${c.title}".'
+                    : isMembership
+                    ? '"${c.title}" đã được kích hoạt. Đưa mã QR thẻ thành viên khi vào phòng tập.'
                     : 'Đơn "${c.title}" đã được thanh toán thành công.',
                 textAlign: TextAlign.center,
                 style: context.text.body.copyWith(color: col.textMuted),
@@ -86,6 +89,22 @@ class PaymentSuccessView extends StatelessWidget {
                   expand: true,
                   onPressed: () => context.pushReplacement(AppRoutes.myCourse(c.classId!)),
                 ),
+              ] else if (isMembership) ...[
+                AppButton(
+                  label: 'Xem thẻ thành viên',
+                  icon: AppIcons.membership,
+                  expand: true,
+                  onPressed: () => context.pushReplacement(AppRoutes.membershipCard),
+                ),
+                if (c.invoiceId != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  AppButton.outline(
+                    label: 'Chi tiết thanh toán',
+                    icon: AppIcons.invoice,
+                    expand: true,
+                    onPressed: () => context.pushReplacement(AppRoutes.invoice(c.invoiceId!)),
+                  ),
+                ],
               ] else ...[
                 AppButton(
                   label: 'Xem đơn hàng',

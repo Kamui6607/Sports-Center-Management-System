@@ -15,12 +15,18 @@ abstract final class PaymentJson {
     final items = order?.objList('items') ?? const <Json>[];
     final itemsTitle = items.map((i) => i.str('productName')).where((n) => n.isNotEmpty).join(', ');
     final createdAt = j.dateOrNull('createdAt');
+    // Mua gói thành viên: không có classId/orderId; tên gói ở `membership.planName` (polling) hoặc `planName` (tạo đơn).
+    final planName = j.objOrNull('membership')?.strOrNull('planName') ?? j.strOrNull('planName');
     return Checkout(
       paymentId: j.str('paymentId'),
       orderCode: j.str('orderCode'),
       amount: j.money('amount'),
       status: j.enumOr('status', PaymentStatus.values, PaymentStatus.pending),
-      purpose: orderId != null ? CheckoutPurpose.product : CheckoutPurpose.course,
+      purpose: orderId != null
+          ? CheckoutPurpose.product
+          : planName != null
+          ? CheckoutPurpose.membership
+          : CheckoutPurpose.course,
       expiresAt:
           j.dateOrNull('expiresAt') ?? (createdAt ?? DateTime.now()).add(const Duration(minutes: Env.sepayTtlMinutes)),
       transferContent: j.str('transferContent', j.str('orderCode')),
@@ -32,7 +38,7 @@ abstract final class PaymentJson {
         accountNumber: bank.str('accountNumber'),
         accountHolder: bank.str('accountHolder'),
       ),
-      title: title ?? classInfo?.strOrNull('name') ?? (itemsTitle.isEmpty ? 'Đơn hàng' : itemsTitle),
+      title: title ?? planName ?? classInfo?.strOrNull('name') ?? (itemsTitle.isEmpty ? 'Đơn hàng' : itemsTitle),
       classId: classId,
       productOrderId: orderId,
       quantity: quantity ?? (items.isEmpty ? null : items.fold<int>(0, (s, i) => s + i.integer('quantity'))),
@@ -47,6 +53,7 @@ abstract final class PaymentJson {
   static Invoice invoice(Json p) {
     final items = p.objList('items');
     final isOrder = p.str('type') == 'ORDER';
+    final isMembership = p.str('type') == 'MEMBERSHIP';
     final lines = [
       for (final i in items)
         InvoiceLine(
@@ -62,8 +69,16 @@ abstract final class PaymentJson {
       invoiceNumber: p.str('transactionCode', p.str('id')),
       status: p.str('status') == 'REFUNDED' ? InvoiceStatus.cancelled : InvoiceStatus.issued,
       issuedAt: p.dateOrNull('paidAt') ?? p.date('createdAt'),
-      purpose: isOrder ? CheckoutPurpose.product : CheckoutPurpose.course,
-      itemName: isOrder ? lines.map((l) => l.name).join(', ') : p.str('className', 'Khóa học'),
+      purpose: isOrder
+          ? CheckoutPurpose.product
+          : isMembership
+          ? CheckoutPurpose.membership
+          : CheckoutPurpose.course,
+      itemName: isOrder
+          ? lines.map((l) => l.name).join(', ')
+          : isMembership
+          ? p.str('membershipPlanName', 'Gói thành viên')
+          : p.str('className', 'Khóa học'),
       subtotal: total,
       discount: 0,
       total: total,

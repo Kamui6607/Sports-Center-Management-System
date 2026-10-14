@@ -140,7 +140,12 @@ class PaymentMockRepository implements PaymentRepository {
     final classId = p.classId;
     final orderId = p.productOrderId;
     final order = orderId == null ? null : db.shopOrders.firstWhere((o) => o.id == orderId);
-    final title = classId != null ? db.classRow(classId).name : order!.lines.map((l) => l.productName).join(', ');
+    final planId = p.membershipPlanId;
+    final title = classId != null
+        ? db.classRow(classId).name
+        : planId != null
+        ? db.membershipPlan(planId)!.name
+        : order!.lines.map((l) => l.productName).join(', ');
     final enrolled = classId == null || p.status != PaymentStatus.success
         ? null
         : db.enrollments
@@ -157,7 +162,11 @@ class PaymentMockRepository implements PaymentRepository {
       orderCode: p.orderCode,
       amount: p.amount,
       status: p.status,
-      purpose: classId != null ? CheckoutPurpose.course : CheckoutPurpose.product,
+      purpose: classId != null
+          ? CheckoutPurpose.course
+          : planId != null
+          ? CheckoutPurpose.membership
+          : CheckoutPurpose.product,
       expiresAt: p.expiresAt,
       transferContent: p.orderCode,
       qrUrl:

@@ -55,6 +55,7 @@ abstract final class AppIcons {
 
   // Nghiệp vụ
   static const IconData qr = LucideIcons.qrCode;
+  static const IconData membership = LucideIcons.idCard;
   static const IconData scan = LucideIcons.scanLine;
   static const IconData keyboard = LucideIcons.keyboard;
   static const IconData flash = LucideIcons.flashlight;

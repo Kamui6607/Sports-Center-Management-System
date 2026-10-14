@@ -3,6 +3,7 @@ import 'seed_class_activity.dart';
 import 'seed_classes.dart';
 import 'seed_commerce.dart';
 import 'seed_helpers.dart';
+import 'seed_memberships.dart';
 import 'seed_people.dart';
 import 'seed_social.dart';
 
@@ -23,6 +24,7 @@ MockDatabase seedDatabase(DateTime Function() now) {
   seedPeople(seeder);
   seedClassActivity(seeder, seedClasses(seeder));
   seedCommerce(seeder);
+  seedMemberships(seeder);
   seedSocial(seeder);
   return db;
 }

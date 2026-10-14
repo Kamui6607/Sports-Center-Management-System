@@ -26,7 +26,14 @@ class CoachHomeScreen extends ConsumerWidget {
     final now = DateTime.now();
     return AppScaffold(
       titleWidget: const BrandLogo(),
-      actions: const [HeaderActions()],
+      actions: [
+        IconButton(
+          tooltip: 'Quét thẻ thành viên',
+          icon: const Icon(AppIcons.scan),
+          onPressed: () => context.push(AppRoutes.membershipScanner),
+        ),
+        const HeaderActions(),
+      ],
       body: AsyncValueView(
         value: value,
         loading: const SkeletonDetail(),

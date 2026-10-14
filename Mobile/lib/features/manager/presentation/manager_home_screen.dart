@@ -158,6 +158,13 @@ class _ShopSection extends ConsumerWidget {
           expand: true,
           onPressed: () => context.push(AppRoutes.pickupScan),
         ),
+        const SizedBox(height: AppSpacing.xs),
+        AppButton.outline(
+          label: 'Quét thẻ thành viên',
+          icon: AppIcons.membership,
+          expand: true,
+          onPressed: () => context.push(AppRoutes.membershipScanner),
+        ),
       ],
     );
   }
