@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { computeAttendanceBuckets } from "../attendance/attendance-analytics.service.js";
@@ -101,8 +102,8 @@ export async function getMemberReport(startDate: string, endDate: string) {
   const end = new Date(`${endDate}T23:59:59.999+07:00`);
   const now = new Date();
 
-  // BR-19: Use distinct memberId to count PEOPLE not subscriptions
-  const [totalMembers, newMembers, activeSubs] = await Promise.all([
+  // BR-19: đếm NGƯỜI (distinct memberId), không đếm số lần mua gói.
+  const [totalMembers, newMembers, activeMemberships] = await Promise.all([
     // Count members whose user is still MEMBER role and active
     prisma.memberProfile.count({
       where: { user: { role: { name: "MEMBER" }, isActive: true } },
@@ -113,38 +114,33 @@ export async function getMemberReport(startDate: string, endDate: string) {
         user: { role: { name: "MEMBER" }, isActive: true },
       },
     }),
-    (prisma as any).membershipSubscription.findMany({
-      where: { status: "ACTIVE", startDate: { lte: now }, endDate: { gte: now } },
-      select: { memberId: true, tier: true },
+    prisma.membership.findMany({
+      where: { status: "ACTIVE", startDate: { lte: now }, endDate: { gt: now } },
+      select: { memberId: true, plan: { select: { name: true } } },
+      orderBy: { endDate: "desc" },
     }),
   ]);
 
-  // Count distinct members (max tier per person)
-  const memberTierMap: Record<string, string> = {};
-  for (const s of activeSubs) {
-    // Priority: PREMIUM > MEMBERSHIP
-    if (!memberTierMap[s.memberId] || s.tier === "PREMIUM") {
-      memberTierMap[s.memberId] = s.tier;
-    }
+  // Mỗi người tính 1 lần, theo gói có hạn xa nhất (orderBy endDate desc ⇒ dòng đầu của mỗi người).
+  const memberPlanMap: Record<string, string> = {};
+  for (const m of activeMemberships) {
+    if (!memberPlanMap[m.memberId]) memberPlanMap[m.memberId] = m.plan.name;
   }
 
-  const activeCount = Object.keys(memberTierMap).length;
-  const tierCounts: Record<string, number> = { FREE: 0, MEMBERSHIP: 0, PREMIUM: 0 };
-  for (const tier of Object.values(memberTierMap)) {
-    tierCounts[tier] = (tierCounts[tier] ?? 0) + 1;
+  const activeCount = Object.keys(memberPlanMap).length;
+  const planCounts: Record<string, number> = {};
+  for (const name of Object.values(memberPlanMap)) {
+    planCounts[name] = (planCounts[name] ?? 0) + 1;
   }
-  // Member KHÔNG có gói ACTIVE hiệu lực → coi như đang ở gói FREE mặc định (provisioning).
-  // KHÔNG được ghi đè số FREE thật bằng (totalMembers - activeCount) như trước — cách cũ
-  // biến member FREE đang hoạt động thành 0 khi mọi member đều FREE.
-  tierCounts.FREE += Math.max(0, totalMembers - activeCount);
 
   return {
     totalMembers,
     newMembers,
     activeMembers: activeCount,
-    expiredMembers: totalMembers - activeCount,
-    membersByTier: tierCounts,
-    note: "membersByTier counts PEOPLE (max tier per person), not subscriptions.",
+    expiredMembers: Math.max(0, totalMembers - activeCount),
+    // Tên khóa giữ nguyên cho FE; giá trị là số người theo TÊN GÓI đang hiệu lực (không còn hạng gói).
+    membersByTier: planCounts,
+    note: "membersByTier counts PEOPLE by their active membership plan name (one plan per person).",
   };
 }
 
@@ -219,26 +215,19 @@ export async function getMembershipReport(startDate: string, endDate: string) {
   const now = new Date();
   const dateFilter = { createdAt: { gte: start, lte: end } };
 
-  const [totalSubs, newSubs, byStatus, byTier, revenueAgg] = await Promise.all([
-    (prisma as any).membershipSubscription.count(),
-    (prisma as any).membershipSubscription.count({ where: dateFilter }),
-    (prisma as any).membershipSubscription.groupBy({
-      by: ["status"],
+  const [totalSubs, newSubs, byStatus, activeByPlan, revenueAgg] = await Promise.all([
+    prisma.membership.count(),
+    prisma.membership.count({ where: dateFilter }),
+    prisma.membership.groupBy({ by: ["status"], _count: true }),
+    // BR-19: gói đang hiệu lực hiện tại (không giới hạn theo kỳ), nhóm theo gói.
+    prisma.membership.groupBy({
+      by: ["planId"],
+      where: { status: "ACTIVE", startDate: { lte: now }, endDate: { gt: now } },
       _count: true,
     }),
-    // BR-19: Count subscriptions currently effective (not just in date range) by tier
-    (prisma as any).membershipSubscription.groupBy({
-      by: ["tier"],
-      where: { status: "ACTIVE", startDate: { lte: now }, endDate: { gte: now } },
-      _count: true,
-    }),
-    // BR-20: Use paidAt for revenue
+    // BR-20: doanh thu theo paidAt — chỉ tính giao dịch MUA GÓI thành viên.
     prisma.payment.aggregate({
-      where: {
-        paidAt: { gte: start, lte: end },
-        status: "SUCCESS",
-        
-      },
+      where: { paidAt: { gte: start, lte: end }, status: "SUCCESS", membership: { isNot: null } },
       _sum: { amount: true },
     }),
   ]);
@@ -246,8 +235,17 @@ export async function getMembershipReport(startDate: string, endDate: string) {
   const statusMap: Record<string, number> = {};
   for (const s of byStatus) statusMap[s.status] = s._count;
 
-  const tierMap: Record<string, number> = { MEMBERSHIP: 0, PREMIUM: 0 };
-  for (const t of byTier) tierMap[t.tier] = t._count;
+  const plans = await prisma.membershipPlan.findMany({
+    where: { id: { in: activeByPlan.map((r) => r.planId) } },
+    select: { id: true, name: true },
+  });
+  const planName = new Map(plans.map((p) => [p.id, p.name]));
+  // Tên khóa `subscriptionsByTier` giữ nguyên cho FE; giá trị nhóm theo TÊN GÓI.
+  const planMap: Record<string, number> = {};
+  for (const r of activeByPlan) {
+    const name = planName.get(r.planId) ?? r.planId;
+    planMap[name] = (planMap[name] ?? 0) + r._count;
+  }
 
   return {
     totalSubscriptions: totalSubs,
@@ -255,8 +253,8 @@ export async function getMembershipReport(startDate: string, endDate: string) {
     activeSubscriptions: statusMap["ACTIVE"] ?? 0,
     expiredSubscriptions: statusMap["EXPIRED"] ?? 0,
     cancelledSubscriptions: statusMap["CANCELLED"] ?? 0,
-    suspendedSubscriptions: statusMap["SUSPENDED"] ?? 0,
-    subscriptionsByTier: tierMap,
+    suspendedSubscriptions: 0,
+    subscriptionsByTier: planMap,
     totalRevenue: Number(revenueAgg._sum.amount ?? 0),
   };
 }
@@ -266,7 +264,7 @@ export async function getSubscriptionLogs(startDate?: string, endDate?: string, 
   const limit = Math.min(100, Math.max(1, parseInt(limitStr ?? "20") || 20));
   const skip = (page - 1) * limit;
 
-  const where: any = {};
+  const where: Prisma.MembershipWhereInput = {};
   if (startDate && endDate) {
     const start = new Date(`${startDate}T00:00:00+07:00`);
     const end = new Date(`${endDate}T23:59:59.999+07:00`);
@@ -274,8 +272,8 @@ export async function getSubscriptionLogs(startDate?: string, endDate?: string, 
   }
 
   const [total, subs] = await Promise.all([
-    (prisma as any).membershipSubscription.count({ where }),
-    (prisma as any).membershipSubscription.findMany({
+    prisma.membership.count({ where }),
+    prisma.membership.findMany({
       where,
       orderBy: { createdAt: "desc" },
       skip,
@@ -283,23 +281,23 @@ export async function getSubscriptionLogs(startDate?: string, endDate?: string, 
       include: {
         member: { include: { user: { select: { fullName: true, email: true } } } },
         plan: { select: { name: true, price: true } },
-        payments: { select: { amount: true, status: true, paidAt: true }, take: 1, orderBy: { createdAt: "desc" } }
-      }
-    })
+        payment: { select: { amount: true, status: true, paidAt: true } },
+      },
+    }),
   ]);
 
-  const formattedLogs = subs.map((sub: any) => ({
+  const formattedLogs = subs.map((sub) => ({
     id: sub.id,
-    action: "Mua / Gia hạn gói", // Action description as requested
+    action: "Mua / Gia hạn gói",
     username: sub.member.user.fullName,
     email: sub.member.user.email,
     planName: sub.plan.name,
-    planTier: sub.tier,
-    price: Number(sub.payments[0]?.amount ?? sub.plan.price),
-    paymentStatus: sub.payments[0]?.status ?? "N/A",
+    planTier: sub.plan.name,
+    price: Number(sub.payment?.amount ?? sub.plan.price),
+    paymentStatus: sub.payment?.status ?? "N/A",
     startDate: sub.startDate,
     endDate: sub.endDate,
-    purchasedAt: sub.createdAt, // Real-time timestamp
+    purchasedAt: sub.createdAt,
   }));
 
   return {
@@ -309,7 +307,7 @@ export async function getSubscriptionLogs(startDate?: string, endDate?: string, 
       limit,
       total,
       totalPages: Math.ceil(total / limit),
-    }
+    },
   };
 }
 
