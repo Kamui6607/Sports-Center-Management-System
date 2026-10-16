@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "dev:local": "node scripts/with-local-env.mjs tsx watch src/server.ts",
-    "build": "tsc",
+    "postinstall": "prisma generate",
+    "build": "prisma generate && tsc",
     "start": "node dist/server.js",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
@@ -29,6 +30,7 @@
     "test:smoke:shop:local": "node scripts/with-local-env.mjs tsx tests/smoke-shop.local.ts"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^2.11.0",
     "cors": "^2.8.5",
@@ -45,7 +47,6 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@prisma/client": "^5.22.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.18",
     "@types/express": "^5.0.3",
