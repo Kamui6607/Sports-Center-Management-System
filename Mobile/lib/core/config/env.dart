@@ -43,7 +43,10 @@ abstract final class Env {
 
   /// URL staging / prod — truyền qua `--dart-define` khi BE được triển khai.
   static const String _stagingBaseUrl = String.fromEnvironment('API_BASE_URL_STAGING');
-  static const String _prodBaseUrl = String.fromEnvironment('API_BASE_URL_PROD');
+  static const String _prodBaseUrl = String.fromEnvironment(
+    'API_BASE_URL_PROD',
+    defaultValue: 'https://sports-center-management-system-2jgl.onrender.com',
+  );
 
   /// Origin BE theo môi trường. Dev: Android emulator dùng `10.0.2.2` (localhost
   /// của máy dev), iOS simulator / desktop dùng `localhost`. Thiết bị thật: truyền

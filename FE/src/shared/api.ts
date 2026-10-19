@@ -44,7 +44,7 @@ export const contract = operations as unknown as Record<string, Operation>;
 export const BASE_URL = (
   (import.meta as unknown as { env: Record<string, string> }).env
     .VITE_API_BASE_URL ||
-  "https://sports-center-management-system.onrender.com/api/v1"
+  "https://sports-center-management-system-2jgl.onrender.com/api/v1"
 ).replace(/\/$/, "");
 let accessToken = sessionStorage.getItem("pulse.access") || "";
 let refreshToken = sessionStorage.getItem("pulse.refresh") || "";
