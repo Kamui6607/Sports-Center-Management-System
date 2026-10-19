@@ -36,6 +36,7 @@ class MemberProfileRow {
     required this.id,
     required this.userId,
     this.fitnessGoal,
+    this.fitnessGoals = const [],
     this.trainingLevel,
     this.trainingPreference,
   });
@@ -43,6 +44,7 @@ class MemberProfileRow {
   final String id;
   final String userId;
   String? fitnessGoal;
+  List<String> fitnessGoals;
   TrainingLevel? trainingLevel;
   String? trainingPreference;
 }

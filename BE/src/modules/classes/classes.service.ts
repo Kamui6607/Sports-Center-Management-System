@@ -4,6 +4,11 @@ import { buildPaginationMeta } from "../../utils/pagination.js";
 import { broadcastNotification, createNotification } from "../notifications/notifications.service.js";
 import { evaluateCourseEligibility } from "../enrollments/course-enrollment.service.js";
 import { getMemberPurchase, withClassSummaries } from "./class-summary.service.js";
+import { computeGoalMatch, FITNESS_GOALS, GYM_FITNESS, type GoalMatch } from "../../config/fitness-goals.js";
+import { foldVietnamese } from "../../utils/i18n.js";
+import { resubmitActivityPlan } from "../class-schedules/class-schedules.service.js";
+import type { ClassDraftInput } from "./classes.schema.js";
+import type { TrainingLevel } from "@prisma/client";
 
 /** Người gọi API (null = Guest — BE-1). */
 type Actor = { id: string; role: string } | undefined;
@@ -41,6 +46,27 @@ async function withEnrollmentCountOne<T extends { id: string; _count: { schedule
   return withEnrollmentCount(cls, await countEnrollmentsByClass([cls.id]));
 }
 
+/** Mục tiêu + trình độ của hội viên (để tính độ phù hợp khóa học). */
+async function memberGoalsOf(actor?: Actor) {
+  if (actor?.role !== "MEMBER") return null;
+  return prisma.memberProfile.findUnique({
+    where: { userId: actor.id },
+    select: { fitnessGoals: true, trainingLevel: true },
+  });
+}
+
+function withGoalMatch<T extends { goalTags: string[]; targetLevel: TrainingLevel | null }>(
+  cls: T,
+  member: { fitnessGoals: string[]; trainingLevel: TrainingLevel | null } | null
+): T & { goalMatch: GoalMatch | null } {
+  return { ...cls, goalMatch: member ? computeGoalMatch(member, cls) : null };
+}
+
+/** Danh mục mục tiêu tập luyện (công khai) — Coach gắn cho khóa, Member chọn cho hồ sơ. */
+export function listGoalOptions() {
+  return FITNESS_GOALS.map((g) => ({ ...g }));
+}
+
 export async function listClasses(query: any, actor?: Actor) {
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
@@ -50,7 +76,7 @@ export async function listClasses(query: any, actor?: Actor) {
   if (query.fitness) where.fitness = { equals: String(query.fitness).trim(), mode: "insensitive" };
   if (query.classType) where.classType = query.classType;
   if (query.areaType) where.areaType = query.areaType;
-  if (query.search) where.name = { contains: query.search, mode: "insensitive" };
+  if (query.goal) where.goalTags = { has: query.goal };
   if (query.coachId) where.coachId = query.coachId;
   if (query.status) {
     where.status = query.status;
@@ -63,6 +89,9 @@ export async function listClasses(query: any, actor?: Actor) {
       where.coachId = coachProfile.id;
     } else if (coachProfile && !query.status) {
       where.OR = [{ status: "APPROVED" }, { coachId: coachProfile.id }];
+    } else if (query.status === "DRAFT") {
+      // Bản nháp chỉ chủ khóa thấy.
+      where.coachId = coachProfile?.id ?? "__none__";
     }
   } else if (actor?.role === "MEMBER" && !query.status) {
     // Member chỉ thấy class APPROVED
@@ -72,6 +101,24 @@ export async function listClasses(query: any, actor?: Actor) {
     where.status = "APPROVED";
     where.isActive = true;
     delete where.coachId;
+  }
+  // Bản nháp là của riêng Coach — Manager/Member không thấy (kể cả khi lọc status=DRAFT).
+  if (actor?.role !== "COACH") {
+    if (where.status === "DRAFT") where.id = "__none__";
+    else if (!where.status) where.status = { not: "DRAFT" };
+  }
+
+  const member = await memberGoalsOf(actor);
+  const matchMine = query.matchMyGoals === "true" && member;
+  if (matchMine) {
+    where.goalTags = member.fitnessGoals.length ? { hasSome: member.fitnessGoals } : { has: "__none__" };
+  }
+
+  // Tìm không dấu: so khớp tên đã bỏ dấu (PostgreSQL chưa bật unaccent) — số khóa học nhỏ nên lọc trong bộ nhớ.
+  if (query.search && String(query.search).trim()) {
+    const needle = foldVietnamese(String(query.search));
+    const candidates = await prisma.class.findMany({ where, select: { id: true, name: true } });
+    where.id = { in: candidates.filter((c) => foldVietnamese(c.name).includes(needle)).map((c) => c.id) };
   }
 
   const [total, classes] = await Promise.all([
@@ -84,10 +131,13 @@ export async function listClasses(query: any, actor?: Actor) {
   ]);
   const counts = await countEnrollmentsByClass(classes.map((c) => c.id));
   // BE-12: kèm `summary` (lịch, chỗ trống, học viên) + điểm HLV; Guest không thấy email HLV.
-  const withSummary = await withClassSummaries(
-    classes.map((c) => withEnrollmentCount(c, counts)),
-    { hideCoachEmail: !actor }
-  );
+  const withSummary = (
+    await withClassSummaries(
+      classes.map((c) => withEnrollmentCount(c, counts)),
+      { hideCoachEmail: !actor }
+    )
+  ).map((c) => withGoalMatch(c, member));
+  if (matchMine) withSummary.sort((a, b) => (b.goalMatch?.score ?? 0) - (a.goalMatch?.score ?? 0));
   return { classes: withSummary, pagination: buildPaginationMeta(total, page, limit) };
 }
 
@@ -105,6 +155,7 @@ export async function createClass(data: any, actor: { id: string; role: string }
     const cls = await tx.class.create({
       data: {
         ...data,
+        fitness: data.fitness || GYM_FITNESS,
         status: "PENDING",
         coachId: coachProfile.id,
       },
@@ -212,8 +263,12 @@ export async function getClassById(id: string, actor?: Actor) {
   if (!cls) throw new AppError("Class not found", 404);
   // BE-1: Guest chỉ xem được khóa đang mở bán.
   if (!actor && (cls.status !== "APPROVED" || !cls.isActive)) throw new AppError("Class not found", 404);
+  // Bản nháp chỉ chủ khóa xem được.
+  if (cls.status === "DRAFT" && (actor?.role !== "COACH" || cls.coach.user.id !== actor.id)) {
+    throw new AppError("Class not found", 404);
+  }
   const [withSummary] = await withClassSummaries([await withEnrollmentCountOne(cls)], { hideCoachEmail: !actor });
-  return withSummary;
+  return withGoalMatch(withSummary, await memberGoalsOf(actor));
 }
 
 /**
@@ -241,6 +296,9 @@ export async function updateClass(id: string, data: any, actor?: { id: string; r
   });
   if (!cls) throw new AppError("Class not found", 404);
 
+  if (cls.status === "DRAFT") {
+    throw new AppError("Bản nháp chỉ được sửa trong màn tạo khóa học của HLV.", 400, { code: "CLASS_IS_DRAFT" });
+  }
   // Coach chỉ được sửa class PENDING của chính mình
   if (actor?.role === "COACH") {
     if (cls.coach.userId !== actor.id) {
@@ -385,15 +443,23 @@ export async function getClassCoursePlan(
       name: true,
       description: true,
       goal: true,
+      goalTags: true,
+      targetLevel: true,
+      startDate: true,
+      endDate: true,
       fitness: true,
       classType: true,
       areaType: true,
       capacity: true,
       isActive: true,
       status: true,
+      coach: { select: { userId: true } },
     },
   });
   if (!cls) throw new AppError("Class not found", 404);
+  if (cls.status === "DRAFT" && (actor?.role !== "COACH" || cls.coach.userId !== actor.id)) {
+    throw new AppError("Class not found", 404);
+  }
   // BE-1: Guest chỉ xem lộ trình của khóa đang mở bán.
   if (!actor && (cls.status !== "APPROVED" || !cls.isActive)) throw new AppError("Class not found", 404);
 
@@ -407,7 +473,10 @@ export async function getClassCoursePlan(
       endTime: true,
       status: true,
       roomId: true,
-      room: { select: { id: true, name: true, areaType: true } },
+      makeupForId: true,
+      originalStartTime: true,
+      rescheduleReason: true,
+      room: { select: { id: true, name: true, areaType: true, location: true, floor: true, directions: true } },
       _count: {
         select: {
           enrollments: { where: { status: { in: ["BOOKED", "COMPLETED"] } } },
@@ -462,7 +531,18 @@ export async function getClassCoursePlan(
       weekdayLabel: vnWeekdayLabel(weekday),
       timeLabel: `${vnClock(s.startTime)} – ${vnClock(s.endTime)}`,
       status: s.status,
-      room: { id: s.room.id, name: s.room.name, areaType: s.room.areaType },
+      room: {
+        id: s.room.id,
+        name: s.room.name,
+        areaType: s.room.areaType,
+        location: s.room.location,
+        floor: s.room.floor,
+        directions: s.room.directions,
+      },
+      isMakeup: s.makeupForId !== null,
+      /** Buổi đã bị HLV dời lịch: giờ ban đầu + lý do. */
+      originalStartTime: s.originalStartTime,
+      rescheduleReason: s.rescheduleReason,
       bookedCount,
       remainingSlots,
       isFull,
@@ -522,6 +602,10 @@ export async function getClassCoursePlan(
 
   const firstSession = sessions[0];
   const lastSession = sessions[sessions.length - 1];
+  const memberGoals = await memberGoalsOf(actor);
+  const pastSessionCount = await prisma.classSchedule.count({
+    where: { classId, status: { not: "CANCELLED" }, startTime: { lte: now } },
+  });
 
   return {
     course:
@@ -532,6 +616,11 @@ export async function getClassCoursePlan(
             className: cls.name,
             description: cls.description,
             goal: cls.goal,
+            goalTags: cls.goalTags,
+            targetLevel: cls.targetLevel,
+            startDate: cls.startDate,
+            endDate: cls.endDate,
+            pastSessionCount,
             fitness: cls.fitness,
             classType: cls.classType,
             areaType: cls.areaType,
@@ -564,6 +653,7 @@ export async function getClassCoursePlan(
             },
           },
     sessions,
+    goalMatch: memberGoals ? computeGoalMatch(memberGoals, cls) : null,
     registration: memberProfile
       ? {
           eligible: (eligibility?.blockers.length ?? 0) === 0,
@@ -580,4 +670,87 @@ export async function getClassCoursePlan(
         }
       : null,
   };
+}
+
+
+// ─────────────────────────────────────────
+// BẢN NHÁP KHÓA HỌC (Doc/GYM_SCOPE_CHANGES.md §10.2)
+// ─────────────────────────────────────────
+
+/** Số bản nháp tối đa một HLV giữ cùng lúc. */
+export const MAX_DRAFTS_PER_COACH = 10;
+
+function draftColumns(data: ClassDraftInput) {
+  const out: Record<string, unknown> = {};
+  if (data.name !== undefined) out.name = data.name;
+  if (data.description !== undefined) out.description = data.description || null;
+  if (data.goal !== undefined) out.goal = data.goal || null;
+  if (data.goalTags !== undefined) out.goalTags = [...new Set(data.goalTags)];
+  if (data.targetLevel !== undefined) out.targetLevel = data.targetLevel;
+  if (data.capacity !== undefined) out.capacity = data.capacity;
+  if (data.classType !== undefined) out.classType = data.classType;
+  if (data.price !== undefined) out.price = data.price;
+  if (data.draftData !== undefined) out.draftData = data.draftData as object;
+  return out;
+}
+
+async function ownDraft(classId: string, actor: { id: string; role: string }) {
+  const cls = await prisma.class.findUnique({ where: { id: classId }, include: { coach: { select: { userId: true } } } });
+  if (!cls || cls.coach.userId !== actor.id) throw new AppError("Không tìm thấy bản nháp.", 404, { code: "DRAFT_NOT_FOUND" });
+  if (cls.status !== "DRAFT") {
+    throw new AppError("Khóa học này đã được gửi duyệt, không còn là bản nháp.", 409, { code: "CLASS_NOT_DRAFT", classStatus: cls.status });
+  }
+  return cls;
+}
+
+/** HLV tạo bản nháp (wizard lưu lần đầu) — chưa giữ phòng, chưa tạo buổi. */
+export async function createDraft(data: ClassDraftInput, actor: { id: string; role: string }) {
+  if (actor.role !== "COACH") throw new AppError("Chỉ Coach được tạo khóa học", 403);
+  const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: actor.id } });
+  if (!coachProfile) throw new AppError("Coach profile not found", 404);
+  const drafts = await prisma.class.count({ where: { coachId: coachProfile.id, status: "DRAFT" } });
+  if (drafts >= MAX_DRAFTS_PER_COACH) {
+    throw new AppError(`Bạn đang có ${drafts} bản nháp — hãy hoàn tất hoặc xóa bớt (tối đa ${MAX_DRAFTS_PER_COACH}).`, 409, {
+      code: "DRAFT_LIMIT",
+      max: MAX_DRAFTS_PER_COACH,
+    });
+  }
+  const cls = await prisma.class.create({
+    data: {
+      name: "",
+      fitness: GYM_FITNESS,
+      capacity: 12,
+      areaType: "INDOOR",
+      ...draftColumns(data),
+      status: "DRAFT",
+      coachId: coachProfile.id,
+    },
+    include: classInclude,
+  });
+  return withEnrollmentCountOne(cls);
+}
+
+/** Tự lưu bản nháp (ghi đè các field được gửi). */
+export async function updateDraft(classId: string, data: ClassDraftInput, actor: { id: string; role: string }) {
+  await ownDraft(classId, actor);
+  const cls = await prisma.class.update({ where: { id: classId }, data: draftColumns(data), include: classInclude });
+  return withEnrollmentCountOne(cls);
+}
+
+/** Xóa bản nháp (chưa có buổi/giao dịch nên xóa hẳn). */
+export async function deleteDraft(classId: string, actor: { id: string; role: string }) {
+  await ownDraft(classId, actor);
+  await prisma.class.delete({ where: { id: classId } });
+  return { id: classId, deleted: true };
+}
+
+/** Gửi duyệt bản nháp: kiểm tra đầy đủ, giữ phòng, tạo buổi ⇒ PENDING (cùng luật với tạo kế hoạch). */
+export async function submitDraft(classId: string, plan: any, actor: { id: string; role: string }) {
+  await ownDraft(classId, actor);
+  if (!plan?.class?.goalTags?.length) {
+    throw new AppError("Chọn ít nhất 1 mục tiêu cho khóa học trước khi gửi duyệt.", 400, {
+      code: "CLASS_GOALS_REQUIRED",
+    });
+  }
+  return resubmitActivityPlan(classId, plan, actor, { fromDraft: true });
 }

@@ -68,6 +68,7 @@ class ProfileUpdate {
     this.gender,
     this.dateOfBirth,
     this.fitnessGoal,
+    this.fitnessGoals,
     this.trainingLevel,
     this.trainingPreference,
     this.specialization,
@@ -80,6 +81,9 @@ class ProfileUpdate {
   final Gender? gender;
   final DateTime? dateOfBirth;
   final String? fitnessGoal;
+
+  /// Mã mục tiêu chọn từ gợi ý (null = không đổi).
+  final List<String>? fitnessGoals;
   final TrainingLevel? trainingLevel;
   final String? trainingPreference;
   final String? specialization;

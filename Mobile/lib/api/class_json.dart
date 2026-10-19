@@ -1,5 +1,6 @@
 import '../core/network/api_client.dart';
 import '../core/network/json.dart';
+import '../features/auth/domain/entities/app_user.dart';
 import '../features/catalog/domain/entities/catalog.dart';
 import '../features/classes/domain/entities/course.dart';
 import '../features/schedule/domain/entities/session.dart';
@@ -53,6 +54,101 @@ abstract final class ClassJson {
       minRemainingSlots: stats?.minRemainingSlots,
       rejectReason: cls.strOrNull('rejectReason'),
       coachRevenue: coachRevenue,
+      goal: cls.strOrNull('goal'),
+      goalTags: cls.strList('goalTags'),
+      targetLevel: cls.enumOrNull('targetLevel', TrainingLevel.values),
+      startDate: cls.dateOrNull('startDate') ?? stats?.firstSessionStart,
+      endDate: cls.dateOrNull('endDate') ?? stats?.lastSessionEnd,
+      goalMatch: goalMatch(cls.objOrNull('goalMatch')),
+    );
+  }
+
+  /// `goalMatch` của BE (null với Guest/HLV).
+  static GoalMatch? goalMatch(Json? g) => g == null
+      ? null
+      : GoalMatch(
+          score: g.integer('score'),
+          level: g.enumOr('level', GoalMatchLevel.values, GoalMatchLevel.unknown),
+          matchedGoals: [for (final m in g.objList('matchedGoals')) m.str('code')],
+          message: g.str('message'),
+        );
+
+  /// Một dòng `GET /enrollments/my/courses` — thông tin khóa theo snapshot lúc mua.
+  static MemberCourse memberCourse(Json r) {
+    final cls = r.obj('class');
+    final coach = cls.obj('coach');
+    final pay = r.obj('payment');
+    final review = r.objOrNull('myReview');
+    return MemberCourse(
+      classId: r.str('classId', cls.str('id')),
+      status: r.enumOr('courseStatus', MemberCourseStatus.values, MemberCourseStatus.ongoing),
+      className: cls.str('name', 'Khóa học'),
+      coachName: coach.str('fullName', 'Huấn luyện viên'),
+      coachProfileId: coach.strOrNull('id'),
+      coachUserId: coach.strOrNull('userId'),
+      coachAvatarUrl: ApiClient.absoluteUrl(coach.strOrNull('avatarUrl')),
+      goal: cls.strOrNull('goal'),
+      amountPaid: pay.money('amount'),
+      paidAt: pay.dateOrNull('paidAt'),
+      paymentId: pay.strOrNull('id'),
+      pendingExpiresAt: pay.dateOrNull('pendingExpiresAt'),
+      startDate: r.dateOrNull('startDate'),
+      endDate: r.dateOrNull('endDate'),
+      nextSessionStart: r.objOrNull('nextSession')?.dateOrNull('startTime'),
+      totalSessions: r.integer('totalSessions'),
+      completedSessions: r.integer('completedSessions'),
+      myBookedSessions: r.integer('myBookedSessions'),
+      pendingRefundAmount: r.objOrNull('pendingRefund')?.money('amount'),
+      canReview: r.boolean('canReview'),
+      canEditReview: r.boolean('canEditReview'),
+      myRating: r.intOrNull('myRating'),
+      myReviewComment: review?.strOrNull('comment'),
+    );
+  }
+
+  /// `GET /coaches/:id/profile`.
+  static CoachPublicProfile coachProfile(Json p) {
+    final stats = p.obj('stats');
+    final rating = p.obj('rating');
+    final dist = rating.obj('distribution');
+    return CoachPublicProfile(
+      coachProfileId: p.str('coachProfileId'),
+      userId: p.str('userId'),
+      fullName: p.str('fullName', 'Huấn luyện viên'),
+      avatarUrl: ApiClient.absoluteUrl(p.strOrNull('avatarUrl')),
+      specialization: p.strOrNull('specialization'),
+      experienceYears: p.intOrNull('experienceYears'),
+      bio: p.strOrNull('bio'),
+      joinedAt: p.dateOrNull('joinedAt'),
+      openCourses: stats.integer('openCourses'),
+      totalCourses: stats.integer('totalCourses'),
+      totalStudents: stats.integer('totalStudents'),
+      completedSessions: stats.integer('completedSessions'),
+      ratingAverage: rating['average'] == null ? null : rating.dbl('average'),
+      ratingCount: rating.integer('count'),
+      distribution: {for (var i = 1; i <= 5; i++) i: dist.integer('$i')},
+      courses: [
+        for (final c in p.objList('courses'))
+          CoachCourseItem(
+            id: c.str('id'),
+            name: c.str('name'),
+            price: c.money('price'),
+            goalTags: [for (final g in c.objList('goals')) g.str('code')],
+            upcomingSessions: c.integer('upcomingSessions'),
+            startDate: c.dateOrNull('startDate'),
+            endDate: c.dateOrNull('endDate'),
+          ),
+      ],
+      reviews: [
+        for (final r in p.objList('recentReviews'))
+          CoachReviewItem(
+            rating: r.integer('rating'),
+            comment: r.strOrNull('comment'),
+            createdAt: r.date('createdAt'),
+            authorName: r.objOrNull('author')?.strOrNull('fullName'),
+            className: r.objOrNull('class')?.strOrNull('name'),
+          ),
+      ],
     );
   }
 
@@ -84,6 +180,10 @@ abstract final class ClassJson {
       cancelResolution:
           s.enumOrNull('cancelResolution', CancelResolutionMode.values) ??
           (makeupSessionId != null ? CancelResolutionMode.makeup : null),
+      originalStartTime: s.dateOrNull('originalStartTime'),
+      rescheduleReason: s.strOrNull('rescheduleReason'),
+      rescheduleCount: s.integer('rescheduleCount'),
+      rescheduledAt: s.dateOrNull('rescheduledAt'),
     );
   }
 

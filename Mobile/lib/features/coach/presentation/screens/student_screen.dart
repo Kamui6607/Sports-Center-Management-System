@@ -10,6 +10,7 @@ import '../../../../core/utils/validators.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../auth/presentation/auth_labels.dart';
+import '../../../catalog/domain/entities/catalog.dart';
 import '../../../training/data/training_repository_provider.dart';
 import '../../../training/domain/entities/training.dart';
 import '../../../training/presentation/training_screens.dart';
@@ -58,7 +59,9 @@ class StudentScreen extends ConsumerWidget {
                     if (s.trainingLevel != null)
                       StatusLabel('Trình độ: ${s.trainingLevel!.label}', StatusTone.brand).tag(),
                     const SizedBox(height: AppSpacing.md),
-                    if (s.fitnessGoal != null) InfoRow(icon: AppIcons.target, text: 'Mục tiêu: ${s.fitnessGoal}'),
+                    if (s.fitnessGoals.isNotEmpty)
+                      InfoRow(icon: AppIcons.target, text: 'Mục tiêu: ${s.fitnessGoals.map(goalLabel).join(', ')}'),
+                    if (s.fitnessGoal != null) InfoRow(icon: AppIcons.info, text: 'Ghi chú mục tiêu: ${s.fitnessGoal}'),
                     if (s.trainingPreference != null) InfoRow(icon: AppIcons.info, text: s.trainingPreference!),
                     if (s.phone != null) InfoRow(icon: AppIcons.phone, text: s.phone!),
                     const SizedBox(height: AppSpacing.sm),

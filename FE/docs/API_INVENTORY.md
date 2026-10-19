@@ -2,7 +2,7 @@
 
 Source: docs/openapi.json — exported from the checked-out backend with `cd BE && npm run openapi:export` (`--live` downloads https://sports-center-management-system.onrender.com/api/v1/docs/swagger-ui-init.js instead; do not use it for an unreleased local backend).
 
-Snapshot: 2026-10-17. Production base: https://sports-center-management-system.onrender.com/api/v1
+Snapshot: 2026-10-19. Production base: https://sports-center-management-system.onrender.com/api/v1
 
 Response examples are documentation only, never application data. The client sends the documented HTTP Bearer token.
 
@@ -79,7 +79,7 @@ Responses/status codes:
             "data": [
               {
                 "id": "b311dfe5-8575-4ed4-9efd-8bc81a149f14",
-                "email": "staff@sportscenter.com",
+                "email": "manager@sportscenter.com",
                 "fullName": "Jane Doe",
                 "phone": "0900000002",
                 "gender": "FEMALE",
@@ -170,7 +170,7 @@ Responses/status codes:
 ```
 
 ## POST /users
-Create staff, coach, manager or member account (MEMBER creates the member profile too)
+Create coach, manager or member account (MEMBER creates the member profile too)
 
 Authentication: [{"BearerAuth":[]}]
 
@@ -220,9 +220,9 @@ Request body:
       "type": "string",
       "enum": [
         "MEMBER",
-        "COACH",
-        "MANAGER"
-      ]
+        "COACH"
+      ],
+      "description": "Không tạo được tài khoản MANAGER"
     },
     "fitnessGoal": {
       "type": "string",
@@ -3431,13 +3431,12 @@ Request body:
   "type": "object",
   "required": [
     "name",
-    "capacity",
-    "areaType"
+    "capacity"
   ],
   "properties": {
     "name": {
       "type": "string",
-      "example": "Yoga Room A"
+      "example": "Phòng Functional A"
     },
     "capacity": {
       "type": "integer",
@@ -3445,7 +3444,16 @@ Request body:
     },
     "location": {
       "type": "string",
-      "example": "Floor 1"
+      "description": "Khu vực trong trung tâm",
+      "example": "Khu tạ tự do"
+    },
+    "floor": {
+      "type": "string",
+      "example": "Tầng 2"
+    },
+    "directions": {
+      "type": "string",
+      "example": "Thang máy lên tầng 2, rẽ trái"
     },
     "areaType": {
       "type": "string",
@@ -3704,6 +3712,12 @@ Request body:
       "type": "integer"
     },
     "location": {
+      "type": "string"
+    },
+    "floor": {
+      "type": "string"
+    },
+    "directions": {
       "type": "string"
     },
     "areaType": {
@@ -5002,7 +5016,7 @@ Responses/status codes:
 ```
 
 ## POST /refunds/course-cancellation
-MEMBER xin hủy khóa học và hoàn tiền (trước khai giảng ≥ 24h)
+MEMBER hủy khóa học (≥ 3 ngày ⇒ hoàn 100%; muộn hơn ⇒ hủy không hoàn hoặc xin hoàn ngoại lệ)
 
 Authentication: [{"BearerAuth":[]}]
 
@@ -5040,6 +5054,10 @@ Request body:
       "type": "string",
       "maxLength": 100,
       "description": "Tên chủ tài khoản"
+    },
+    "lateRefund": {
+      "type": "boolean",
+      "description": "Hủy < 3 ngày: true ⇒ xin hoàn ngoại lệ (Manager duyệt, trừ phí)"
     }
   }
 }
@@ -5052,7 +5070,7 @@ Responses/status codes:
     "không hoàn tiền (hủy trong vòng 3 ngày trước khai giảng)": null
   },
   "201": {
-    "description": "Đã tạo yêu cầu hoàn 100% (PENDING)"
+    "description": "Đã tạo yêu cầu hoàn (REFUND_REQUESTED 100% hoặc LATE_REFUND_REQUESTED ngoại lệ)"
   },
   "400": {
     "description": "Bad request (validation or malformed body)",
@@ -5371,6 +5389,12 @@ Request body:
       "type": "string",
       "maxLength": 100,
       "description": "Mã giao dịch ngân hàng thực tế (FT code)"
+    },
+    "feePercent": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 99,
+      "description": "Chỉ với MEMBER_CANCEL_COURSE_LATE: % phí chiết khấu chốt khi duyệt (hoàn = grossAmount × (100 − phí)%)"
     }
   }
 }
@@ -9318,6 +9342,7 @@ Request body:
   "type": "object",
   "required": [
     "coachId",
+    "classId",
     "rating"
   ],
   "properties": {
@@ -9328,8 +9353,7 @@ Request body:
     },
     "classId": {
       "type": "string",
-      "format": "uuid",
-      "description": "Lớp học liên quan (tuỳ chọn)"
+      "description": "Khóa học đã học xong (bắt buộc)"
     },
     "rating": {
       "type": "integer",
@@ -9884,7 +9908,7 @@ Responses/status codes:
 ```
 
 ## POST /enrollments
-Book a class (Member books own class; Staff/Manager book for a member)
+Book a class (Member books own class; Manager book for a member)
 
 Authentication: [{"BearerAuth":[]}]
 
@@ -9907,7 +9931,7 @@ Request body:
     "memberId": {
       "type": "string",
       "format": "uuid",
-      "description": "Required when booked by Staff/Manager"
+      "description": "Required when booked by Manager"
     }
   }
 }
@@ -10430,7 +10454,7 @@ Responses/status codes:
 ```
 
 ## POST /enrollments/bulk
-Enroll in a WHOLE course (all upcoming sessions of a class) — Member self-enrolls; Staff/Manager for a member
+Enroll in a WHOLE course (all upcoming sessions of a class) — Member self-enrolls; Manager for a member
 
 Authentication: [{"BearerAuth":[]}]
 
@@ -10452,7 +10476,7 @@ Request body:
     },
     "memberId": {
       "type": "string",
-      "description": "Required when enrolled by Staff/Manager (nhận cả userId hoặc MemberProfile.id)"
+      "description": "Required when enrolled by Manager (nhận cả userId hoặc MemberProfile.id)"
     }
   }
 }
@@ -10785,7 +10809,7 @@ Responses/status codes:
 ```
 
 ## GET /enrollments/{id}/transfer-options
-Sessions of the same course a booking can be moved to (free slots, weekday, room, conflicts)
+Buổi có thể đổi sang (cùng khóa hoặc khóa tương đương cùng HLV, cùng hạng) + số lần đổi còn lại
 
 Authentication: [{"BearerAuth":[]}]
 
@@ -10994,7 +11018,7 @@ Responses/status codes:
 ```
 
 ## POST /enrollments/{id}/transfer
-Move a booking to another schedule (Member moves own booking; Staff/Manager any member)
+Move a booking to another schedule (Member moves own booking; Manager any member)
 
 Authentication: [{"BearerAuth":[]}]
 
@@ -12084,6 +12108,51 @@ Responses/status codes:
 }
 ```
 
+## GET /coaches/{id}/profile
+Hồ sơ CÔNG KHAI của HLV (bảng thông tin ở chi tiết khóa học) — công khai
+
+Authentication: []
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## GET /coaches/{id}/upcoming-sessions
 Upcoming sessions of a coach (for the coach info panel in course detail)
 
@@ -12289,6 +12358,26 @@ Parameters:
   },
   {
     "in": "query",
+    "name": "goal",
+    "schema": {
+      "type": "string"
+    },
+    "description": "Lọc theo 1 mục tiêu (mã trong GET /classes/goal-options)"
+  },
+  {
+    "in": "query",
+    "name": "matchMyGoals",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "true",
+        "false"
+      ]
+    },
+    "description": "MEMBER: chỉ khóa khớp ≥ 1 mục tiêu của tôi, sắp theo độ phù hợp. Mỗi khóa kèm `goalMatch` khi người gọi là MEMBER."
+  },
+  {
+    "in": "query",
     "name": "classType",
     "schema": {
       "type": "string",
@@ -12326,13 +12415,14 @@ Parameters:
     "schema": {
       "type": "string",
       "enum": [
+        "DRAFT",
         "PENDING",
         "APPROVED",
         "REJECTED",
         "COMPLETED"
       ]
     },
-    "description": "Filter by approval status (Guest luôn chỉ thấy APPROVED)"
+    "description": "Filter by approval status (Guest luôn chỉ thấy APPROVED; DRAFT chỉ HLV chủ khóa thấy)"
   },
   {
     "in": "query",
@@ -12647,6 +12737,208 @@ Responses/status codes:
 {
   "200": {
     "description": "data: string[]"
+  }
+}
+```
+
+## GET /classes/goal-options
+Danh mục mục tiêu tập luyện (công khai) — Coach gắn cho khóa, Member chọn cho hồ sơ
+
+Authentication: []
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "[{ code, label, description }]"
+  }
+}
+```
+
+## POST /classes/drafts
+COACH tạo bản nháp khóa học (wizard tự lưu) — status DRAFT, chưa giữ phòng/tạo buổi
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "goal": {
+      "type": "string"
+    },
+    "goalTags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "targetLevel": {
+      "type": "string",
+      "enum": [
+        "BEGINNER",
+        "INTERMEDIATE",
+        "ADVANCED"
+      ]
+    },
+    "capacity": {
+      "type": "integer"
+    },
+    "classType": {
+      "type": "string",
+      "enum": [
+        "REGULAR",
+        "PREMIUM"
+      ]
+    },
+    "price": {
+      "type": "number"
+    },
+    "draftData": {
+      "type": "object",
+      "description": "Toàn bộ trạng thái wizard (client tự định nghĩa)"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "201": {
+    "description": "Bản nháp (Class)"
+  },
+  "409": {
+    "description": "DRAFT_LIMIT — tối đa 10 bản nháp"
+  }
+}
+```
+
+## PATCH /classes/drafts/{id}
+COACH tự lưu bản nháp (ghi đè field được gửi)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "description": "Giống POST /classes/drafts"
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Bản nháp đã lưu"
+  },
+  "404": {
+    "description": "DRAFT_NOT_FOUND"
+  },
+  "409": {
+    "description": "CLASS_NOT_DRAFT"
+  }
+}
+```
+
+## DELETE /classes/drafts/{id}
+COACH xóa bản nháp
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ id, deleted: true }"
+  }
+}
+```
+
+## POST /classes/drafts/{id}/submit
+COACH gửi duyệt bản nháp ⇒ PENDING (kiểm tra đủ, giữ phòng, tạo buổi)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "description": "Giống body POST /class-schedules/activity-plan: { class (bắt buộc goalTags ≥ 1), roomId, schedules[] | recurrence }"
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ class, schedulesCreated, startDate, endDate, totalSessions, status: PENDING }"
+  },
+  "400": {
+    "description": "CLASS_GOALS_REQUIRED / validate"
+  },
+  "409": {
+    "description": "ROOM_CONFLICT / COACH_CONFLICT / CLASS_NOT_DRAFT"
   }
 }
 ```
@@ -14513,6 +14805,83 @@ Responses/status codes:
 }
 ```
 
+## POST /class-schedules/{id}/reschedule
+COACH dời MỘT buổi sang ngày/giờ khác (thông báo học viên)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "startTime",
+    "endTime",
+    "reason"
+  ],
+  "properties": {
+    "startTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "endTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "roomId": {
+      "type": "string",
+      "description": "Tùy chọn — đổi phòng cùng lúc"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 500
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ schedule, affectedMembers, conflictedMembers[], rescheduleCount, remainingReschedules }"
+  },
+  "400": {
+    "description": "RESCHEDULE_TOO_LATE / RESCHEDULE_NEW_TIME_TOO_SOON / RESCHEDULE_LIMIT / RESCHEDULE_NO_CHANGE"
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  },
+  "409": {
+    "description": "ROOM_CONFLICT / COACH_CONFLICT / SCHEDULE_STATE_CHANGED"
+  }
+}
+```
+
 ## PATCH /class-schedules/{id}/complete
 Mark a schedule as COMPLETED (only after endTime)
 
@@ -15028,6 +15397,123 @@ Responses/status codes:
           "example": {
             "success": false,
             "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /center
+Thông tin trung tâm (công khai)
+
+Authentication: []
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ id, name, address, mapUrl, mapLink, hotline, email, openingHours, parkingNote, description }"
+  }
+}
+```
+
+## PUT /center
+MANAGER cập nhật thông tin trung tâm
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "name",
+    "address"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "example": "Pulse Gym Center"
+    },
+    "address": {
+      "type": "string",
+      "example": "123 Nguyễn Văn Linh, Phường Tân Phong, TP. Hồ Chí Minh"
+    },
+    "mapUrl": {
+      "type": "string",
+      "example": "https://maps.app.goo.gl/abc"
+    },
+    "hotline": {
+      "type": "string",
+      "example": "0909123456"
+    },
+    "email": {
+      "type": "string",
+      "example": "lienhe@pulsegym.vn"
+    },
+    "openingHours": {
+      "type": "string",
+      "example": "05:30 – 22:00 hằng ngày"
+    },
+    "parkingNote": {
+      "type": "string",
+      "example": "Gửi xe máy miễn phí tại tầng hầm B1"
+    },
+    "description": {
+      "type": "string"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Đã cập nhật"
+  },
+  "400": {
+    "description": "Bad request (validation or malformed body)",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Validation failed",
+            "errors": [
+              {
+                "field": "email",
+                "message": "Invalid email address"
+              }
+            ]
           }
         }
       }
@@ -15737,7 +16223,15 @@ Request body:
       "description": "Must be in the past"
     },
     "fitnessGoal": {
-      "type": "string"
+      "type": "string",
+      "description": "Ghi chú mục tiêu tự do"
+    },
+    "fitnessGoals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Mã mục tiêu từ GET /classes/goal-options (tối đa 5)"
     },
     "trainingLevel": {
       "type": "string",

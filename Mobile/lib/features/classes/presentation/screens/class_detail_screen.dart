@@ -8,13 +8,17 @@ import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../auth/domain/entities/app_user.dart';
+import '../../../auth/presentation/auth_labels.dart';
 import '../../../auth/presentation/providers/session_provider.dart';
+import '../../../catalog/domain/entities/catalog.dart';
+import '../../../catalog/presentation/location_card.dart';
 import '../../../feedbacks/presentation/feedback_widgets.dart';
 import '../../domain/entities/course.dart';
 import '../class_labels.dart';
 import '../providers/course_providers.dart';
 import '../widgets/class_card.dart';
 import '../widgets/class_purchase_bar.dart';
+import '../widgets/coach_profile_sheet.dart';
 
 /// M03 — Chi tiết khóa học + lộ trình buổi; CTA theo tình trạng mua.
 class ClassDetailScreen extends ConsumerWidget {
@@ -87,11 +91,13 @@ class _Body extends StatelessWidget {
               const SizedBox(height: AppSpacing.xs),
               MoneyText(course.price, style: context.text.title.copyWith(color: c.primary)),
               Text(
-                'Trọn khóa ${course.mainSessionCount} buổi',
+                'Trọn khóa ${course.mainSessionCount} buổi'
+                '${course.startDate != null && course.endDate != null ? ' · ${VnTime.date(course.startDate!)} – ${VnTime.date(course.endDate!)}' : ''}',
                 style: context.text.caption.copyWith(color: c.textMuted),
               ),
               const SizedBox(height: AppSpacing.md),
               _PurchaseNotice(purchase: purchase, isMember: user?.role == UserRole.member),
+              if (user?.role == UserRole.member) _GoalMatchBanner(match: detail.goalMatch ?? course.goalMatch),
               KpiGrid(
                 children: [
                   KpiTile(icon: AppIcons.calendar, label: 'Số buổi', value: '${course.mainSessionCount}'),
@@ -99,7 +105,12 @@ class _Body extends StatelessWidget {
                   KpiTile(
                     icon: AppIcons.time,
                     label: 'Khai giảng',
-                    value: course.firstSessionStart == null ? '—' : VnTime.dateShort(course.firstSessionStart!),
+                    value: course.startDate == null ? '—' : VnTime.dateShort(course.startDate!),
+                  ),
+                  KpiTile(
+                    icon: AppIcons.calendar,
+                    label: 'Kết thúc',
+                    value: course.endDate == null ? '—' : VnTime.dateShort(course.endDate!),
                   ),
                   KpiTile(
                     icon: AppIcons.users,
@@ -109,7 +120,39 @@ class _Body extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),
-              if (course.description != null) ...[
+              const SectionHeader(title: 'Mục tiêu khóa học'),
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (course.goalTags.isNotEmpty)
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xs,
+                        children: [
+                          for (final g in course.goalTags)
+                            StatusLabel(
+                              goalLabel(g),
+                              (detail.goalMatch ?? course.goalMatch)?.matchedGoals.contains(g) ?? false
+                                  ? StatusTone.success
+                                  : StatusTone.info,
+                            ).tag(),
+                        ],
+                      ),
+                    if (course.goal?.trim().isNotEmpty ?? false) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(course.goal!, style: context.text.body),
+                    ],
+                    const SizedBox(height: AppSpacing.sm),
+                    InfoRow(
+                      icon: AppIcons.target,
+                      text: 'Trình độ phù hợp: ${course.targetLevel?.label ?? 'Mọi trình độ'}',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              if (course.description != null && course.description != course.goal) ...[
                 const SectionHeader(title: 'Giới thiệu'),
                 Text(course.description!, style: context.text.body),
                 const SizedBox(height: AppSpacing.lg),
@@ -117,9 +160,22 @@ class _Body extends StatelessWidget {
               const SectionHeader(title: 'Huấn luyện viên'),
               CoachMiniCard(
                 coach: course.coach,
+                onTap: () => showCoachProfileSheet(
+                  context,
+                  coachProfileId: course.coach.coachProfileId,
+                  coachName: course.coach.fullName,
+                  currentClassId: course.id,
+                ),
                 onChat: purchase.status == PurchaseStatus.purchased
                     ? () => context.push(AppRoutes.chatRoom(course.coach.userId))
                     : null,
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.xxs),
+                child: Text(
+                  'Chạm vào HLV để xem hồ sơ, đánh giá và các khóa khác.',
+                  style: context.text.caption.copyWith(color: c.textMuted),
+                ),
               ),
               const SizedBox(height: AppSpacing.lg),
               if (detail.slots.isNotEmpty) ...[
@@ -141,13 +197,23 @@ class _Body extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.lg),
               ],
-              _UpcomingSessions(sessions: detail.sessions),
+              _UpcomingSessions(sessions: detail.sessions, pastCount: detail.pastSessionCount, className: course.name),
               const SizedBox(height: AppSpacing.lg),
-              const SectionHeader(title: 'Chính sách hủy khóa'),
+              const SectionHeader(title: 'Địa điểm tập'),
+              LocationCard(
+                extraRooms: [
+                  ...{for (final s in detail.sessions) s.room.id: s.room}.values,
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              const SectionHeader(title: 'Chính sách hủy & hoàn tiền'),
               const AlertBanner.info(
                 message:
-                    'Bạn được hủy khóa và hoàn tiền khi còn ít nhất 24 giờ trước buổi khai giảng. Quá thời hạn, hệ thống sẽ từ chối yêu cầu. '
-                    'Nếu buổi học bị hủy, HLV sẽ dạy bù hoặc hoàn tiền buổi đó cho bạn.',
+                    '• Hủy khóa trước buổi khai giảng ≥ 3 ngày: hoàn 100%.\n'
+                    '• Hủy trong vòng 3 ngày / khi đã khai giảng: không hoàn tiền; có thể gửi yêu cầu hoàn ngoại lệ — '
+                    'nếu Quản lý chấp nhận sẽ hoàn phần buổi chưa học sau khi trừ phí chiết khấu.\n'
+                    '• Hủy 1 buổi trước giờ học ≥ 24 giờ: hoàn 80% tiền buổi đó.\n'
+                    '• Buổi bị HLV hủy: dạy bù hoặc hoàn tiền buổi; buổi bị dời lịch mà bạn không đi được: hủy được hoàn 100%.',
               ),
               const SizedBox(height: AppSpacing.lg),
               CoachFeedbackSection(
@@ -198,66 +264,165 @@ class _PurchaseNotice extends StatelessWidget {
   }
 }
 
-class _UpcomingSessions extends StatefulWidget {
-  const _UpcomingSessions({required this.sessions});
+/// Mức độ phù hợp của khóa với mục tiêu trong hồ sơ học viên.
+class _GoalMatchBanner extends StatelessWidget {
+  const _GoalMatchBanner({required this.match});
 
-  final List<PlanSession> sessions;
-
-  @override
-  State<_UpcomingSessions> createState() => _UpcomingSessionsState();
-}
-
-class _UpcomingSessionsState extends State<_UpcomingSessions> {
-  static const _collapsed = 4;
-  bool _expanded = false;
+  final GoalMatch? match;
 
   @override
   Widget build(BuildContext context) {
-    final list = _expanded ? widget.sessions : widget.sessions.take(_collapsed).toList();
-    final c = context.colors;
+    final m = match;
+    if (m == null) return const SizedBox.shrink();
+    final banner = switch (m.level) {
+      GoalMatchLevel.high => AlertBanner.success(title: 'Rất phù hợp với bạn (${m.score}%)', message: m.message),
+      GoalMatchLevel.medium ||
+      GoalMatchLevel.low => AlertBanner.info(title: '${m.level.tag.label} (${m.score}%)', message: m.message),
+      GoalMatchLevel.none => AlertBanner.warning(title: 'Chưa khớp mục tiêu của bạn', message: m.message),
+      GoalMatchLevel.unknown => AlertBanner.info(
+        title: 'Khóa này có hợp với bạn?',
+        message: m.message,
+        action: TextButton(
+          onPressed: () => context.push(AppRoutes.profileEdit),
+          child: const Text('Cập nhật mục tiêu'),
+        ),
+      ),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: banner,
+    );
+  }
+}
+
+class _UpcomingSessions extends StatelessWidget {
+  const _UpcomingSessions({required this.sessions, required this.pastCount, required this.className});
+
+  final List<PlanSession> sessions;
+  final int pastCount;
+  final String className;
+
+  static const _collapsed = 4;
+
+  void _openAll(BuildContext context) => showAppBottomSheet<void>(
+    context: context,
+    title: 'Các buổi học',
+    subtitle: '$className · ${sessions.length} buổi sắp diễn ra${pastCount > 0 ? ' · $pastCount buổi đã diễn ra' : ''}',
+    expand: true,
+    builder: (_) => _SessionList(sessions: sessions),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final list = sessions.take(_collapsed).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader(title: 'Buổi sắp diễn ra (${widget.sessions.length})'),
-        if (widget.sessions.isEmpty)
+        SectionHeader(
+          title: 'Buổi sắp diễn ra (${sessions.length})',
+          actionLabel: sessions.isEmpty ? null : 'Xem tất cả',
+          onAction: sessions.isEmpty ? null : () => _openAll(context),
+        ),
+        if (sessions.isEmpty)
           const EmptyState(compact: true, icon: AppIcons.calendar, title: 'Chưa có buổi học sắp tới')
         else
           AppCard(
+            onTap: () => _openAll(context),
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
             child: Column(
               children: [
-                for (var i = 0; i < list.length; i++) ...[
-                  if (i > 0) const Divider(),
+                for (var i = 0; i < list.length; i++) ...[if (i > 0) const Divider(), _SessionRow(session: list[i])],
+                if (sessions.length > _collapsed)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(VnTime.dayLabel(list[i].startTime), style: context.text.label),
-                              Text(
-                                '${VnTime.timeRange(list[i].startTime, list[i].endTime)} · ${list[i].room.name}',
-                                style: context.text.caption.copyWith(color: c.textMuted),
-                              ),
-                            ],
-                          ),
-                        ),
-                        _sessionTag(list[i]),
-                      ],
+                    child: Text(
+                      'Chạm để xem tất cả ${sessions.length} buổi',
+                      style: context.text.caption.copyWith(color: context.colors.primary),
                     ),
-                  ),
-                ],
-                if (widget.sessions.length > _collapsed)
-                  TextButton(
-                    onPressed: () => setState(() => _expanded = !_expanded),
-                    child: Text(_expanded ? 'Thu gọn' : 'Xem tất cả ${widget.sessions.length} buổi'),
                   ),
               ],
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Danh sách đầy đủ các buổi (nhóm theo tháng) trong bottom sheet.
+class _SessionList extends StatelessWidget {
+  const _SessionList({required this.sessions});
+
+  final List<PlanSession> sessions;
+
+  @override
+  Widget build(BuildContext context) {
+    final byMonth = <String, List<PlanSession>>{};
+    for (final s in sessions) {
+      final w = VnTime.wall(s.startTime);
+      byMonth.putIfAbsent('Tháng ${w.month}/${w.year}', () => []).add(s);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final entry in byMonth.entries) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
+            child: Text(entry.key, style: context.text.label),
+          ),
+          AppCard(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+            child: Column(
+              children: [
+                for (var i = 0; i < entry.value.length; i++) ...[
+                  if (i > 0) const Divider(),
+                  _SessionRow(session: entry.value[i], showPlace: true),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SessionRow extends StatelessWidget {
+  const _SessionRow({required this.session, this.showPlace = false});
+
+  final PlanSession session;
+  final bool showPlace;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = session;
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(VnTime.dayLabel(s.startTime), style: context.text.label),
+                Text(
+                  '${VnTime.timeRange(s.startTime, s.endTime)} · ${s.room.name}',
+                  style: context.text.caption.copyWith(color: c.textMuted),
+                ),
+                if (showPlace && s.room.placeLabel.isNotEmpty)
+                  Text(s.room.placeLabel, style: context.text.caption.copyWith(color: c.textMuted)),
+                if (s.isRescheduled)
+                  Text(
+                    'Đã dời từ ${VnTime.dayLabel(s.originalStartTime!)} ${VnTime.time(s.originalStartTime!)}'
+                    '${s.rescheduleReason == null ? '' : ' · ${s.rescheduleReason}'}',
+                    style: context.text.caption.copyWith(color: context.tones.of(StatusTone.warning).foreground),
+                  ),
+              ],
+            ),
+          ),
+          _sessionTag(s),
+        ],
+      ),
     );
   }
 

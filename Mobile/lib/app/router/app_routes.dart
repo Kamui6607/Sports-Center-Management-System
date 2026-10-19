@@ -17,6 +17,7 @@ abstract final class AppRoutes {
   static const chat = '/chat';
   static String chatRoom(String peerId) => '/chat/$peerId';
   static const profileEdit = '/profile/edit';
+  static const centerInfo = '/center';
   static const changePassword = '/profile/password';
   static const orders = '/orders';
   static String order(String id) => '/orders/$id';
@@ -47,6 +48,7 @@ abstract final class AppRoutes {
 
   // Member — màn con
   static const myCourses = '/member/courses';
+  static const courseHistory = '/member/courses/history';
   static String myCourse(String classId) => '/member/courses/$classId';
   static String cancelCourse(String classId) => '/member/courses/$classId/cancel';
   static const refunds = '/member/refunds';
@@ -70,7 +72,9 @@ abstract final class AppRoutes {
   static String sessionQr(String id) => '/coach/sessions/$id/qr';
   static String sessionAttendance(String id) => '/coach/sessions/$id/attendance';
   static String sessionCancel(String id) => '/coach/sessions/$id/cancel';
+  static String sessionReschedule(String id) => '/coach/sessions/$id/reschedule';
   static const createClass = '/coach/classes/new';
+  static String resumeDraft(String draftId) => '/coach/classes/new?draft=$draftId';
   static String coachClass(String id) => '/coach/classes/$id';
   static String editClass(String id) => '/coach/classes/$id/edit';
   static String student(String memberId) => '/coach/students/$memberId';

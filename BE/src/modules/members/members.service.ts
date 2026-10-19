@@ -79,10 +79,11 @@ export async function updateMember(id: string, data: UpdateMemberInput) {
   });
   if (!memberProfile) throw new AppError("Member not found", 404);
 
-  const { fitnessGoal, trainingLevel, trainingPreference, ...userFields } = data;
+  const { fitnessGoal, fitnessGoals, trainingLevel, trainingPreference, ...userFields } = data;
 
   const profileData: any = {};
   if (fitnessGoal !== undefined) profileData.fitnessGoal = fitnessGoal;
+  if (fitnessGoals !== undefined) profileData.fitnessGoals = [...new Set(fitnessGoals)];
   if (trainingLevel !== undefined) profileData.trainingLevel = trainingLevel;
   if (trainingPreference !== undefined) profileData.trainingPreference = trainingPreference;
 

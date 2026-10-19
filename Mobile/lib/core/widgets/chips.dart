@@ -42,7 +42,15 @@ class AppChip extends StatelessWidget {
                     Icon(icon, size: AppSizes.iconSm, color: fg),
                     const SizedBox(width: AppSpacing.xxs + 2),
                   ],
-                  Text(label, style: context.text.label.copyWith(color: fg)),
+                  // Nhãn dài (VD mục tiêu tập luyện) trên màn hẹp/chữ lớn ⇒ co lại + "…" thay vì tràn.
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.label.copyWith(color: fg),
+                    ),
+                  ),
                   if (trailingIcon != null) ...[
                     const SizedBox(width: AppSpacing.xxs),
                     Icon(trailingIcon, size: AppSizes.iconSm, color: fg),

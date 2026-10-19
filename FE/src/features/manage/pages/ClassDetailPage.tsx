@@ -25,6 +25,7 @@ import {
   dateOnly,
   dateTime,
   get,
+  goalLabels,
   num,
   str,
   vnd,
@@ -77,7 +78,7 @@ function ClassDetail({ cls }: { cls: Row }) {
             <ArrowLeft size={15} /> Khóa học & lớp
           </Link>
         }
-        eyebrow={`${str(cls.fitness)} · ${CLASS_TYPE_LABEL[str(cls.classType)] ?? ""} · ${AREA_LABEL[str(cls.areaType)] ?? ""}`}
+        eyebrow={`Gym · ${CLASS_TYPE_LABEL[str(cls.classType)] ?? ""}${cls.startDate && cls.endDate ? ` · ${dateOnly(cls.startDate)} – ${dateOnly(cls.endDate)}` : ""}`}
         title={str(cls.name)}
         desc={
           <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
@@ -205,6 +206,17 @@ function ClassDetail({ cls }: { cls: Row }) {
               ]}
             />
           </Panel>
+          <Panel title="Mục tiêu & lịch">
+            <Dl
+              items={[
+                ["Mục tiêu", goalLabels(cls.goalTags).join(", ")],
+                ["Mô tả mục tiêu", str(cls.goal)],
+                ["Trình độ", cls.targetLevel ? LEVEL_LABEL[str(cls.targetLevel)] ?? str(cls.targetLevel) : "Mọi trình độ"],
+                ["Khai giảng", cls.startDate ? dateOnly(cls.startDate) : ""],
+                ["Kết thúc", cls.endDate ? dateOnly(cls.endDate) : ""],
+              ]}
+            />
+          </Panel>
           <Panel title="Thông tin">
             <Dl items={[["Tạo lúc", dateTime(cls.createdAt)], ["Cập nhật", dateTime(cls.updatedAt)]]} />
           </Panel>
@@ -298,9 +310,6 @@ function ClassForm({ cls, onSaved }: { cls: Row; onSaved: () => void }) {
       >
         <Field label="Tên khóa" required error={errs.name}>
           <input value={f.name} onChange={set("name")} />
-        </Field>
-        <Field label="Môn tập" required error={errs.fitness}>
-          <input value={f.fitness} onChange={set("fitness")} />
         </Field>
         <Field label="Sức chứa / buổi" required error={capBad ? "Từ 1 đến 200." : errs.capacity}>
           <input type="number" min={1} max={200} value={f.capacity} onChange={set("capacity")} />

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import {
   Activity,
+  Building2,
   CalendarDays,
   CalendarClock,
   ChevronDown,
@@ -13,6 +14,9 @@ import {
   Menu,
   Package,
   PanelLeftClose,
+  ReceiptText,
+  Undo2,
+  Banknote,
   PanelLeftOpen,
   Settings,
   UserRound,
@@ -42,6 +46,10 @@ const ProductsPage = lazy(() => import("./pages/ProductsPage"));
 const ProductDetail = lazy(() => import("./pages/ProductDetailPage"));
 const RevenuePage = lazy(() => import("./pages/RevenuePage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const RefundsPage = lazy(() => import("./pages/RefundsPage"));
+const WithdrawalsPage = lazy(() => import("./pages/WithdrawalsPage"));
+const OrdersPage = lazy(() => import("./pages/OrdersPage"));
+const CenterSettingsPage = lazy(() => import("./pages/CenterSettingsPage"));
 
 type NavItem = [path: string, label: string, icon: LucideIcon];
 const NAV: { title: string; items: NavItem[] }[] = [
@@ -65,9 +73,18 @@ const NAV: { title: string; items: NavItem[] }[] = [
     title: "Kinh doanh",
     items: [
       ["products", "Sản phẩm", Package],
+      ["orders", "Đơn hàng", ReceiptText],
       ["revenue", "Doanh thu", WalletCards],
     ],
   },
+  {
+    title: "Tài chính",
+    items: [
+      ["refunds", "Hoàn tiền", Undo2],
+      ["withdrawals", "Rút tiền HLV", Banknote],
+    ],
+  },
+  { title: "Hệ thống", items: [["center", "Cài đặt trung tâm", Building2]] },
 ];
 
 function readCollapsed() {
@@ -315,6 +332,10 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
               <Route path="/manager/products" element={<ProductsPage />} />
               <Route path="/manager/products/:id" element={<ProductDetail />} />
               <Route path="/manager/revenue" element={<RevenuePage />} />
+              <Route path="/manager/orders" element={<OrdersPage />} />
+              <Route path="/manager/refunds" element={<RefundsPage />} />
+              <Route path="/manager/withdrawals" element={<WithdrawalsPage />} />
+              <Route path="/manager/center" element={<CenterSettingsPage />} />
               <Route path="/manager/reports" element={<Navigate replace to="/manager/revenue" />} />
               <Route path="/manager/profile" element={<ProfilePage user={user} />} />
               <Route path="/manager" element={<Navigate replace to="/manager/dashboard" />} />

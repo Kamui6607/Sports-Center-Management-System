@@ -16,8 +16,14 @@ class ClassQueryNotifier extends Notifier<ClassQuery> {
 
   void search(String text) => state = state.copyWith(search: text, page: 1);
 
-  void filters({String? sportId, ClassType? classType, AreaType? areaType}) =>
-      state = state.withFilters(sportId: sportId, classType: classType, areaType: areaType);
+  void filters({String? sportId, ClassType? classType, AreaType? areaType, String? goal, bool matchMyGoals = false}) =>
+      state = state.withFilters(
+        sportId: sportId,
+        classType: classType,
+        areaType: areaType,
+        goal: goal,
+        matchMyGoals: matchMyGoals,
+      );
 }
 
 class BrowseState {
@@ -64,6 +70,12 @@ final courseDetailProvider = FutureProvider.autoDispose.family<CourseDetail, Str
 final myCoursesProvider = FutureProvider.autoDispose<List<MyCourse>>((ref) {
   ref.watch(dataRevisionProvider);
   return ref.watch(courseRepositoryProvider).myCourses();
+});
+
+/// Lịch sử khóa học của Member (`GET /enrollments/my/courses`) — dùng cho nút "Khóa của tôi" và màn Lịch sử.
+final courseHistoryProvider = FutureProvider.autoDispose<List<MemberCourse>>((ref) {
+  ref.watch(dataRevisionProvider);
+  return ref.watch(courseRepositoryProvider).courseHistory();
 });
 
 final coachClassesProvider = FutureProvider.autoDispose<List<CourseClass>>((ref) {

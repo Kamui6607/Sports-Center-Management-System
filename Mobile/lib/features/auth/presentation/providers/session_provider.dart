@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/config/env.dart';
 import '../../../../core/data/data_revision.dart';
+import '../../../../core/error/app_failure.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/realtime_client.dart';
 import '../../data/auth_repository_provider.dart';
@@ -21,11 +23,31 @@ class SessionNotifier extends AsyncNotifier<AuthSession?> {
         ref.read(dataRevisionProvider.notifier).bump();
       }
     });
-    return ref.read(authRepositoryProvider).restoreSession();
+    return _restore();
+  }
+
+  /// App Mobile dành cho Member & Coach; Manager quản lý trên Web (Doc/GYM_SCOPE_CHANGES.md).
+  /// Chế độ mock vẫn cho vào màn Manager rút gọn để demo/test giao diện.
+  static bool _blockedOnMobile(AuthSession s) => s.user.role == UserRole.manager && !Env.useMock;
+
+  static const managerUseWebMessage =
+      'Tài khoản Quản lý vui lòng đăng nhập trang Web quản trị. Ứng dụng di động dành cho Học viên và Huấn luyện viên.';
+
+  Future<AuthSession?> _restore() async {
+    final session = await ref.read(authRepositoryProvider).restoreSession();
+    if (session != null && _blockedOnMobile(session)) {
+      await ref.read(authRepositoryProvider).logout().catchError((_) {});
+      return null;
+    }
+    return session;
   }
 
   Future<AuthSession> login(String email, String password) async {
     final session = await ref.read(authRepositoryProvider).login(email, password);
+    if (_blockedOnMobile(session)) {
+      await ref.read(authRepositoryProvider).logout().catchError((_) {});
+      throw const AppFailure.forbidden(managerUseWebMessage);
+    }
     state = AsyncData(session);
     ref.read(dataRevisionProvider.notifier).bump();
     return session;

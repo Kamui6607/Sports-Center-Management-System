@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import fs from "node:fs";
 const doc = JSON.parse(fs.readFileSync("docs/openapi.json", "utf8"));
-export async function setup(page: Page, role = "STAFF", longText = false) {
+export async function setup(page: Page, role = "MANAGER", longText = false) {
   await page.addInitScript(() =>
     sessionStorage.setItem("pulse.access", "fixture-token"),
   );

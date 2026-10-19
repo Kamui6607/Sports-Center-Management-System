@@ -56,7 +56,7 @@ Chỉ liệt kê tính năng có trong [`Doc/PROJECT_OVERVIEW.md`](../Doc/PROJEC
 ### Manager
 
 - Quản trị (phòng, môn, sản phẩm & tồn kho, duyệt CV, duyệt rút tiền, duyệt/từ chối hoàn tiền, báo cáo) thực hiện trên **Web**, ngoài phạm vi Mobile giai đoạn đầu.
-- `TODO:` xác nhận có cần bản Manager rút gọn trên Mobile (VD: nhận thông báo + duyệt CV/rút tiền/hoàn tiền) hay không.
+- **Đã chốt (19/10/2026):** Manager chỉ dùng **Web**; khi chạy API thật, tài khoản Manager đăng nhập Mobile bị từ chối kèm hướng dẫn dùng Web. Màn Manager rút gọn chỉ còn cho chế độ mock (demo/test). Phạm vi app thu hẹp còn bộ môn **Gym** — xem [`Doc/GYM_SCOPE_CHANGES.md`](../Doc/GYM_SCOPE_CHANGES.md).
 
 ## 🚀 Công nghệ sử dụng (Mobile Frontend)
 

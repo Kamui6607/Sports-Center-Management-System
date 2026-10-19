@@ -1,7 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
-import { hasMemberCompletedClass, listMemberCompletedClassIds } from "../enrollments/my-courses.service.js";
+import { hasMemberCompletedClass } from "../enrollments/my-courses.service.js";
 import type { CreateFeedbackInput, UpdateFeedbackInput, FeedbackQueryInput } from "./feedbacks.schema.js";
 
 const feedbackInclude = {
@@ -12,11 +12,13 @@ const feedbackInclude = {
 
 /**
  * Member tạo feedback cho Coach.
- * Business rules:
+ * Business rules (Doc/GYM_SCOPE_CHANGES.md §7):
+ *  - Bắt buộc `classId`; khóa phải thuộc HLV được đánh giá.
  *  - Member phải HỌC XONG khóa (mọi buổi chính đã kết thúc + đã thanh toán) mới được đánh giá.
- *  - Nếu truyền classId: phải thuộc lớp có Coach đó.
- *  - Mỗi (memberId, coachId, classId) chỉ được feedback 1 lần (upsert cho phép sửa).
+ *  - Mỗi (member, khóa) đánh giá 1 lần và được SỬA LẠI đúng 1 lần (`editCount`); lần sửa thứ 2 ⇒ 409.
  */
+export const MAX_FEEDBACK_EDITS = 1;
+
 export async function createFeedback(data: CreateFeedbackInput, userId: string) {
   // Tìm memberProfile từ userId
   const memberProfile = await prisma.memberProfile.findUnique({ where: { userId } });
@@ -38,51 +40,48 @@ export async function createFeedback(data: CreateFeedbackInput, userId: string) 
   }
 
   // Chỉ được đánh giá SAU KHI học xong khóa: mọi buổi chính đã kết thúc + đã thanh toán.
-  if (data.classId) {
-    if (!(await hasMemberCompletedClass(memberProfile.id, data.classId))) {
-      throw new AppError(
-        "Bạn chỉ có thể đánh giá sau khi hoàn thành khóa học (mọi buổi đã kết thúc và đã thanh toán).",
-        403,
-        { code: "COURSE_NOT_COMPLETED", classId: data.classId }
-      );
-    }
-  } else {
-    const done = await listMemberCompletedClassIds(memberProfile.id, data.coachId);
-    if (done.length === 0) {
-      throw new AppError(
-        "Bạn chỉ có thể đánh giá HLV sau khi hoàn thành một khóa học của HLV này.",
-        403,
-        { code: "COURSE_NOT_COMPLETED" }
-      );
-    }
+  if (!(await hasMemberCompletedClass(memberProfile.id, data.classId))) {
+    throw new AppError(
+      "Bạn chỉ có thể đánh giá sau khi hoàn thành khóa học (mọi buổi đã kết thúc và đã thanh toán).",
+      403,
+      { code: "COURSE_NOT_COMPLETED", classId: data.classId }
+    );
   }
 
-  // Upsert: cho phép sửa nếu đã feedback rồi
-  const feedback = await prisma.coachFeedback.upsert({
-    where: {
-      coachId_memberId_classId: {
+  const existing = await prisma.coachFeedback.findFirst({
+    where: { memberId: memberProfile.id, classId: data.classId },
+  });
+  if (!existing) {
+    return prisma.coachFeedback.create({
+      data: {
         coachId: data.coachId,
         memberId: memberProfile.id,
-        classId: data.classId ?? "",
+        classId: data.classId,
+        rating: data.rating,
+        comment: data.comment,
+        isAnonymous: data.isAnonymous ?? false,
       },
-    },
-    create: {
-      coachId: data.coachId,
-      memberId: memberProfile.id,
-      classId: data.classId,
-      rating: data.rating,
-      comment: data.comment,
-      isAnonymous: data.isAnonymous ?? false,
-    },
-    update: {
-      rating: data.rating,
-      comment: data.comment,
-      isAnonymous: data.isAnonymous ?? false,
-    },
-    include: feedbackInclude,
-  });
+      include: feedbackInclude,
+    });
+  }
 
-  return feedback;
+  // Đã đánh giá ⇒ đây là lần SỬA: chỉ cho phép 1 lần (CAS theo editCount chống gửi song song).
+  const edited = await prisma.coachFeedback.updateMany({
+    where: { id: existing.id, editCount: { lt: MAX_FEEDBACK_EDITS } },
+    data: {
+      rating: data.rating,
+      comment: data.comment,
+      isAnonymous: data.isAnonymous ?? false,
+      editCount: { increment: 1 },
+    },
+  });
+  if (edited.count === 0) {
+    throw new AppError("Bạn đã đánh giá và sửa lại đánh giá khóa học này — không thể sửa thêm.", 409, {
+      code: "FEEDBACK_EDIT_LIMIT",
+      feedbackId: existing.id,
+    });
+  }
+  return prisma.coachFeedback.findUniqueOrThrow({ where: { id: existing.id }, include: feedbackInclude });
 }
 
 /**
@@ -159,7 +158,8 @@ export async function getMyFeedbacks(userId: string) {
 }
 
 /**
- * Member xóa feedback của mình.
+ * Member KHÔNG được tự xóa đánh giá (tránh xóa rồi đánh giá lại vô hạn — luật 1 lần + sửa 1 lần).
+ * Đánh giá vi phạm do Manager xóa (`DELETE /feedbacks/:id/manager`).
  */
 export async function deleteFeedback(feedbackId: string, userId: string) {
   const memberProfile = await prisma.memberProfile.findUnique({ where: { userId } });
@@ -169,8 +169,11 @@ export async function deleteFeedback(feedbackId: string, userId: string) {
   if (!feedback) throw new AppError("Feedback not found", 404);
   if (feedback.memberId !== memberProfile.id) throw new AppError("Forbidden: not your feedback", 403);
 
-  await prisma.coachFeedback.delete({ where: { id: feedbackId } });
-  return { message: "Feedback đã được xóa thành công." };
+  throw new AppError(
+    "Không thể xóa đánh giá. Bạn chỉ được sửa lại đánh giá 1 lần; liên hệ Quản lý nếu cần gỡ nội dung.",
+    403,
+    { code: "FEEDBACK_DELETE_NOT_ALLOWED" }
+  );
 }
 
 /**

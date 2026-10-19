@@ -102,3 +102,9 @@ export async function getMyStudent(req: Request, res: Response, next: NextFuncti
     next(err);
   }
 }
+
+export async function getCoachPublicProfile(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await coachService.getCoachPublicProfile(req.params.id as string), "Hồ sơ huấn luyện viên");
+  } catch (err) { next(err); }
+}

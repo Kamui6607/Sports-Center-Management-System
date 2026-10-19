@@ -22,7 +22,6 @@ async function main() {
 
   // ─── USERS ───────────────────────────────────────────
   const managerPwd = await bcrypt.hash("Manager@123", SALT);
-  const staffPwd = await bcrypt.hash("Staff@123", SALT);
   const coachPwd = await bcrypt.hash("Coach@123", SALT);
   const memberPwd = await bcrypt.hash("Member@123", SALT);
 
@@ -42,20 +41,7 @@ async function main() {
   });
   console.log("Manager:", manager.email);
 
-  // Staff (Receptionist)
-  const staff = await prisma.user.upsert({
-    where: { email: "staff@sportscenter.com" },
-    update: {},
-    create: {
-      email: "staff@sportscenter.com",
-      password: staffPwd,
-      fullName: "Lê Thị Lễ Tân",
-      phone: "0900000002",
-      role: { connect: { name: "MANAGER" } },
-      isActive: true,
-    },
-  });
-  console.log("Staff:", staff.email);
+  // Hệ thống chỉ còn 3 vai trò (MEMBER, COACH, MANAGER) — không còn tài khoản Staff/Lễ tân.
 
   // Coach 1
   const coach1 = await prisma.user.upsert({
@@ -70,9 +56,9 @@ async function main() {
       isActive: true,
       coachProfile: {
         create: {
-          specialization: "Yoga, Pilates",
+          specialization: "Gym nền tảng, Giảm mỡ, Phục hồi chức năng",
           experienceYears: 5,
-          bio: "Chuyên gia Yoga với 5 năm kinh nghiệm giảng dạy.",
+          bio: "HLV Gym 5 năm kinh nghiệm, chứng chỉ NASM-CPT. Chuyên giáo án giảm mỡ và hướng dẫn người mới làm quen phòng tập an toàn.",
           // Hồ sơ chứng nhận đã duyệt sẵn (seed không có file CV ⇒ fileUrl NULL)
           certification: { create: { status: "APPROVED" } },
         },
@@ -94,9 +80,9 @@ async function main() {
       isActive: true,
       coachProfile: {
         create: {
-          specialization: "HIIT, Strength Training",
+          specialization: "Tăng cơ, Sức mạnh (Powerlifting)",
           experienceYears: 7,
-          bio: "HLV HIIT và Strength Training với 7 năm kinh nghiệm.",
+          bio: "HLV Strength & Conditioning 7 năm kinh nghiệm, từng thi đấu Powerlifting. Chuyên giáo án tăng cơ, tăng sức mạnh.",
           // Hồ sơ chứng nhận đã duyệt sẵn (seed không có file CV ⇒ fileUrl NULL)
           certification: { create: { status: "APPROVED" } },
         },
@@ -118,7 +104,8 @@ async function main() {
       isActive: true,
       memberProfile: {
         create: {
-          fitnessGoal: "Giảm cân",
+          fitnessGoal: "Giảm 5kg trong 3 tháng",
+          fitnessGoals: ["WEIGHT_LOSS", "GYM_FOUNDATION"],
           trainingLevel: "BEGINNER",
           trainingPreference: "Buổi sáng",
         },
@@ -140,7 +127,8 @@ async function main() {
       isActive: true,
       memberProfile: {
         create: {
-          fitnessGoal: "Tăng cơ",
+          fitnessGoal: "Tăng cơ tay và vai",
+          fitnessGoals: ["MUSCLE_GAIN", "STRENGTH"],
           trainingLevel: "INTERMEDIATE",
           trainingPreference: "Buổi tối",
         },
@@ -163,6 +151,7 @@ async function main() {
       memberProfile: {
         create: {
           fitnessGoal: "Nâng cao thể lực",
+          fitnessGoals: ["ENDURANCE", "STRENGTH"],
           trainingLevel: "ADVANCED",
           trainingPreference: "Cuối tuần",
         },
@@ -196,42 +185,65 @@ async function main() {
   console.log("Member SePay test:", memberSepay.email);
 
   // ─── ROOMS ───────────────────────────────────────────
+  // Phạm vi Gym: mọi phòng là khu trong nhà, có tầng + khu vực + chỉ dẫn để hội viên/HLV tìm đường.
   const room1 = await prisma.room.upsert({
-    where: { name: "Phòng Yoga A" },
+    where: { name: "Khu Tạ Tự Do A" },
     update: { areaType: AreaType.INDOOR },
     create: {
-      name: "Phòng Yoga A",
+      name: "Khu Tạ Tự Do A",
       capacity: 20,
-      location: "Tầng 1",
+      floor: "Tầng 1",
+      location: "Khu tạ tự do (bên trái quầy lễ tân)",
+      directions: "Vào sảnh chính, đi thẳng qua quầy, rẽ trái.",
       areaType: AreaType.INDOOR,
       isActive: true,
     },
   });
 
   const room2 = await prisma.room.upsert({
-    where: { name: "Phòng HIIT B" },
+    where: { name: "Phòng Functional B" },
     update: { areaType: AreaType.INDOOR },
     create: {
-      name: "Phòng HIIT B",
+      name: "Phòng Functional B",
       capacity: 15,
-      location: "Tầng 2",
+      floor: "Tầng 2",
+      location: "Phòng kính cạnh khu cardio",
+      directions: "Thang máy/ thang bộ lên tầng 2, phòng kính đầu tiên bên phải.",
       areaType: AreaType.INDOOR,
       isActive: true,
     },
   });
 
-  const room3 = await prisma.room.upsert({
-    where: { name: "Hồ Bơi" },
-    update: { areaType: AreaType.POOL },
+  await prisma.room.upsert({
+    where: { name: "Phòng PT 1-1" },
+    update: { areaType: AreaType.INDOOR },
     create: {
-      name: "Hồ Bơi",
-      capacity: 25,
-      location: "Tầng Trệt",
-      areaType: AreaType.POOL,
+      name: "Phòng PT 1-1",
+      capacity: 8,
+      floor: "Tầng 3",
+      location: "Khu huấn luyện cá nhân",
+      directions: "Lên tầng 3, cuối hành lang.",
+      areaType: AreaType.INDOOR,
       isActive: true,
     },
   });
   console.log("Rooms created");
+
+  // ─── THÔNG TIN TRUNG TÂM ─────────────────────────────
+  await prisma.centerSetting.upsert({
+    where: { id: "default" },
+    update: {},
+    create: {
+      id: "default",
+      name: "Pulse Gym Center",
+      address: "7 Đường D1, Khu Công nghệ cao, Phường Tăng Nhơn Phú, TP. Hồ Chí Minh",
+      hotline: "0900000001",
+      email: "lienhe@pulsegym.vn",
+      openingHours: "05:30 – 22:00 hằng ngày (CN đến 20:00)",
+      parkingNote: "Gửi xe máy miễn phí tại tầng hầm B1, lối vào cổng phụ đường D1.",
+      description: "Trung tâm Gym 3 tầng: khu tạ tự do, phòng functional, phòng PT 1-1, khu cardio.",
+    },
+  });
 
   // ─── CLASSES ─────────────────────────────────────────
   const coachProfile1 = await prisma.coachProfile.findUnique({ where: { userId: coach1.id } });
@@ -246,10 +258,12 @@ async function main() {
       // Seed dùng ID custom ổn định (không phải UUID) để test/dev dễ tham chiếu.
       // API giữ string.min(1), KHÔNG ép uuid để tương thích các ID này.
       id: "class-yoga-001",
-      name: "Yoga Buổi Sáng",
-      description: "Lớp Yoga nhẹ nhàng buổi sáng, phù hợp mọi trình độ.",
-      fitness: "Yoga",
-      goal: "Tăng độ linh hoạt, cải thiện tư thế và giảm căng thẳng sau 8 tuần.",
+      name: "Gym Nền Tảng Buổi Sáng",
+      description: "Làm quen phòng gym: kỹ thuật squat, deadlift, đẩy ngực cơ bản và cách dùng máy an toàn.",
+      fitness: "Gym",
+      goal: "Thành thạo 6 bài compound cơ bản, giảm 2–3% mỡ cơ thể sau 8 tuần.",
+      goalTags: ["GYM_FOUNDATION", "WEIGHT_LOSS", "GENERAL_HEALTH"],
+      targetLevel: "BEGINNER",
       coach: { connect: { id: coachProfile1.id } },
       capacity: 15,
       classType: ClassType.REGULAR,
@@ -265,10 +279,12 @@ async function main() {
     update: { areaType: AreaType.INDOOR, coach: { connect: { id: coachProfile2.id } } },
     create: {
       id: "class-hiit-001",
-      name: "HIIT Cardio",
-      description: "Lớp HIIT cường độ cao, đốt cháy calo tối đa.",
-      fitness: "HIIT",
-      goal: "Giảm mỡ, tăng sức bền tim mạch; yêu cầu thể lực cơ bản.",
+      name: "Tăng Cơ – Sức Mạnh",
+      description: "Giáo án hypertrophy + strength theo chu kỳ, theo dõi mức tạ từng buổi.",
+      fitness: "Gym",
+      goal: "Tăng 2kg cơ nạc và 10–15% mức tạ squat/bench sau 8 tuần.",
+      goalTags: ["MUSCLE_GAIN", "STRENGTH"],
+      targetLevel: "INTERMEDIATE",
       coach: { connect: { id: coachProfile2.id } },
       capacity: 12,
       classType: ClassType.REGULAR,
@@ -284,10 +300,11 @@ async function main() {
     update: { areaType: AreaType.INDOOR, coach: { connect: { id: coachProfile1.id } } },
     create: {
       id: "class-yoga-premium-001",
-      name: "Premium Yoga & Meditation",
-      description: "Lớp Yoga Premium với coach 1-1 và thiền định chuyên sâu.",
-      fitness: "Yoga",
-      goal: "Nâng cao kỹ thuật Yoga và thiền định, phù hợp người đã có nền tảng.",
+      name: "PT Premium Giảm Mỡ",
+      description: "Nhóm nhỏ tối đa 8 người, HLV kèm sát, kết hợp tạ + conditioning + tư vấn dinh dưỡng.",
+      fitness: "Gym",
+      goal: "Giảm 4–6kg mỡ, săn chắc vóc dáng sau 8 tuần.",
+      goalTags: ["WEIGHT_LOSS", "BODY_SHAPING", "ENDURANCE"],
       coach: { connect: { id: coachProfile1.id } },
       capacity: 8,
       classType: ClassType.PREMIUM,
@@ -386,6 +403,13 @@ async function main() {
     await prisma.membershipPlan.upsert({ where: { id: p.id }, update: {}, create: p });
   }
   console.log("Membership plans created");
+
+  // Ngày khai giảng / kết thúc của khóa = buổi chưa hủy sớm nhất / muộn nhất (BE tự duy trì khi lịch đổi).
+  await prisma.$executeRaw`
+    UPDATE "Class" c SET "startDate" = s.min_start, "endDate" = s.max_end
+    FROM (SELECT "classId", MIN("startTime") AS min_start, MAX("endTime") AS max_end
+          FROM "ClassSchedule" WHERE "status" <> 'CANCELLED' GROUP BY "classId") s
+    WHERE s."classId" = c."id"`;
 
   console.log("  SePay:    sepay.test@example.com   / Member@123");
 }

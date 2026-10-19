@@ -96,17 +96,23 @@ router.get("/:id", authenticate, roomsController.getRoomById);
  *             required:
  *               - name
  *               - capacity
- *               - areaType
  *             properties:
  *               name:
  *                 type: string
- *                 example: "Yoga Room A"
+ *                 example: "Phòng Functional A"
  *               capacity:
  *                 type: integer
  *                 example: 20
  *               location:
  *                 type: string
- *                 example: "Floor 1"
+ *                 description: Khu vực trong trung tâm
+ *                 example: "Khu tạ tự do"
+ *               floor:
+ *                 type: string
+ *                 example: "Tầng 2"
+ *               directions:
+ *                 type: string
+ *                 example: "Thang máy lên tầng 2, rẽ trái"
  *               areaType:
  *                 type: string
  *                 enum: [POOL, INDOOR, OUTDOOR]
@@ -151,6 +157,10 @@ router.post(
  *               capacity:
  *                 type: integer
  *               location:
+ *                 type: string
+ *               floor:
+ *                 type: string
+ *               directions:
  *                 type: string
  *               areaType:
  *                 type: string

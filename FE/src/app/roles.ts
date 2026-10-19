@@ -1,6 +1,5 @@
 export const roleHomes: Record<string, string> = {
   MANAGER: "/manager",
-  STAFF: "/receptionist",
   COACH: "/coach",
   MEMBER: "/member",
 };

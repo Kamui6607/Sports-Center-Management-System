@@ -1,4 +1,5 @@
 import { Payment, Prisma } from "@prisma/client";
+import { buildMembershipSnapshot } from "../payments/purchase-snapshot.js";
 import { prisma } from "../../config/prisma.js";
 import { buildSepayPaymentCode, buildVietQrUrl, isSepayConfigured, sepayConfig } from "../../config/sepay.js";
 import { AppError } from "../../middlewares/errorHandler.js";
@@ -234,6 +235,8 @@ export async function purchaseMembership(userId: string, planId: string) {
           transactionCode: orderCode,
           gateway: SEPAY_GATEWAY,
           note: `${MEMBERSHIP_NOTE_PREFIX}${plan.id}`,
+          // Ảnh chụp gói tại thời điểm mua — đổi giá/tên gói sau này không ảnh hưởng giao dịch cũ.
+          purchaseSnapshot: { ...buildMembershipSnapshot(plan) },
           gatewayPayload: {
             provider: SEPAY_GATEWAY,
             orderCode,

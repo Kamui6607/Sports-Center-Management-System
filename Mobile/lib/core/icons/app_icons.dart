@@ -63,6 +63,12 @@ abstract final class AppIcons {
   static const IconData camera = LucideIcons.camera;
   static const IconData time = LucideIcons.clock;
   static const IconData location = LucideIcons.mapPin;
+  static const IconData map = LucideIcons.map;
+  static const IconData directions = LucideIcons.navigation;
+  static const IconData building = LucideIcons.building2;
+  static const IconData history = LucideIcons.history;
+  static const IconData draft = LucideIcons.filePen;
+  static const IconData reschedule = LucideIcons.calendarClock;
   static const IconData users = LucideIcons.users;
   static const IconData user = LucideIcons.user;
   static const IconData training = LucideIcons.dumbbell;

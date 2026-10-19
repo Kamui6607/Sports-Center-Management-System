@@ -113,7 +113,7 @@ router.patch(
  *       `effectiveTier` = tier của MembershipSubscription ACTIVE (FREE | MEMBERSHIP | PREMIUM).
  *       Khi member KHÔNG có subscription ACTIVE → `effectiveTier = null`, `activeSubscription = null`,
  *       `daysRemaining = null` (KHÔNG dùng "FREE" để đại diện cho "không có gói") — nhất quán với
- *       `GET /enrollments/my/quota`. Authorization không đổi: MANAGER / STAFF.
+ *       `GET /enrollments/my/quota`. Authorization không đổi: MANAGER.
  *     tags: [Members]
  *     parameters:
  *       - in: path

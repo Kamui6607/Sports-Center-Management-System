@@ -5,14 +5,22 @@ export const AreaTypeEnum = z.enum(["POOL", "INDOOR", "OUTDOOR"]);
 export const CreateRoomSchema = z.object({
   name: z.string().min(2),
   capacity: z.number().int().positive(),
-  location: z.string().optional(),
-  areaType: AreaTypeEnum,
+  /** Khu vực trong trung tâm (VD "Khu tạ tự do"). */
+  location: z.string().trim().max(120).optional(),
+  /** Tầng (VD "Tầng 2"). */
+  floor: z.string().trim().max(40).optional(),
+  /** Chỉ dẫn đường đi tới phòng. */
+  directions: z.string().trim().max(500).optional(),
+  // Phạm vi Gym: mặc định khu vực trong nhà.
+  areaType: AreaTypeEnum.default("INDOOR"),
 });
 
 export const UpdateRoomSchema = z.object({
   name: z.string().min(2).optional(),
   capacity: z.number().int().positive().optional(),
-  location: z.string().optional(),
+  location: z.string().trim().max(120).nullable().optional(),
+  floor: z.string().trim().max(40).nullable().optional(),
+  directions: z.string().trim().max(500).nullable().optional(),
   areaType: AreaTypeEnum.optional(),
   isActive: z.boolean().optional(),
 });

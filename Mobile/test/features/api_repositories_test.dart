@@ -125,7 +125,7 @@ void main() {
       expect(d.purchase.pendingPaymentId, 'p9');
     });
 
-    test('chi tiết: PURCHASED ⇒ hạn hủy = khai giảng − 24h', () async {
+    test('chi tiết: PURCHASED ⇒ hạn hủy được hoàn 100% = khai giảng − 3 ngày', () async {
       final api = FakeApi(storedTokens: authed);
       api.backend
         ..on('GET /classes/c1', (_) async => FakeReply.ok(_class()))
@@ -142,7 +142,7 @@ void main() {
       final d = await CourseApiRepository(api.client, api.tokens).detail('c1');
       expect(d.purchase.status, PurchaseStatus.purchased);
       expect(d.purchase.hasPendingRefund, isTrue);
-      expect(d.purchase.cancelDeadline, _now.add(const Duration(days: 1)).toLocal());
+      expect(d.purchase.cancelDeadline, _now.add(const Duration(days: 2)).subtract(const Duration(days: 3)).toLocal());
     });
 
     test('gửi lại khóa bị từ chối (BE-3) + lý do từ chối (BE-2)', () async {
@@ -165,7 +165,9 @@ void main() {
         ),
       );
       final body = api.backend.requests.single.body! as Map;
-      expect((body['class'] as Map)['fitness'], 'Pilates');
+      // Phạm vi Gym: bộ môn cố định "Gym", khu vực trong nhà.
+      expect((body['class'] as Map)['fitness'], 'Gym');
+      expect((body['class'] as Map)['areaType'], 'INDOOR');
       expect((body['schedules'] as List), hasLength(1));
       expect(c.status, ClassStatus.pending);
       expect(

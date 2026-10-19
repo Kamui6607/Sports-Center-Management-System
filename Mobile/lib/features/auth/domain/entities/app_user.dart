@@ -7,20 +7,36 @@ enum TrainingLevel { beginner, intermediate, advanced }
 
 /// Hồ sơ học viên (`MemberProfile`).
 class MemberProfile {
-  const MemberProfile({required this.id, this.fitnessGoal, this.trainingLevel, this.trainingPreference});
+  const MemberProfile({
+    required this.id,
+    this.fitnessGoal,
+    this.fitnessGoals = const [],
+    this.trainingLevel,
+    this.trainingPreference,
+  });
 
   final String id;
+
+  /// Ghi chú mục tiêu tự do.
   final String? fitnessGoal;
+
+  /// Mã mục tiêu chọn từ danh mục gợi ý — dùng tính độ phù hợp khóa học.
+  final List<String> fitnessGoals;
   final TrainingLevel? trainingLevel;
   final String? trainingPreference;
 
-  MemberProfile copyWith({String? fitnessGoal, TrainingLevel? trainingLevel, String? trainingPreference}) =>
-      MemberProfile(
-        id: id,
-        fitnessGoal: fitnessGoal ?? this.fitnessGoal,
-        trainingLevel: trainingLevel ?? this.trainingLevel,
-        trainingPreference: trainingPreference ?? this.trainingPreference,
-      );
+  MemberProfile copyWith({
+    String? fitnessGoal,
+    List<String>? fitnessGoals,
+    TrainingLevel? trainingLevel,
+    String? trainingPreference,
+  }) => MemberProfile(
+    id: id,
+    fitnessGoal: fitnessGoal ?? this.fitnessGoal,
+    fitnessGoals: fitnessGoals ?? this.fitnessGoals,
+    trainingLevel: trainingLevel ?? this.trainingLevel,
+    trainingPreference: trainingPreference ?? this.trainingPreference,
+  );
 }
 
 /// Hồ sơ huấn luyện viên (`CoachProfile`).

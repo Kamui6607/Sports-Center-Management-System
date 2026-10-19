@@ -23,7 +23,7 @@ class ClassCard extends StatelessWidget {
     return AppCard(
       onTap: onTap,
       padding: EdgeInsets.zero,
-      semanticLabel: 'Khóa ${course.name}, ${course.sportNames}, giá ${course.price} đồng',
+      semanticLabel: 'Khóa ${course.name}, giá ${course.price} đồng',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -43,7 +43,12 @@ class ClassCard extends StatelessWidget {
                   top: AppSpacing.sm,
                   child: Wrap(
                     spacing: AppSpacing.xxs,
-                    children: [course.classType.tag.tag(), if (showStatus) course.status.status.tag()],
+                    children: [
+                      course.classType.tag.tag(),
+                      if (showStatus) course.status.status.tag(),
+                      if (course.goalMatch != null && course.goalMatch!.level != GoalMatchLevel.unknown)
+                        course.goalMatch!.level.tag.tag(),
+                    ],
                   ),
                 ),
                 if (remaining != null && remaining <= 3)
@@ -65,7 +70,9 @@ class ClassCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  course.sportNames.toUpperCase(),
+                  (course.goalTags.isEmpty ? course.sportNames : course.goalLabels.join(' · ')).toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: context.text.caption.copyWith(color: c.accentStrong, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: AppSpacing.xxs),
@@ -94,7 +101,9 @@ class ClassCard extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xs),
                 InfoRow(
                   icon: AppIcons.calendar,
-                  text: course.nextSessionStart == null
+                  text: course.startDate != null && course.endDate != null
+                      ? '${course.mainSessionCount} buổi · ${VnTime.dateShort(course.startDate!)} – ${VnTime.dateShort(course.endDate!)}'
+                      : course.nextSessionStart == null
                       ? '${course.mainSessionCount} buổi · Không còn buổi sắp tới'
                       : '${course.mainSessionCount} buổi · Buổi tới ${VnTime.dayLabel(course.nextSessionStart!)}',
                 ),
@@ -118,13 +127,17 @@ class ClassCard extends StatelessWidget {
 
 /// Thẻ HLV phụ trách.
 class CoachMiniCard extends StatelessWidget {
-  const CoachMiniCard({super.key, required this.coach, this.onChat});
+  const CoachMiniCard({super.key, required this.coach, this.onChat, this.onTap});
 
   final CoachSummary coach;
   final VoidCallback? onChat;
 
+  /// Mở bảng thông tin đầy đủ của HLV.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) => AppCard(
+    onTap: onTap,
     child: Row(
       children: [
         AppAvatar(name: coach.fullName, imageUrl: coach.avatarUrl, size: AppSizes.avatar + AppSpacing.xs),
@@ -151,6 +164,7 @@ class CoachMiniCard extends StatelessWidget {
         ),
         if (onChat != null)
           AppIconButton(icon: AppIcons.chat, tooltip: 'Nhắn tin cho HLV', onPressed: onChat, filled: true),
+        if (onTap != null) Icon(AppIcons.chevronRight, color: context.colors.textMuted),
       ],
     ),
   );

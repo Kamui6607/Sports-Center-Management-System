@@ -12,8 +12,9 @@ abstract interface class ScheduleRepository {
   /// `DELETE /enrollments/:id` — chỉ `BOOKED`, buổi chưa bắt đầu.
   Future<void> cancelEnrollment(String enrollmentId);
 
-  /// Buổi có thể đổi sang (cùng khóa, `SCHEDULED`, chưa bắt đầu).
-  Future<List<TransferOption>> transferOptions(String enrollmentId);
+  /// `GET /enrollments/:id/transfer-options` — buổi đổi được (cùng khóa hoặc khóa tương đương cùng HLV)
+  /// + số lần đổi còn lại.
+  Future<TransferOptions> transferOptions(String enrollmentId);
 
   /// `POST /enrollments/:id/transfer`.
   Future<void> transferEnrollment(String enrollmentId, String targetSessionId);
@@ -31,6 +32,9 @@ abstract interface class ScheduleRepository {
 
   /// `POST /class-schedules/:id/cancel` với `resolution` MAKEUP / REFUND.
   Future<CancelSessionResult> cancelSession(String sessionId, CancelSessionInput input);
+
+  /// `POST /class-schedules/:id/reschedule` — HLV dời buổi sang ngày/giờ khác (thông báo học viên).
+  Future<RescheduleResult> rescheduleSession(String sessionId, RescheduleInput input);
 
   /// `POST /attendance` / `PATCH /attendance/:id` cho cả danh sách.
   Future<void> saveAttendance(String sessionId, Map<String, AttendanceStatus> statuses, Map<String, String> notes);

@@ -5,7 +5,6 @@ const screens = [
   ...[
     "members",
     "coaches",
-    "staff",
     "membership-plans",
     "sports",
     "rooms",
@@ -15,16 +14,9 @@ const screens = [
     "roles",
     "audit-logs",
   ].map((path) => ["MANAGER", "/manager/" + path] as const),
-  ...["dashboard", "members", "checkin", "support", "profile"].map(
-    (path) => ["STAFF", "/receptionist/" + path] as const,
-  ),
   ["MANAGER", "/manager/dashboard"],
   ["MANAGER", "/manager/users"],
   ["MANAGER", "/manager/profile"],
-  ["STAFF", "/receptionist/members/create"],
-  ["STAFF", "/receptionist/membership"],
-  ["STAFF", "/receptionist/classes"],
-  ["STAFF", "/receptionist/payments"],
   ["COACH", "/coach/dashboard"],
   ["MEMBER", "/user/dashboard"],
 ] as const;
@@ -41,20 +33,6 @@ for (const width of [375, 1440])
       await page.goto(path);
       await expect(page.locator("main h1")).toBeVisible();
       await expect(page.locator(".loading, .skeleton")).toHaveCount(0);
-      if (
-        role === "STAFF" &&
-        [
-          "/receptionist/membership",
-          "/receptionist/classes",
-          "/receptionist/payments",
-        ].includes(path)
-      ) {
-        await page
-          .getByRole("button", { name: "Chọn", exact: true })
-          .first()
-          .click();
-        await expect(page.locator(".loading, .skeleton")).toHaveCount(0);
-      }
       const scan = async () => {
         const result = await new AxeBuilder({ page })
           .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
@@ -131,7 +109,7 @@ test("mobile keyboard navigation traps focus, closes on Escape, restores focus",
 }) => {
   await setup(page);
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.goto("/receptionist/dashboard");
+  await page.goto("/manager/dashboard");
   const trigger = page.getByRole("button", { name: "Mở menu" });
   await trigger.focus();
   await page.keyboard.press("Enter");

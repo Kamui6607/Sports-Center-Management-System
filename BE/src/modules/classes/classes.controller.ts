@@ -70,3 +70,29 @@ export async function listClassStudents(req: Request, res: Response, next: NextF
     sendSuccess(res, result, "Class students retrieved successfully");
   } catch (err) { next(err); }
 }
+
+export async function listGoalOptions(_req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, classesService.listGoalOptions(), "Danh mục mục tiêu tập luyện");
+  } catch (err) { next(err); }
+}
+export async function createDraft(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendCreated(res, await classesService.createDraft(req.body, req.user!), "Đã lưu bản nháp");
+  } catch (err) { next(err); }
+}
+export async function updateDraft(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await classesService.updateDraft(req.params.id as string, req.body, req.user!), "Đã lưu bản nháp");
+  } catch (err) { next(err); }
+}
+export async function deleteDraft(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await classesService.deleteDraft(req.params.id as string, req.user!), "Đã xóa bản nháp");
+  } catch (err) { next(err); }
+}
+export async function submitDraft(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await classesService.submitDraft(req.params.id as string, req.body, req.user!), "Đã gửi khóa học chờ duyệt");
+  } catch (err) { next(err); }
+}

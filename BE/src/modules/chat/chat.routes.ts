@@ -5,14 +5,14 @@ import { chatUploadSingle } from "../../middlewares/upload.js";
 
 const router = Router();
 
-// Allow all authenticated users (Member, Coach, Staff, Manager) to use chat APIs
+// Allow all authenticated users (Member, Coach, Manager) to use chat APIs
 router.use(authenticate);
 
 /**
  * @swagger
  * tags:
  *   name: Chat
- *   description: Real-time messaging and chat history (Manager & Staff)
+ *   description: Real-time messaging and chat history (Member, Coach & Manager)
  */
 
 /**

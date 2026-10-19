@@ -9,6 +9,7 @@ import {
   ScheduleQuerySchema,
   ScheduleIdSchema,
   CancelScheduleSchema,
+  RescheduleScheduleSchema,
 } from "./class-schedules.schema.js";
 import * as schedulesController from "./class-schedules.controller.js";
 
@@ -383,6 +384,50 @@ router.post(
   validate(ScheduleIdSchema, "params"),
   validate(CancelScheduleSchema),
   schedulesController.cancelSchedule
+);
+
+/**
+ * @swagger
+ * /class-schedules/{id}/reschedule:
+ *   post:
+ *     summary: COACH dời MỘT buổi sang ngày/giờ khác (thông báo học viên)
+ *     description: |
+ *       Luật (Doc/GYM_SCOPE_CHANGES.md §12): buổi SCHEDULED của khóa APPROVED; buổi hiện tại còn ≥ 24h;
+ *       giờ mới cách hiện tại ≥ 24h; tối đa 2 lần/buổi; bắt buộc lý do. Trùng phòng/lịch HLV ⇒ 409.
+ *       Học viên trùng lịch cá nhân không chặn (trả `conflictedMembers`). Học viên được thông báo và có thể
+ *       hủy buổi để được hoàn 100% tiền buổi (`SESSION_RESCHEDULED`) hoặc đổi buổi.
+ *     tags: [Class Schedules]
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [startTime, endTime, reason]
+ *             properties:
+ *               startTime: { type: string, format: date-time }
+ *               endTime: { type: string, format: date-time }
+ *               roomId: { type: string, description: "Tùy chọn — đổi phòng cùng lúc" }
+ *               reason: { type: string, minLength: 3, maxLength: 500 }
+ *     responses:
+ *       200: { description: "{ schedule, affectedMembers, conflictedMembers[], rescheduleCount, remainingReschedules }" }
+ *       400: { description: "RESCHEDULE_TOO_LATE / RESCHEDULE_NEW_TIME_TOO_SOON / RESCHEDULE_LIMIT / RESCHEDULE_NO_CHANGE" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       409: { description: "ROOM_CONFLICT / COACH_CONFLICT / SCHEDULE_STATE_CHANGED" }
+ */
+router.post(
+  "/:id/reschedule",
+  authenticate,
+  authorize("COACH"),
+  validate(ScheduleIdSchema, "params"),
+  validate(RescheduleScheduleSchema),
+  schedulesController.rescheduleSchedule
 );
 
 /**

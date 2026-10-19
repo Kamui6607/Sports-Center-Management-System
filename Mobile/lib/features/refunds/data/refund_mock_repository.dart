@@ -16,8 +16,8 @@ class RefundMockRepository implements RefundRepository {
 
   final MockServer _server;
 
-  /// Hạn hủy khóa: ≥ 24 giờ trước buổi khai giảng.
-  static const cancelWindow = Duration(hours: 24);
+  /// Hạn hủy khóa được hoàn 100%: ≥ 3 ngày trước buổi khai giảng (mock không hỗ trợ hoàn ngoại lệ).
+  static const cancelWindow = Duration(days: 3);
 
   Refund _toRefund(MockDatabase db, RefundRow r) {
     final orderId = r.orderId;
@@ -86,7 +86,7 @@ class RefundMockRepository implements RefundRepository {
     )) {
       block = 'Bạn đã gửi yêu cầu hủy khóa, đang chờ Quản lý duyệt.';
     } else if (deadline == null || !db.now().isBefore(deadline)) {
-      block = 'Đã quá hạn hủy khóa (phải trước buổi khai giảng ít nhất 24 giờ).';
+      block = 'Đã quá hạn hủy khóa được hoàn tiền (phải trước buổi khai giảng ít nhất 3 ngày).';
     } else if (remaining <= 0) {
       block = 'Giao dịch đã được hoàn hết.';
     }
@@ -104,12 +104,13 @@ class RefundMockRepository implements RefundRepository {
       _server.run(() => _eligibility(_server.db, _server.requireMember().id, classId));
 
   @override
-  Future<Refund> requestCancellation(
+  Future<CancellationResult> requestCancellation(
     String classId, {
     String? note,
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    bool lateRefund = false,
   }) => _server.run(() {
     final db = _server.db;
     final member = _server.requireMember();
@@ -143,7 +144,7 @@ class RefundMockRepository implements RefundRepository {
       '$memberName yêu cầu hủy khóa "${cls.name}".',
       metadata: {'refundId': row.id},
     );
-    return _toRefund(db, row);
+    return CancellationResult(mode: CancellationMode.refundRequested, refund: _toRefund(db, row));
   });
 
   @override

@@ -72,7 +72,7 @@ function RoomDetail({ room }: { room: Row }) {
         </div>
         <div className="cr-kpi">
           <div className="cr-kpi-label">Vị trí</div>
-          <div className="cr-kpi-value" style={{ fontSize: 18, fontFamily: "inherit" }}>{str(room.location) || "—"}</div>
+          <div className="cr-kpi-value" style={{ fontSize: 18, fontFamily: "inherit" }}>{[room.floor, room.location].filter(Boolean).map(str).join(" · ") || "—"}</div>
           <div className="cr-kpi-note">Cập nhật {dateTime(room.updatedAt)}</div>
         </div>
       </div>

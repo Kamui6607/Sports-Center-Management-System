@@ -17,6 +17,7 @@ abstract final class StudentJson {
       phone: user.strOrNull('phone'),
       trainingLevel: m.enumOrNull('trainingLevel', TrainingLevel.values),
       fitnessGoal: m.strOrNull('fitnessGoal'),
+      fitnessGoals: m.strList('fitnessGoals'),
       trainingPreference: m.strOrNull('trainingPreference'),
       attendedCount: attendedCount ?? m.integer('attendedCount'),
       pastSessionCount: pastSessionCount ?? m.integer('pastSessionCount'),

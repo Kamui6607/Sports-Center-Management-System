@@ -28,7 +28,8 @@
     "test:e2e:all": "npm run test:e2e && npm run test:e2e:attendance && npm run test:e2e:course && npm run test:e2e:sepay && npm run test:e2e:chat",
     "test:local": "node scripts/with-local-env.mjs node scripts/run-e2e.mjs",
     "test:smoke:local": "node scripts/with-local-env.mjs tsx tests/smoke-mobile.local.ts",
-    "test:smoke:shop:local": "node scripts/with-local-env.mjs tsx tests/smoke-shop.local.ts"
+    "test:smoke:shop:local": "node scripts/with-local-env.mjs tsx tests/smoke-shop.local.ts",
+    "test:gym:local": "node scripts/with-local-env.mjs tsx tests/gym-scope.local.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

@@ -5,16 +5,20 @@ import type { RefundQueryInput } from "./refunds.schema.js";
 
 export async function requestCourseRefund(req: Request, res: Response, next: NextFunction) {
   try {
-    const { classId, note, bankName, bankAccountNumber, bankAccountName } = req.body;
-    const result = await refundsService.requestCourseRefund(req.user!.id, classId, note, {
-      bankName,
-      bankAccountNumber,
-      bankAccountName,
-    });
-    if (result.refund) {
-      sendCreated(res, result, "Course cancellation requested — waiting for manager approval");
+    const { classId, note, bankName, bankAccountNumber, bankAccountName, lateRefund } = req.body;
+    const result = await refundsService.requestCourseRefund(
+      req.user!.id,
+      classId,
+      note,
+      { bankName, bankAccountNumber, bankAccountName },
+      { lateRefund: lateRefund === true }
+    );
+    if (result.mode === "REFUND_REQUESTED") {
+      sendCreated(res, result, "Đã gửi yêu cầu hủy khóa — chờ Quản lý duyệt hoàn tiền");
+    } else if (result.mode === "LATE_REFUND_REQUESTED") {
+      sendCreated(res, result, "Đã hủy khóa và gửi yêu cầu hoàn tiền ngoại lệ — chờ Quản lý xem xét");
     } else {
-      sendSuccess(res, result, "Course cancelled — no refund (cancelled within 3 days before the start date)");
+      sendSuccess(res, result, "Đã hủy khóa — không hoàn tiền (hủy trong vòng 3 ngày trước khai giảng)");
     }
   } catch (err) { next(err); }
 }
@@ -49,7 +53,8 @@ export async function approveRefund(req: Request, res: Response, next: NextFunct
       req.params.id as string,
       req.user!.id,
       req.body.note,
-      req.body.transactionRef
+      req.body.transactionRef,
+      req.body.feePercent
     );
     sendSuccess(res, refund, "Refund approved");
   } catch (err) { next(err); }

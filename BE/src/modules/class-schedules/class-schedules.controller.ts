@@ -47,6 +47,13 @@ export async function cancelSchedule(req: Request, res: Response, next: NextFunc
     sendSuccess(res, result, "Schedule cancelled successfully");
   } catch (err) { next(err); }
 }
+export async function rescheduleSchedule(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = { id: req.user!.id, role: req.user!.role };
+    const result = await schedulesService.rescheduleSchedule(req.params.id as string, req.body, actor);
+    sendSuccess(res, result, "Đã dời lịch buổi học và thông báo cho học viên");
+  } catch (err) { next(err); }
+}
 export async function completeSchedule(req: Request, res: Response, next: NextFunction) {
   try {
     const schedule = await schedulesService.completeSchedule(req.params.id as string, { id: req.user!.id, role: req.user!.role });

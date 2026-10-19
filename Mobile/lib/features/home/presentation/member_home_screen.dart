@@ -27,7 +27,7 @@ class MemberHomeScreen extends ConsumerWidget {
 
   Future<void> _refresh(WidgetRef ref) async {
     ref
-      ..invalidate(myCoursesProvider)
+      ..invalidate(courseHistoryProvider)
       ..invalidate(myAttendanceSummaryProvider)
       ..invalidate(myPenaltiesProvider)
       ..invalidate(notificationsProvider)
@@ -191,8 +191,8 @@ class _OngoingCourses extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final courses = (ref.watch(myCoursesProvider).value ?? const <MyCourse>[])
-        .where((c) => c.phase != MyCoursePhase.ended)
+    final courses = (ref.watch(courseHistoryProvider).value ?? const <MemberCourse>[])
+        .where((c) => c.isActive)
         .toList();
     if (courses.isEmpty) return const SizedBox.shrink();
     return Column(
@@ -206,7 +206,7 @@ class _OngoingCourses extends ConsumerWidget {
         for (final c in courses.take(2))
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: MyCourseCard(item: c),
+            child: MemberCourseCard(item: c),
           ),
       ],
     );

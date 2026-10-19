@@ -8,6 +8,7 @@ import {
   UpdateClassSchema,
   ApproveClassSchema,
   ClassQuerySchema,
+  ClassDraftSchema,
 } from "./classes.schema.js";
 import { CreateActivityPlanSchema } from "../class-schedules/class-schedules.schema.js";
 import * as classesController from "./classes.controller.js";
@@ -39,6 +40,17 @@ const router = Router();
  *           type: string
  *         description: Lọc theo môn tập (không phân biệt hoa/thường, khớp đúng tên môn)
  *       - in: query
+ *         name: goal
+ *         schema:
+ *           type: string
+ *         description: Lọc theo 1 mục tiêu (mã trong GET /classes/goal-options)
+ *       - in: query
+ *         name: matchMyGoals
+ *         schema:
+ *           type: string
+ *           enum: ["true", "false"]
+ *         description: "MEMBER: chỉ khóa khớp ≥ 1 mục tiêu của tôi, sắp theo độ phù hợp. Mỗi khóa kèm `goalMatch` khi người gọi là MEMBER."
+ *       - in: query
  *         name: classType
  *         schema:
  *           type: string
@@ -59,8 +71,8 @@ const router = Router();
  *         name: status
  *         schema:
  *           type: string
- *           enum: [PENDING, APPROVED, REJECTED, COMPLETED]
- *         description: Filter by approval status (Guest luôn chỉ thấy APPROVED)
+ *           enum: [DRAFT, PENDING, APPROVED, REJECTED, COMPLETED]
+ *         description: Filter by approval status (Guest luôn chỉ thấy APPROVED; DRAFT chỉ HLV chủ khóa thấy)
  *       - in: query
  *         name: isActive
  *         schema:
@@ -100,6 +112,94 @@ router.get(
  *       200: { description: "data: string[]" }
  */
 router.get("/fitness", classesController.listFitness);
+
+/**
+ * @swagger
+ * /classes/goal-options:
+ *   get:
+ *     summary: Danh mục mục tiêu tập luyện (công khai) — Coach gắn cho khóa, Member chọn cho hồ sơ
+ *     tags: [Classes]
+ *     security: []
+ *     responses:
+ *       200: { description: "[{ code, label, description }]" }
+ */
+router.get("/goal-options", classesController.listGoalOptions);
+
+/**
+ * @swagger
+ * /classes/drafts:
+ *   post:
+ *     summary: "COACH tạo bản nháp khóa học (wizard tự lưu) — status DRAFT, chưa giữ phòng/tạo buổi"
+ *     tags: [Classes]
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               description: { type: string }
+ *               goal: { type: string }
+ *               goalTags: { type: array, items: { type: string } }
+ *               targetLevel: { type: string, enum: [BEGINNER, INTERMEDIATE, ADVANCED] }
+ *               capacity: { type: integer }
+ *               classType: { type: string, enum: [REGULAR, PREMIUM] }
+ *               price: { type: number }
+ *               draftData: { type: object, description: "Toàn bộ trạng thái wizard (client tự định nghĩa)" }
+ *     responses:
+ *       201: { description: Bản nháp (Class) }
+ *       409: { description: "DRAFT_LIMIT — tối đa 10 bản nháp" }
+ * /classes/drafts/{id}:
+ *   patch:
+ *     summary: COACH tự lưu bản nháp (ghi đè field được gửi)
+ *     tags: [Classes]
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { type: object, description: "Giống POST /classes/drafts" }
+ *     responses:
+ *       200: { description: Bản nháp đã lưu }
+ *       404: { description: DRAFT_NOT_FOUND }
+ *       409: { description: CLASS_NOT_DRAFT }
+ *   delete:
+ *     summary: COACH xóa bản nháp
+ *     tags: [Classes]
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: "{ id, deleted: true }" }
+ * /classes/drafts/{id}/submit:
+ *   post:
+ *     summary: COACH gửi duyệt bản nháp ⇒ PENDING (kiểm tra đủ, giữ phòng, tạo buổi)
+ *     tags: [Classes]
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, description: "Giống body POST /class-schedules/activity-plan: { class (bắt buộc goalTags ≥ 1), roomId, schedules[] | recurrence }" }
+ *     responses:
+ *       200: { description: "{ class, schedulesCreated, startDate, endDate, totalSessions, status: PENDING }" }
+ *       400: { description: CLASS_GOALS_REQUIRED / validate }
+ *       409: { description: ROOM_CONFLICT / COACH_CONFLICT / CLASS_NOT_DRAFT }
+ */
+router.post("/drafts", authenticate, authorize("COACH"), validate(ClassDraftSchema), classesController.createDraft);
+router.patch("/drafts/:id", authenticate, authorize("COACH"), validate(ClassDraftSchema), classesController.updateDraft);
+router.delete("/drafts/:id", authenticate, authorize("COACH"), classesController.deleteDraft);
+router.post(
+  "/drafts/:id/submit",
+  authenticate,
+  authorize("COACH"),
+  validate(CreateActivityPlanSchema),
+  classesController.submitDraft
+);
 
 /**
  * @swagger

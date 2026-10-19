@@ -72,6 +72,7 @@ type BaseEntityModels = {
   InventoryTransaction: Models.InventoryTransaction;
   MembershipPlan: Models.MembershipPlan;
   Membership: Models.Membership;
+  CenterSetting: Models.CenterSetting;
 };
 
 // ── Kiểm tra lúc biên dịch (không sinh code chạy) ────────────────────────────

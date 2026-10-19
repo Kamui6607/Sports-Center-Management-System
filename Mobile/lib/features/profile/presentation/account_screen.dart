@@ -88,6 +88,7 @@ class AccountScreen extends ConsumerWidget {
                 title: 'Mua sắm & thanh toán',
                 items: [
                   MenuItemData(icon: AppIcons.order, label: 'Đơn hàng', onTap: () => go(AppRoutes.orders)),
+                  MenuItemData(icon: AppIcons.map, label: 'Sổ địa chỉ giao hàng', onTap: () => go(AppRoutes.addresses)),
                   MenuItemData(
                     icon: AppIcons.invoice,
                     label: 'Lịch sử thanh toán',
@@ -124,6 +125,7 @@ class AccountScreen extends ConsumerWidget {
                 items: [
                   MenuItemData(icon: AppIcons.shop, label: 'Cửa hàng', onTap: () => go(AppRoutes.shop)),
                   MenuItemData(icon: AppIcons.order, label: 'Đơn hàng', onTap: () => go(AppRoutes.orders)),
+                  MenuItemData(icon: AppIcons.map, label: 'Sổ địa chỉ giao hàng', onTap: () => go(AppRoutes.addresses)),
                 ],
               ),
             ],
@@ -154,6 +156,12 @@ class AccountScreen extends ConsumerWidget {
             title: 'Cài đặt',
             items: [
               MenuItemData(icon: AppIcons.user, label: 'Hồ sơ cá nhân', onTap: () => go(AppRoutes.profileEdit)),
+              MenuItemData(
+                icon: AppIcons.location,
+                label: 'Thông tin trung tâm',
+                subtitle: 'Địa chỉ, bản đồ, giờ mở cửa, vị trí phòng tập',
+                onTap: () => go(AppRoutes.centerInfo),
+              ),
               MenuItemData(icon: AppIcons.lock, label: 'Đổi mật khẩu', onTap: () => go(AppRoutes.changePassword)),
               if (Env.useMock)
                 MenuItemData(

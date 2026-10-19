@@ -14,6 +14,7 @@ class StudentSummary {
     this.phone,
     this.trainingLevel,
     this.fitnessGoal,
+    this.fitnessGoals = const [],
     this.trainingPreference,
     this.attendedCount = 0,
     this.pastSessionCount = 0,
@@ -27,6 +28,7 @@ class StudentSummary {
   final String? phone;
   final TrainingLevel? trainingLevel;
   final String? fitnessGoal;
+  final List<String> fitnessGoals;
   final String? trainingPreference;
   final int attendedCount;
   final int pastSessionCount;
@@ -71,10 +73,20 @@ class ClassDraft {
     required this.roomId,
     required this.sessions,
     this.description,
+    this.goal,
+    this.goalTags = const [],
+    this.targetLevel,
   });
 
   final String name;
   final String? description;
+
+  /// Mô tả chi tiết mục tiêu khóa học.
+  final String? goal;
+
+  /// Mã mục tiêu (1–4) — bắt buộc khi gửi duyệt.
+  final List<String> goalTags;
+  final TrainingLevel? targetLevel;
   final List<String> sportIds;
   final int capacity;
   final ClassType classType;

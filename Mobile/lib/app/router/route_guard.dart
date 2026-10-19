@@ -15,6 +15,7 @@ abstract final class RouteGuard {
     AppRoutes.exploreClasses,
     AppRoutes.shop,
     AppRoutes.devTools,
+    AppRoutes.centerInfo,
   };
   static const _publicPrefixes = ['/classes/', '/products/'];
 

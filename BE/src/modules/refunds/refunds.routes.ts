@@ -25,12 +25,14 @@ const router = Router();
  * @swagger
  * /refunds/course-cancellation:
  *   post:
- *     summary: MEMBER xin hủy khóa học và hoàn tiền (trước khai giảng ≥ 24h)
+ *     summary: MEMBER hủy khóa học (≥ 3 ngày ⇒ hoàn 100%; muộn hơn ⇒ hủy không hoàn hoặc xin hoàn ngoại lệ)
  *     description: |
- *       Tạo yêu cầu hoàn tiền PENDING cho giao dịch lớp học đã thu tiền gần nhất của hội viên.
- *       - Chỉ khi còn ≥ 24h trước buổi khai giảng; trễ hơn ⇒ 400 `COURSE_CANCEL_TOO_LATE`.
- *       - Hoàn phần còn lại của giao dịch (100% nếu chưa có khoản hoàn buổi lẻ nào).
- *       - Chỗ đã đặt vẫn giữ tới khi Manager duyệt; duyệt ⇒ trừ ví HLV, giao dịch REFUNDED, hủy chỗ.
+ *       Doc/GYM_SCOPE_CHANGES.md §11:
+ *       - Còn ≥ 72h trước buổi khai giảng ⇒ yêu cầu hoàn 100% phần còn lại (PENDING). Chỗ giữ tới khi Manager duyệt.
+ *       - < 72h, `lateRefund` không gửi/false ⇒ hủy ngay mọi buổi sắp tới, không hoàn (`mode=CANCELLED_NO_REFUND`).
+ *       - < 72h, `lateRefund: true` ⇒ hủy ngay + yêu cầu `MEMBER_CANCEL_COURSE_LATE`: giá trị gốc = tiền đã trả × buổi chính
+ *         chưa diễn ra / tổng buổi chính; hoàn = gốc × (100% − phí chiết khấu, mặc định `LATE_CANCEL_FEE_PERCENT`=30%).
+ *         Manager duyệt (có thể chỉnh phí) hoặc từ chối (`mode=LATE_REFUND_REQUESTED`).
  *     tags: [Refunds]
  *     requestBody:
  *       required: true
@@ -45,8 +47,9 @@ const router = Router();
  *               bankName: { type: string, maxLength: 100, description: "Tên ngân hàng (VD: MBBank, VCB, Techcombank)" }
  *               bankAccountNumber: { type: string, maxLength: 50, description: "Số tài khoản nhận tiền" }
  *               bankAccountName: { type: string, maxLength: 100, description: "Tên chủ tài khoản" }
+ *               lateRefund: { type: boolean, description: "Hủy < 3 ngày: true ⇒ xin hoàn ngoại lệ (Manager duyệt, trừ phí)" }
  *     responses:
- *       201: { description: Đã tạo yêu cầu hoàn 100% (PENDING) }
+ *       201: { description: "Đã tạo yêu cầu hoàn (REFUND_REQUESTED 100% hoặc LATE_REFUND_REQUESTED ngoại lệ)" }
  *       200: { description: Đã hủy ngay, không hoàn tiền (hủy trong vòng 3 ngày trước khai giảng) }
  *       400: { $ref: "#/components/responses/BadRequest" }
  *       401: { $ref: "#/components/responses/Unauthorized" }
@@ -133,6 +136,7 @@ router.get(
  *             properties:
  *               note: { type: string, maxLength: 500, description: "Ghi chú duyệt hoàn tiền" }
  *               transactionRef: { type: string, maxLength: 100, description: "Mã giao dịch ngân hàng thực tế (FT code)" }
+ *               feePercent: { type: integer, minimum: 0, maximum: 99, description: "Chỉ với MEMBER_CANCEL_COURSE_LATE: % phí chiết khấu chốt khi duyệt (hoàn = grossAmount × (100 − phí)%)" }
  *     responses:
  *       200: { description: Đã duyệt }
  *       401: { $ref: "#/components/responses/Unauthorized" }

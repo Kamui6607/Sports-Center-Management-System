@@ -3,7 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { api } from "../../../shared/api";
-import { ActivePill, AREA_LABEL, DataTable, Dialog, ErrorBox, Field, fieldErrors, PageHead, Pager, Panel, QueryView, SearchBox, Select, num, str, useUrlState } from "../kit";
+import { ActivePill, DataTable, Dialog, ErrorBox, Field, fieldErrors, PageHead, Pager, Panel, QueryView, SearchBox, Select, num, str, useUrlState } from "../kit";
 import type { Row } from "../kit";
 
 export default function RoomsPage() {
@@ -29,7 +29,6 @@ export default function RoomsPage() {
       <Panel>
         <div className="cr-filters" style={{ marginBottom: 14 }}>
           <SearchBox value={s.value("search")} onChange={(v) => s.set({ search: v })} placeholder="Tìm theo tên phòng" />
-          <Select label="Khu vực" value={s.value("areaType")} onChange={(v) => s.set({ areaType: v })} options={Object.entries(AREA_LABEL)} />
           <Select
             label="Trạng thái"
             value={s.value("isActive")}
@@ -52,11 +51,11 @@ export default function RoomsPage() {
                     render: (r) => (
                       <div className="cr-cell-main">
                         <Link to={`/manager/rooms/${str(r.id)}`}>{str(r.name)}</Link>
-                        <small>{str(r.location) || "Chưa ghi vị trí"}</small>
+                        <small>{[r.floor, r.location].filter(Boolean).map(str).join(" · ") || "Chưa ghi vị trí"}</small>
                       </div>
                     ),
                   },
-                  { key: "a", title: "Khu vực", render: (r) => AREA_LABEL[str(r.areaType)] ?? str(r.areaType) },
+                  { key: "a", title: "Chỉ dẫn", render: (r) => str(r.directions) || "—" },
                   { key: "c", title: "Sức chứa", className: "num", render: (r) => `${num(r.capacity)} người` },
                   { key: "s", title: "Trạng thái", render: (r) => <ActivePill active={r.isActive} on="Đang sử dụng" off="Ngừng sử dụng" /> },
                   {
@@ -91,12 +90,23 @@ export function RoomDialog({ room, onClose }: { room: Row | null; onClose: () =>
     name: str(room?.name),
     capacity: room ? str(room.capacity) : "",
     location: str(room?.location),
+    floor: str(room?.floor),
+    directions: str(room?.directions),
+    // Phạm vi Gym: phòng mới luôn là khu trong nhà; phòng cũ giữ nguyên khu vực.
     areaType: str(room?.areaType) || "INDOOR",
   });
   const cache = useQueryClient();
   const m = useMutation({
     mutationFn: () => {
-      const body = { name: f.name.trim(), capacity: Number(f.capacity), location: f.location.trim() || undefined, areaType: f.areaType };
+      const opt = (v: string) => (v.trim() ? v.trim() : room ? null : undefined);
+      const body = {
+        name: f.name.trim(),
+        capacity: Number(f.capacity),
+        location: opt(f.location),
+        floor: opt(f.floor),
+        directions: opt(f.directions),
+        areaType: f.areaType,
+      };
       return room ? api("PATCH /rooms/{id}", { params: { id: str(room.id) }, body }) : api("POST /rooms", { body });
     },
     onSuccess: () => {
@@ -132,17 +142,14 @@ export function RoomDialog({ room, onClose }: { room: Row | null; onClose: () =>
         <Field label="Sức chứa" required error={f.capacity && capInvalid ? "Nhập số nguyên lớn hơn 0." : errs.capacity} hint="Không giảm được dưới số chỗ đã giữ/sức chứa lớp đang xếp lịch.">
           <input type="number" min={1} value={f.capacity} onChange={(e) => setF({ ...f, capacity: e.target.value })} />
         </Field>
-        <Field label="Loại khu vực" required error={errs.areaType} hint={room ? "Không đổi được khi lịch sắp tới dùng khóa khác loại khu vực." : undefined}>
-          <select value={f.areaType} onChange={(e) => setF({ ...f, areaType: e.target.value })}>
-            {Object.entries(AREA_LABEL).map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
-          </select>
+        <Field label="Tầng" error={errs.floor}>
+          <input value={f.floor} onChange={(e) => setF({ ...f, floor: e.target.value })} placeholder="VD: Tầng 2" maxLength={40} />
         </Field>
-        <Field label="Vị trí" error={errs.location}>
-          <input value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} placeholder="VD: Tầng 2, khu A" />
+        <Field label="Khu vực trong trung tâm" error={errs.location}>
+          <input value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} placeholder="VD: Khu tạ tự do" maxLength={120} />
+        </Field>
+        <Field label="Chỉ dẫn đường đi" wide error={errs.directions} hint="Hiển thị cho hội viên/HLV ở chi tiết buổi học trên ứng dụng.">
+          <textarea value={f.directions} onChange={(e) => setF({ ...f, directions: e.target.value })} placeholder="VD: Thang máy lên tầng 2, rẽ trái, phòng kính đầu tiên." maxLength={500} />
         </Field>
       </div>
       {m.error && !Object.keys(errs).length ? <ErrorBox error={m.error} /> : null}

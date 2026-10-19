@@ -8,9 +8,7 @@ import { scanAttendanceWarnings } from "../attendance/attendance.service.js";
 import { lockSchedule } from "../../utils/dbLocks.js";
 import { createSessionRefundsTx, notifyManagersNewRefunds } from "../refunds/refunds.service.js";
 import { addDaysToDateKey, vnDateKey, vnDateTime, weekdayIsoOfDateKey } from "../../utils/vnTime.js";
-import {
-  
-} from "../attendance/attendance-analytics.service.js";
+import { GYM_FITNESS } from "../../config/fitness-goals.js";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
@@ -377,9 +375,11 @@ export async function createSchedule(data: any, actor: ScheduleActor) {
 type ActivityPlanInput = {
   class: {
     name: string;
-    fitness: string;
+    fitness?: string;
     description?: string;
     goal?: string;
+    goalTags?: string[];
+    targetLevel?: "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | null;
     capacity: number;
     classType: "REGULAR" | "PREMIUM";
     areaType: "POOL" | "INDOOR" | "OUTDOOR";
@@ -431,6 +431,22 @@ function planScheduleSummary(slots: { startTime: Date; endTime: Date }[]) {
   };
 }
 
+/**
+ * Cập nhật ngày khai giảng / kết thúc của khóa từ các buổi CHƯA HỦY (sớm nhất / muộn nhất).
+ * Gọi sau mọi thay đổi lịch: tạo kế hoạch, dời lịch, hủy buổi, thêm buổi bù.
+ */
+export async function refreshClassDateRange(db: DbClient, classId: string) {
+  const agg = await db.classSchedule.aggregate({
+    where: { classId, status: { not: "CANCELLED" } },
+    _min: { startTime: true },
+    _max: { endTime: true },
+  });
+  await db.class.update({
+    where: { id: classId },
+    data: { startDate: agg._min.startTime ?? null, endDate: agg._max.endTime ?? null },
+  });
+}
+
 /** Phòng của kế hoạch: đang hoạt động, đúng khu vực, đủ sức chứa. */
 async function assertPlanRoom(tx: Prisma.TransactionClient, data: ActivityPlanInput) {
   const room = await tx.room.findUnique({ where: { id: data.roomId } });
@@ -460,15 +476,18 @@ async function persistPlanSchedules(
   const created = await tx.classSchedule.createMany({
     data: slots.map((slot) => ({ classId, roomId: data.roomId, ...slot, status: "SCHEDULED" as const })),
   });
+  await refreshClassDateRange(tx, classId);
   return { count: created.count, ...planScheduleSummary(slots) };
 }
 
 function planClassData(data: ActivityPlanInput) {
   return {
     name: data.class.name,
-    fitness: data.class.fitness.trim(),
+    fitness: data.class.fitness?.trim() || GYM_FITNESS,
     description: data.class.description || null,
     goal: data.class.goal?.trim() || null,
+    goalTags: [...new Set(data.class.goalTags ?? [])],
+    targetLevel: data.class.targetLevel ?? null,
     capacity: data.class.capacity,
     classType: data.class.classType,
     areaType: data.class.areaType,
@@ -526,13 +545,23 @@ export async function createActivityPlan(data: ActivityPlanInput, actor: { id: s
  * BE-3: Coach sửa & gửi lại khóa PENDING/REJECTED — thay thông tin + TOÀN BỘ lịch (khóa chưa bán nên
  * chưa có chỗ đặt), xóa lý do từ chối, quay về PENDING chờ duyệt lại.
  */
-export async function resubmitActivityPlan(classId: string, data: ActivityPlanInput, actor: { id: string; role: string }) {
+export async function resubmitActivityPlan(
+  classId: string,
+  data: ActivityPlanInput,
+  actor: { id: string; role: string },
+  opts: { fromDraft?: boolean } = {}
+) {
   if (actor.role !== "COACH") throw new AppError("Forbidden", 403);
+  let wasDraft = false;
   const result = await prisma.$transaction(async (tx) => {
     const cls = await tx.class.findUnique({ where: { id: classId }, include: { coach: { select: { userId: true } } } });
     if (!cls) throw new AppError("Class not found", 404);
     if (cls.coach.userId !== actor.id) throw new AppError("Forbidden: You can only edit your own classes", 403);
-    if (cls.status !== "PENDING" && cls.status !== "REJECTED") {
+    wasDraft = cls.status === "DRAFT";
+    if (opts.fromDraft && !wasDraft) {
+      throw new AppError("Khóa học này không còn là bản nháp.", 400, { code: "CLASS_NOT_DRAFT", classStatus: cls.status });
+    }
+    if (cls.status !== "PENDING" && cls.status !== "REJECTED" && cls.status !== "DRAFT") {
       throw new AppError("Chỉ sửa & gửi lại được khóa đang chờ duyệt hoặc bị từ chối.", 400, {
         code: "CLASS_NOT_EDITABLE",
         classStatus: cls.status,
@@ -546,13 +575,14 @@ export async function resubmitActivityPlan(classId: string, data: ActivityPlanIn
     await tx.classSchedule.deleteMany({ where: { classId } });
     const updated = await tx.class.update({
       where: { id: classId },
-      data: { ...planClassData(data), status: "PENDING", rejectReason: null },
+      // Gửi duyệt ⇒ bỏ dữ liệu nháp của wizard.
+      data: { ...planClassData(data), status: "PENDING", rejectReason: null, draftData: Prisma.DbNull },
     });
     const planned = await persistPlanSchedules(tx, classId, cls.coachId, data);
     return { class: updated, schedulesCreated: planned.count, startDate: planned.startDate, endDate: planned.endDate, totalSessions: planned.totalSessions, status: "PENDING" as const };
   }, { timeout: 30_000 });
 
-  void notifyManagersClassToReview(result.class.name, classId, true);
+  void notifyManagersClassToReview(result.class.name, classId, !wasDraft);
   return result;
 }
 
@@ -796,6 +826,7 @@ export async function cancelScheduleWithResolution(
       where: { id },
       data: { cancelReason: data.reason?.trim() || null, cancelResolution: resolution?.mode ?? null },
     });
+    await refreshClassDateRange(tx, fresh.classId);
     const cancelled = await tx.classSchedule.findUnique({
       where: { id },
       include: { class: true, room: true },
@@ -861,6 +892,23 @@ export async function updateSchedule(id: string, data: any, actor: ScheduleActor
   }
 
   const timeOrRoomChanged = Boolean(data.startTime || data.endTime || data.roomId);
+  const timeChanged =
+    startTime.getTime() !== existing.startTime.getTime() || endTime.getTime() !== existing.endTime.getTime();
+
+  // Đổi GIỜ = dời lịch ⇒ dùng chung luật dời lịch (báo trước 24h, tối đa 2 lần, thông báo học viên).
+  if (data.status !== "CANCELLED" && timeChanged) {
+    const moved = await rescheduleSchedule(
+      id,
+      {
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        roomId,
+        reason: data.reason?.trim() || "HLV điều chỉnh lịch học",
+      },
+      actor
+    );
+    return moved.schedule;
+  }
 
   // Cancel qua PATCH: reuse unified cancel flow, không cho đổi room/time cùng lúc.
   if (data.status === "CANCELLED") {
@@ -868,7 +916,9 @@ export async function updateSchedule(id: string, data: any, actor: ScheduleActor
       throw new AppError("Cannot change room/time when cancelling a schedule", 400);
     }
     const result = await prisma.$transaction(async (tx) => {
-      return cancelScheduleTx(tx, existing as any, data.reason);
+      const out = await cancelScheduleTx(tx, existing as any, data.reason);
+      await refreshClassDateRange(tx, existing.classId);
+      return out;
     });
     const enrolled = await prisma.enrollment.findMany({
       where: { scheduleId: id, status: "CANCELLED" },
@@ -998,7 +1048,9 @@ export async function deleteSchedule(id: string, actor: ScheduleActor) {
   const startStr = schedule.startTime.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
 
   const result = await prisma.$transaction(async (tx) => {
-    return cancelScheduleTx(tx, schedule as any, "Lịch học bị hủy");
+    const out = await cancelScheduleTx(tx, schedule as any, "Lịch học bị hủy");
+    await refreshClassDateRange(tx, schedule.classId);
+    return out;
   });
 
   // Notify sau commit — fire-and-forget
@@ -1101,4 +1153,160 @@ export async function completeSchedule(id: string, actor: ScheduleActor) {
   scanAttendanceWarnings(schedule.classId).catch(() => {});
 
   return completed;
+}
+
+
+// ─────────────────────────────────────────
+// HLV DỜI BUỔI HỌC (Doc/GYM_SCOPE_CHANGES.md §12)
+// ─────────────────────────────────────────
+
+/** Buổi hiện tại phải còn ≥ ngần này giờ mới được dời; giờ mới cũng phải cách hiện tại ≥ ngần này giờ. */
+export const RESCHEDULE_MIN_NOTICE_HOURS = 24;
+/** Mỗi buổi được dời tối đa ngần này lần. */
+export const RESCHEDULE_MAX_PER_SESSION = 2;
+
+/**
+ * HLV dời MỘT buổi sang ngày/giờ (và phòng) khác:
+ * - Chỉ buổi SCHEDULED của khóa APPROVED; buổi còn ≥ 24h; giờ mới cách hiện tại ≥ 24h; tối đa 2 lần/buổi.
+ * - Chặn trùng phòng / trùng lịch dạy của HLV. Học viên trùng lịch cá nhân KHÔNG chặn — được cảnh báo riêng.
+ * - Học viên đã giữ chỗ được thông báo; không đi được ⇒ hủy buổi trước giờ học mới để được hoàn 100% tiền buổi
+ *   (`SESSION_RESCHEDULED`) hoặc đổi buổi.
+ */
+export async function rescheduleSchedule(
+  id: string,
+  data: { startTime: string; endTime: string; roomId?: string; reason: string },
+  actor: ScheduleActor
+) {
+  const existing = await prisma.classSchedule.findUnique({ where: { id }, include: { class: true, room: true } });
+  if (!existing) throw new AppError("Schedule not found", 404);
+  await assertCanManageClassSchedule(prisma, actor, existing.classId);
+  if (existing.status === "COMPLETED") throw new AppError("Schedule is already completed", 400);
+  if (existing.status === "CANCELLED") throw new AppError("Schedule is already cancelled", 400);
+  assertClassApprovedForScheduling(existing.class);
+
+  const startTime = new Date(data.startTime);
+  const endTime = new Date(data.endTime);
+  if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+    throw new AppError("Invalid startTime or endTime", 400);
+  }
+  if (endTime <= startTime) throw new AppError("endTime must be strictly greater than startTime", 400);
+  const roomId = data.roomId ?? existing.roomId;
+  const minNoticeMs = RESCHEDULE_MIN_NOTICE_HOURS * 3_600_000;
+  const now = Date.now();
+
+  if (existing.startTime.getTime() - now < minNoticeMs) {
+    throw new AppError(
+      `Buổi học bắt đầu trong vòng ${RESCHEDULE_MIN_NOTICE_HOURS} giờ tới — không thể dời lịch. Hãy dùng "Hủy buổi" kèm dạy bù hoặc hoàn tiền.`,
+      400,
+      { code: "RESCHEDULE_TOO_LATE", minHours: RESCHEDULE_MIN_NOTICE_HOURS }
+    );
+  }
+  if (startTime.getTime() - now < minNoticeMs) {
+    throw new AppError(
+      `Giờ học mới phải cách hiện tại ít nhất ${RESCHEDULE_MIN_NOTICE_HOURS} giờ để học viên kịp sắp xếp.`,
+      400,
+      { code: "RESCHEDULE_NEW_TIME_TOO_SOON", minHours: RESCHEDULE_MIN_NOTICE_HOURS }
+    );
+  }
+  if (existing.rescheduleCount >= RESCHEDULE_MAX_PER_SESSION) {
+    throw new AppError(
+      `Mỗi buổi chỉ được dời tối đa ${RESCHEDULE_MAX_PER_SESSION} lần. Hãy dùng "Hủy buổi" kèm dạy bù hoặc hoàn tiền.`,
+      400,
+      { code: "RESCHEDULE_LIMIT", max: RESCHEDULE_MAX_PER_SESSION }
+    );
+  }
+  if (
+    startTime.getTime() === existing.startTime.getTime() &&
+    endTime.getTime() === existing.endTime.getTime() &&
+    roomId === existing.roomId
+  ) {
+    throw new AppError("Giờ và phòng mới trùng với lịch hiện tại.", 400, { code: "RESCHEDULE_NO_CHANGE" });
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    await lockSchedule(tx, id);
+    const fresh = await tx.classSchedule.findUnique({ where: { id } });
+    if (!fresh || fresh.status !== "SCHEDULED") {
+      throw new AppError("Lịch học đã thay đổi trạng thái, vui lòng tải lại.", 409, { code: "SCHEDULE_STATE_CHANGED" });
+    }
+    const room = await tx.room.findUnique({ where: { id: roomId } });
+    if (!room || !room.isActive) throw new AppError("Room not found or inactive", 404);
+    if (room.capacity < existing.class.capacity) throw new AppError("Room capacity is too small for this class", 400);
+    assertClassRoomAreaMatch(existing.class.areaType, room.areaType);
+
+    const coachIds = await getCoachIdsOfClass(tx, existing.classId);
+    await lockScheduleResources(tx, [fresh.roomId, roomId], coachIds);
+    await checkConflicts(tx, roomId, existing.classId, startTime, endTime, id);
+
+    const booked = await tx.enrollment.findMany({
+      where: { scheduleId: id, status: "BOOKED" },
+      select: { memberId: true, member: { select: { userId: true, user: { select: { fullName: true } } } } },
+    });
+    // Học viên bị trùng lịch cá nhân ở giờ mới (không chặn — chỉ cảnh báo).
+    const clashes = booked.length
+      ? await tx.enrollment.findMany({
+          where: {
+            memberId: { in: booked.map((b) => b.memberId) },
+            status: "BOOKED",
+            scheduleId: { not: id },
+            schedule: { status: "SCHEDULED", startTime: { lt: endTime }, endTime: { gt: startTime } },
+          },
+          select: { memberId: true, schedule: { select: { class: { select: { name: true } } } } },
+        })
+      : [];
+
+    const moved = await tx.classSchedule.updateMany({
+      where: { id, status: "SCHEDULED" },
+      data: {
+        startTime,
+        endTime,
+        roomId,
+        originalStartTime: fresh.originalStartTime ?? fresh.startTime,
+        rescheduleCount: { increment: 1 },
+        rescheduleReason: data.reason.trim(),
+        rescheduledAt: new Date(),
+      },
+    });
+    if (moved.count === 0) {
+      throw new AppError("Lịch học đã thay đổi trạng thái, vui lòng tải lại.", 409, { code: "SCHEDULE_STATE_CHANGED" });
+    }
+    await refreshClassDateRange(tx, existing.classId);
+    const schedule = await tx.classSchedule.findUnique({ where: { id }, include: { class: true, room: true } });
+    return { schedule: schedule!, booked, clashes };
+  });
+
+  const fmt = (d: Date) => d.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+  const s = result.schedule;
+  const clashByMember = new Map(result.clashes.map((c) => [c.memberId, c.schedule.class.name]));
+  for (const b of result.booked) {
+    const clash = clashByMember.get(b.memberId);
+    broadcastNotification(
+      [b.member.userId],
+      "SCHEDULE_UPDATED",
+      `Buổi học đã được dời lịch: ${s.class.name}`,
+      `HLV đã dời buổi "${s.class.name}" từ ${fmt(existing.startTime)} sang ${fmt(s.startTime)} – ${fmt(s.endTime)} tại ${s.room.name}. ` +
+        `Lý do: ${data.reason.trim()}. ` +
+        (clash ? `Lưu ý: giờ mới trùng với buổi "${clash}" của bạn. ` : "") +
+        "Nếu không thể tham gia, bạn có thể hủy buổi này trước giờ học để được hoàn 100% tiền buổi, hoặc đổi sang buổi khác.",
+      {
+        reason: data.reason.trim(),
+        metadata: {
+          scheduleId: id,
+          classId: s.classId,
+          previousStartTime: existing.startTime,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          conflictWith: clash ?? null,
+        },
+      }
+    ).catch(() => {});
+  }
+
+  return {
+    schedule: s,
+    affectedMembers: result.booked.length,
+    conflictedMembers: result.booked.filter((b) => clashByMember.has(b.memberId)).map((b) => b.member.user.fullName),
+    rescheduleCount: s.rescheduleCount,
+    remainingReschedules: Math.max(0, RESCHEDULE_MAX_PER_SESSION - s.rescheduleCount),
+  };
 }

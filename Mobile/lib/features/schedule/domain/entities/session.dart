@@ -10,6 +10,13 @@ enum EnrollmentStatus { booked, cancelled, completed }
 /// Phương án xử lý khi hủy buổi đã có học viên.
 enum CancelResolutionMode { makeup, refund }
 
+/// Luật dời lịch (BE `RESCHEDULE_*`): buổi còn ≥ 24h, giờ mới cách hiện tại ≥ 24h, tối đa 2 lần/buổi.
+const kRescheduleMinNoticeHours = 24;
+const kMaxReschedules = 2;
+
+/// Luật đổi buổi của học viên (BE `MAX_TRANSFERS_PER_COURSE`).
+const kMaxTransfersPerCourse = 2;
+
 /// Một buổi học (`ClassSchedule`).
 class ClassSession {
   const ClassSession({
@@ -28,6 +35,10 @@ class ClassSession {
     this.makeupSessionId,
     this.cancelReason,
     this.cancelResolution,
+    this.originalStartTime,
+    this.rescheduleReason,
+    this.rescheduleCount = 0,
+    this.rescheduledAt,
   });
 
   final String id;
@@ -50,7 +61,15 @@ class ClassSession {
   final String? cancelReason;
   final CancelResolutionMode? cancelResolution;
 
+  /// Buổi bị HLV dời lịch: giờ ban đầu, lý do, số lần đã dời (tối đa [kMaxReschedules]).
+  final DateTime? originalStartTime;
+  final String? rescheduleReason;
+  final int rescheduleCount;
+  final DateTime? rescheduledAt;
+
   bool get isMakeup => makeupForId != null;
+
+  bool get isRescheduled => rescheduledAt != null || originalStartTime != null;
 
   bool isOngoing(DateTime now) =>
       status == ScheduleStatus.scheduled && !now.isBefore(startTime) && now.isBefore(endTime);
@@ -91,12 +110,15 @@ class MySession {
   bool get canTransfer => transferBlockReason == null;
 }
 
-/// Buổi đích khi đổi buổi.
+/// Buổi đích khi đổi buổi (cùng khóa hoặc khóa tương đương cùng HLV).
 class TransferOption {
-  const TransferOption({required this.session, this.blockReason});
+  const TransferOption({required this.session, this.blockReason, this.isSameClass = true});
 
   final ClassSession session;
   final String? blockReason;
+
+  /// false ⇒ buổi của khóa tương đương (cùng HLV, cùng hạng).
+  final bool isSameClass;
 
   int get remaining => (session.capacity - session.bookedCount).clamp(0, session.capacity);
 }
@@ -162,4 +184,41 @@ class CancelSessionResult {
   final int affectedMembers;
   final ClassSession? makeupSession;
   final int refundCount;
+}
+
+/// Danh sách buổi đổi được + số lần đổi còn lại (`GET /enrollments/:id/transfer-options`).
+class TransferOptions {
+  const TransferOptions({
+    required this.options,
+    this.transfersLeft = kMaxTransfersPerCourse,
+    this.maxTransfers = kMaxTransfersPerCourse,
+    this.blockReason,
+  });
+
+  final List<TransferOption> options;
+  final int transfersLeft;
+  final int maxTransfers;
+
+  /// Lý do không đổi được (null ⇒ được chọn buổi).
+  final String? blockReason;
+}
+
+/// Dữ liệu dời buổi (`POST /class-schedules/:id/reschedule`).
+class RescheduleInput {
+  const RescheduleInput({required this.start, required this.end, required this.reason, this.roomId});
+
+  final DateTime start;
+  final DateTime end;
+  final String reason;
+  final String? roomId;
+}
+
+class RescheduleResult {
+  const RescheduleResult({required this.session, required this.affectedMembers, this.conflictedMembers = const []});
+
+  final ClassSession session;
+  final int affectedMembers;
+
+  /// Học viên bị trùng lịch cá nhân ở giờ mới (đã được cảnh báo).
+  final List<String> conflictedMembers;
 }

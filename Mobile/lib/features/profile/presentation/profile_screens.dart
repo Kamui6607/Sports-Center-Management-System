@@ -13,6 +13,8 @@ import '../../auth/domain/entities/auth_models.dart';
 import '../../auth/presentation/auth_labels.dart';
 import '../../auth/presentation/providers/session_provider.dart';
 import '../../auth/presentation/widgets/gender_birthday_fields.dart';
+import '../../catalog/domain/entities/catalog.dart';
+import '../../catalog/presentation/goal_chips_field.dart';
 
 /// U01 — Sửa hồ sơ (chung + riêng Member / Coach). Email chỉ đọc.
 class EditProfileScreen extends ConsumerStatefulWidget {
@@ -36,6 +38,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> with Subm
   late Gender? _gender = _user.gender;
   late DateTime? _dob = _user.dateOfBirth;
   late TrainingLevel? _level = _user.memberProfile?.trainingLevel;
+  late List<String> _goals = [...?_user.memberProfile?.fitnessGoals];
   bool _uploading = false;
 
   @override
@@ -82,6 +85,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> with Subm
 
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
+    final isMember = (ref.read(currentUserProvider) ?? _user).role == UserRole.member;
     final user = await submit(
       () => ref
           .read(authRepositoryProvider)
@@ -92,6 +96,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> with Subm
               gender: _gender,
               dateOfBirth: _dob,
               fitnessGoal: _goal.text.trim().isEmpty ? null : _goal.text.trim(),
+              fitnessGoals: isMember ? _goals : null,
               trainingLevel: _level,
               trainingPreference: _pref.text.trim().isEmpty ? null : _pref.text.trim(),
               specialization: _spec.text.trim().isEmpty ? null : _spec.text.trim(),
@@ -171,10 +176,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> with Subm
               const SizedBox(height: AppSpacing.lg),
               Text('Hồ sơ tập luyện', style: context.text.titleSmall),
               const SizedBox(height: AppSpacing.sm),
-              AppTextField(
+              GoalChipsField(
                 label: 'Mục tiêu tập luyện',
+                selected: _goals,
+                max: kMaxMemberGoals,
+                helper: 'Chọn mục tiêu để hệ thống gợi ý khóa học phù hợp và HLV hiểu bạn hơn.',
+                onChanged: (v) => setState(() => _goals = v),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              AppTextField(
+                label: 'Mục tiêu cụ thể (tùy chọn)',
                 controller: _goal,
-                hint: 'VD: Tăng cơ giảm mỡ, cải thiện sức bền…',
+                maxLength: 500,
+                hint: 'VD: Giảm 5kg trong 3 tháng, squat 80kg…',
               ),
               const SizedBox(height: AppSpacing.md),
               SelectField<TrainingLevel>(

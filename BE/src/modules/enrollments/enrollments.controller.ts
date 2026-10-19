@@ -23,7 +23,7 @@ async function resolveMemberProfileId(req: Request, bodyMemberId?: string): Prom
   }
 
   if (role === "MANAGER") {
-    if (!bodyMemberId) throw new AppError("memberId is required for staff/manager booking", 400);
+    if (!bodyMemberId) throw new AppError("memberId is required for manager booking", 400);
     const profile = await prisma.memberProfile.findFirst({
       where: { OR: [{ id: bodyMemberId }, { userId: bodyMemberId }] },
     });

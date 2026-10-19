@@ -7,6 +7,8 @@ import swaggerUi from "swagger-ui-express";
 
 import { swaggerSpec } from "./config/swagger.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
+import { z } from "zod";
+import { normalizeUnicode, viZodErrorMap } from "./utils/i18n.js";
 
 // Routes
 import authRoutes from "./modules/auth/auth.routes.js";
@@ -28,7 +30,11 @@ import feedbackRoutes from "./modules/feedbacks/feedbacks.routes.js";
 import refundRoutes from "./modules/refunds/refunds.routes.js";
 import shopRoutes from "./modules/shop/shop.routes.js";
 import locationRoutes from "./modules/locations/locations.routes.js";
+import centerRoutes from "./modules/center/center.routes.js";
 import membershipRoutes, { membershipPlanRouter } from "./modules/memberships/memberships.routes.js";
+
+// Lỗi validate (Zod) bằng tiếng Việt cho mọi schema.
+z.setErrorMap(viZodErrorMap);
 
 const app = express();
 
@@ -49,6 +55,8 @@ app.use(
   })
 );
 app.use(express.urlencoded({ extended: true }));
+// Chuẩn hoá Unicode NFC cho chữ tiếng Việt trong body (gõ kiểu tổ hợp NFD từ một số bộ gõ).
+app.use(normalizeUnicode);
 
 // API dữ liệu theo phiên: cấm cache (browser/CDN) — tránh conditional request/304.
 // Bỏ qua /docs (tài nguyên Swagger UI tĩnh vẫn nên được cache).
@@ -97,6 +105,7 @@ app.use(`${v1}/feedbacks`, feedbackRoutes);
 app.use(`${v1}/refunds`, refundRoutes);
 app.use(`${v1}/shop`, shopRoutes);
 app.use(`${v1}/locations`, locationRoutes);
+app.use(`${v1}/center`, centerRoutes);
 app.use(`${v1}/membership-plans`, membershipPlanRouter);
 app.use(`${v1}/memberships`, membershipRoutes);
 

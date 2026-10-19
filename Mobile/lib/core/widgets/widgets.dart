@@ -27,6 +27,7 @@ export 'quantity_stepper.dart';
 export 'rating.dart';
 export 'refreshable_list.dart';
 export 'search_field.dart';
+export 'search_select_field.dart';
 export 'segmented_tabs.dart';
 export 'select_field.dart';
 export 'skeleton.dart';

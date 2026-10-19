@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { buildClassSnapshot } from "./purchase-snapshot.js";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
@@ -109,11 +110,13 @@ export async function createPayment(data: any, createdById: string) {
 
   return prisma.$transaction(async (tx) => {
     const paymentStatus = data.status ?? "SUCCESS";
+    const purchaseSnapshot = data.classId ? await buildClassSnapshot(tx, data.classId) : null;
     const payment = await tx.payment.create({
       data: {
         memberId: memberProfile.id,
         classId: data.classId,
         classNameSnapshot: cls?.name,
+        purchaseSnapshot: purchaseSnapshot ? (purchaseSnapshot as unknown as Prisma.InputJsonValue) : undefined,
         amount: data.amount,
         method: data.method,
         status: paymentStatus,

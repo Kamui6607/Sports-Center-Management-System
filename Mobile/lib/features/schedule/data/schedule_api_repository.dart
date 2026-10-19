@@ -3,6 +3,7 @@ import '../../../core/error/app_failure.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/json.dart';
 import '../../attendance/domain/entities/attendance.dart';
+import '../../catalog/domain/entities/catalog.dart';
 import '../domain/entities/session.dart';
 import '../domain/repositories/schedule_repository.dart';
 
@@ -87,9 +88,11 @@ class ScheduleApiRepository implements ScheduleRepository {
 
     var mine = _toMySession(e, results[1] as Map<String, AttendanceStatus>);
     if (mine.canTransfer) {
-      final targets = await _targets(e, all);
-      if (targets.every((t) => t.blockReason != null)) {
-        mine = _copy(mine, transferBlockReason: 'Không còn buổi nào khác của khóa còn chỗ để đổi.');
+      final t = await _transferOptions(e.str('id'));
+      if (t.blockReason != null) {
+        mine = _copy(mine, transferBlockReason: t.blockReason);
+      } else if (t.options.every((o) => o.blockReason != null)) {
+        mine = _copy(mine, transferBlockReason: 'Không còn buổi nào phù hợp còn chỗ để đổi.');
       }
     }
     if (mine.session.status == ScheduleStatus.cancelled) {
@@ -113,50 +116,61 @@ class ScheduleApiRepository implements ScheduleRepository {
   @override
   Future<void> cancelEnrollment(String enrollmentId) => _api.delete('/enrollments/$enrollmentId');
 
-  /// Buổi có thể đổi sang: cùng khóa, `SCHEDULED`, chưa bắt đầu (lý do chặn tính như mock;
-  /// BE kiểm tra lại toàn bộ khi gửi).
-  Future<List<TransferOption>> _targets(Json enrollment, List<Json> myEnrollments) async {
-    final current = enrollment.obj('schedule');
-    final now = _now();
-    final rows = await _api.getAll(
-      '/class-schedules',
-      query: {'classId': current.str('classId'), 'status': 'SCHEDULED', 'from': _iso(now)},
-    );
-    final booked = myEnrollments
-        .where((e) => e.str('status') == 'BOOKED')
-        .map((e) => e.obj('schedule'))
-        .where((s) => s.str('status') == 'SCHEDULED')
-        .toList();
-    final sessions = ClassJson.sessions(rows, classes: {current.str('classId'): current.obj('class')});
-    return [
-      for (final s in sessions)
-        if (s.id != current.str('id') && s.startTime.isAfter(now))
-          TransferOption(
-            session: s,
-            blockReason: () {
-              if (booked.any((m) => m.str('id') == s.id)) return 'Bạn đã giữ chỗ buổi này';
-              if (s.bookedCount >= s.capacity) return 'Hết chỗ';
-              final clash = booked
-                  .where(
-                    (m) =>
-                        m.str('id') != current.str('id') &&
-                        m.date('startTime').isBefore(s.endTime) &&
-                        s.startTime.isBefore(m.date('endTime')),
-                  )
-                  .firstOrNull;
-              return clash == null ? null : 'Trùng giờ với "${clash.obj('class').str('name')}"';
-            }(),
+  /// BE tính sẵn buổi đổi được (cùng khóa + khóa tương đương cùng HLV), chỗ trống, xung đột và số lần đổi còn lại.
+  Future<TransferOptions> _transferOptions(String enrollmentId) async {
+    final d = (await _api.get('/enrollments/$enrollmentId/transfer-options')).json;
+    final block = switch (d.strOrNull('blockReason')) {
+      null => null,
+      'TRANSFER_LIMIT' =>
+        'Bạn đã dùng hết ${d.integer('maxTransfers', kMaxTransfersPerCourse)} lần đổi buổi của khóa này.',
+      'ENROLLMENT_TRANSFER_TOO_LATE' => 'Chỉ đổi được khi buổi học còn ít nhất ${d.integer('minHoursBefore', 24)} giờ.',
+      'SESSION_ALREADY_STARTED' => 'Buổi học đã bắt đầu.',
+      _ => 'Chỉ đổi được buổi đang giữ chỗ.',
+    };
+    final options = [
+      for (final o in d.objList('options'))
+        TransferOption(
+          isSameClass: o.boolean('isSameClass', true),
+          session: ClassSession(
+            id: o.str('scheduleId'),
+            classId: o.str('classId'),
+            className: o.str('className'),
+            coachName: '',
+            coachUserId: '',
+            room: Room(
+              id: o.obj('room').str('id'),
+              name: o.obj('room').str('name'),
+              capacity: o.integer('capacity'),
+              areaType: AreaType.indoor,
+              location: o.obj('room').strOrNull('location'),
+              floor: o.obj('room').strOrNull('floor'),
+            ),
+            startTime: o.date('startTime'),
+            endTime: o.date('endTime'),
+            status: ScheduleStatus.scheduled,
+            bookedCount: o.integer('bookedCount'),
+            capacity: o.integer('capacity'),
+            makeupForId: o.boolean('isMakeup') ? 'makeup' : null,
           ),
+          blockReason: o.boolean('canSelect')
+              ? null
+              : o.boolean('isFull')
+              ? 'Hết chỗ'
+              : o.objOrNull('conflictWith') != null
+              ? 'Trùng giờ với "${o.obj('conflictWith').str('className')}"'
+              : (block ?? 'Không chọn được'),
+        ),
     ];
+    return TransferOptions(
+      options: options,
+      transfersLeft: d.integer('transfersLeft', kMaxTransfersPerCourse),
+      maxTransfers: d.integer('maxTransfers', kMaxTransfersPerCourse),
+      blockReason: block,
+    );
   }
 
   @override
-  Future<List<TransferOption>> transferOptions(String enrollmentId) async {
-    final all = await _api.getAll('/enrollments/my');
-    final e = all.where((x) => x.str('id') == enrollmentId).firstOrNull;
-    if (e == null) throw const AppFailure.notFound('Không tìm thấy chỗ đã giữ.');
-    return _targets(e, all);
-  }
+  Future<TransferOptions> transferOptions(String enrollmentId) => _transferOptions(enrollmentId);
 
   @override
   Future<void> transferEnrollment(String enrollmentId, String targetSessionId) =>
@@ -284,6 +298,26 @@ class ScheduleApiRepository implements ScheduleRepository {
             },
         ],
       },
+    );
+  }
+
+  @override
+  Future<RescheduleResult> rescheduleSession(String sessionId, RescheduleInput input) async {
+    final res = await _api.post(
+      '/class-schedules/$sessionId/reschedule',
+      body: {
+        'startTime': _iso(input.start),
+        'endTime': _iso(input.end),
+        'reason': input.reason.trim(),
+        'roomId': ?input.roomId,
+      },
+    );
+    final d = res.json;
+    final s = d.obj('schedule');
+    return RescheduleResult(
+      session: ClassJson.session(s, classJson: s.obj('class')),
+      affectedMembers: d.integer('affectedMembers'),
+      conflictedMembers: d.strList('conflictedMembers'),
     );
   }
 }

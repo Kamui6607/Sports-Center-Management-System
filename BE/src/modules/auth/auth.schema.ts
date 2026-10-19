@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FITNESS_GOAL_CODES, MAX_MEMBER_GOALS } from "../../config/fitness-goals.js";
 
 export const RegisterSchema = z.object({
   email: z.string().email("Invalid email address").transform(v => v.toLowerCase().trim()),
@@ -41,6 +42,8 @@ export const UpdateProfileSchema = z.object({
     .refine(v => !v || new Date(v) <= new Date(), "Date of birth cannot be in the future")
     .optional(),
   fitnessGoal: z.string().max(500).optional(),
+  /** Mục tiêu chọn từ danh mục gợi ý (GET /classes/goal-options), tối đa 5. */
+  fitnessGoals: z.array(z.enum(FITNESS_GOAL_CODES)).max(MAX_MEMBER_GOALS).optional(),
   trainingLevel: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]).optional(),
   trainingPreference: z.string().max(500).optional(),
 });

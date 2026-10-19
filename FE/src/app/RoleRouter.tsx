@@ -8,11 +8,6 @@ const ManagerLayout = lazy(() =>
     default: module.ManagerLayout,
   })),
 );
-const ReceptionLayout = lazy(() =>
-  import("../features/reception/ReceptionLayout").then((module) => ({
-    default: module.ReceptionLayout,
-  })),
-);
 const CoachLayout = lazy(() =>
   import("../features/coach/CoachLayout").then((module) => ({
     default: module.CoachLayout,
@@ -71,8 +66,6 @@ function Portal(props: PortalProps) {
   switch (props.user.role) {
     case "MANAGER":
       return <ManagerLayout {...props} />;
-    case "STAFF":
-      return <ReceptionLayout {...props} />;
     case "COACH":
       return <CoachLayout {...props} />;
     default:

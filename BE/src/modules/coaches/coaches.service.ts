@@ -5,6 +5,7 @@ import type { CoachQueryInput, UpdateCoachInput } from "./coaches.schema.js";
 import { ROLE_NAME_SELECT, flattenRole } from "../../utils/roles.js";
 import { vnClock, vnDateKey, vnWeekdayIso, vnWeekdayLabel } from "../../utils/vnTime.js";
 import { COACH_PROFILE_WITH_CERT, withCvFields, withUserCvFields } from "../../utils/certification.js";
+import { goalLabel } from "../../config/fitness-goals.js";
 
 export async function listCoaches(query: CoachQueryInput) {
   const { search, specialization } = query;
@@ -339,4 +340,115 @@ export async function listPendingCoachCVs(query: { page?: string; limit?: string
   ]);
 
   return { coaches: profiles.map(withCvFields), pagination: buildPaginationMeta(total, page, limit) };
+}
+
+
+/**
+ * Hồ sơ CÔNG KHAI của HLV (bảng thông tin khi hội viên bấm vào HLV ở chi tiết khóa học).
+ * `id` = CoachProfile.id hoặc userId. KHÔNG trả email/SĐT/CV; đánh giá ẩn danh không lộ tên người viết.
+ */
+export async function getCoachPublicProfile(id: string) {
+  const profile = await prisma.coachProfile.findFirst({
+    where: { OR: [{ id }, { userId: id }], user: { isActive: true, role: { name: "COACH" } } },
+    select: {
+      id: true,
+      userId: true,
+      specialization: true,
+      experienceYears: true,
+      bio: true,
+      createdAt: true,
+      user: { select: { fullName: true, avatarUrl: true, gender: true } },
+    },
+  });
+  if (!profile) throw new AppError("Coach not found", 404);
+
+  const now = new Date();
+  const [classes, studentRows, completedSessions, ratingAgg, ratingGroups, reviews] = await Promise.all([
+    prisma.class.findMany({
+      where: { coachId: profile.id, status: { in: ["APPROVED", "COMPLETED"] } },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        status: true,
+        isActive: true,
+        classType: true,
+        goalTags: true,
+        targetLevel: true,
+        startDate: true,
+        endDate: true,
+        capacity: true,
+        _count: { select: { schedules: { where: { status: "SCHEDULED", startTime: { gt: now } } } } },
+      },
+      orderBy: { startDate: "asc" },
+    }),
+    prisma.payment.findMany({
+      where: { status: "SUCCESS", class: { coachId: profile.id } },
+      select: { memberId: true },
+      distinct: ["memberId"],
+    }),
+    prisma.classSchedule.count({ where: { status: "COMPLETED", class: { coachId: profile.id } } }),
+    prisma.coachFeedback.aggregate({ where: { coachId: profile.id }, _avg: { rating: true }, _count: { rating: true } }),
+    prisma.coachFeedback.groupBy({ by: ["rating"], where: { coachId: profile.id }, _count: { rating: true } }),
+    prisma.coachFeedback.findMany({
+      where: { coachId: profile.id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        rating: true,
+        comment: true,
+        isAnonymous: true,
+        createdAt: true,
+        class: { select: { id: true, name: true } },
+        member: { select: { user: { select: { fullName: true, avatarUrl: true } } } },
+      },
+    }),
+  ]);
+
+  const distribution: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+  for (const g of ratingGroups) distribution[String(g.rating)] = g._count.rating;
+  const openCourses = classes.filter((c) => c.status === "APPROVED" && c.isActive && c._count.schedules > 0);
+
+  return {
+    coachProfileId: profile.id,
+    userId: profile.userId,
+    fullName: profile.user.fullName,
+    avatarUrl: profile.user.avatarUrl,
+    gender: profile.user.gender,
+    specialization: profile.specialization,
+    experienceYears: profile.experienceYears,
+    bio: profile.bio,
+    joinedAt: profile.createdAt,
+    stats: {
+      openCourses: openCourses.length,
+      totalCourses: classes.length,
+      totalStudents: studentRows.length,
+      completedSessions,
+    },
+    rating: {
+      average: ratingAgg._avg.rating ? Math.round(ratingAgg._avg.rating * 10) / 10 : null,
+      count: ratingAgg._count.rating,
+      distribution,
+    },
+    courses: openCourses.map((c) => ({
+      id: c.id,
+      name: c.name,
+      price: Number(c.price),
+      classType: c.classType,
+      goals: c.goalTags.map((code) => ({ code, label: goalLabel(code) })),
+      targetLevel: c.targetLevel,
+      startDate: c.startDate,
+      endDate: c.endDate,
+      upcomingSessions: c._count.schedules,
+    })),
+    recentReviews: reviews.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      comment: r.comment,
+      createdAt: r.createdAt,
+      class: r.class,
+      author: r.isAnonymous ? null : { fullName: r.member.user.fullName, avatarUrl: r.member.user.avatarUrl },
+    })),
+  };
 }

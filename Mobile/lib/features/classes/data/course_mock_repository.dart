@@ -269,4 +269,95 @@ class CourseMockRepository implements CourseRepository {
     );
     return db.toCourse(row);
   });
+
+  // ── Phạm vi Gym (đợt 19/10): bản nháp, hồ sơ HLV, lịch sử khóa ─────────────
+  // Mock giữ bản nháp trong bộ nhớ; khi gửi duyệt đi đúng luồng `createClass` của mock.
+  final Map<String, ({ClassDraft draft, Map<String, Object?> state})> _drafts = {};
+
+  @override
+  Future<CoachPublicProfile> coachProfile(String coachProfileId) => _server.run(() {
+    final db = _server.db;
+    final courses = db.classes.where((c) => c.coachProfileId == coachProfileId).map(db.toCourse).toList();
+    if (courses.isEmpty) throw const AppFailure.notFound('Không tìm thấy huấn luyện viên.');
+    final coach = courses.first.coach;
+    final open = courses.where((c) => c.status == ClassStatus.approved).toList();
+    return CoachPublicProfile(
+      coachProfileId: coachProfileId,
+      userId: coach.userId,
+      fullName: coach.fullName,
+      avatarUrl: coach.avatarUrl,
+      specialization: coach.specialization,
+      experienceYears: coach.experienceYears,
+      openCourses: open.length,
+      totalCourses: courses.length,
+      totalStudents: courses.fold(0, (s, c) => s + c.studentCount),
+      completedSessions: courses.fold(0, (s, c) => s + c.completedSessionCount),
+      ratingAverage: coach.ratingCount == 0 ? null : coach.ratingAverage,
+      ratingCount: coach.ratingCount,
+      distribution: const {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+      courses: [
+        for (final c in open)
+          CoachCourseItem(
+            id: c.id,
+            name: c.name,
+            price: c.price,
+            goalTags: c.goalTags,
+            upcomingSessions: c.upcomingSessionCount,
+            startDate: c.firstSessionStart,
+            endDate: c.lastSessionEnd,
+          ),
+      ],
+      reviews: const [],
+    );
+  });
+
+  @override
+  Future<List<MemberCourse>> courseHistory() async => [
+    for (final m in await myCourses())
+      MemberCourse(
+        classId: m.course.id,
+        status: switch (m.phase) {
+          MyCoursePhase.ongoing => MemberCourseStatus.ongoing,
+          MyCoursePhase.upcoming => MemberCourseStatus.upcoming,
+          MyCoursePhase.ended => MemberCourseStatus.completed,
+        },
+        className: m.course.name,
+        coachName: m.course.coach.fullName,
+        coachProfileId: m.course.coach.coachProfileId,
+        coachUserId: m.course.coach.userId,
+        amountPaid: m.amountPaid,
+        paidAt: m.purchasedAt,
+        startDate: m.course.firstSessionStart,
+        endDate: m.course.lastSessionEnd,
+        nextSessionStart: m.nextSessionStart,
+        totalSessions: m.totalSessions,
+        completedSessions: m.attendedCount,
+        myBookedSessions: m.bookedCount,
+        canReview: m.phase == MyCoursePhase.ended,
+        canEditReview: false,
+      ),
+  ];
+
+  @override
+  Future<String> saveDraft(String? draftId, ClassDraft draft, Map<String, Object?> state) => _server.run(() {
+    final id = draftId ?? 'draft-${DateTime.now().microsecondsSinceEpoch}';
+    _drafts[id] = (draft: draft, state: state);
+    return id;
+  });
+
+  @override
+  Future<Map<String, Object?>?> loadDraftState(String draftId) => _server.run(() => _drafts[draftId]?.state);
+
+  @override
+  Future<void> deleteDraft(String draftId) => _server.run(() => _drafts.remove(draftId));
+
+  @override
+  Future<CourseClass> submitDraft(String draftId, ClassDraft draft) async {
+    if (draft.goalTags.isEmpty) {
+      throw const AppFailure.business('Chọn ít nhất 1 mục tiêu cho khóa học trước khi gửi duyệt.');
+    }
+    final course = await createClass(draft);
+    _drafts.remove(draftId);
+    return course;
+  }
 }

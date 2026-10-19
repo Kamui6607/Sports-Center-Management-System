@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma.js";
 import { sepayConfig } from "../../config/sepay.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
+import { readClassSnapshot } from "../payments/purchase-snapshot.js";
 
 /**
  * Trạng thái của một khóa học đối với MỘT hội viên (suy ra từ giao dịch + lịch + chỗ đặt):
@@ -114,6 +115,7 @@ export async function getMyCourses(userId: string, query: MyCoursesQuery) {
       paidAt: true,
       createdAt: true,
       transactionCode: true,
+      purchaseSnapshot: true,
       refunds: { select: { id: true, status: true, reason: true, amount: true, createdAt: true }, orderBy: { createdAt: "desc" } },
     },
   });
@@ -152,11 +154,15 @@ export async function getMyCourses(userId: string, query: MyCoursesQuery) {
       select: { id: true, classId: true, startTime: true, endTime: true, status: true, makeupForId: true },
       orderBy: { startTime: "asc" },
     }),
+    // Kể cả chỗ đã ĐỔI sang khóa tương đương (`sourceClassId` = khóa đã mua).
     prisma.enrollment.findMany({
-      where: { memberId, schedule: { classId: { in: classIds } } },
-      select: { scheduleId: true, status: true, schedule: { select: { classId: true } } },
+      where: { memberId, OR: [{ schedule: { classId: { in: classIds } } }, { sourceClassId: { in: classIds } }] },
+      select: { scheduleId: true, status: true, sourceClassId: true, schedule: { select: { classId: true } } },
     }),
-    prisma.coachFeedback.findMany({ where: { memberId, classId: { in: classIds } }, select: { classId: true, rating: true } }),
+    prisma.coachFeedback.findMany({
+      where: { memberId, classId: { in: classIds } },
+      select: { id: true, classId: true, rating: true, comment: true, editCount: true },
+    }),
   ]);
   const classMap = new Map(classes.map((c) => [c.id, c]));
 
@@ -167,7 +173,7 @@ export async function getMyCourses(userId: string, query: MyCoursesQuery) {
       const payment = best.get(classId)!;
       const own = schedules.filter((s) => s.classId === classId);
       const live = own.filter((s) => s.status !== "CANCELLED");
-      const mine = enrollments.filter((e) => e.schedule.classId === classId);
+      const mine = enrollments.filter((e) => (e.sourceClassId ?? e.schedule.classId) === classId);
       const activeMine = mine.filter((e) => e.status === "BOOKED" || e.status === "COMPLETED");
       const cancelledMine = mine.filter((e) => e.status === "CANCELLED");
       const completedCourseRefund = payment.refunds.find((r) => r.reason === "MEMBER_CANCEL_COURSE" && r.status === "COMPLETED");
@@ -184,19 +190,29 @@ export async function getMyCourses(userId: string, query: MyCoursesQuery) {
       const pendingRefund = payment.refunds.find((r) => r.status === "PENDING") ?? null;
       const feedback = feedbacks.find((f) => f.classId === classId) ?? null;
       const coachUser = cls.coach.user;
+      // Thông tin khóa LÚC MUA (snapshot) — Coach/Manager sửa tên/giá sau này không đổi lịch sử của hội viên.
+      const snap = readClassSnapshot(payment.purchaseSnapshot);
       return {
         classId,
         courseStatus,
         class: {
           id: cls.id,
-          name: cls.name,
-          fitness: cls.fitness,
-          goal: cls.goal,
-          classType: cls.classType,
+          name: snap?.name ?? cls.name,
+          fitness: snap?.fitness ?? cls.fitness,
+          goal: snap?.goal !== undefined ? snap.goal : cls.goal,
+          classType: snap?.classType ?? cls.classType,
           areaType: cls.areaType,
-          price: Number(cls.price),
-          coach: { id: cls.coach.id, userId: coachUser.id, fullName: coachUser.fullName, avatarUrl: coachUser.avatarUrl },
+          price: snap?.price ?? Number(cls.price),
+          /** Tên hiện tại (nếu khóa đã đổi tên sau khi mua). */
+          currentName: cls.name,
+          coach: {
+            id: cls.coach.id,
+            userId: coachUser.id,
+            fullName: snap?.coach?.fullName ?? coachUser.fullName,
+            avatarUrl: coachUser.avatarUrl,
+          },
         },
+        purchaseSnapshot: payment.purchaseSnapshot ?? null,
         payment: {
           id: payment.id,
           status: payment.status,
@@ -217,8 +233,13 @@ export async function getMyCourses(userId: string, query: MyCoursesQuery) {
         pendingRefund: pendingRefund
           ? { id: pendingRefund.id, reason: pendingRefund.reason, amount: Number(pendingRefund.amount) }
           : null,
+        // Đánh giá: học xong mới được đánh giá; 1 lần + sửa lại đúng 1 lần.
         canReview: courseStatus === "COMPLETED" && !feedback,
+        canEditReview: courseStatus === "COMPLETED" && !!feedback && feedback.editCount < 1,
         myRating: feedback?.rating ?? null,
+        myReview: feedback
+          ? { id: feedback.id, rating: feedback.rating, comment: feedback.comment, editCount: feedback.editCount }
+          : null,
         sortKey: courseStatus === "COMPLETED" || courseStatus === "CANCELLED" ? 1 : 0,
       };
     })

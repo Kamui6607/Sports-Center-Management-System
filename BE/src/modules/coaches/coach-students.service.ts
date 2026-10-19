@@ -66,6 +66,7 @@ export async function getMyStudent(coachUserId: string, memberId: string, now = 
       id: member.id,
       userId: member.userId,
       fitnessGoal: member.fitnessGoal,
+      fitnessGoals: member.fitnessGoals,
       trainingLevel: member.trainingLevel,
       trainingPreference: member.trainingPreference,
       user: member.user,

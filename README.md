@@ -2,7 +2,7 @@
 
 Hệ thống quản lý trung tâm thể thao theo mô hình nền tảng kết nối: Huấn luyện viên (Coach) tự mở khóa học và định giá, Học viên (Member) mua khóa học / sản phẩm bằng chuyển khoản VietQR (SePay), Quản lý (Manager) vận hành phòng tập, duyệt Coach, duyệt rút tiền và hoàn tiền.
 
-Backend cung cấp REST API (HTTP/JSON) và Socket.IO, dùng chung cho **Web Frontend** và **Mobile App (Flutter)**. Mô tả nghiệp vụ chi tiết: [`Doc/PROJECT_OVERVIEW.md`](Doc/PROJECT_OVERVIEW.md).
+Backend cung cấp REST API (HTTP/JSON) và Socket.IO, dùng chung cho **Web Frontend** và **Mobile App (Flutter)**. Mô tả nghiệp vụ chi tiết: [`Doc/PROJECT_OVERVIEW.md`](Doc/PROJECT_OVERVIEW.md). Phạm vi hiện tại: **chỉ bộ môn Gym** — Member & Coach dùng Mobile, Manager dùng Web, không còn tài khoản Lễ tân (xem [`Doc/GYM_SCOPE_CHANGES.md`](Doc/GYM_SCOPE_CHANGES.md)).
 
 ## 📦 Cấu trúc repo
 

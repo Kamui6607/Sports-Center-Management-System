@@ -16,11 +16,6 @@ final coachFeedbackProvider = FutureProvider.autoDispose.family<FeedbackPage, Co
   return ref.watch(feedbackRepositoryProvider).forCoach(args.coachProfileId, classId: args.classId);
 });
 
-final canReviewCoachProvider = FutureProvider.autoDispose.family<bool, String>((ref, coachProfileId) {
-  ref.watch(dataRevisionProvider);
-  return ref.watch(feedbackRepositoryProvider).canReview(coachProfileId);
-});
-
 /// Một đánh giá.
 class FeedbackTile extends StatelessWidget {
   const FeedbackTile({super.key, required this.item});
@@ -74,7 +69,8 @@ class FeedbackTile extends StatelessWidget {
   }
 }
 
-/// Khối "Đánh giá HLV" ở chi tiết khóa học / khóa của tôi (Q6 — Member chấm HLV).
+/// Khối "Đánh giá HLV" ở chi tiết khóa học / khóa của tôi (chỉ xem). Học viên đánh giá khóa đã HỌC XONG
+/// ở màn Lịch sử khóa học (1 lần + sửa lại 1 lần — Doc/GYM_SCOPE_CHANGES.md §7).
 class CoachFeedbackSection extends ConsumerWidget {
   const CoachFeedbackSection({
     super.key,
@@ -92,13 +88,11 @@ class CoachFeedbackSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final page = ref.watch(coachFeedbackProvider((coachProfileId: coachProfileId, classId: null)));
-    final canReview = ref.watch(canReviewCoachProvider(coachProfileId)).value ?? false;
     return page.when(
       skipLoadingOnReload: true,
       loading: () => const Shimmer(child: SkeletonBox(height: AppSpacing.xxl * 2)),
       error: (e, _) => ErrorState(error: e, compact: true, onRetry: () => ref.invalidate(coachFeedbackProvider)),
       data: (p) {
-        final mine = p.items.where((f) => f.isMine).firstOrNull;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -128,21 +122,11 @@ class CoachFeedbackSection extends ConsumerWidget {
                       distribution: p.summary.distribution,
                     ),
                   for (final f in p.items.take(limit)) ...[const Divider(height: AppSpacing.lg), FeedbackTile(item: f)],
-                  if (canReview) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    AppButton.outline(
-                      label: mine == null ? 'Viết đánh giá' : 'Sửa đánh giá của tôi',
-                      icon: AppIcons.star,
-                      expand: true,
-                      onPressed: () => showFeedbackSheet(
-                        context,
-                        coachProfileId: coachProfileId,
-                        coachName: coachName,
-                        classId: classId,
-                        existing: mine,
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Bạn có thể đánh giá sau khi hoàn thành khóa học (mục Lịch sử khóa học).',
+                    style: context.text.caption.copyWith(color: context.colors.textMuted),
+                  ),
                 ],
               ),
             ),
@@ -153,34 +137,52 @@ class CoachFeedbackSection extends ConsumerWidget {
   }
 }
 
-/// M14 — Viết / sửa / xóa đánh giá HLV.
+/// M14 — Đánh giá khóa học đã học xong (1 lần) / sửa lại (đúng 1 lần). Học viên không tự xóa được đánh giá.
 Future<void> showFeedbackSheet(
   BuildContext context, {
   required String coachProfileId,
   required String coachName,
-  String? classId,
-  CoachFeedback? existing,
+  required String classId,
+  required String className,
+  bool isEdit = false,
+  int? initialRating,
+  String? initialComment,
 }) => showAppBottomSheet<void>(
   context: context,
-  title: existing == null ? 'Đánh giá HLV $coachName' : 'Sửa đánh giá',
-  builder: (_) => _FeedbackForm(coachProfileId: coachProfileId, classId: classId, existing: existing),
+  title: isEdit ? 'Sửa đánh giá' : 'Đánh giá khóa học',
+  subtitle: '$className · HLV $coachName',
+  builder: (_) => _FeedbackForm(
+    coachProfileId: coachProfileId,
+    classId: classId,
+    isEdit: isEdit,
+    initialRating: initialRating,
+    initialComment: initialComment,
+  ),
 );
 
 class _FeedbackForm extends ConsumerStatefulWidget {
-  const _FeedbackForm({required this.coachProfileId, this.classId, this.existing});
+  const _FeedbackForm({
+    required this.coachProfileId,
+    required this.classId,
+    required this.isEdit,
+    this.initialRating,
+    this.initialComment,
+  });
 
   final String coachProfileId;
-  final String? classId;
-  final CoachFeedback? existing;
+  final String classId;
+  final bool isEdit;
+  final int? initialRating;
+  final String? initialComment;
 
   @override
   ConsumerState<_FeedbackForm> createState() => _FeedbackFormState();
 }
 
 class _FeedbackFormState extends ConsumerState<_FeedbackForm> with SubmittingState {
-  late int _rating = widget.existing?.rating ?? 0;
-  late bool _anonymous = widget.existing?.isAnonymous ?? false;
-  late final _comment = TextEditingController(text: widget.existing?.comment);
+  late int _rating = widget.initialRating ?? 0;
+  bool _anonymous = false;
+  late final _comment = TextEditingController(text: widget.initialComment);
 
   @override
   void dispose() {
@@ -207,32 +209,19 @@ class _FeedbackFormState extends ConsumerState<_FeedbackForm> with SubmittingSta
     if (!ok || !mounted) return;
     ref.read(dataRevisionProvider.notifier).bump();
     Navigator.of(context).pop();
-    AppSnackbar.success(context, 'Cảm ơn bạn đã đánh giá!');
-  }
-
-  Future<void> _delete() async {
-    final confirmed = await showConfirmSheet(
-      context: context,
-      title: 'Xóa đánh giá?',
-      message: 'Đánh giá của bạn sẽ bị xóa vĩnh viễn.',
-      confirmLabel: 'Xóa đánh giá',
-      destructive: true,
-    );
-    if (!confirmed || !mounted) return;
-    var ok = false;
-    await submit(() async {
-      await ref.read(feedbackRepositoryProvider).delete(widget.existing!.id);
-      ok = true;
-    });
-    if (!ok || !mounted) return;
-    ref.read(dataRevisionProvider.notifier).bump();
-    Navigator.of(context).pop();
+    AppSnackbar.success(context, widget.isEdit ? 'Đã cập nhật đánh giá.' : 'Cảm ơn bạn đã đánh giá!');
   }
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
+      AlertBanner.info(
+        message: widget.isEdit
+            ? 'Đây là lần sửa DUY NHẤT — sau khi lưu bạn không thể sửa đánh giá này nữa.'
+            : 'Mỗi khóa học được đánh giá 1 lần và sửa lại tối đa 1 lần.',
+      ),
+      const SizedBox(height: AppSpacing.md),
       RatingInput(value: _rating, onChanged: (v) => setState(() => _rating = v)),
       const SizedBox(height: AppSpacing.md),
       AppTextField(
@@ -251,16 +240,12 @@ class _FeedbackFormState extends ConsumerState<_FeedbackForm> with SubmittingSta
       ),
       if (formError != null) ...[const SizedBox(height: AppSpacing.xs), AlertBanner.error(message: formError!)],
       const SizedBox(height: AppSpacing.md),
-      AppButton(label: 'Gửi đánh giá', expand: true, loading: submitting, onPressed: _rating == 0 ? null : _save),
-      if (widget.existing != null) ...[
-        const SizedBox(height: AppSpacing.xs),
-        AppButton.ghost(
-          label: 'Xóa đánh giá',
-          icon: AppIcons.delete,
-          expand: true,
-          onPressed: submitting ? null : _delete,
-        ),
-      ],
+      AppButton(
+        label: widget.isEdit ? 'Lưu đánh giá' : 'Gửi đánh giá',
+        expand: true,
+        loading: submitting,
+        onPressed: _rating == 0 ? null : _save,
+      ),
     ],
   );
 }

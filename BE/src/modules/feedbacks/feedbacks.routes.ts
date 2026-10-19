@@ -21,8 +21,9 @@ const router = Router();
  *     summary: Member gửi đánh giá cho HLV
  *     description: |
  *       **Business Rules:**
- *       - Chỉ Member đã từng `BOOKED` hoặc `COMPLETED` ít nhất 1 buổi học cùng HLV mới được đánh giá.
- *       - Mỗi cặp (member + coach + class) chỉ có **1 feedback** — gửi lại sẽ cập nhật feedback cũ.
+ *       - Bắt buộc `classId`; chỉ đánh giá khi đã **học xong khóa** (đã thanh toán, mọi buổi chưa hủy đã kết thúc).
+ *       - Mỗi (member + khóa) đánh giá **1 lần**; gửi lại = **sửa**, chỉ được sửa **1 lần** (lần 2 ⇒ 409 `FEEDBACK_EDIT_LIMIT`).
+ *       - Member không tự xóa được đánh giá (403 `FEEDBACK_DELETE_NOT_ALLOWED`).
  *       - `isAnonymous: true` → tên member sẽ được ẩn khi hiển thị công khai.
  *     tags: [Feedbacks]
  *     security:
@@ -33,7 +34,7 @@ const router = Router();
  *         application/json:
  *           schema:
  *             type: object
- *             required: [coachId, rating]
+ *             required: [coachId, classId, rating]
  *             properties:
  *               coachId:
  *                 type: string
@@ -41,8 +42,7 @@ const router = Router();
  *                 description: CoachProfile ID
  *               classId:
  *                 type: string
- *                 format: uuid
- *                 description: Lớp học liên quan (tuỳ chọn)
+ *                 description: Khóa học đã học xong (bắt buộc)
  *               rating:
  *                 type: integer
  *                 minimum: 1

@@ -199,7 +199,8 @@ router.get("/me", authenticateRestricted, authController.getMe);
  *               phone: { type: string, pattern: "^[0-9+]{9,15}$", description: "Optional, 9-15 digits, can start with +" }
  *               gender: { type: string, enum: [MALE, FEMALE, OTHER] }
  *               dateOfBirth: { type: string, format: date, description: "Must be in the past" }
- *               fitnessGoal: { type: string }
+ *               fitnessGoal: { type: string, description: "Ghi chú mục tiêu tự do" }
+ *               fitnessGoals: { type: array, items: { type: string }, description: "Mã mục tiêu từ GET /classes/goal-options (tối đa 5)" }
  *               trainingLevel: { type: string, enum: [BEGINNER, INTERMEDIATE, ADVANCED] }
  *               trainingPreference: { type: string }
  *     responses:

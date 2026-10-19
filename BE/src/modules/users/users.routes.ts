@@ -45,7 +45,7 @@ router.get("/", validate(UserQuerySchema, "query"), usersController.listUsers);
  * @swagger
  * /users:
  *   post:
- *     summary: Create staff, coach, manager or member account (MEMBER creates the member profile too)
+ *     summary: Create coach, manager or member account (MEMBER creates the member profile too)
  *     description: |
  *       Với `role = MEMBER`, backend tạo MemberProfile + **auto-provision một MembershipSubscription ACTIVE
  *       với gói FREE** (`maxConcurrentClasses = 0`) trong cùng transaction. COACH/MANAGER KHÔNG được cấp

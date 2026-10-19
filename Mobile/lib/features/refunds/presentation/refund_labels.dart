@@ -11,10 +11,12 @@ extension RefundStatusLabel on RefundStatus {
   };
 }
 
-
 extension RefundReasonLabel on RefundReason {
   String get label => switch (this) {
     RefundReason.memberCancelCourse => 'Hủy khóa học',
+    RefundReason.memberCancelCourseLate => 'Hủy khóa muộn — hoàn ngoại lệ',
+    RefundReason.memberCancelSession => 'Hủy 1 buổi học (hoàn 80%)',
+    RefundReason.sessionRescheduled => 'Hủy buổi bị dời lịch (hoàn 100%)',
     RefundReason.sessionCancelled => 'Buổi học bị hủy',
     RefundReason.orderCancelled => 'Hủy đơn hàng đã thanh toán',
     RefundReason.orderNotPickedUp => 'Không đến lấy hàng đúng hạn',

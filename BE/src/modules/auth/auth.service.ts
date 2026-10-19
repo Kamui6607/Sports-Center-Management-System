@@ -324,13 +324,14 @@ export async function getMe(userId: string) {
 }
 
 export async function updateMe(userId: string, data: UpdateProfileInput) {
-  const { fitnessGoal, trainingLevel, trainingPreference, ...userFields } = data;
+  const { fitnessGoal, fitnessGoals, trainingLevel, trainingPreference, ...userFields } = data;
 
   const user = await prisma.user.findUnique({ where: { id: userId }, include: { role: true } });
   if (!user) throw new AppError("User not found", 404);
 
   const profileData: Record<string, unknown> = {};
   if (fitnessGoal !== undefined) profileData.fitnessGoal = fitnessGoal;
+  if (fitnessGoals !== undefined) profileData.fitnessGoals = [...new Set(fitnessGoals)];
   if (trainingLevel !== undefined) profileData.trainingLevel = trainingLevel;
   if (trainingPreference !== undefined) profileData.trainingPreference = trainingPreference;
 

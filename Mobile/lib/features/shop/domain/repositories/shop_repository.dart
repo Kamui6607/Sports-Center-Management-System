@@ -6,6 +6,12 @@ abstract interface class ShopRepository {
   /// `GET /shop/config` (công khai).
   Future<ShopConfig> config();
 
+  /// `GET /locations/provinces` — 34 Tỉnh/Thành (địa giới mới từ 01/07/2025) + cờ khu vực giao hàng.
+  Future<List<LocationItem>> provinces();
+
+  /// `GET /locations/provinces/:code/wards` — Phường/Xã của Tỉnh/Thành.
+  Future<List<LocationItem>> wards(int provinceCode);
+
   // ── Giỏ hàng ─────────────────────────────────────────────────────────
   /// `GET /shop/cart`.
   Future<Cart> cart();

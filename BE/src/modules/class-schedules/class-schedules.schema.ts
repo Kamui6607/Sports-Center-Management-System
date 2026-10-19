@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FITNESS_GOAL_CODES, GYM_FITNESS, MAX_CLASS_GOALS } from "../../config/fitness-goals.js";
 
 export const ScheduleIdSchema = z.object({
   id: z.string().min(1),
@@ -143,17 +144,27 @@ export const PlanRecurrenceSchema = z.object({
   totalSessions: z.number().int().min(1).max(200),
 }).refine((d) => d.endTime > d.startTime, { message: "endTime must be after startTime", path: ["endTime"] });
 
+/** Thông tin khóa của kế hoạch (dùng chung cho tạo mới, gửi lại và gửi duyệt bản nháp). */
+export const PlanClassSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  // Phạm vi Gym: bộ môn cố định "Gym" (giữ field để tương thích client cũ).
+  fitness: z.string().trim().min(2).max(60).default(GYM_FITNESS),
+  description: z.string().trim().max(2000).optional(),
+  /** Mô tả chi tiết mục tiêu khóa học (học viên đọc trước khi mua). */
+  goal: z.string().trim().max(1000).optional(),
+  /** Mã mục tiêu khóa (1–4) — xem GET /classes/goal-options. */
+  /** Bắt buộc ≥ 1 khi gửi duyệt bản nháp (Mobile); API cũ không gửi ⇒ rỗng. */
+  goalTags: z.array(z.enum(FITNESS_GOAL_CODES)).max(MAX_CLASS_GOALS).default([]),
+  /** Trình độ phù hợp (bỏ trống = mọi trình độ). */
+  targetLevel: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]).nullable().optional(),
+  capacity: z.number().int().positive().max(200),
+  classType: z.enum(["REGULAR", "PREMIUM"]).default("REGULAR"),
+  areaType: z.enum(["POOL", "INDOOR", "OUTDOOR"]).default("INDOOR"),
+  price: z.number().min(0).default(0),
+});
+
 export const CreateActivityPlanSchema = z.object({
-  class: z.object({
-    name: z.string().trim().min(2),
-    fitness: z.string().trim().min(2).max(60),
-    description: z.string().trim().optional(),
-    goal: z.string().trim().max(1000).optional(),
-    capacity: z.number().int().positive().max(200),
-    classType: z.enum(["REGULAR", "PREMIUM"]),
-    areaType: z.enum(["POOL", "INDOOR", "OUTDOOR"]),
-    price: z.number().min(0).default(0),
-  }),
+  class: PlanClassSchema,
   // HLV của lớp là chính Coach gọi API (mỗi lớp đúng 1 HLV) — không nhận coachId từ client.
   roomId: z.string().min(1),
   // Gửi ĐÚNG MỘT trong hai: `schedules` (từng buổi) hoặc `recurrence` (tự sinh từ thứ + số buổi).
@@ -203,6 +214,19 @@ export const UpdateScheduleSchema = z.object({
   },
   { message: "endTime must be after startTime", path: ["endTime"] }
 );
+
+/** HLV dời MỘT buổi sang ngày/giờ khác (Doc/GYM_SCOPE_CHANGES.md §12). */
+export const RescheduleScheduleSchema = z.object({
+  startTime: z.string().datetime({ offset: true }),
+  endTime: z.string().datetime({ offset: true }),
+  roomId: z.string().min(1).optional(),
+  reason: z.string().trim().min(3, "Nhập lý do dời lịch (tối thiểu 3 ký tự)").max(500),
+}).refine((d) => new Date(d.endTime) > new Date(d.startTime), {
+  message: "Giờ kết thúc phải sau giờ bắt đầu",
+  path: ["endTime"],
+});
+
+export type RescheduleScheduleInput = z.infer<typeof RescheduleScheduleSchema>;
 
 /** Hủy buổi kèm xử lý quyền lợi hội viên: dạy bù (giờ/phòng mới) hoặc hoàn tiền 1 buổi. */
 export const CancelScheduleSchema = z.object({

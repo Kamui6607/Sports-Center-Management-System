@@ -8,6 +8,7 @@ import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../catalog/presentation/location_card.dart';
 import '../../data/schedule_repository_provider.dart';
 import '../../domain/entities/session.dart';
 import '../providers/schedule_providers.dart';
@@ -21,6 +22,10 @@ class MySessionScreen extends ConsumerWidget {
 
   /// Cho quét QR từ 30 phút trước giờ học tới khi kết thúc.
   static const checkInWindow = Duration(minutes: 30);
+
+  /// Luật hoàn tiền khi hội viên hủy 1 buổi (BE `SESSION_REFUND_*`).
+  static const refundMinHours = 24;
+  static const refundPercent = 80;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -79,11 +84,26 @@ class _Content extends ConsumerWidget {
               const SizedBox(height: AppSpacing.sm),
               InfoRow(icon: AppIcons.calendar, text: VnTime.friendlyDay(s.startTime, now)),
               InfoRow(icon: AppIcons.time, text: VnTime.timeRange(s.startTime, s.endTime)),
-              InfoRow(icon: AppIcons.location, text: [s.room.name, s.room.location].whereType<String>().join(' · ')),
               InfoRow(icon: AppIcons.user, text: 'HLV ${s.coachName}'),
             ],
           ),
         ),
+        const SizedBox(height: AppSpacing.md),
+        if (s.isRescheduled && !cancelled) ...[
+          AlertBanner.warning(
+            title: 'Buổi học đã được HLV dời lịch',
+            message: [
+              if (s.originalStartTime != null)
+                'Giờ cũ: ${VnTime.friendlyDay(s.originalStartTime!, now)} · ${VnTime.time(s.originalStartTime!)}.',
+              'Giờ mới: ${VnTime.friendlyDay(s.startTime, now)} · ${VnTime.timeRange(s.startTime, s.endTime)}.',
+              if (s.rescheduleReason != null) 'Lý do: ${s.rescheduleReason}.',
+              'Nếu không thể tham gia, bạn có thể hủy buổi này trước giờ học để được hoàn 100% tiền buổi, hoặc đổi sang buổi khác.',
+            ].join('\n'),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
+        const SectionHeader(title: 'Địa điểm tập'),
+        LocationCard(room: s.room),
         const SizedBox(height: AppSpacing.md),
         if (cancelled) ...[
           AlertBanner.error(
@@ -114,7 +134,10 @@ class _Content extends ConsumerWidget {
           _ActionRow(
             icon: AppIcons.transfer,
             title: 'Đổi sang buổi khác',
-            subtitle: item.transferBlockReason ?? 'Chuyển chỗ sang một buổi khác cùng khóa còn chỗ.',
+            subtitle:
+                item.transferBlockReason ??
+                'Sang buổi khác của khóa hoặc khóa tương đương cùng HLV · trước giờ học ≥ 24h · tối đa $kMaxTransfersPerCourse lần/khóa.',
+
             enabled: item.canTransfer,
             onTap: () => _transfer(context, ref),
           ),
@@ -122,7 +145,7 @@ class _Content extends ConsumerWidget {
           _ActionRow(
             icon: AppIcons.ban,
             title: 'Hủy buổi này',
-            subtitle: item.cancelBlockReason ?? 'Trả lại chỗ. Hủy một buổi không được hoàn tiền.',
+            subtitle: item.cancelBlockReason ?? _refundPolicy(now),
             enabled: item.canCancel,
             danger: true,
             onTap: () => _cancel(context, ref),
@@ -146,13 +169,25 @@ class _Content extends ConsumerWidget {
     );
   }
 
+  /// Chính sách hoàn tiền nếu hủy buổi NGAY BÂY GIỜ (BE tính chính thức khi hủy).
+  String _refundPolicy(DateTime now) {
+    final s = item.session;
+    if (s.isRescheduled) return 'Buổi đã bị HLV dời lịch — hủy được hoàn 100% tiền buổi.';
+    if (s.startTime.difference(now).inMinutes >= MySessionScreen.refundMinHours * 60) {
+      return 'Hủy trước giờ học ≥ ${MySessionScreen.refundMinHours}h — hoàn ${MySessionScreen.refundPercent}% tiền buổi.';
+    }
+    return 'Còn dưới ${MySessionScreen.refundMinHours}h — hủy được nhưng không hoàn tiền.';
+  }
+
   Future<void> _cancel(BuildContext context, WidgetRef ref) async {
     final s = item.session;
     final ok = await showConfirmSheet(
       context: context,
       title: 'Hủy buổi học?',
       message: 'Bạn sẽ hủy chỗ ở buổi ${VnTime.sessionLabel(s.startTime, s.endTime)} của khóa "${s.className}".',
-      warning: 'Hủy một buổi KHÔNG được hoàn tiền. Muốn hoàn tiền, hãy hủy cả khóa trước buổi khai giảng ≥ 24 giờ.',
+      warning:
+          '${_refundPolicy(DateTime.now())} Tiền hoàn (nếu có) được Quản lý chuyển khoản sau khi duyệt. '
+          'Buổi đã hủy kèm hoàn tiền không đặt lại được.',
       confirmLabel: 'Hủy buổi',
       destructive: true,
     );
@@ -160,7 +195,7 @@ class _Content extends ConsumerWidget {
     final done = await runAction(
       context,
       () => ref.read(scheduleRepositoryProvider).cancelEnrollment(item.enrollmentId).then((_) => true),
-      success: 'Đã hủy buổi học.',
+      success: 'Đã hủy buổi học. Xem yêu cầu hoàn tiền (nếu có) ở mục Hoàn tiền.',
     );
     if (done == true && context.mounted) {
       ref.read(dataRevisionProvider.notifier).bump();
@@ -171,8 +206,8 @@ class _Content extends ConsumerWidget {
   Future<void> _transfer(BuildContext context, WidgetRef ref) async {
     final target = await showAppBottomSheet<TransferOption>(
       context: context,
-      title: 'Đổi buổi trong cùng khóa',
-      subtitle: 'Chọn buổi bạn muốn chuyển sang',
+      title: 'Đổi buổi học',
+      subtitle: 'Buổi của khóa này hoặc khóa tương đương cùng HLV',
       builder: (_) => _TransferPicker(enrollmentId: item.enrollmentId),
     );
     if (target == null || !context.mounted) return;
@@ -266,42 +301,58 @@ class _TransferPickerState extends ConsumerState<_TransferPicker> {
         compact: true,
         onRetry: () => ref.invalidate(transferOptionsProvider(widget.enrollmentId)),
       ),
-      data: (options) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (options.isEmpty) const EmptyState(compact: true, title: 'Khóa không còn buổi nào khác để đổi'),
-          RadioGroup<String>(
-            groupValue: _selected?.session.id,
-            onChanged: (id) => setState(() => _selected = options.firstWhere((o) => o.session.id == id)),
-            child: Column(
-              children: [
-                for (final o in options)
-                  RadioListTile<String>(
-                    value: o.session.id,
-                    enabled: o.blockReason == null,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      VnTime.sessionLabel(o.session.startTime, o.session.endTime),
-                      style: context.text.bodyStrong,
-                    ),
-                    subtitle: Text(
-                      o.blockReason ?? '${o.session.room.name} · Còn ${o.remaining} chỗ',
-                      style: context.text.caption.copyWith(
-                        color: o.blockReason == null ? c.textMuted : context.tones.of(StatusTone.danger).foreground,
+      data: (t) {
+        final options = t.options;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Còn ${t.transfersLeft}/${t.maxTransfers} lần đổi buổi cho khóa này. Đổi buổi không hoàn tiền.',
+              style: context.text.small.copyWith(color: c.textMuted),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            if (t.blockReason != null) ...[
+              AlertBanner.warning(message: t.blockReason!),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            if (options.isEmpty) const EmptyState(compact: true, title: 'Không còn buổi nào phù hợp để đổi'),
+            RadioGroup<String>(
+              groupValue: _selected?.session.id,
+              onChanged: (id) => setState(() => _selected = options.firstWhere((o) => o.session.id == id)),
+              child: Column(
+                children: [
+                  for (final o in options)
+                    RadioListTile<String>(
+                      value: o.session.id,
+                      enabled: o.blockReason == null,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        VnTime.sessionLabel(o.session.startTime, o.session.endTime),
+                        style: context.text.bodyStrong,
+                      ),
+                      subtitle: Text(
+                        [
+                          if (!o.isSameClass) 'Khóa ${o.session.className}',
+                          if (o.session.isMakeup) 'Buổi dạy bù',
+                          o.blockReason ?? '${o.session.room.name} · Còn ${o.remaining} chỗ',
+                        ].join(' · '),
+                        style: context.text.caption.copyWith(
+                          color: o.blockReason == null ? c.textMuted : context.tones.of(StatusTone.danger).foreground,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          AppButton(
-            label: 'Xác nhận đổi buổi',
-            expand: true,
-            onPressed: _selected == null ? null : () => Navigator.of(context).pop(_selected),
-          ),
-        ],
-      ),
+            const SizedBox(height: AppSpacing.md),
+            AppButton(
+              label: 'Xác nhận đổi buổi',
+              expand: true,
+              onPressed: _selected == null ? null : () => Navigator.of(context).pop(_selected),
+            ),
+          ],
+        );
+      },
     );
   }
 }

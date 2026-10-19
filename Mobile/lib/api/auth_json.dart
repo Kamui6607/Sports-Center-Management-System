@@ -23,6 +23,7 @@ abstract final class AuthJson {
           : MemberProfile(
               id: member.str('id'),
               fitnessGoal: member.strOrNull('fitnessGoal'),
+              fitnessGoals: member.strList('fitnessGoals'),
               trainingLevel: member.enumOrNull('trainingLevel', TrainingLevel.values),
               trainingPreference: member.strOrNull('trainingPreference'),
             ),

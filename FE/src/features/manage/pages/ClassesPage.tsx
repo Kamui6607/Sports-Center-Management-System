@@ -5,8 +5,10 @@ import { allPages } from "../../../shared/pagedApi";
 import {
   ActivePill,
   ApprovalPill,
-  AREA_LABEL,
   CLASS_TYPE_LABEL,
+  GOAL_LABEL,
+  dateOnly,
+  goalLabels,
   DataTable,
   PageHead,
   Pager,
@@ -38,14 +40,12 @@ export function useCoachOptions() {
 export default function ClassesPage() {
   const s = useUrlState();
   const coaches = useCoachOptions();
-  const fitness = useQuery({ queryKey: ["admin", "classes", "fitness"], queryFn: ({ signal }) => api<string[]>("GET /classes/fitness", { signal }) });
   const query = {
     search: s.value("search"),
     status: s.value("status"),
     coachId: s.value("coachId"),
-    fitness: s.value("fitness"),
+    goal: s.value("goal"),
     classType: s.value("classType"),
-    areaType: s.value("areaType"),
     isActive: s.value("isActive"),
     page: String(s.page),
     limit: "15",
@@ -76,8 +76,8 @@ export default function ClassesPage() {
             ]}
           />
           <Select label="Huấn luyện viên" value={s.value("coachId")} onChange={(v) => s.set({ coachId: v })} options={coaches.data ?? []} />
-          <Select label="Môn tập" value={s.value("fitness")} onChange={(v) => s.set({ fitness: v })} options={(fitness.data?.data ?? []).map((f) => [f, f])} />
-          <Select label="Khu vực" value={s.value("areaType")} onChange={(v) => s.set({ areaType: v })} options={Object.entries(AREA_LABEL)} />
+          <Select label="Mục tiêu" value={s.value("goal")} onChange={(v) => s.set({ goal: v })} options={Object.entries(GOAL_LABEL)} />
+          <Select label="Hạng" value={s.value("classType")} onChange={(v) => s.set({ classType: v })} options={Object.entries(CLASS_TYPE_LABEL)} />
           <Select
             label="Mở bán"
             value={s.value("isActive")}
@@ -101,7 +101,13 @@ export default function ClassesPage() {
                       <div className="cr-cell-main">
                         <Link to={`/manager/classes/${str(c.id)}`}>{str(c.name)}</Link>
                         <small>
-                          {str(c.fitness)} · {CLASS_TYPE_LABEL[str(c.classType)] ?? str(c.classType)} · {AREA_LABEL[str(c.areaType)] ?? str(c.areaType)}
+                          {[
+                            goalLabels(c.goalTags).join(", "),
+                            CLASS_TYPE_LABEL[str(c.classType)] ?? str(c.classType),
+                            c.startDate && c.endDate ? `${dateOnly(c.startDate)} – ${dateOnly(c.endDate)}` : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </small>
                       </div>
                     ),

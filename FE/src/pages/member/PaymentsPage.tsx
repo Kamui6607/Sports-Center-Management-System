@@ -5,7 +5,7 @@ import { api, type RecordData } from "../../shared/api";
 import { allPages } from "../../shared/pagedApi";
 import { at, display, money } from "../../shared/config";
 import { Details, Empty, ErrorState, Loading, Modal } from "../../shared/ui";
-import { InvoiceDialog } from "../../features/reception/payments/PaymentsPage";
+import { InvoiceDialog } from "../../shared/InvoiceDialog";
 export function MemberPaymentsPage() {
   const { user } = useAuth();
   const memberId = String(at(user, "memberProfile.id") || "");

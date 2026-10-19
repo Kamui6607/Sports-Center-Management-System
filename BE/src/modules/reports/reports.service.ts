@@ -4,6 +4,12 @@ import { buildPaginationMeta } from "../../utils/pagination.js";
 import { computeAttendanceBuckets } from "../attendance/attendance-analytics.service.js";
 import { expireStalePenalties } from "../attendance/attendance-penalties.service.js";
 
+/** Tên mặt hàng của giao dịch LÚC MUA (snapshot) — đổi tên/giá sau này không ảnh hưởng báo cáo. */
+function purchasedItemName(p: { purchaseSnapshot: unknown; classNameSnapshot: string | null; orderId: string | null }) {
+  const snap = p.purchaseSnapshot as { name?: string } | null;
+  return snap?.name ?? p.classNameSnapshot ?? (p.orderId ? "Đơn hàng sản phẩm" : "Giao dịch khác");
+}
+
 export async function getRevenueReport(startDate: string, endDate: string) {
   // BR-26: Parse as VN business day boundaries (start of startDate, end of endDate in +07:00)
   const start = new Date(`${startDate}T00:00:00+07:00`);
@@ -55,6 +61,23 @@ export async function getRevenueReport(startDate: string, endDate: string) {
       }),
     ]);
 
+  // Doanh thu theo mặt hàng (khóa học / gói / đơn hàng) — số tiền thực thu + TÊN LÚC MUA (snapshot).
+  const collected = await prisma.payment.findMany({
+    where: { ...cashFilter, status: "SUCCESS" },
+    select: { amount: true, classId: true, orderId: true, note: true, purchaseSnapshot: true, classNameSnapshot: true },
+  });
+  const byItem = new Map<string, { key: string; kind: string; name: string; revenue: number; count: number }>();
+  for (const p of collected) {
+    const snap = p.purchaseSnapshot as { kind?: string; planId?: string } | null;
+    const kind = p.classId ? "CLASS" : p.orderId ? "ORDER" : snap?.kind === "MEMBERSHIP" ? "MEMBERSHIP" : "OTHER";
+    const key = p.classId ? `CLASS:${p.classId}` : kind === "MEMBERSHIP" ? `MEMBERSHIP:${snap?.planId ?? p.note}` : kind;
+    const row = byItem.get(key) ?? { key, kind, name: purchasedItemName(p), revenue: 0, count: 0 };
+    row.revenue += Number(p.amount);
+    row.count += 1;
+    byItem.set(key, row);
+  }
+  const revenueByItem = [...byItem.values()].sort((a, b) => b.revenue - a.revenue);
+
   const methodMap: Record<string, number> = {};
   for (const m of byMethod) methodMap[m.method] = Number(m._sum.amount ?? 0);
 
@@ -87,7 +110,9 @@ export async function getRevenueReport(startDate: string, endDate: string) {
       BANK_TRANSFER: methodMap["BANK_TRANSFER"] ?? 0,
       SEPAY: methodMap["SEPAY"] ?? 0,
     },
-    recentPayments,
+    recentPayments: recentPayments.map((p) => ({ ...p, itemName: purchasedItemName(p) })),
+    /** Doanh thu thực thu theo mặt hàng, tên theo snapshot lúc mua. */
+    revenueByItem,
     note:
       "totalRevenue = tiền THỰC THU trong kỳ (SUCCESS theo paidAt); refundedAmount = tiền ĐÃ HOÀN " +
       "(REFUNDED theo paidAt); netRevenue = thực nhận (gross − refunded). pendingPayments/failedPayments/" +
@@ -281,7 +306,7 @@ export async function getSubscriptionLogs(startDate?: string, endDate?: string, 
       include: {
         member: { include: { user: { select: { fullName: true, email: true } } } },
         plan: { select: { name: true, price: true } },
-        payment: { select: { amount: true, status: true, paidAt: true } },
+        payment: { select: { amount: true, status: true, paidAt: true, purchaseSnapshot: true } },
       },
     }),
   ]);
@@ -291,8 +316,9 @@ export async function getSubscriptionLogs(startDate?: string, endDate?: string, 
     action: "Mua / Gia hạn gói",
     username: sub.member.user.fullName,
     email: sub.member.user.email,
-    planName: sub.plan.name,
-    planTier: sub.plan.name,
+    // Tên gói & giá theo snapshot lúc mua (đổi tên/giá gói sau này không ảnh hưởng lịch sử).
+    planName: (sub.payment?.purchaseSnapshot as { name?: string } | null)?.name ?? sub.plan.name,
+    planTier: (sub.payment?.purchaseSnapshot as { name?: string } | null)?.name ?? sub.plan.name,
     price: Number(sub.payment?.amount ?? sub.plan.price),
     paymentStatus: sub.payment?.status ?? "N/A",
     startDate: sub.startDate,

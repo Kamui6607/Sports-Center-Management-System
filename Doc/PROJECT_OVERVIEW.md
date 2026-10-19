@@ -20,7 +20,8 @@ Hệ thống xoay quanh 3 Role chính (và Guest):
    - Xem lịch tập, thực hiện điểm danh.
    - Xem lộ trình tập luyện (Training Plan) và nhận phản hồi (Feedback) từ Coach.
    - Đánh giá sản phẩm đã mua.
-   - Yêu cầu hủy khóa học (trước khai giảng ít nhất 24 giờ) để được hoàn tiền và theo dõi trạng thái yêu cầu hoàn tiền của mình.
+   - Hủy khóa học: trước khai giảng ≥ 3 ngày được hoàn 100%; muộn hơn hủy không hoàn hoặc xin hoàn ngoại lệ (Manager duyệt, trừ phí chiết khấu). Hủy 1 buổi trước ≥ 24h được hoàn 80% tiền buổi. Theo dõi trạng thái yêu cầu hoàn tiền.
+   - Đánh giá khóa học sau khi học xong (1 lần, sửa lại tối đa 1 lần); đổi buổi sang buổi khác của khóa/khóa tương đương cùng HLV (tối đa 2 lần/khóa).
 
 3. **COACH (Huấn luyện viên):**
    - Đăng ký tài khoản nhưng phải **nộp CV (PDF)** và đợi Manager xét duyệt.
@@ -33,7 +34,7 @@ Hệ thống xoay quanh 3 Role chính (và Guest):
 
 4. **MANAGER (Quản lý Trung tâm):**
    - Có toàn quyền quản trị hệ thống.
-   - Quản lý danh mục cơ sở vật chất: Phòng tập (Room), Môn thể thao (Sport).
+   - Quản lý cơ sở vật chất: Phòng tập (Room — tầng, khu vực, chỉ dẫn) và Thông tin trung tâm (địa chỉ, bản đồ, giờ mở cửa). Phạm vi chỉ bộ môn Gym.
    - Xét duyệt hồ sơ (CV) của Coach.
    - Quản lý cửa hàng sản phẩm (Products): Thêm, sửa, xóa, kiểm soát tồn kho.
    - Nhận 15% doanh thu từ các khóa học của Coach.
@@ -82,7 +83,7 @@ Hệ thống xoay quanh 3 Role chính (và Guest):
 - **Notification:** Mọi sự kiện quan trọng (đăng ký, thanh toán, duyệt CV, duyệt rút tiền, sắp đến giờ học...) đều được đẩy thông báo thời gian thực về cho user.
 
 ### 3.7. Luồng Hủy khóa học & Hoàn tiền (Course Cancellation & Refund)
-1. **Member** gửi yêu cầu hủy khóa học khi còn **≥ 24 giờ** trước buổi khai giảng (buổi chính đầu tiên); quá hạn ➔ hệ thống từ chối.
+1. **Member** hủy khóa học: còn **≥ 3 ngày** trước buổi khai giảng ➔ yêu cầu hoàn 100%; muộn hơn ➔ hủy ngay không hoàn, hoặc kèm **yêu cầu hoàn ngoại lệ** (giá trị buổi chưa học − phí chiết khấu do Manager chốt). Chi tiết: `Doc/GYM_SCOPE_CHANGES.md` §11.
 2. Hệ thống tạo yêu cầu hoàn tiền (Refund) ở trạng thái **PENDING** với số tiền hoàn = phần còn lại của giao dịch đã thanh toán (trừ các khoản đã hoàn trước đó của cùng giao dịch).
 3. **Manager** xem danh sách yêu cầu hoàn tiền, chuyển khoản thủ công cho Member rồi nhấn **APPROVE** (hoặc **REJECT** kèm lý do). Sepay không có API hoàn tiền nên bước chuyển khoản do Manager thực hiện ngoài hệ thống.
 4. Khi duyệt: ví ảo của Coach bị trừ đúng tỷ lệ Coach đã nhận từ giao dịch gốc (ví dụ hoàn 100.000đ của lớp 1.000.000đ ➔ trừ ví 85.000đ); giao dịch chuyển **REFUNDED**, hóa đơn bị hủy, các chỗ đang giữ của Member trong khóa học được giải phóng. Member và Coach nhận thông báo.

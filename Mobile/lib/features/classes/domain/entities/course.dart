@@ -1,7 +1,8 @@
+import '../../../auth/domain/entities/app_user.dart';
 import '../../../catalog/domain/entities/catalog.dart';
 
-/// Trạng thái duyệt khóa học (`ClassApprovalStatus`).
-enum ClassStatus { pending, approved, rejected, completed }
+/// Trạng thái duyệt khóa học (`ClassApprovalStatus`). `draft` = bản nháp HLV đang soạn (wizard tự lưu).
+enum ClassStatus { draft, pending, approved, rejected, completed }
 
 /// Hạng khóa (`ClassType`).
 enum ClassType { regular, premium }
@@ -53,11 +54,33 @@ class CourseClass {
     this.minRemainingSlots,
     this.rejectReason,
     this.coachRevenue = 0,
+    this.goal,
+    this.goalTags = const [],
+    this.targetLevel,
+    this.startDate,
+    this.endDate,
+    this.goalMatch,
   });
 
   final String id;
   final String name;
   final String? description;
+
+  /// Mô tả chi tiết mục tiêu khóa học (HLV ghi).
+  final String? goal;
+
+  /// Mã mục tiêu khóa (danh mục [kFitnessGoals]).
+  final List<String> goalTags;
+
+  /// Trình độ phù hợp (null = mọi trình độ).
+  final TrainingLevel? targetLevel;
+
+  /// Ngày khai giảng / kết thúc (BE tự cập nhật khi lịch thay đổi).
+  final DateTime? startDate;
+  final DateTime? endDate;
+
+  /// Độ phù hợp với mục tiêu của học viên đang xem (null với Guest/HLV).
+  final GoalMatch? goalMatch;
   final List<Sport> sports;
 
   /// Giá trọn khóa (VND).
@@ -93,6 +116,10 @@ class CourseClass {
 
   String get sportNames => sports.map((s) => s.name).join(' · ');
 
+  bool get isDraft => status == ClassStatus.draft;
+
+  List<String> get goalLabels => goalTags.map(goalLabel).toList();
+
   bool get isFull => minRemainingSlots == 0;
 }
 
@@ -123,6 +150,8 @@ class PlanSession {
     this.isMakeup = false,
     this.mine = false,
     this.conflictWith,
+    this.originalStartTime,
+    this.rescheduleReason,
   });
 
   final String id;
@@ -138,6 +167,12 @@ class PlanSession {
 
   /// Tên khóa trùng giờ với lịch của người xem.
   final String? conflictWith;
+
+  /// Buổi đã bị HLV dời lịch: giờ ban đầu + lý do.
+  final DateTime? originalStartTime;
+  final String? rescheduleReason;
+
+  bool get isRescheduled => originalStartTime != null;
 
   int get remainingSlots => (capacity - bookedCount).clamp(0, capacity);
   bool get isFull => remainingSlots == 0;
@@ -178,9 +213,22 @@ class PurchaseInfo {
 
 /// Chi tiết khóa học + lộ trình buổi (`GET /classes/:id` + `/course-plan`).
 class CourseDetail {
-  const CourseDetail({required this.course, required this.slots, required this.sessions, required this.purchase});
+  const CourseDetail({
+    required this.course,
+    required this.slots,
+    required this.sessions,
+    required this.purchase,
+    this.goalMatch,
+    this.pastSessionCount = 0,
+  });
 
   final CourseClass course;
+
+  /// Độ phù hợp với mục tiêu của học viên (null với Guest/HLV).
+  final GoalMatch? goalMatch;
+
+  /// Số buổi (chưa hủy) đã diễn ra.
+  final int pastSessionCount;
   final List<CourseSlot> slots;
 
   /// Các buổi `SCHEDULED` chưa diễn ra.
@@ -224,26 +272,55 @@ class MyCourse {
 
 /// Bộ lọc khám phá khóa học (`ClassQuerySchema`).
 class ClassQuery {
-  const ClassQuery({this.search = '', this.sportId, this.classType, this.areaType, this.page = 1});
+  const ClassQuery({
+    this.search = '',
+    this.sportId,
+    this.classType,
+    this.areaType,
+    this.goal,
+    this.matchMyGoals = false,
+    this.page = 1,
+  });
 
   final String search;
   final String? sportId;
   final ClassType? classType;
   final AreaType? areaType;
+
+  /// Lọc theo một mục tiêu (mã [GoalOption.code]).
+  final String? goal;
+
+  /// Chỉ khóa khớp mục tiêu của tôi (Member), sắp theo độ phù hợp.
+  final bool matchMyGoals;
   final int page;
 
-  int get activeFilterCount => [sportId, classType, areaType].where((e) => e != null).length;
+  int get activeFilterCount =>
+      [sportId, classType, areaType, goal].where((e) => e != null).length + (matchMyGoals ? 1 : 0);
 
   ClassQuery copyWith({String? search, int? page}) => ClassQuery(
     search: search ?? this.search,
     sportId: sportId,
     classType: classType,
     areaType: areaType,
+    goal: goal,
+    matchMyGoals: matchMyGoals,
     page: page ?? this.page,
   );
 
-  ClassQuery withFilters({String? sportId, ClassType? classType, AreaType? areaType}) =>
-      ClassQuery(search: search, sportId: sportId, classType: classType, areaType: areaType);
+  ClassQuery withFilters({
+    String? sportId,
+    ClassType? classType,
+    AreaType? areaType,
+    String? goal,
+    bool matchMyGoals = false,
+  }) => ClassQuery(
+    search: search,
+    sportId: sportId,
+    classType: classType,
+    areaType: areaType,
+    goal: goal,
+    matchMyGoals: matchMyGoals,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -252,8 +329,166 @@ class ClassQuery {
       other.sportId == sportId &&
       other.classType == classType &&
       other.areaType == areaType &&
+      other.goal == goal &&
+      other.matchMyGoals == matchMyGoals &&
       other.page == page;
 
   @override
-  int get hashCode => Object.hash(search, sportId, classType, areaType, page);
+  int get hashCode => Object.hash(search, sportId, classType, areaType, goal, matchMyGoals, page);
+}
+
+/// Mức độ phù hợp khóa ↔ mục tiêu học viên (BE `computeGoalMatch`).
+enum GoalMatchLevel { high, medium, low, none, unknown }
+
+class GoalMatch {
+  const GoalMatch({required this.score, required this.level, required this.matchedGoals, required this.message});
+
+  /// 0–100.
+  final int score;
+  final GoalMatchLevel level;
+  final List<String> matchedGoals;
+  final String message;
+}
+
+/// Hồ sơ công khai HLV (`GET /coaches/:id/profile`).
+class CoachPublicProfile {
+  const CoachPublicProfile({
+    required this.coachProfileId,
+    required this.userId,
+    required this.fullName,
+    required this.openCourses,
+    required this.totalCourses,
+    required this.totalStudents,
+    required this.completedSessions,
+    required this.ratingCount,
+    required this.distribution,
+    required this.courses,
+    required this.reviews,
+    this.avatarUrl,
+    this.specialization,
+    this.experienceYears,
+    this.bio,
+    this.ratingAverage,
+    this.joinedAt,
+  });
+
+  final String coachProfileId;
+  final String userId;
+  final String fullName;
+  final String? avatarUrl;
+  final String? specialization;
+  final int? experienceYears;
+  final String? bio;
+  final DateTime? joinedAt;
+  final int openCourses;
+  final int totalCourses;
+  final int totalStudents;
+  final int completedSessions;
+  final double? ratingAverage;
+  final int ratingCount;
+
+  /// Số đánh giá theo mức sao 1..5.
+  final Map<int, int> distribution;
+  final List<CoachCourseItem> courses;
+  final List<CoachReviewItem> reviews;
+}
+
+class CoachCourseItem {
+  const CoachCourseItem({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.goalTags,
+    required this.upcomingSessions,
+    this.startDate,
+    this.endDate,
+  });
+
+  final String id;
+  final String name;
+  final int price;
+  final List<String> goalTags;
+  final int upcomingSessions;
+  final DateTime? startDate;
+  final DateTime? endDate;
+}
+
+class CoachReviewItem {
+  const CoachReviewItem({required this.rating, required this.createdAt, this.comment, this.authorName, this.className});
+
+  final int rating;
+  final String? comment;
+  final DateTime createdAt;
+
+  /// null = ẩn danh.
+  final String? authorName;
+  final String? className;
+}
+
+/// Trạng thái khóa học của học viên (`GET /enrollments/my/courses`).
+enum MemberCourseStatus { pendingPayment, upcoming, ongoing, completed, cancelled, paidNotEnrolled }
+
+/// Một dòng lịch sử khóa học đã mua — thông tin khóa theo SNAPSHOT lúc mua (giá/tên không đổi khi khóa bị sửa).
+class MemberCourse {
+  const MemberCourse({
+    required this.classId,
+    required this.status,
+    required this.className,
+    required this.coachName,
+    required this.amountPaid,
+    required this.totalSessions,
+    required this.completedSessions,
+    required this.myBookedSessions,
+    required this.canReview,
+    required this.canEditReview,
+    this.coachProfileId,
+    this.coachUserId,
+    this.coachAvatarUrl,
+    this.goal,
+    this.paidAt,
+    this.paymentId,
+    this.pendingExpiresAt,
+    this.startDate,
+    this.endDate,
+    this.nextSessionStart,
+    this.pendingRefundAmount,
+    this.myRating,
+    this.myReviewComment,
+  });
+
+  final String classId;
+  final MemberCourseStatus status;
+  final String className;
+  final String coachName;
+  final String? coachProfileId;
+  final String? coachUserId;
+  final String? coachAvatarUrl;
+  final String? goal;
+  final int amountPaid;
+  final DateTime? paidAt;
+  final String? paymentId;
+
+  /// Hạn chuyển khoản (chỉ khi đang chờ thanh toán).
+  final DateTime? pendingExpiresAt;
+  final DateTime? startDate;
+  final DateTime? endDate;
+  final DateTime? nextSessionStart;
+  final int totalSessions;
+  final int completedSessions;
+  final int myBookedSessions;
+  final int? pendingRefundAmount;
+
+  /// Đã học xong và chưa đánh giá.
+  final bool canReview;
+
+  /// Đã đánh giá, còn 1 lần sửa.
+  final bool canEditReview;
+  final int? myRating;
+  final String? myReviewComment;
+
+  bool get isActive => const {
+    MemberCourseStatus.pendingPayment,
+    MemberCourseStatus.upcoming,
+    MemberCourseStatus.ongoing,
+  }.contains(status);
 }

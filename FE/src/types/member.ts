@@ -1,4 +1,4 @@
-export type UserRole = "MEMBER" | "COACH" | "STAFF" | "MANAGER";
+export type UserRole = "MEMBER" | "COACH" | "MANAGER";
 export type Gender = "MALE" | "FEMALE" | "OTHER";
 export type MemberTier = "FREE" | "MEMBERSHIP" | "PREMIUM";
 export type MembershipStatus = "ACTIVE" | "EXPIRED" | "CANCELLED" | "SUSPENDED";

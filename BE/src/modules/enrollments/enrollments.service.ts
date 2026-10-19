@@ -32,13 +32,14 @@ async function assertCanBook(
   tx: Prisma.TransactionClient,
   memberProfileId: string,
   schedule: BookableSchedule,
-  options: { excludeEnrollmentId?: string; quotaExemptClassId?: string } = {}
+  options: { excludeEnrollmentId?: string; quotaExemptClassId?: string; paidClassId?: string } = {}
 ) {
-  // Chốt chặn 1: Member phải đã MUA khóa học này (Payment SUCCESS với classId này).
+  // Chốt chặn 1: Member phải đã MUA khóa học này (Payment SUCCESS). Đổi buổi sang khóa tương đương ⇒
+  // kiểm tra theo khóa ĐÃ TRẢ TIỀN (`paidClassId`).
   const hasPaid = await tx.payment.findFirst({
     where: {
       memberId: memberProfileId,
-      classId: schedule.class.id,
+      classId: options.paidClassId ?? schedule.class.id,
       status: "SUCCESS",
     },
   });
@@ -238,14 +239,19 @@ export async function cancelEnrollment(
       where: { id: enrollmentId },
       include: { member: { select: { id: true, userId: true } }, schedule: { include: { class: true } } },
     });
+    // Buổi bị HLV dời lịch SAU khi hội viên giữ chỗ ⇒ hủy được hoàn 100% (không áp hạn 24h).
+    const rescheduledByCoach =
+      !!enrollment.schedule.rescheduledAt && enrollment.bookedAt.getTime() < enrollment.schedule.rescheduledAt.getTime();
     const created =
       role === "MEMBER"
         ? await createMemberSessionRefundTx(tx, {
             memberId: enrollment.memberId,
             userId,
-            classId: enrollment.schedule.classId,
+            // Buổi đổi sang khóa tương đương ⇒ hoàn theo khóa đã trả tiền.
+            classId: enrollment.sourceClassId ?? enrollment.schedule.classId,
             scheduleId: enrollment.scheduleId,
             startTime: enrollment.schedule.startTime,
+            rescheduledByCoach,
           })
         : null;
     return { cancelled: updated, refund: created };
@@ -258,7 +264,7 @@ export async function cancelEnrollment(
     "ENROLLMENT_CANCELLED",
     `Đã hủy đặt lớp: ${cancelled.schedule.class.name}`,
     refund
-      ? `Lịch học "${cancelled.schedule.class.name}" vào lúc ${startStr} đã được hủy. Yêu cầu hoàn ${Number(refund.amount).toLocaleString("vi-VN")}đ (80% tiền buổi) đang chờ Quản lý xử lý.`
+      ? `Lịch học "${cancelled.schedule.class.name}" vào lúc ${startStr} đã được hủy. Yêu cầu hoàn ${Number(refund.amount).toLocaleString("vi-VN")}đ (${refund.reason === "SESSION_RESCHEDULED" ? "100% tiền buổi do HLV dời lịch" : "80% tiền buổi"}) đang chờ Quản lý xử lý.`
       : `Lịch học "${cancelled.schedule.class.name}" vào lúc ${startStr} đã được hủy thành công.`,
     { metadata: { enrollmentId, scheduleId: cancelled.scheduleId, refundId: refund?.id ?? null } }
   ).catch(() => {});
@@ -358,15 +364,55 @@ export async function getScheduleEnrollments(
   return { enrollments, pagination: buildPaginationMeta(total, page, limit) };
 }
 
+/** Số lần đổi buổi tối đa cho MỘT khóa đã mua (Doc/GYM_SCOPE_CHANGES.md §8). */
+export const MAX_TRANSFERS_PER_COURSE = 2;
+
+type TransferSource = {
+  id: string;
+  memberId: string;
+  scheduleId: string;
+  sourceClassId: string | null;
+  schedule: { classId: string; startTime: Date; class: { id: string; coachId: string; classType: string; name: string } };
+};
+
+/** Khóa hội viên đã trả tiền cho chỗ này (đổi sang khóa tương đương vẫn tính theo khóa gốc). */
+const paidClassOf = (e: { sourceClassId: string | null; schedule: { classId: string } }) => e.sourceClassId ?? e.schedule.classId;
+
+/** Số lần hội viên đã đổi buổi trong một khóa đã mua. */
+async function countTransfers(db: typeof prisma | Prisma.TransactionClient, memberId: string, paidClassId: string) {
+  return db.enrollment.count({
+    where: {
+      memberId,
+      transferredFromId: { not: null },
+      OR: [{ sourceClassId: paidClassId }, { sourceClassId: null, schedule: { classId: paidClassId } }],
+    },
+  });
+}
+
 /**
- * Chuyển chỗ đặt của hội viên sang một buổi khác TRONG CÙNG CLASS (KHÔNG sửa ClassSchedule/Class/Room).
- * - BR-08: `targetScheduleId` bắt buộc thuộc cùng Class với Enrollment hiện tại (khác Class -> 400).
- * - Chỗ cũ: BOOKED + buổi chưa diễn ra; chỗ mới: SCHEDULED + chưa bắt đầu.
- * - Áp dụng đầy đủ luật đặt chỗ (gói tập, tier, sức chứa, trùng chỗ, trùng giờ) — bỏ qua chỗ cũ khi check trùng giờ.
- * - BR-09: serialize transfer theo (memberId, classId) + compare-and-set khi nhả chỗ cũ nên một Enrollment
- *   không thể bị chuyển đồng thời sang nhiều buổi.
- * - Toàn bộ nằm trong 1 transaction: fail thì rollback, hội viên giữ nguyên chỗ cũ.
- * - Chỗ cũ chuyển CANCELLED (giữ lịch sử); nếu buổi mới từng bị hủy trước đây thì kích hoạt lại (BR-07).
+ * Buổi đích hợp lệ: buổi khác của CHÍNH khóa đó (VD buổi dạy bù) hoặc buổi của KHÓA TƯƠNG ĐƯƠNG
+ * (cùng HLV — để 85% doanh thu vẫn đúng người dạy — cùng hạng, đang mở bán).
+ */
+function isEligibleTarget(
+  source: TransferSource,
+  target: { classId: string; class: { coachId: string; classType: string; status: string; isActive: boolean } }
+) {
+  if (target.classId === paidClassOf(source) || target.classId === source.schedule.classId) return true;
+  return (
+    target.class.coachId === source.schedule.class.coachId &&
+    target.class.classType === source.schedule.class.classType &&
+    target.class.status === "APPROVED" &&
+    target.class.isActive
+  );
+}
+
+/**
+ * Đổi buổi (Doc/GYM_SCOPE_CHANGES.md §8): bỏ buổi hiện tại để học bù ở một buổi khác.
+ * - Đích: buổi của chính khóa (VD dạy bù) hoặc khóa tương đương (cùng HLV, cùng hạng, đang mở bán).
+ * - Hội viên: buổi hiện tại VÀ buổi đích đều còn ≥ 24h; tối đa 2 lần đổi / khóa đã mua (Manager không bị giới hạn).
+ * - Áp dụng đủ luật đặt chỗ (sức chứa, trùng giờ, phạt chuyên cần) — bỏ qua chỗ cũ khi xét trùng giờ.
+ * - Không hoàn tiền. Chỗ cũ → CANCELLED; chỗ mới ghi `sourceClassId` (khóa đã trả tiền) + `transferredFromId`.
+ * - Một transaction + lock (member × khóa) + compare-and-set ⇒ không đổi đồng thời sang nhiều buổi.
  */
 export async function transferEnrollment(
   enrollmentId: string,
@@ -397,11 +443,9 @@ export async function transferEnrollment(
   if (enrollment.schedule.startTime <= new Date())
     throw new AppError("Cannot transfer enrollment for a past or ongoing class", 400);
 
+  const minMs = SESSION_REFUND_MIN_HOURS * 3_600_000;
   // Hội viên chỉ được đổi buổi khi buổi hiện tại còn ≥24h (Manager không bị giới hạn).
-  if (
-    role === "MEMBER" &&
-    enrollment.schedule.startTime.getTime() - Date.now() < SESSION_REFUND_MIN_HOURS * 3_600_000
-  ) {
+  if (role === "MEMBER" && enrollment.schedule.startTime.getTime() - Date.now() < minMs) {
     throw new AppError(
       `Chỉ được đổi buổi trước giờ học ít nhất ${SESSION_REFUND_MIN_HOURS} giờ.`,
       400,
@@ -415,38 +459,48 @@ export async function transferEnrollment(
   });
   if (!target) throw new AppError("Target schedule not found", 404);
 
-  // BR-08: chỉ đổi GIỜ trong cùng Class — không dùng endpoint này để chuyển sang lớp khác.
-  if (target.classId !== enrollment.schedule.classId)
+  if (!isEligibleTarget(enrollment, target)) {
     throw new AppError(
-      "Target schedule must belong to the same class as the current enrollment",
-      400
+      "Chỉ đổi được sang buổi của chính khóa này hoặc khóa tương đương (cùng HLV, cùng hạng, đang mở bán).",
+      400,
+      { code: "TRANSFER_TARGET_NOT_ELIGIBLE" }
     );
-
+  }
   if (target.status !== "SCHEDULED")
     throw new AppError("Target schedule is not available for booking", 400);
   if (target.startTime <= new Date())
     throw new AppError("Cannot transfer to a past class", 400);
+  if (role === "MEMBER" && target.startTime.getTime() - Date.now() < minMs) {
+    throw new AppError(`Buổi muốn đổi sang phải còn ít nhất ${SESSION_REFUND_MIN_HOURS} giờ mới bắt đầu.`, 400, {
+      code: "TRANSFER_TARGET_TOO_SOON",
+      minHours: SESSION_REFUND_MIN_HOURS,
+    });
+  }
 
-  return prisma.$transaction(async (tx) => {
-    // Quota là tài nguyên theo memberId nên phải lock TRƯỚC (lock order: memberQuota ->
-    // memberClass -> schedule).
+  const paidClassId = paidClassOf(enrollment);
+  const crossClass = target.classId !== paidClassId;
+
+  const transferred = await prisma.$transaction(async (tx) => {
+    // Lock order: memberQuota -> memberClass -> schedule (giống bookClass).
     await lockMemberQuota(tx, enrollment.memberId);
-    // BR-09: serialize mọi transfer của cùng (memberId, classId). Thiếu lock này, 2 request
-    // đồng thời (lock schedule đích khác nhau) có thể cùng thấy enrollment BOOKED rồi cùng commit
-    // -> member giữ 2 chỗ trong cùng Class.
-    await lockMemberClass(tx, enrollment.memberId, enrollment.schedule.classId);
-    // Lock buổi đích: nhiều hội viên cùng chuyển tới không được vượt sức chứa.
+    // BR-09: serialize mọi transfer của cùng (member × khóa đã trả tiền).
+    await lockMemberClass(tx, enrollment.memberId, paidClassId);
     await lockSchedule(tx, targetScheduleId);
 
+    if (role === "MEMBER") {
+      const used = await countTransfers(tx, enrollment.memberId, paidClassId);
+      if (used >= MAX_TRANSFERS_PER_COURSE) {
+        throw new AppError(
+          `Bạn đã dùng hết ${MAX_TRANSFERS_PER_COURSE} lần đổi buổi của khóa này.`,
+          400,
+          { code: "TRANSFER_LIMIT", max: MAX_TRANSFERS_PER_COURSE }
+        );
+      }
+    }
+
     // Nhả chỗ cũ bằng compare-and-set ngay trong lock: chỉ thành công khi vẫn BOOKED.
-    // Request thua trong cuộc đua sẽ count = 0 -> 409 và rollback (không nhận thêm chỗ).
     const released = await tx.enrollment.updateMany({
-      where: {
-        id: enrollment.id,
-        memberId: enrollment.memberId,
-        schedule: { classId: enrollment.schedule.classId },
-        status: "BOOKED",
-      },
+      where: { id: enrollment.id, memberId: enrollment.memberId, status: "BOOKED" },
       data: { status: "CANCELLED", cancelledAt: new Date() },
     });
     if (released.count !== 1)
@@ -457,54 +511,51 @@ export async function transferEnrollment(
 
     const existingTarget = await assertCanBook(tx, enrollment.memberId, target, {
       excludeEnrollmentId: enrollment.id,
-      // §9: transfer chỉ đổi buổi TRONG CÙNG Class (BR-08) => số Class không đổi, không tiêu quota mới.
-      quotaExemptClassId: enrollment.schedule.classId,
+      quotaExemptClassId: paidClassId,
+      paidClassId,
     });
 
-    const enrollmentInclude = {
-      schedule: { include: { class: true, room: true } },
+    const enrollmentInclude = { schedule: { include: { class: true, room: true } } };
+    const transferData = {
+      status: "BOOKED" as const,
+      bookedAt: new Date(),
+      cancelledAt: null,
+      sourceClassId: crossClass ? paidClassId : null,
+      transferredFromId: enrollment.id,
     };
-    const transferred = existingTarget
-      ? await tx.enrollment.update({
-          where: { id: existingTarget.id },
-          data: { status: "BOOKED", bookedAt: new Date(), cancelledAt: null },
-          include: enrollmentInclude,
-        })
-      : await tx.enrollment.create({
-          data: {
-            memberId: enrollment.memberId,
-            scheduleId: targetScheduleId,
-            status: "BOOKED",
-          },
+    return existingTarget
+      ? tx.enrollment.update({ where: { id: existingTarget.id }, data: transferData, include: enrollmentInclude })
+      : tx.enrollment.create({
+          data: { memberId: enrollment.memberId, scheduleId: targetScheduleId, ...transferData },
           include: enrollmentInclude,
         });
-
-    // Một notification duy nhất mô tả việc chuyển buổi (tránh gửi kèm CANCELLED gây rối).
-    const oldStart = enrollment.schedule.startTime.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-    const newStart = target.startTime.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-    createNotification(
-      enrollment.member.userId,
-      "ENROLLMENT_CONFIRMED",
-      `Đã chuyển buổi học: ${target.class.name}`,
-      `Bạn đã chuyển từ buổi "${enrollment.schedule.class.name}" lúc ${oldStart} sang "${target.class.name}" lúc ${newStart}. Chúc bạn tập luyện vui vẻ!`,
-      {
-        metadata: {
-          enrollmentId: transferred.id,
-          scheduleId: targetScheduleId,
-          classId: target.classId,
-          previousScheduleId: enrollment.scheduleId,
-        },
-      }
-    ).catch(() => {});
-
-    return transferred;
   });
+
+  // Một notification duy nhất mô tả việc chuyển buổi (tránh gửi kèm CANCELLED gây rối).
+  const fmt = (d: Date) => d.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+  createNotification(
+    enrollment.member.userId,
+    "ENROLLMENT_CONFIRMED",
+    `Đã đổi buổi học: ${target.class.name}`,
+    `Bạn đã đổi từ buổi "${enrollment.schedule.class.name}" lúc ${fmt(enrollment.schedule.startTime)} sang ` +
+      `"${target.class.name}" lúc ${fmt(target.startTime)} tại ${transferred.schedule.room.name}. Chúc bạn tập luyện vui vẻ!`,
+    {
+      metadata: {
+        enrollmentId: transferred.id,
+        scheduleId: targetScheduleId,
+        classId: target.classId,
+        previousScheduleId: enrollment.scheduleId,
+      },
+    }
+  ).catch(() => {});
+
+  return transferred;
 }
 
 /**
- * Các buổi mà hội viên có thể ĐỔI SANG (cùng khóa, còn SCHEDULED, chưa bắt đầu).
- * Mỗi buổi có thứ/giờ (giờ VN), phòng, chỗ trống, cùng-ngày hay không, và xung đột với buổi khác của hội viên.
- * `date=YYYY-MM-DD` (tùy chọn) lọc theo ngày; `weekday=1..7` (ISO, tùy chọn) lọc theo thứ.
+ * Các buổi hội viên có thể ĐỔI SANG: buổi khác của chính khóa + buổi của khóa tương đương (cùng HLV, cùng hạng),
+ * còn SCHEDULED và (với hội viên) còn ≥ 24h. Mỗi buổi kèm khóa, thứ/giờ VN, phòng, chỗ trống, xung đột lịch.
+ * `date=YYYY-MM-DD` / `weekday=1..7` (tùy chọn) để lọc.
  */
 export async function getTransferOptions(
   enrollmentId: string,
@@ -522,22 +573,37 @@ export async function getTransferOptions(
   if (role === "COACH") throw new AppError("Forbidden", 403);
 
   const now = new Date();
+  const minMs = SESSION_REFUND_MIN_HOURS * 3_600_000;
+  const paidClassId = paidClassOf(enrollment);
+  const transfersUsed = await countTransfers(prisma, enrollment.memberId, paidClassId);
   const hoursLeft = (enrollment.schedule.startTime.getTime() - now.getTime()) / 3_600_000;
   let canTransfer = true;
   let blockReason: string | null = null;
   if (enrollment.status !== "BOOKED") { canTransfer = false; blockReason = "ENROLLMENT_NOT_BOOKED"; }
   else if (hoursLeft <= 0) { canTransfer = false; blockReason = "SESSION_ALREADY_STARTED"; }
   else if (role === "MEMBER" && hoursLeft < SESSION_REFUND_MIN_HOURS) { canTransfer = false; blockReason = "ENROLLMENT_TRANSFER_TOO_LATE"; }
+  else if (role === "MEMBER" && transfersUsed >= MAX_TRANSFERS_PER_COURSE) { canTransfer = false; blockReason = "TRANSFER_LIMIT"; }
 
-  const classId = enrollment.schedule.classId;
+  const cls = enrollment.schedule.class;
+  const earliest = role === "MEMBER" ? new Date(now.getTime() + minMs) : now;
   const [targets, mine] = await Promise.all([
     prisma.classSchedule.findMany({
-      where: { classId, status: "SCHEDULED", startTime: { gt: now }, id: { not: enrollment.scheduleId } },
+      where: {
+        status: "SCHEDULED",
+        startTime: { gt: earliest },
+        id: { not: enrollment.scheduleId },
+        OR: [
+          { classId: { in: [...new Set([enrollment.schedule.classId, paidClassId])] } },
+          { class: { coachId: cls.coachId, classType: cls.classType, status: "APPROVED", isActive: true } },
+        ],
+      },
       include: {
-        room: { select: { id: true, name: true } },
+        room: { select: { id: true, name: true, location: true, floor: true } },
+        class: { select: { id: true, name: true, capacity: true } },
         _count: { select: { enrollments: { where: { status: { in: ["BOOKED", "COMPLETED"] } } } } },
       },
       orderBy: { startTime: "asc" },
+      take: 200,
     }),
     prisma.enrollment.findMany({
       where: { memberId: enrollment.memberId, status: { in: ["BOOKED", "COMPLETED"] }, id: { not: enrollment.id }, schedule: { status: "SCHEDULED", startTime: { gt: now } } },
@@ -545,16 +611,20 @@ export async function getTransferOptions(
     }),
   ]);
 
-  const capacity = enrollment.schedule.class.capacity;
   const curKey = vnDateKey(enrollment.schedule.startTime);
   const options = targets
     .map((t) => {
+      const capacity = t.class.capacity;
       const booked = t._count.enrollments;
       const alreadyMine = mine.some((m) => m.schedule.id === t.id);
       const conflict = mine.find((m) => m.schedule.startTime < t.endTime && m.schedule.endTime > t.startTime);
       const isFull = booked >= capacity;
       return {
         scheduleId: t.id,
+        classId: t.class.id,
+        className: t.class.name,
+        /** true = buổi của chính khóa đã mua; false = khóa tương đương cùng HLV. */
+        isSameClass: t.classId === paidClassId || t.classId === enrollment.schedule.classId,
         date: vnDateKey(t.startTime),
         weekday: vnWeekdayIso(t.startTime),
         weekdayLabel: vnWeekdayLabel(vnWeekdayIso(t.startTime)),
@@ -569,10 +639,12 @@ export async function getTransferOptions(
         isFull,
         sameDay: vnDateKey(t.startTime) === curKey,
         isMakeup: !!t.makeupForId,
+        alreadyBooked: alreadyMine,
         conflictWith: conflict ? { scheduleId: conflict.schedule.id, className: conflict.schedule.class.name } : null,
         canSelect: canTransfer && !isFull && !alreadyMine && !conflict,
       };
     })
+    .filter((o) => !o.alreadyBooked)
     .filter((o) => (filter.date ? o.date === filter.date : true) && (filter.weekday ? o.weekday === filter.weekday : true));
 
   return {
@@ -580,8 +652,13 @@ export async function getTransferOptions(
     canTransfer,
     blockReason,
     minHoursBefore: SESSION_REFUND_MIN_HOURS,
+    transfersUsed,
+    transfersLeft: Math.max(0, MAX_TRANSFERS_PER_COURSE - transfersUsed),
+    maxTransfers: MAX_TRANSFERS_PER_COURSE,
     current: {
       scheduleId: enrollment.scheduleId,
+      classId: enrollment.schedule.classId,
+      className: cls.name,
       date: curKey,
       weekdayLabel: vnWeekdayLabel(vnWeekdayIso(enrollment.schedule.startTime)),
       startClock: vnClock(enrollment.schedule.startTime),

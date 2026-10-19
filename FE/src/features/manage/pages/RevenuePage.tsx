@@ -79,7 +79,8 @@ export default function RevenuePage() {
     <>
       <PageHead
         eyebrow="Kinh doanh · Báo cáo"
-        title="Doanh thu"
+        title="Doanh thu"
+
       />
       <Panel>
         <div className="cr-filters">
@@ -203,6 +204,21 @@ function RevenueBody({ r, enrollments, membershipRevenue }: { r: Row; enrollment
           </ul>
         </Panel>
       </div>
+      <Panel
+        title="Doanh thu theo mặt hàng"
+        desc="Tên & số tiền theo ảnh chụp lúc mua — đổi giá/tên khóa học, gói hay sản phẩm sau này không làm thay đổi số liệu đã thu."
+      >
+        <DataTable
+          rows={(r.revenueByItem as Row[]) ?? []}
+          empty={<p className="cr-muted" style={{ margin: 0 }}>Chưa có khoản thu trong kỳ.</p>}
+          columns={[
+            { key: "n", title: "Mặt hàng (lúc mua)", render: (x) => str(x.name) },
+            { key: "k", title: "Loại", render: (x) => ({ CLASS: "Khóa học", MEMBERSHIP: "Gói thành viên", ORDER: "Đơn hàng" })[str(x.kind)] ?? "Khác" },
+            { key: "c", title: "Giao dịch", className: "num", render: (x) => num(x.count) },
+            { key: "v", title: "Đã thu", className: "num", render: (x) => vnd(x.revenue) },
+          ]}
+        />
+      </Panel>
       <Panel title="10 giao dịch gần nhất của kỳ">
         <DataTable
           rows={(r.recentPayments as Row[]) ?? []}
@@ -211,6 +227,7 @@ function RevenueBody({ r, enrollments, membershipRevenue }: { r: Row; enrollment
             { key: "t", title: "Thanh toán lúc", render: (p) => <span className="cr-mono">{dateTime(p.paidAt)}</span> },
             { key: "m", title: "Người mua", render: (p) => str(get(p, "member.user.fullName")) || "—" },
             { key: "k", title: "Loại", render: (p) => paymentType(p) },
+            { key: "i", title: "Mặt hàng (lúc mua)", render: (p) => str(p.itemName) || "—" },
             { key: "s", title: "Trạng thái", render: (p) => <PayPill status={p.status} /> },
             { key: "a", title: "Số tiền", className: "num", render: (p) => vnd(p.amount) },
           ]}
@@ -277,7 +294,8 @@ function PaymentsTable({ start, end }: { start: string; end: string }) {
   }
   return (
     <Panel
-      title="Giao dịch trong kỳ"
+      title="Giao dịch trong kỳ"
+
       actions={
         <button className="cr-btn" onClick={exportCsv} disabled={exporting}>
           <Download size={16} /> {exporting ? "Đang xuất…" : "Xuất CSV toàn bộ"}

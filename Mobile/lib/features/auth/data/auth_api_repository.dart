@@ -154,6 +154,7 @@ class AuthApiRepository implements AuthRepository {
           if (update.dateOfBirth != null) 'dateOfBirth': AuthJson.dateOnly(update.dateOfBirth),
           if (role == UserRole.member) ...{
             'fitnessGoal': ?update.fitnessGoal,
+            'fitnessGoals': ?update.fitnessGoals,
             if (update.trainingLevel != null) 'trainingLevel': beName(update.trainingLevel!),
             'trainingPreference': ?update.trainingPreference,
           },

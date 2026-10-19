@@ -19,7 +19,20 @@ class RefundBankInfo {
 enum RefundStatus { pending, completed, rejected, cancelled }
 
 /// Lý do hoàn tiền (`RefundReason`). `order*` = hoàn tiền đơn hàng của cửa hàng.
-enum RefundReason { memberCancelCourse, sessionCancelled, orderCancelled, orderNotPickedUp, orderLatePayment }
+enum RefundReason {
+  memberCancelCourse,
+
+  /// Hủy khóa < 3 ngày trước khai giảng, xin hoàn ngoại lệ (Manager duyệt kèm phí chiết khấu).
+  memberCancelCourseLate,
+  memberCancelSession,
+
+  /// Hủy buổi đã bị HLV dời lịch — hoàn 100% tiền buổi.
+  sessionRescheduled,
+  sessionCancelled,
+  orderCancelled,
+  orderNotPickedUp,
+  orderLatePayment,
+}
 
 /// Yêu cầu hoàn tiền (`Refund`).
 class Refund {
@@ -43,6 +56,8 @@ class Refund {
     this.orderId,
     this.orderCode,
     this.bankInfo,
+    this.grossAmount,
+    this.feePercent,
   });
 
   final String id;
@@ -81,24 +96,68 @@ class Refund {
   /// `null` nếu học viên không cung cấp tài khoản.
   final RefundBankInfo? bankInfo;
 
+  /// Hoàn ngoại lệ: giá trị gốc trước phí + % phí chiết khấu.
+  final int? grossAmount;
+  final int? feePercent;
+
   bool get isOrder => orderId != null;
 }
 
-/// Điều kiện hủy khóa (≥ 24h trước buổi khai giảng).
+/// Điều kiện hủy khóa: ≥ 3 ngày trước khai giảng ⇒ hoàn 100%; muộn hơn ⇒ hủy không hoàn hoặc xin hoàn ngoại lệ.
 class CancellationEligibility {
   const CancellationEligibility({
     required this.allowed,
     required this.paidAmount,
     required this.estimatedRefund,
+    this.fullRefund = true,
     this.deadline,
     this.blockReason,
+    this.lateRefund,
   });
 
   final bool allowed;
   final int paidAmount;
 
-  /// Ước tính = phần còn lại của giao dịch (BE tính chính thức).
+  /// Ước tính tiền hoàn nếu hủy ngay (BE tính chính thức).
   final int estimatedRefund;
+
+  /// `true` ⇒ còn ≥ 3 ngày, hoàn 100%; `false` ⇒ hủy muộn.
+  final bool fullRefund;
+
+  /// Hạn cuối được hoàn 100% (khai giảng − 3 ngày).
   final DateTime? deadline;
   final String? blockReason;
+
+  /// Chỉ khi hủy muộn: thông tin yêu cầu hoàn ngoại lệ.
+  final LateRefundOption? lateRefund;
+}
+
+/// Yêu cầu hoàn ngoại lệ khi hủy muộn: hoàn = giá trị buổi chưa học × (100% − phí), Manager chốt phí khi duyệt.
+class LateRefundOption {
+  const LateRefundOption({
+    required this.available,
+    required this.grossAmount,
+    required this.feePercent,
+    required this.estimatedAmount,
+    required this.futureSessions,
+    required this.totalSessions,
+  });
+
+  final bool available;
+  final int grossAmount;
+  final int feePercent;
+  final int estimatedAmount;
+  final int futureSessions;
+  final int totalSessions;
+}
+
+/// Kết quả gửi hủy khóa.
+enum CancellationMode { refundRequested, lateRefundRequested, cancelledNoRefund }
+
+class CancellationResult {
+  const CancellationResult({required this.mode, this.refund, this.cancelledSessions = 0});
+
+  final CancellationMode mode;
+  final Refund? refund;
+  final int cancelledSessions;
 }

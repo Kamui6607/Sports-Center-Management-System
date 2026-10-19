@@ -33,7 +33,7 @@ router.use(authenticate);
  *     summary: "Get attendance roster of a schedule (MANAGER: full roster; COACH: only own classes; MEMBER: only own records)"
  *     description: |
  *       **Authorization:**
- *       - MANAGER / STAFF: xem toàn bộ roster (STAFF read-only, mutations vẫn chỉ COACH/MANAGER).
+ *       - MANAGER: xem toàn bộ roster (mutations chỉ COACH/MANAGER).
  *       - COACH: chỉ lớp mình phụ trách (403 nếu không).
  *       - MEMBER: chỉ nhận bản ghi điểm danh của CHÍNH MÌNH (không lộ roster của người khác).
  *     tags: [Attendance]
@@ -67,7 +67,7 @@ router.get(
  *     description: |
  *       **Authorization:** COACH (chỉ lớp mình phụ trách) và MANAGER ghi được `PRESENT`/`ABSENT`/`LATE`.
  *       `EXCUSED` (vắng có phép): MANAGER hoặc COACH phụ trách buổi học (L5) — không tính vào chuyên cần/phạt.
- *       MEMBER/STAFF không có quyền ghi attendance.
+ *       MEMBER không có quyền ghi attendance.
  *     tags: [Attendance]
  *     security:
  *       - BearerAuth: []

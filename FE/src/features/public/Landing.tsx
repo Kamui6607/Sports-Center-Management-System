@@ -375,7 +375,6 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
               { icon: Users, name: "Hội viên" },
               { icon: Dumbbell, name: "Huấn luyện viên" },
               { icon: ShieldCheck, name: "Quản lý trung tâm" },
-              { icon: HeartPulse, name: "Lễ tân" },
             ].map(({ icon: Icon, name }) => (
               <div key={name}>
                 <Icon size={21} />

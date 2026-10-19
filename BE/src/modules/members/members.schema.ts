@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FITNESS_GOAL_CODES, MAX_MEMBER_GOALS } from "../../config/fitness-goals.js";
 
 export const UpdateMemberSchema = z.object({
   fullName: z.string().min(2).optional(),
@@ -6,6 +7,7 @@ export const UpdateMemberSchema = z.object({
   gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
   dateOfBirth: z.string().optional(),
   fitnessGoal: z.string().optional(),
+  fitnessGoals: z.array(z.enum(FITNESS_GOAL_CODES)).max(MAX_MEMBER_GOALS).optional(),
   trainingLevel: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]).optional(),
   trainingPreference: z.string().optional(),
 });

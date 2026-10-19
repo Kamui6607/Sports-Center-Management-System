@@ -191,6 +191,7 @@ export async function getClassStudents(classId: string, actor: { id: string; rol
             id: true,
             userId: true,
             fitnessGoal: true,
+            fitnessGoals: true,
             trainingLevel: true,
             trainingPreference: true,
             user: { select: { id: true, fullName: true, email: true, phone: true, avatarUrl: true } },

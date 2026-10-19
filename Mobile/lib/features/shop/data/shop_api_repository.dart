@@ -206,4 +206,12 @@ class ShopApiRepository implements ShopRepository {
     '/shop/manage/reviews/$reviewId',
     body: {'isHidden': hidden, if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim()},
   );
+
+  @override
+  Future<List<LocationItem>> provinces() async =>
+      (await _api.get('/locations/provinces')).list.map(ShopJson.location).toList();
+
+  @override
+  Future<List<LocationItem>> wards(int provinceCode) async =>
+      (await _api.get('/locations/provinces/$provinceCode/wards')).list.map(ShopJson.location).toList();
 }

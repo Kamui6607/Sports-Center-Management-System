@@ -27,7 +27,7 @@ final mySessionProvider = FutureProvider.autoDispose.family<MySession, String>((
   return ref.watch(scheduleRepositoryProvider).mySession(id);
 });
 
-final transferOptionsProvider = FutureProvider.autoDispose.family<List<TransferOption>, String>(
+final transferOptionsProvider = FutureProvider.autoDispose.family<TransferOptions, String>(
   (ref, enrollmentId) => ref.watch(scheduleRepositoryProvider).transferOptions(enrollmentId),
 );
 

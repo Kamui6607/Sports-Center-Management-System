@@ -51,14 +51,22 @@ abstract final class ShopJson {
     street: j.str('street'),
     isDefault: j.boolean('isDefault'),
     deliverable: j.boolean('deliverable', true),
+    provinceCode: j.intOrNull('provinceCode'),
+    wardCode: j.intOrNull('wardCode'),
   );
+
+  static LocationItem location(Json j) =>
+      LocationItem(code: j.integer('code'), name: j.str('name'), deliverable: j.boolean('deliverable', true));
 
   static Map<String, Object?> addressBody(AddressInput a) => {
     'recipientName': a.recipientName.trim(),
     'phone': a.phone.trim(),
     'province': a.province.trim(),
-    'district': a.district.trim(),
+    // Địa giới 2 cấp (từ 01/07/2025) không còn Quận/Huyện ⇒ chỉ gửi khi có.
+    'district': a.district.trim().isEmpty ? null : a.district.trim(),
     if (a.ward != null && a.ward!.trim().isNotEmpty) 'ward': a.ward!.trim(),
+    'provinceCode': a.provinceCode,
+    'wardCode': a.wardCode,
     'street': a.street.trim(),
     if (a.isDefault) 'isDefault': true,
   };

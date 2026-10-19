@@ -27,6 +27,7 @@ extension MockEntityMappers on MockDatabase {
           : MemberProfile(
               id: m.id,
               fitnessGoal: m.fitnessGoal,
+              fitnessGoals: m.fitnessGoals,
               trainingLevel: m.trainingLevel,
               trainingPreference: m.trainingPreference,
             ),

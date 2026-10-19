@@ -12,6 +12,7 @@ import '../../features/auth/presentation/screens/password_reset_screens.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
+import '../../features/catalog/presentation/center_info_screen.dart';
 import '../../features/chat/presentation/chat_room_screen.dart';
 import '../../features/chat/presentation/conversations_screen.dart';
 import '../../features/classes/presentation/screens/browse_classes_screen.dart';
@@ -47,6 +48,7 @@ import '../../features/schedule/presentation/screens/coach_schedule_screen.dart'
 import '../../features/schedule/presentation/screens/manual_attendance_screen.dart';
 import '../../features/schedule/presentation/screens/member_schedule_screen.dart';
 import '../../features/schedule/presentation/screens/my_session_screen.dart';
+import '../../features/schedule/presentation/screens/reschedule_session_screen.dart';
 import '../../features/schedule/presentation/screens/teaching_session_screen.dart';
 import '../../features/shop/presentation/screens/address_screens.dart';
 import '../../features/shop/presentation/screens/cart_screen.dart';
@@ -112,6 +114,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       page(AppRoutes.chat, (_) => const ConversationsScreen()),
       page('/chat/:peerId', (s) => ChatRoomScreen(peerId: s.pathParameters['peerId']!)),
       page(AppRoutes.profileEdit, (_) => const EditProfileScreen()),
+      page(AppRoutes.centerInfo, (_) => const CenterInfoScreen()),
       page(AppRoutes.changePassword, (_) => const ChangePasswordScreen()),
       page(AppRoutes.orders, (_) => const OrdersScreen()),
       page('/orders/:id', (s) => OrderDetailScreen(orderId: s.pathParameters['id']!)),
@@ -146,6 +149,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       page(AppRoutes.myCourses, (_) => const MyCoursesScreen()),
+      // Khai báo TRƯỚC '/member/courses/:id' để không bị hiểu "history" là mã khóa.
+      page(AppRoutes.courseHistory, (_) => const MyCoursesScreen(initialTab: CourseHistoryTab.completed)),
       page('/member/courses/:id', (s) => MyCourseDetailScreen(classId: s.pathParameters['id']!)),
       page('/member/courses/:id/cancel', (s) => CancelCourseScreen(classId: s.pathParameters['id']!)),
       page(AppRoutes.refunds, (_) => const RefundsScreen()),
@@ -172,7 +177,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       page('/coach/sessions/:id/qr', (s) => SessionQrScreen(sessionId: s.pathParameters['id']!)),
       page('/coach/sessions/:id/attendance', (s) => ManualAttendanceScreen(sessionId: s.pathParameters['id']!)),
       page('/coach/sessions/:id/cancel', (s) => CancelSessionScreen(sessionId: s.pathParameters['id']!)),
-      page(AppRoutes.createClass, (_) => const ClassWizardScreen()),
+      page('/coach/sessions/:id/reschedule', (s) => RescheduleSessionScreen(sessionId: s.pathParameters['id']!)),
+      page(AppRoutes.createClass, (s) => ClassWizardScreen(draftId: s.uri.queryParameters['draft'])),
       page('/coach/classes/:id', (s) => CoachClassDetailScreen(classId: s.pathParameters['id']!)),
       page('/coach/classes/:id/edit', (s) => ClassWizardScreen(classId: s.pathParameters['id'])),
       page('/coach/students/:id', (s) => StudentScreen(memberProfileId: s.pathParameters['id']!)),

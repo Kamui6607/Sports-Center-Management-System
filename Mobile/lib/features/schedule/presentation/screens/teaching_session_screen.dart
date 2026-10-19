@@ -8,6 +8,7 @@ import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../catalog/presentation/location_card.dart';
 import '../../data/schedule_repository_provider.dart';
 import '../../domain/entities/session.dart';
 import '../providers/schedule_providers.dart';
@@ -60,6 +61,7 @@ class _Body extends StatelessWidget {
                 children: [
                   sessionStatus(s, now).tag(),
                   if (s.isMakeup) const StatusLabel('Buổi dạy bù', StatusTone.brand).tag(),
+                  if (s.isRescheduled) const StatusLabel('Đã dời lịch', StatusTone.warning).tag(),
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -67,8 +69,14 @@ class _Body extends StatelessWidget {
               const SizedBox(height: AppSpacing.xs),
               InfoRow(icon: AppIcons.calendar, text: VnTime.friendlyDay(s.startTime, now)),
               InfoRow(icon: AppIcons.time, text: VnTime.timeRange(s.startTime, s.endTime)),
-              InfoRow(icon: AppIcons.location, text: [s.room.name, s.room.location].whereType<String>().join(' · ')),
               InfoRow(icon: AppIcons.users, text: '${s.bookedCount}/${s.capacity} học viên giữ chỗ'),
+              if (s.isRescheduled && s.originalStartTime != null)
+                InfoRow(
+                  icon: AppIcons.reschedule,
+                  text:
+                      'Dời từ ${VnTime.date(s.originalStartTime!)} ${VnTime.time(s.originalStartTime!)}'
+                      '${s.rescheduleReason == null ? '' : ' · ${s.rescheduleReason}'}',
+                ),
               if (s.status == ScheduleStatus.cancelled) ...[
                 const SizedBox(height: AppSpacing.sm),
                 AlertBanner.error(
@@ -87,6 +95,9 @@ class _Body extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: AppSpacing.md),
+        const SectionHeader(title: 'Địa điểm dạy'),
+        LocationCard(room: s.room),
         const SizedBox(height: AppSpacing.lg),
         SectionHeader(title: 'Học viên (${detail.roster.length}) · Có mặt ${detail.checkedIn}'),
         if (detail.roster.isEmpty)
@@ -200,7 +211,16 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                     onPressed: _complete,
                   ),
                 )
-              else if (!started)
+              else if (!started) ...[
+                Expanded(
+                  child: AppButton.outline(
+                    label: 'Dời lịch',
+                    icon: AppIcons.reschedule,
+                    size: AppButtonSize.small,
+                    onPressed: () => context.push(AppRoutes.sessionReschedule(s.id)),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: AppButton.danger(
                     label: 'Hủy buổi',
@@ -209,6 +229,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                     onPressed: () => context.push(AppRoutes.sessionCancel(s.id)),
                   ),
                 ),
+              ],
             ],
           ),
           if (!s.hasEnded(now) && started)

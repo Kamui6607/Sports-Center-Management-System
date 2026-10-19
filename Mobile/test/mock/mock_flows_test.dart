@@ -74,11 +74,11 @@ void main() {
   });
 
   group('Hủy khóa & hoàn tiền (L7)', () {
-    test('còn ≥ 24h ⇒ tạo yêu cầu PENDING, ví HLV bị tạm giữ', () async {
+    test('còn ≥ 3 ngày ⇒ tạo yêu cầu PENDING, ví HLV bị tạm giữ', () async {
       await login('member2@demo.vn');
       final refunds = RefundMockRepository(server);
       final holdBefore = server.db.refundHold(server.db.walletOf('cp-1').id);
-      final r = await refunds.requestCancellation('c2', note: 'Bận');
+      final r = (await refunds.requestCancellation('c2', note: 'Bận')).refund!;
       expect(r.status, RefundStatus.pending);
       expect(r.amount, 2400000);
       expect(server.db.refundHold(server.db.walletOf('cp-1').id) - holdBefore, (2400000 * 0.85).round());
@@ -118,7 +118,7 @@ void main() {
         DateTime.now().add(const Duration(days: 60)),
       )).firstWhere((s) => s.session.classId == 'c1' && s.canTransfer);
       final options = await schedule.transferOptions(future.enrollmentId);
-      final target = options.firstWhere((o) => o.blockReason == null);
+      final target = options.options.firstWhere((o) => o.blockReason == null);
       await schedule.transferEnrollment(future.enrollmentId, target.session.id);
       final moved = server.db.enrollments.firstWhere((e) => e.id == future.enrollmentId);
       expect(moved.sessionId, target.session.id);

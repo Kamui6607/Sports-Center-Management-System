@@ -56,7 +56,7 @@ export const createAttendance = async (data: Prisma.AttendanceUncheckedCreateInp
 
 /**
  * §16: roster attendance.
- * - MANAGER / STAFF: xem toàn bộ roster (STAFF read-only — khớp UI tiếp nhận hiện có, mutations vẫn COACH/MANAGER).
+ * - MANAGER: xem toàn bộ roster (mutations: COACH/MANAGER).
  * - COACH: chỉ lớp mình phụ trách (403 nếu không).
  * - MEMBER: chỉ trả về bản ghi điểm danh của CHÍNH MÌNH (tương thích FE member hiện tại + không lộ roster).
  */
@@ -82,7 +82,7 @@ export const getAttendancesBySchedule = async (
       where: { scheduleId, memberId: memberProfile.id },
       include: { member: { include: { user: { select: { id: true, fullName: true } } } } },
     });
-  } else if (actor.role !== "MANAGER" && actor.role !== "STAFF") {
+  } else if (actor.role !== "MANAGER") {
     throw new AppError("Forbidden: bạn không có quyền xem điểm danh của buổi này", 403);
   }
 

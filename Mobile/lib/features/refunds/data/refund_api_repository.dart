@@ -36,9 +36,7 @@ class RefundApiRepository implements RefundRepository {
       processedNote: r.strOrNull('managerNote') ?? (status == RefundStatus.completed ? legacy : null),
       rejectReason: r.strOrNull('rejectReason'),
       paidAmount: r.objOrNull('payment')?.money('amount'),
-      bankInfo: bi == null ||
-              bi.str('bankName').isEmpty ||
-              bi.str('bankAccountNumber').isEmpty
+      bankInfo: bi == null || bi.str('bankName').isEmpty || bi.str('bankAccountNumber').isEmpty
           ? null
           : RefundBankInfo(
               bankName: bi.str('bankName'),
@@ -46,6 +44,8 @@ class RefundApiRepository implements RefundRepository {
               accountName: bi.str('bankAccountName'),
               vietQrUrl: bi.strOrNull('vietQrUrl'),
             ),
+      grossAmount: r['grossAmount'] == null ? null : r.money('grossAmount'),
+      feePercent: r.intOrNull('feePercent'),
     );
   }
 
@@ -53,22 +53,35 @@ class RefundApiRepository implements RefundRepository {
   Future<CancellationEligibility> eligibility(String classId) async {
     // BE-16: điều kiện hủy khóa do BE tính (hạn khai giảng − 24h, tiền còn hoàn, đã gửi chưa).
     final p = (await _api.get('/refunds/course-cancellation/preview', query: {'classId': classId})).json;
+    final late = p.objOrNull('lateRefund');
     return CancellationEligibility(
       allowed: p.boolean('allowed'),
       paidAmount: p.money('paidAmount'),
-      estimatedRefund: p.money('refundableAmount'),
-      deadline: p.dateOrNull('deadline'),
+      estimatedRefund: p.money('estimatedRefundAmount'),
+      fullRefund: p.integer('refundPercent') == 100,
+      deadline: p.dateOrNull('fullRefundDeadline') ?? p.dateOrNull('deadline'),
       blockReason: p.strOrNull('blockMessage'),
+      lateRefund: late == null
+          ? null
+          : LateRefundOption(
+              available: late.boolean('available'),
+              grossAmount: late.money('grossAmount'),
+              feePercent: late.integer('feePercent'),
+              estimatedAmount: late.money('estimatedAmount'),
+              futureSessions: late.integer('futureMainSessions'),
+              totalSessions: late.integer('totalMainSessions'),
+            ),
     );
   }
 
   @override
-  Future<Refund> requestCancellation(
+  Future<CancellationResult> requestCancellation(
     String classId, {
     String? note,
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    bool lateRefund = false,
   }) async {
     final res = await _api.post(
       '/refunds/course-cancellation',
@@ -78,9 +91,20 @@ class RefundApiRepository implements RefundRepository {
         if (bankName?.trim().isNotEmpty ?? false) 'bankName': bankName!.trim(),
         if (bankAccountNumber?.trim().isNotEmpty ?? false) 'bankAccountNumber': bankAccountNumber!.trim(),
         if (bankAccountName?.trim().isNotEmpty ?? false) 'bankAccountName': bankAccountName!.trim(),
+        if (lateRefund) 'lateRefund': true,
       },
     );
-    return _refund(res.json);
+    final d = res.json;
+    final refund = d.objOrNull('refund');
+    return CancellationResult(
+      mode: switch (d.strOrNull('mode')) {
+        'REFUND_REQUESTED' => CancellationMode.refundRequested,
+        'LATE_REFUND_REQUESTED' => CancellationMode.lateRefundRequested,
+        _ => CancellationMode.cancelledNoRefund,
+      },
+      refund: refund == null ? null : _refund(refund),
+      cancelledSessions: d.integer('cancelledEnrollments'),
+    );
   }
 
   @override

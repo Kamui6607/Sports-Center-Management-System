@@ -304,6 +304,24 @@ router.get("/:id", authenticate, coachController.getCoachById);
 
 /**
  * @swagger
+ * /coaches/{id}/profile:
+ *   get:
+ *     summary: Hồ sơ CÔNG KHAI của HLV (bảng thông tin ở chi tiết khóa học) — công khai
+ *     description: |
+ *       `id` = CoachProfile.id hoặc userId. Trả thông tin chuyên môn, thống kê (khóa đang mở, học viên, buổi đã dạy),
+ *       điểm đánh giá + phân bố sao, các khóa đang mở bán và 5 đánh giá gần nhất. Không có email/SĐT/CV.
+ *     tags: [Coaches]
+ *     security: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: OK }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.get("/:id/profile", coachController.getCoachPublicProfile);
+
+/**
+ * @swagger
  * /coaches/{id}/upcoming-sessions:
  *   get:
  *     summary: Upcoming sessions of a coach (for the coach info panel in course detail)

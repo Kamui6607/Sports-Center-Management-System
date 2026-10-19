@@ -79,7 +79,6 @@ export const labels: Record<string, string> = {
   newPassword: "Mật khẩu mới",
   MEMBER: "Hội viên",
   COACH: "Huấn luyện viên",
-  STAFF: "Lễ tân",
   MANAGER: "Quản lý",
   MEMBERSHIP: "Tiêu chuẩn",
   PREMIUM: "Cao cấp",

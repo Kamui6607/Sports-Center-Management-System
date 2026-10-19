@@ -181,8 +181,11 @@ class _Content extends ConsumerWidget {
                 const Shimmer(child: SkeletonBox(height: AppSpacing.xl))
               else if (eligibility.allowed) ...[
                 Text(
-                  'Bạn có thể hủy khóa đến ${VnTime.dateTime(eligibility.deadline!)} '
-                  '(còn ${VnTime.durationLabel(eligibility.deadline!.difference(now))}).',
+                  eligibility.fullRefund && eligibility.deadline != null
+                      ? 'Hủy được hoàn 100% đến ${VnTime.dateTime(eligibility.deadline!)} '
+                            '(còn ${VnTime.durationLabel(eligibility.deadline!.difference(now))}).'
+                      : 'Đã qua hạn hoàn 100% (3 ngày trước khai giảng). Bạn vẫn có thể hủy không hoàn tiền '
+                            'hoặc gửi yêu cầu hoàn ngoại lệ (trừ phí chiết khấu, Quản lý xem xét).',
                   style: context.text.small,
                 ),
                 const SizedBox(height: AppSpacing.sm),

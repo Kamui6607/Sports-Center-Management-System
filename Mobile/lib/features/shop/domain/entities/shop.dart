@@ -124,6 +124,17 @@ class Cart {
   static const empty = Cart();
 }
 
+/// Một địa danh (Tỉnh/Thành hoặc Phường/Xã) — `GET /locations/...` (địa giới 2 cấp từ 01/07/2025).
+class LocationItem {
+  const LocationItem({required this.code, required this.name, this.deliverable = true});
+
+  final int code;
+  final String name;
+
+  /// Tỉnh/Thành nằm trong khu vực giao hàng của cửa hàng.
+  final bool deliverable;
+}
+
 class ShopAddress {
   const ShopAddress({
     required this.id,
@@ -135,7 +146,13 @@ class ShopAddress {
     this.ward,
     this.isDefault = false,
     this.deliverable = true,
+    this.provinceCode,
+    this.wardCode,
   });
+
+  /// Mã địa danh để mở lại đúng mục trong dropdown (địa chỉ cũ có thể null).
+  final int? provinceCode;
+  final int? wardCode;
 
   final String id;
   final String recipientName;
@@ -162,7 +179,12 @@ class AddressInput {
     required this.street,
     this.ward,
     this.isDefault = false,
+    this.provinceCode,
+    this.wardCode,
   });
+
+  final int? provinceCode;
+  final int? wardCode;
 
   final String recipientName;
   final String phone;

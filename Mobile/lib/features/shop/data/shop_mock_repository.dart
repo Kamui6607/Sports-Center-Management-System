@@ -191,7 +191,6 @@ class ShopMockRepository implements ShopRepository {
       if (i.recipientName.trim().length < 2) 'recipientName': 'Nhập tên người nhận',
       if (!RegExp(r'^(\+?84|0)\d{9,10}$').hasMatch(i.phone.trim())) 'phone': 'Số điện thoại không hợp lệ',
       if (i.province.trim().length < 2) 'province': 'Nhập tỉnh/thành phố',
-      if (i.district.trim().length < 2) 'district': 'Nhập quận/huyện',
       if (i.street.trim().length < 3) 'street': 'Nhập số nhà, tên đường',
     };
     if (errors.isNotEmpty) {
@@ -1025,4 +1024,28 @@ class ShopMockRepository implements ShopRepository {
     if (r == null) throw const AppFailure.notFound('Không tìm thấy đánh giá.');
     r.isHidden = hidden;
   });
+
+  // Danh mục địa danh rút gọn cho chế độ mock (BE thật lấy từ provinces.open-api.vn bản v2).
+  static const _mockProvinces = [
+    LocationItem(code: 79, name: 'Thành phố Hồ Chí Minh'),
+    LocationItem(code: 1, name: 'Thành phố Hà Nội', deliverable: false),
+    LocationItem(code: 48, name: 'Thành phố Đà Nẵng', deliverable: false),
+  ];
+  static const _mockWards = {
+    79: [
+      LocationItem(code: 26734, name: 'Phường Sài Gòn'),
+      LocationItem(code: 26740, name: 'Phường Bến Thành'),
+      LocationItem(code: 26743, name: 'Phường Tân Định'),
+      LocationItem(code: 27094, name: 'Phường Tăng Nhơn Phú'),
+      LocationItem(code: 26848, name: 'Phường Thủ Đức'),
+    ],
+    1: [LocationItem(code: 4, name: 'Phường Ba Đình'), LocationItem(code: 70, name: 'Phường Hoàn Kiếm')],
+    48: [LocationItem(code: 20194, name: 'Phường Hải Châu'), LocationItem(code: 20200, name: 'Phường Thanh Khê')],
+  };
+
+  @override
+  Future<List<LocationItem>> provinces() => _server.run(() => _mockProvinces);
+
+  @override
+  Future<List<LocationItem>> wards(int provinceCode) => _server.run(() => _mockWards[provinceCode] ?? const []);
 }

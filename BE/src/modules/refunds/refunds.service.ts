@@ -15,6 +15,27 @@ export const COURSE_FULL_REFUND_MIN_HOURS = 72;
 /** Hủy MỘT buổi lẻ trước giờ học ≥ ngần này giờ ⇒ hoàn `SESSION_REFUND_PERCENT`% tiền của buổi đó. */
 export const SESSION_REFUND_MIN_HOURS = 24;
 export const SESSION_REFUND_PERCENT = 80;
+/** Phí chiết khấu mặc định (%) của yêu cầu hoàn NGOẠI LỆ khi hủy khóa < 3 ngày (Manager chỉnh khi duyệt). */
+export function lateCancelFeePercent(): number {
+  const n = Math.round(Number(process.env.LATE_CANCEL_FEE_PERCENT ?? 30));
+  return Number.isFinite(n) ? Math.min(99, Math.max(0, n)) : 30;
+}
+
+/**
+ * Giá trị gốc của hoàn ngoại lệ = tiền đã trả × (số buổi CHÍNH chưa diễn ra / tổng buổi CHÍNH), tối đa phần còn hoàn.
+ * Buổi đã học không được hoàn.
+ */
+async function lateRefundGross(db: DbClient, payment: { id: string; amount: Prisma.Decimal }, classId: string, now: Date) {
+  const [totalMain, futureMain] = await Promise.all([
+    db.classSchedule.count({ where: { classId, makeupForId: null } }),
+    db.classSchedule.count({ where: { classId, makeupForId: null, status: "SCHEDULED", startTime: { gt: now } } }),
+  ]);
+  const proportional = totalMain > 0 ? Math.floor((money(payment.amount) * futureMain) / totalMain) : 0;
+  const gross = Math.max(0, Math.min(proportional, await remainingRefundable(db, payment)));
+  return { gross, totalMain, futureMain };
+}
+
+const afterFee = (gross: number, feePercent: number) => Math.round((gross * (100 - feePercent)) / 100);
 
 /** Tỷ lệ hoàn khi hủy khóa: 100 nếu còn ≥ 72h trước buổi khai giảng (hoặc khóa chưa có lịch), ngược lại 0. */
 export function courseRefundPercent(firstSessionStart: Date | null, now = new Date()): 100 | 0 {
@@ -185,7 +206,13 @@ export async function notifyManagersNewRefunds(body: string, metadata: Record<st
  * - Muộn hơn (hoặc khóa đã khai giảng) ⇒ vẫn hủy được NGAY nhưng KHÔNG hoàn tiền: các chỗ đặt trong tương lai của
  *   hội viên trong khóa chuyển CANCELLED, giao dịch giữ SUCCESS, ví HLV không bị trừ.
  */
-export async function requestCourseRefund(userId: string, classId: string, note?: string, bankInfo?: PayoutBankDetails) {
+export async function requestCourseRefund(
+  userId: string,
+  classId: string,
+  note?: string,
+  bankInfo?: PayoutBankDetails,
+  opts: { lateRefund?: boolean } = {}
+) {
   const memberProfile = await prisma.memberProfile.findUnique({
     where: { userId },
     select: { id: true, user: { select: { fullName: true } } },
@@ -218,7 +245,11 @@ export async function requestCourseRefund(userId: string, classId: string, note?
     }
 
     const existing = await tx.refund.findFirst({
-      where: { paymentId: payment.id, reason: "MEMBER_CANCEL_COURSE", status: { notIn: ["REJECTED", "CANCELLED"] } },
+      where: {
+        paymentId: payment.id,
+        reason: { in: ["MEMBER_CANCEL_COURSE", "MEMBER_CANCEL_COURSE_LATE"] },
+        status: { notIn: ["REJECTED", "CANCELLED"] },
+      },
       select: { id: true, status: true },
     });
     if (existing) {
@@ -258,7 +289,39 @@ export async function requestCourseRefund(userId: string, classId: string, note?
       return { refund, cancelledEnrollments: 0 };
     }
 
-    // < 72h: hủy ngay, không hoàn tiền. Thứ tự lock: payment → member-class (khớp luồng webhook ghi danh).
+    // < 72h: hủy ngay mọi buổi sắp tới. Thứ tự lock: payment → member-class (khớp luồng webhook ghi danh).
+    // `lateRefund` ⇒ kèm yêu cầu hoàn NGOẠI LỆ (giá trị buổi chưa học − phí chiết khấu, Manager quyết định).
+    let lateRefund: Awaited<ReturnType<typeof tx.refund.create>> | null = null;
+    if (opts.lateRefund) {
+      const { gross } = await lateRefundGross(tx, payment, classId, now);
+      if (gross <= 0) {
+        throw new AppError("Khóa học không còn buổi nào chưa diễn ra để xin hoàn tiền.", 400, { code: "NOTHING_TO_REFUND" });
+      }
+      const feePercent = lateCancelFeePercent();
+      const amount = afterFee(gross, feePercent);
+      const debit = await computeCoachDebit(tx, payment, amount);
+      const memberNote = note?.trim() || null;
+      lateRefund = await tx.refund.create({
+        data: {
+          paymentId: payment.id,
+          memberId: memberProfile.id,
+          classId,
+          reason: "MEMBER_CANCEL_COURSE_LATE",
+          grossAmount: gross,
+          feePercent,
+          amount,
+          coachWalletId: debit.coachWalletId,
+          coachDebitAmount: debit.coachDebitAmount,
+          note: memberNote,
+          memberNote,
+          bankName: bankInfo?.bankName?.trim() || null,
+          bankAccountNumber: bankInfo?.bankAccountNumber?.trim() || null,
+          bankAccountName: bankInfo?.bankAccountName?.trim().toUpperCase() || null,
+          requestedById: userId,
+        },
+        include: refundInclude,
+      });
+    }
     await lockMemberClass(tx, memberProfile.id, classId);
     const cancelled = await tx.enrollment.updateMany({
       where: {
@@ -273,10 +336,25 @@ export async function requestCourseRefund(userId: string, classId: string, note?
         code: "NO_ACTIVE_BOOKINGS",
       });
     }
-    return { refund: null, cancelledEnrollments: cancelled.count };
+    return { refund: lateRefund, cancelledEnrollments: cancelled.count };
   });
 
-  if (outcome.refund) {
+  if (outcome.refund && outcome.refund.reason === "MEMBER_CANCEL_COURSE_LATE") {
+    void notifyManagersNewRefunds(
+      `Hội viên ${memberProfile.user.fullName} hủy khóa "${cls.name}" sát ngày khai giảng và xin hoàn ngoại lệ — ` +
+        `giá trị buổi chưa học ${vnd(money(outcome.refund.grossAmount))}, đề xuất hoàn ${vnd(money(outcome.refund.amount))} ` +
+        `(phí ${outcome.refund.feePercent}%).`,
+      { refundId: outcome.refund.id, classId }
+    );
+    createNotification(
+      userId,
+      "ENROLLMENT_CANCELLED",
+      `Đã hủy khóa: ${cls.name}`,
+      `Bạn đã hủy ${outcome.cancelledEnrollments} buổi sắp tới của khóa "${cls.name}". Yêu cầu hoàn tiền ngoại lệ ` +
+        `(dự kiến ${vnd(money(outcome.refund.amount))} sau phí ${outcome.refund.feePercent}%) đang chờ Quản lý xem xét.`,
+      { metadata: { classId, refundId: outcome.refund.id } }
+    ).catch(() => {});
+  } else if (outcome.refund) {
     void notifyManagersNewRefunds(
       `Hội viên ${memberProfile.user.fullName} xin hủy khóa "${cls.name}" — cần hoàn ${vnd(money(outcome.refund.amount))}.`,
       { refundId: outcome.refund.id, classId }
@@ -291,7 +369,12 @@ export async function requestCourseRefund(userId: string, classId: string, note?
     ).catch(() => {});
   }
   return {
-    mode: percent === 100 ? ("REFUND_REQUESTED" as const) : ("CANCELLED_NO_REFUND" as const),
+    mode:
+      percent === 100
+        ? ("REFUND_REQUESTED" as const)
+        : outcome.refund
+          ? ("LATE_REFUND_REQUESTED" as const)
+          : ("CANCELLED_NO_REFUND" as const),
     refundPercent: percent,
     refundAmount: outcome.refund ? money(outcome.refund.amount) : 0,
     cancelledEnrollments: outcome.cancelledEnrollments,
@@ -309,11 +392,23 @@ export async function requestCourseRefund(userId: string, classId: string, note?
  */
 export async function createMemberSessionRefundTx(
   tx: Prisma.TransactionClient,
-  params: { memberId: string; userId: string; classId: string; scheduleId: string; startTime: Date; now?: Date }
+  params: {
+    memberId: string;
+    userId: string;
+    classId: string;
+    scheduleId: string;
+    startTime: Date;
+    now?: Date;
+    /** Buổi đã bị HLV dời lịch sau khi hội viên giữ chỗ ⇒ hoàn 100%, không áp hạn 24h. */
+    rescheduledByCoach?: boolean;
+  }
 ) {
   const now = params.now ?? new Date();
   const hoursLeft = (params.startTime.getTime() - now.getTime()) / 3_600_000;
-  if (hoursLeft < SESSION_REFUND_MIN_HOURS) return null;
+  const rescheduled = params.rescheduledByCoach === true;
+  if (!rescheduled && hoursLeft < SESSION_REFUND_MIN_HOURS) return null;
+  if (hoursLeft <= 0) return null;
+  const percent = rescheduled ? 100 : SESSION_REFUND_PERCENT;
 
   const found = await findPaidClassPayment(tx, params.memberId, params.classId);
   if (!found) return null;
@@ -329,7 +424,7 @@ export async function createMemberSessionRefundTx(
 
   const mainSessions = await tx.classSchedule.count({ where: { classId: params.classId, makeupForId: null } });
   const perSession = Number(payment.amount) / Math.max(1, mainSessions);
-  const amount = Math.min(money((perSession * SESSION_REFUND_PERCENT) / 100), await remainingRefundable(tx, payment));
+  const amount = Math.min(money((perSession * percent) / 100), await remainingRefundable(tx, payment));
   if (amount <= 0) return null;
   const debit = await computeCoachDebit(tx, payment, amount);
 
@@ -339,11 +434,13 @@ export async function createMemberSessionRefundTx(
       memberId: params.memberId,
       classId: params.classId,
       scheduleId: params.scheduleId,
-      reason: "MEMBER_CANCEL_SESSION",
+      reason: rescheduled ? "SESSION_RESCHEDULED" : "MEMBER_CANCEL_SESSION",
       amount,
       coachWalletId: debit.coachWalletId,
       coachDebitAmount: debit.coachDebitAmount,
-      note: `Hội viên hủy 1 buổi trước ${SESSION_REFUND_MIN_HOURS}h — hoàn ${SESSION_REFUND_PERCENT}% tiền buổi học.`,
+      note: rescheduled
+        ? "Hội viên hủy buổi đã bị HLV dời lịch — hoàn 100% tiền buổi học."
+        : `Hội viên hủy 1 buổi trước ${SESSION_REFUND_MIN_HOURS}h — hoàn ${SESSION_REFUND_PERCENT}% tiền buổi học.`,
       requestedById: params.userId,
     },
     include: refundInclude,
@@ -365,7 +462,7 @@ export async function findSessionsBlockedByRefund(
     where: {
       memberId,
       scheduleId: { in: scheduleIds },
-      reason: "MEMBER_CANCEL_SESSION",
+      reason: { in: ["MEMBER_CANCEL_SESSION", "SESSION_RESCHEDULED"] },
       status: { in: ["PENDING", "COMPLETED"] },
     },
     select: { scheduleId: true },
@@ -384,7 +481,13 @@ export function throwSessionRefundedError(scheduleIds: string[]): never {
 // ── Hội viên / người mua tự hủy yêu cầu hoàn tiền đang chờ ────────────────────
 
 /** Lý do hoàn tiền do CHÍNH người dùng gửi — chỉ những loại này mới được tự hủy. */
-const SELF_CANCELLABLE_REASONS = ["MEMBER_CANCEL_COURSE", "MEMBER_CANCEL_SESSION", "ORDER_CANCELLED"];
+const SELF_CANCELLABLE_REASONS = [
+  "MEMBER_CANCEL_COURSE",
+  "MEMBER_CANCEL_COURSE_LATE",
+  "MEMBER_CANCEL_SESSION",
+  "SESSION_RESCHEDULED",
+  "ORDER_CANCELLED",
+];
 
 /**
  * MEMBER/COACH hủy yêu cầu hoàn tiền của mình khi còn PENDING (Manager chưa xử lý): status → CANCELLED.
@@ -495,7 +598,13 @@ export async function createSessionRefundsTx(
  * - Hủy khóa học: Payment → REFUNDED, hủy mọi chỗ đang giữ của hội viên trong lớp.
  * - Hoàn buổi lẻ: Payment giữ SUCCESS (báo cáo trừ riêng khoản hoàn này).
  */
-export async function approveRefund(refundId: string, managerUserId: string, note?: string, transactionRef?: string) {
+export async function approveRefund(
+  refundId: string,
+  managerUserId: string,
+  note?: string,
+  transactionRef?: string,
+  feePercent?: number
+) {
   const approved = await prisma.$transaction(async (tx) => {
     const current = await tx.refund.findUnique({ where: { id: refundId }, select: { paymentId: true } });
     if (!current) throw new AppError("Refund not found", 404);
@@ -507,7 +616,7 @@ export async function approveRefund(refundId: string, managerUserId: string, not
         member: { select: { userId: true } },
         class: { select: { name: true } },
         order: { select: { userId: true, code: true } },
-        payment: { select: { amount: true, status: true } },
+        payment: { select: { id: true, amount: true, status: true, classId: true } },
       },
     });
     if (!refund) throw new AppError("Refund not found", 404);
@@ -516,6 +625,37 @@ export async function approveRefund(refundId: string, managerUserId: string, not
         code: "REFUND_ALREADY_PROCESSED",
         status: refund.status,
       });
+    }
+
+    // Hoàn ngoại lệ: Manager chốt % phí chiết khấu ⇒ tính lại số tiền hoàn + phần trừ ví HLV.
+    if (refund.reason === "MEMBER_CANCEL_COURSE_LATE") {
+      const fee = feePercent ?? refund.feePercent ?? lateCancelFeePercent();
+      const gross = money(refund.grossAmount ?? refund.amount);
+      const othersAgg = await tx.refund.aggregate({
+        where: { paymentId: refund.paymentId, id: { not: refund.id }, status: { notIn: ["REJECTED", "CANCELLED"] } },
+        _sum: { amount: true },
+      });
+      const cap = money(refund.payment.amount) - money(othersAgg._sum.amount ?? 0);
+      const newAmount = Math.min(afterFee(gross, fee), Math.max(0, cap));
+      if (newAmount <= 0) {
+        throw new AppError("Số tiền hoàn sau phí bằng 0 — hãy giảm phí hoặc từ chối yêu cầu.", 400, {
+          code: "REFUND_AMOUNT_ZERO",
+        });
+      }
+      const recomputed = await computeCoachDebit(tx, refund.payment, newAmount);
+      await tx.refund.update({
+        where: { id: refund.id },
+        data: {
+          feePercent: fee,
+          amount: newAmount,
+          coachWalletId: recomputed.coachWalletId,
+          coachDebitAmount: recomputed.coachDebitAmount,
+        },
+      });
+      refund.amount = new Prisma.Decimal(newAmount);
+      refund.coachDebitAmount = new Prisma.Decimal(recomputed.coachDebitAmount);
+      refund.coachWalletId = recomputed.coachWalletId;
+      refund.feePercent = fee;
     }
 
     const amount = money(refund.amount);
@@ -538,7 +678,9 @@ export async function approveRefund(refundId: string, managerUserId: string, not
           note:
             refund.reason === "MEMBER_CANCEL_COURSE"
               ? `Trừ ví do hội viên hủy khóa "${className}" (hoàn ${vnd(amount)}) — refund ${refund.id}`
-              : refund.reason === "MEMBER_CANCEL_SESSION"
+              : refund.reason === "MEMBER_CANCEL_COURSE_LATE"
+                ? `Trừ ví do hoàn ngoại lệ khóa "${className}" (hoàn ${vnd(amount)}, phí ${refund.feePercent}%) — refund ${refund.id}`
+                : refund.reason === "MEMBER_CANCEL_SESSION" || refund.reason === "SESSION_RESCHEDULED"
                 ? `Trừ ví do hội viên hủy 1 buổi lớp "${className}" (hoàn ${vnd(amount)}) — refund ${refund.id}`
                 : `Trừ ví do hủy 1 buổi lớp "${className}" không dạy bù (hoàn ${vnd(amount)}) — refund ${refund.id}`,
         },
@@ -588,7 +730,9 @@ export async function approveRefund(refundId: string, managerUserId: string, not
           ? `Đơn hàng ${refund.order.code} đã được hoàn ${vnd(amount)} cho bạn.`
           : refund.reason === "MEMBER_CANCEL_COURSE"
             ? `Yêu cầu hủy khóa "${className}" đã được duyệt. ${vnd(amount)} đã được hoàn cho bạn.`
-            : refund.reason === "MEMBER_CANCEL_SESSION"
+            : refund.reason === "MEMBER_CANCEL_COURSE_LATE"
+              ? `Yêu cầu hoàn tiền ngoại lệ khóa "${className}" đã được chấp nhận. ${vnd(amount)} (sau phí chiết khấu ${refund.feePercent}%) đã được hoàn cho bạn.`
+              : refund.reason === "MEMBER_CANCEL_SESSION" || refund.reason === "SESSION_RESCHEDULED"
               ? `Buổi học bạn đã hủy của lớp "${className}" đã được hoàn ${vnd(amount)} cho bạn.`
               : `Buổi học bị hủy của lớp "${className}" đã được hoàn ${vnd(amount)} cho bạn.`,
         metadata: { refundId: refund.id, paymentId: refund.paymentId, classId: refund.classId, orderId: refund.orderId },
@@ -729,7 +873,9 @@ export async function getRefundSummary() {
     cancelled: { count: 0, amount: 0 },
     byReason: {
       MEMBER_CANCEL_COURSE: { count: 0, amount: 0 },
+      MEMBER_CANCEL_COURSE_LATE: { count: 0, amount: 0 },
       MEMBER_CANCEL_SESSION: { count: 0, amount: 0 },
+      SESSION_RESCHEDULED: { count: 0, amount: 0 },
       SESSION_CANCELLED: { count: 0, amount: 0 },
       ORDER_CANCELLED: { count: 0, amount: 0 },
       ORDER_NOT_PICKED_UP: { count: 0, amount: 0 },
@@ -791,12 +937,15 @@ export async function previewCourseRefund(userId: string, classId: string, now =
     ? await prisma.refund.findFirst({
         where: {
           paymentId: payment.id,
-          reason: "MEMBER_CANCEL_COURSE",
+          reason: { in: ["MEMBER_CANCEL_COURSE", "MEMBER_CANCEL_COURSE_LATE"] },
           status: { notIn: ["REJECTED", "CANCELLED"] },
         },
         select: { id: true, status: true },
       })
     : null;
+  // Hủy muộn (< 3 ngày): ước tính hoàn NGOẠI LỆ nếu hội viên xin (Manager chốt phí khi duyệt).
+  const late = payment && refundPercent === 0 ? await lateRefundGross(prisma, payment, classId, now) : null;
+  const fee = lateCancelFeePercent();
 
   let blockReason: string | null = null;
   let blockMessage: string | null = null;
@@ -834,5 +983,17 @@ export async function previewCourseRefund(userId: string, classId: string, now =
     blockReason,
     blockMessage,
     existingRefundId: existing?.id ?? null,
+    /** Chỉ có khi hủy muộn: thông tin yêu cầu hoàn ngoại lệ (giá trị buổi chưa học − phí chiết khấu). */
+    lateRefund: late
+      ? {
+          available: late.gross > 0 && !existing,
+          grossAmount: late.gross,
+          feePercent: fee,
+          estimatedAmount: afterFee(late.gross, fee),
+          futureMainSessions: late.futureMain,
+          totalMainSessions: late.totalMain,
+          note: "Quản lý xem xét và có thể điều chỉnh phí chiết khấu khi duyệt. Khóa học bị hủy ngay khi gửi yêu cầu.",
+        }
+      : null,
   };
 }

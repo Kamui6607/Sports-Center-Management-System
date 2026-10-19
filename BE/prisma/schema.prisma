@@ -25,6 +25,8 @@ datasource db {
 // ─────────────────────────────────────────
 
 enum ClassApprovalStatus {
+  /// Coach đang soạn (wizard tự lưu) — chưa giữ phòng, chưa tạo buổi; chỉ chủ khóa thấy.
+  DRAFT
   PENDING
   APPROVED
   REJECTED
@@ -211,7 +213,10 @@ model MemberProfile {
   id                 String         @id @default(uuid())
   userId             String         @unique
   user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Ghi chú mục tiêu tự do (ngoài danh mục gợi ý).
   fitnessGoal        String?
+  /// Mã mục tiêu chọn từ danh mục gợi ý (`src/config/fitness-goals.ts`) — dùng tính độ phù hợp khóa học.
+  fitnessGoals       String[]       @default([])
   trainingLevel      TrainingLevel?
   trainingPreference String?
   createdAt          DateTime       @default(now())
@@ -292,7 +297,12 @@ model Room {
   id        String   @id @default(uuid())
   name      String   @unique
   capacity  Int
+  /// Khu vực trong trung tâm (VD "Khu tạ tự do").
   location  String?
+  /// Tầng (VD "Tầng 2").
+  floor     String?
+  /// Chỉ dẫn đường đi tới phòng (VD "Thang máy lên tầng 2, rẽ trái").
+  directions String?
   areaType  AreaType
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -312,6 +322,15 @@ model Class {
   /// Mục tiêu của lớp (HLV ghi) để Member xem và tự đánh giá có phù hợp trước khi đăng ký.
   /// Khác MemberProfile.fitnessGoal (mục tiêu của Member, để HLV đọc).
   goal        String?
+  /// Mã mục tiêu khóa (danh mục `src/config/fitness-goals.ts`) — so với `MemberProfile.fitnessGoals`.
+  goalTags    String[]            @default([])
+  /// Trình độ phù hợp (null = mọi trình độ).
+  targetLevel TrainingLevel?
+  /// Ngày khai giảng / kết thúc (buổi chưa hủy sớm nhất / muộn nhất) — BE tự cập nhật khi lịch thay đổi.
+  startDate   DateTime?
+  endDate     DateTime?
+  /// Trạng thái wizard của bản nháp (DRAFT) — phòng, lịch lặp, danh sách buổi dự kiến…
+  draftData   Json?
   /// Môn tập của lớp (Yoga, HIIT, Bơi...). Chuỗi tự do do Coach nhập — KHÔNG còn bảng bộ môn / quan hệ nhiều-nhiều.
   fitness     String
 
@@ -358,6 +377,11 @@ model ClassSchedule {
   makeupForId String?        @unique
   makeupFor   ClassSchedule? @relation("ScheduleMakeup", fields: [makeupForId], references: [id], onDelete: SetNull)
   makeup      ClassSchedule? @relation("ScheduleMakeup")
+  /// Dời lịch bởi HLV: giờ bắt đầu ban đầu, số lần dời (tối đa 2), lý do, thời điểm dời gần nhất.
+  originalStartTime DateTime?
+  rescheduleCount   Int       @default(0)
+  rescheduleReason  String?
+  rescheduledAt     DateTime?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @default(now()) @updatedAt
 
@@ -385,6 +409,10 @@ model Enrollment {
   status      EnrollmentStatus @default(BOOKED)
   bookedAt    DateTime         @default(now())
   cancelledAt DateTime?
+  /// Đổi buổi sang khóa tương đương: khóa hội viên ĐÃ TRẢ TIỀN (null = chính khóa của buổi).
+  sourceClassId     String?
+  /// Chỗ cũ mà chỗ này được đổi từ đó (null = không phải đổi buổi).
+  transferredFromId String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @default(now()) @updatedAt
 
@@ -409,6 +437,9 @@ model Payment {
   classId           String?
   class             Class?                   @relation(fields: [classId], references: [id])
   classNameSnapshot String?
+  /// Ảnh chụp thông tin mặt hàng TẠI THỜI ĐIỂM MUA (khóa: tên/giá/HLV/số buổi/ngày…; gói thành viên: tên/số ngày/giá).
+  /// Lịch sử mua, hóa đơn và thống kê đọc snapshot + `amount` ⇒ không đổi khi giá/thông tin bị sửa sau.
+  purchaseSnapshot  Json?
   /// Đơn mua sản phẩm mà giao dịch này thanh toán. Một giao dịch chỉ trỏ tới classId HOẶC orderId.
   orderId           String?                  @unique
   order             Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
@@ -743,6 +774,8 @@ model CoachFeedback {
   rating      Int // 1-5 sao
   comment     String?
   isAnonymous Boolean       @default(false)
+  /// Số lần đã sửa đánh giá — chỉ được sửa 1 lần.
+  editCount   Int           @default(0)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @default(now()) @updatedAt
 
@@ -868,7 +901,9 @@ model WalletTransaction {
 
 enum RefundReason {
   MEMBER_CANCEL_COURSE // Hội viên hủy khóa trước khai giảng ≥ 3 ngày — hoàn 100% phần còn lại của giao dịch (hủy muộn hơn: không hoàn, không tạo Refund)
+  MEMBER_CANCEL_COURSE_LATE // Hội viên hủy khóa < 3 ngày trước khai giảng và xin hoàn ngoại lệ — Manager duyệt kèm phí chiết khấu
   MEMBER_CANCEL_SESSION // Hội viên hủy MỘT buổi lẻ trước giờ học ≥ 24h — hoàn 80% tiền của buổi đó
+  SESSION_RESCHEDULED // HLV dời buổi, hội viên không đi được và hủy buổi đó — hoàn 100% tiền buổi
   SESSION_CANCELLED // Buổi học bị hủy và chọn hoàn tiền (không dạy bù) — hoàn tiền 1 buổi
   ORDER_CANCELLED // Đơn hàng đã thanh toán bị hủy (khách yêu cầu / trung tâm hủy) — hoàn toàn bộ
   ORDER_NOT_PICKED_UP // Khách không đến lấy hàng đúng hạn — hoàn theo chính sách (SHOP_NOT_PICKED_UP_REFUND_PERCENT)
@@ -904,6 +939,9 @@ model Refund {
   amount           Decimal       @db.Decimal(12, 2)
   /// Phần trừ vào ví HLV khi duyệt (tỷ lệ theo số tiền HLV đã được cộng từ giao dịch gốc).
   coachDebitAmount Decimal       @default(0) @db.Decimal(12, 2)
+  /// Hoàn ngoại lệ (MEMBER_CANCEL_COURSE_LATE): giá trị gốc trước phí + % phí chiết khấu (Manager chốt khi duyệt).
+  grossAmount      Decimal?      @db.Decimal(12, 2)
+  feePercent       Int?
   coachWalletId    String?
   coachWallet      CoachWallet?  @relation(fields: [coachWalletId], references: [id], onDelete: SetNull)
   note             String?
@@ -1034,6 +1072,9 @@ model UserAddress {
   /// Không bắt buộc: địa giới 2 cấp (Tỉnh → Phường/Xã) không còn Quận/Huyện.
   district      String?
   ward          String?
+  /// Mã địa danh (provinces.open-api.vn v2) để mở lại dropdown đúng mục đã chọn.
+  provinceCode  Int?
+  wardCode      Int?
   street        String
   isDefault     Boolean  @default(false)
   createdAt     DateTime @default(now())
@@ -1245,4 +1286,24 @@ enum MembershipStatus {
   ACTIVE
   EXPIRED
   CANCELLED
+}
+
+// ── Thông tin trung tâm (1 bản ghi, id = "default") ────────────────────────
+
+/// Địa chỉ & thông tin liên hệ của trung tâm Gym — hiển thị cho Member/Coach để biết nơi tập.
+model CenterSetting {
+  id           String   @id @default("default")
+  name         String
+  address      String
+  /// Link Google Maps (tùy chọn) — app mở bản đồ bằng link này, không có thì tìm theo địa chỉ.
+  mapUrl       String?
+  hotline      String?
+  email        String?
+  /// Giờ mở cửa (chữ tự do, VD "05:30 – 22:00 hằng ngày").
+  openingHours String?
+  /// Ghi chú gửi xe / lối vào.
+  parkingNote  String?
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
 }

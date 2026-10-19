@@ -5,6 +5,7 @@ import '../../../core/data/paged.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/json.dart';
 import '../../../core/network/token_storage.dart';
+import '../../catalog/domain/entities/catalog.dart';
 import '../../schedule/domain/entities/session.dart';
 import '../domain/entities/coach_class.dart';
 import '../domain/entities/course.dart';
@@ -38,6 +39,8 @@ class CourseApiRepository implements CourseRepository {
         'fitness': q.sportId,
         'classType': q.classType,
         'areaType': q.areaType,
+        'goal': q.goal,
+        if (q.matchMyGoals) 'matchMyGoals': 'true',
         'status': 'APPROVED',
         'isActive': 'true',
       },
@@ -76,6 +79,8 @@ class CourseApiRepository implements CourseRepository {
           isMakeup: makeupIds.contains(s.str('id')),
           mine: const {'BOOKED', 'COMPLETED'}.contains(s.strOrNull('myEnrollmentStatus')),
           conflictWith: s.objOrNull('conflictWith')?.strOrNull('className'),
+          originalStartTime: s.dateOrNull('originalStartTime'),
+          rescheduleReason: s.strOrNull('rescheduleReason'),
         ),
     ];
     final slots = [
@@ -92,6 +97,8 @@ class CourseApiRepository implements CourseRepository {
       slots: slots,
       sessions: sessions,
       purchase: _purchaseInfo(course, plan.objOrNull('registration')),
+      goalMatch: ClassJson.goalMatch(plan.objOrNull('goalMatch')) ?? course.goalMatch,
+      pastSessionCount: plan.objOrNull('course')?.integer('pastSessionCount') ?? course.completedSessionCount,
     );
   }
 
@@ -99,8 +106,8 @@ class CourseApiRepository implements CourseRepository {
   static PurchaseInfo _purchaseInfo(CourseClass course, Json? registration) {
     if (registration == null) return PurchaseInfo.guest; // Guest / HLV / Quản lý.
     final purchase = registration.obj('purchase');
-    // Hạn hủy khóa = buổi chính đầu tiên − 24h (đúng luật `POST /refunds/course-cancellation`).
-    final deadline = course.firstSessionStart?.subtract(const Duration(hours: 24));
+    // Hạn hủy khóa được hoàn 100% = buổi chính đầu tiên − 3 ngày (luật `POST /refunds/course-cancellation`).
+    final deadline = course.firstSessionStart?.subtract(const Duration(days: 3));
     switch (purchase.str('status')) {
       case 'PURCHASED':
         return PurchaseInfo(
@@ -180,7 +187,7 @@ class CourseApiRepository implements CourseRepository {
           bookedCount: booked.length,
           totalSessions: course.mainSessionCount,
           nextSessionStart: booked.firstOrNull?.date('startTime'),
-          cancelDeadline: first?.subtract(const Duration(hours: 24)),
+          cancelDeadline: first?.subtract(const Duration(days: 3)),
           refundStatusLabel: pending ? 'Chờ duyệt hoàn tiền' : null,
         );
       }),
@@ -226,17 +233,22 @@ class CourseApiRepository implements CourseRepository {
     );
   }
 
+  /// Thông tin khóa gửi BE. Phạm vi Gym: bộ môn cố định "Gym", khu vực trong nhà.
+  static Map<String, Object?> _classBody(ClassDraft d) => {
+    'name': d.name.trim(),
+    'fitness': kGymSport.name,
+    if (d.description?.trim().isNotEmpty ?? false) 'description': d.description!.trim(),
+    if (d.goal?.trim().isNotEmpty ?? false) 'goal': d.goal!.trim(),
+    'goalTags': d.goalTags,
+    'targetLevel': d.targetLevel == null ? null : beName(d.targetLevel!),
+    'capacity': d.capacity,
+    'classType': beName(d.classType),
+    'areaType': beName(AreaType.indoor),
+    'price': d.price,
+  };
+
   Map<String, Object?> _planBody(ClassDraft d) => {
-    'class': {
-      'name': d.name.trim(),
-      // L3: mỗi khóa MỘT bộ môn (`Class.fitness`).
-      'fitness': d.sportIds.isEmpty ? '' : d.sportIds.first.trim(),
-      if (d.description?.trim().isNotEmpty ?? false) 'description': d.description!.trim(),
-      'capacity': d.capacity,
-      'classType': beName(d.classType),
-      'areaType': beName(d.areaType),
-      'price': d.price,
-    },
+    'class': _classBody(d),
     'roomId': d.roomId,
     'schedules': [
       for (final s in d.sessions)
@@ -265,6 +277,9 @@ class CourseApiRepository implements CourseRepository {
     return ClassDraft(
       name: course.name,
       description: cls.strOrNull('description'),
+      goal: course.goal,
+      goalTags: course.goalTags,
+      targetLevel: course.targetLevel,
       sportIds: [for (final s in course.sports) s.id],
       capacity: course.capacity,
       classType: course.classType,
@@ -279,6 +294,52 @@ class CourseApiRepository implements CourseRepository {
   Future<CourseClass> resubmitClass(String classId, ClassDraft draft) async {
     // BE-3: thay thông tin + lịch, xóa lý do từ chối, quay về PENDING.
     final res = await _api.patch('/classes/$classId/resubmit', body: _planBody(draft));
+    return ClassJson.course(res.json.obj('class'));
+  }
+
+  @override
+  Future<CoachPublicProfile> coachProfile(String coachProfileId) async =>
+      ClassJson.coachProfile((await _api.get('/coaches/$coachProfileId/profile', auth: false)).json);
+
+  @override
+  Future<List<MemberCourse>> courseHistory() async =>
+      (await _api.getAll('/enrollments/my/courses')).map(ClassJson.memberCourse).toList();
+
+  /// Field của bản nháp (mọi field tùy chọn — chưa kiểm tra đủ điều kiện gửi duyệt).
+  static Map<String, Object?> _draftBody(ClassDraft d, Map<String, Object?> state) => {
+    'name': d.name.trim(),
+    'description': d.description?.trim(),
+    'goal': d.goal?.trim(),
+    'goalTags': d.goalTags,
+    'targetLevel': d.targetLevel == null ? null : beName(d.targetLevel!),
+    if (d.capacity >= 1 && d.capacity <= 200) 'capacity': d.capacity,
+    'classType': beName(d.classType),
+    if (d.price >= 0) 'price': d.price,
+    'draftData': state,
+  };
+
+  @override
+  Future<String> saveDraft(String? draftId, ClassDraft draft, Map<String, Object?> state) async {
+    final body = _draftBody(draft, state);
+    final res = draftId == null
+        ? await _api.post('/classes/drafts', body: body)
+        : await _api.patch('/classes/drafts/$draftId', body: body);
+    return res.json.str('id', draftId ?? '');
+  }
+
+  @override
+  Future<Map<String, Object?>?> loadDraftState(String draftId) async {
+    final cls = (await _api.get('/classes/$draftId')).json;
+    if (cls.str('status') != 'DRAFT') return null;
+    return cls.objOrNull('draftData') ?? const {};
+  }
+
+  @override
+  Future<void> deleteDraft(String draftId) => _api.delete('/classes/drafts/$draftId');
+
+  @override
+  Future<CourseClass> submitDraft(String draftId, ClassDraft draft) async {
+    final res = await _api.post('/classes/drafts/$draftId/submit', body: _planBody(draft));
     return ClassJson.course(res.json.obj('class'));
   }
 }

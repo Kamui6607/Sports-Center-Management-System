@@ -11,7 +11,7 @@ const router = Router();
  * @swagger
  * /enrollments:
  *   post:
- *     summary: Book a class (Member books own class; Staff/Manager book for a member)
+ *     summary: Book a class (Member books own class; Manager book for a member)
  *     description: |
  *       **Business Rules (Chốt chặn nghiệp vụ):**
  *       - Membership must be ACTIVE at booking time.
@@ -37,7 +37,7 @@ const router = Router();
  *             required: [scheduleId]
  *             properties:
  *               scheduleId: { type: string, format: uuid }
- *               memberId: { type: string, format: uuid, description: "Required when booked by Staff/Manager" }
+ *               memberId: { type: string, format: uuid, description: "Required when booked by Manager" }
  *           example:
  *             scheduleId: "a1b2c3d4-0000-0000-0000-000000000001"
  *     responses:
@@ -185,7 +185,7 @@ router.get("/my/quota", authenticate, authorize("MEMBER"), enrollmentsController
  * @swagger
  * /enrollments/bulk:
  *   post:
- *     summary: Enroll in a WHOLE course (all upcoming sessions of a class) — Member self-enrolls; Staff/Manager for a member
+ *     summary: Enroll in a WHOLE course (all upcoming sessions of a class) — Member self-enrolls; Manager for a member
  *     description: |
  *       **Đăng ký TRỌN KHÓA — ALL-OR-NOTHING.**
  *
@@ -221,7 +221,7 @@ router.get("/my/quota", authenticate, authorize("MEMBER"), enrollmentsController
  *               classId: { type: string, format: uuid }
  *               memberId:
  *                 type: string
- *                 description: "Required when enrolled by Staff/Manager (nhận cả userId hoặc MemberProfile.id)"
+ *                 description: "Required when enrolled by Manager (nhận cả userId hoặc MemberProfile.id)"
  *           example:
  *             classId: "a1b2c3d4-0000-0000-0000-000000000010"
  *     responses:
@@ -307,9 +307,12 @@ router.get(
  * @swagger
  * /enrollments/{id}/transfer-options:
  *   get:
- *     summary: Sessions of the same course a booking can be moved to (free slots, weekday, room, conflicts)
+ *     summary: Buổi có thể đổi sang (cùng khóa hoặc khóa tương đương cùng HLV, cùng hạng) + số lần đổi còn lại
  *     description: |
- *       Trả các buổi SCHEDULED, chưa bắt đầu, CÙNG khóa với chỗ đặt hiện tại: `weekday` (1=Thứ 2…7=CN), `date`,
+ *       Luật đổi buổi (Doc/GYM_SCOPE_CHANGES.md §8): đích là buổi của chính khóa (VD dạy bù) hoặc khóa tương đương
+ *       (cùng HLV, cùng hạng, đang mở bán); buổi hiện tại và buổi đích còn ≥ 24h; tối đa 2 lần đổi/khóa
+ *       (`transfersUsed`, `transfersLeft`); mỗi buổi kèm `classId/className/isSameClass`.
+ *       Trả các buổi SCHEDULED, chưa bắt đầu: `weekday` (1=Thứ 2…7=CN), `date`,
  *       `startClock/endClock` (giờ VN), `room`, `remainingSlots`, `isFull`, `sameDay` (cùng ngày với buổi hiện tại),
  *       `conflictWith` (trùng giờ buổi khác của hội viên), `canSelect`.
  *       `canTransfer=false` + `blockReason` khi buổi hiện tại còn <24h (ENROLLMENT_TRANSFER_TOO_LATE) hoặc đã bắt đầu.
@@ -359,7 +362,7 @@ router.delete("/:id", authenticate, enrollmentsController.cancelEnrollment);
  * @swagger
  * /enrollments/{id}/transfer:
  *   post:
- *     summary: Move a booking to another schedule (Member moves own booking; Staff/Manager any member)
+ *     summary: Move a booking to another schedule (Member moves own booking; Manager any member)
  *     description: |
  *       **Business rules (Chốt chặn nghiệp vụ):**
  *       - Chỉ chuyển chỗ đặt (Enrollment) sang buổi khác — KHÔNG sửa ClassSchedule/Class/Room.

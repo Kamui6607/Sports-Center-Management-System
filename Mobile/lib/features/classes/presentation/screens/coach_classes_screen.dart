@@ -4,14 +4,17 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
 import '../../../../app/shell/header_actions.dart';
+import '../../../../core/data/data_revision.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
+import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../data/course_repository_provider.dart';
 import '../../domain/entities/course.dart';
 import '../class_labels.dart';
 import '../providers/course_providers.dart';
 
-/// H07 — Khóa học của HLV theo trạng thái duyệt.
+/// H07 — Khóa học của HLV theo trạng thái duyệt (+ bản nháp đang soạn dở).
 class CoachClassesScreen extends ConsumerStatefulWidget {
   const CoachClassesScreen({super.key});
 
@@ -46,6 +49,7 @@ class _CoachClassesScreenState extends ConsumerState<CoachClassesScreen> {
               for (final s in const [
                 ClassStatus.approved,
                 ClassStatus.pending,
+                ClassStatus.draft,
                 ClassStatus.completed,
                 ClassStatus.rejected,
               ])
@@ -77,7 +81,8 @@ class _CoachClassesScreenState extends ConsumerState<CoachClassesScreen> {
                     AppSpacing.xxl * 2,
                   ),
                   itemCount: items.length,
-                  itemBuilder: (context, i) => CoachClassCard(course: items[i]),
+                  itemBuilder: (context, i) =>
+                      items[i].isDraft ? _DraftCard(course: items[i]) : CoachClassCard(course: items[i]),
                 );
               },
             ),
@@ -110,7 +115,12 @@ class CoachClassCard extends StatelessWidget {
             ],
           ),
           Text(
-            '${course.sportNames} · ${course.classType.label}',
+            [
+              if (course.goalTags.isNotEmpty) course.goalLabels.join(', '),
+              course.classType.label,
+              if (course.startDate != null && course.endDate != null)
+                '${VnTime.dateShort(course.startDate!)} – ${VnTime.dateShort(course.endDate!)}',
+            ].join(' · '),
             style: context.text.caption.copyWith(color: c.textMuted),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -134,6 +144,61 @@ class CoachClassCard extends StatelessWidget {
               text: 'Doanh thu của bạn (85%): ',
               trailing: MoneyText(course.coachRevenue, style: context.text.label),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bản nháp: tiếp tục tạo hoặc xóa.
+class _DraftCard extends ConsumerWidget {
+  const _DraftCard({required this.course});
+
+  final CourseClass course;
+
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final ok = await showConfirmSheet(
+      context: context,
+      title: 'Xóa bản nháp?',
+      message: course.name.trim().isEmpty ? 'Bản nháp chưa đặt tên.' : 'Bản nháp "${course.name}".',
+      confirmLabel: 'Xóa',
+      destructive: true,
+    );
+    if (!ok || !context.mounted) return;
+    final done = await runAction(
+      context,
+      () => ref.read(courseRepositoryProvider).deleteDraft(course.id).then((_) => true),
+      success: 'Đã xóa bản nháp.',
+    );
+    if (done == true) ref.read(dataRevisionProvider.notifier).bump();
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    return AppCard(
+      onTap: () => context.push(AppRoutes.resumeDraft(course.id)),
+      child: Row(
+        children: [
+          Icon(AppIcons.draft, color: c.textMuted),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(course.name.trim().isEmpty ? '(Chưa đặt tên)' : course.name, style: context.text.bodyStrong),
+                Text(
+                  'Lưu tự động · tạo lúc ${VnTime.date(course.createdAt)} — chạm để tiếp tục',
+                  style: context.text.caption.copyWith(color: c.textMuted),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Xóa bản nháp',
+            icon: const Icon(AppIcons.delete),
+            onPressed: () => _delete(context, ref),
+          ),
         ],
       ),
     );

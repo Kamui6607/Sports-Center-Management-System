@@ -23,6 +23,9 @@ export const AddressSchema = z.object({
   province: z.string().trim().min(2).max(100),
   district: z.string().trim().max(100).nullable().optional(),
   ward: z.string().trim().max(100).nullable().optional(),
+  /** Mã địa danh (GET /locations/...) để mở lại dropdown đúng mục đã chọn. */
+  provinceCode: z.number().int().positive().nullable().optional(),
+  wardCode: z.number().int().positive().nullable().optional(),
   street: z.string().trim().min(3).max(255),
   isDefault: z.boolean().optional(),
 });

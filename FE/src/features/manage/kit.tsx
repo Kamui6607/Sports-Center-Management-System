@@ -30,6 +30,20 @@ export const ROLE_LABEL: Record<string, string> = { MEMBER: "Hội viên", COACH
 export const AREA_LABEL: Record<string, string> = { INDOOR: "Trong nhà", OUTDOOR: "Ngoài trời", POOL: "Hồ bơi" };
 export const CLASS_TYPE_LABEL: Record<string, string> = { REGULAR: "Tiêu chuẩn", PREMIUM: "Cao cấp" };
 export const LEVEL_LABEL: Record<string, string> = { BEGINNER: "Cơ bản", INTERMEDIATE: "Trung cấp", ADVANCED: "Nâng cao" };
+/** Mục tiêu tập luyện (trùng BE `src/config/fitness-goals.ts` — GET /classes/goal-options). */
+export const GOAL_LABEL: Record<string, string> = {
+  WEIGHT_LOSS: "Giảm mỡ / giảm cân",
+  MUSCLE_GAIN: "Tăng cơ",
+  STRENGTH: "Tăng sức mạnh",
+  ENDURANCE: "Tăng sức bền",
+  BODY_SHAPING: "Săn chắc vóc dáng",
+  MOBILITY: "Linh hoạt & tư thế",
+  REHAB: "Phục hồi chấn thương",
+  GENERAL_HEALTH: "Sức khỏe tổng quát",
+  GYM_FOUNDATION: "Làm quen phòng gym",
+  COMPETITION: "Thi đấu thể hình",
+};
+export const goalLabels = (tags: unknown) => (Array.isArray(tags) ? tags.map((t) => GOAL_LABEL[str(t)] ?? str(t)) : []);
 export const GENDER_LABEL: Record<string, string> = { MALE: "Nam", FEMALE: "Nữ", OTHER: "Khác" };
 
 export type Row = Record<string, unknown>;

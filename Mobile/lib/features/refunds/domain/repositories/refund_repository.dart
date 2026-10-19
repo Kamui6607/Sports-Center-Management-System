@@ -5,13 +5,15 @@ abstract interface class RefundRepository {
   /// Kiểm tra điều kiện hủy khóa của Member.
   Future<CancellationEligibility> eligibility(String classId);
 
-  /// `POST /refunds/course-cancellation { classId, note, bankName, bankAccountNumber, bankAccountName }`.
-  Future<Refund> requestCancellation(
+  /// `POST /refunds/course-cancellation { classId, note, bank…, lateRefund }`.
+  /// [lateRefund] chỉ có tác dụng khi hủy muộn (< 3 ngày): `true` ⇒ xin hoàn ngoại lệ.
+  Future<CancellationResult> requestCancellation(
     String classId, {
     String? note,
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    bool lateRefund = false,
   });
 
   /// `GET /refunds/my`.

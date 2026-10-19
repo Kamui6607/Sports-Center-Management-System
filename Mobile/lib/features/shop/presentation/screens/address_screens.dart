@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/data/data_revision.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
+import '../../../../core/utils/vn_text.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../auth/presentation/providers/session_provider.dart';
 import '../../data/shop_repository_provider.dart';
@@ -11,7 +12,7 @@ import '../../domain/entities/shop.dart';
 import '../providers/shop_providers.dart';
 import '../shop_action.dart';
 
-/// S07 — Sổ địa chỉ giao hàng: thêm / sửa / xóa / đặt mặc định.
+/// S07 — Sổ địa chỉ giao hàng (nhiều địa chỉ, tối đa 10): thêm / sửa / xóa / đặt mặc định.
 class AddressesScreen extends ConsumerWidget {
   const AddressesScreen({super.key});
 
@@ -152,11 +153,21 @@ class _AddressFormState extends ConsumerState<_AddressForm> with SubmittingState
   final _form = GlobalKey<FormState>();
   late final _name = TextEditingController(text: widget.initial?.recipientName);
   late final _phone = TextEditingController(text: widget.initial?.phone);
-  late final _province = TextEditingController(text: widget.initial?.province ?? 'Hồ Chí Minh');
-  late final _district = TextEditingController(text: widget.initial?.district);
-  late final _ward = TextEditingController(text: widget.initial?.ward);
   late final _street = TextEditingController(text: widget.initial?.street);
   late bool _isDefault = widget.initial?.isDefault ?? false;
+
+  /// Địa giới hành chính 2 cấp (từ 01/07/2025): Tỉnh/Thành phố → Phường/Xã — chọn từ danh mục BE.
+  late LocationItem? _province = widget.initial == null
+      ? null
+      : LocationItem(code: widget.initial!.provinceCode ?? 0, name: widget.initial!.province);
+  late LocationItem? _ward = widget.initial?.ward == null
+      ? null
+      : LocationItem(code: widget.initial!.wardCode ?? 0, name: widget.initial!.ward!);
+  String? _provinceError;
+  String? _wardError;
+
+  /// Quận/Huyện của địa chỉ cũ (trước sáp nhập) — giữ nguyên khi sửa nếu người dùng không đổi Tỉnh.
+  late String _legacyDistrict = widget.initial?.district ?? '';
 
   @override
   void initState() {
@@ -170,7 +181,7 @@ class _AddressFormState extends ConsumerState<_AddressForm> with SubmittingState
 
   @override
   void dispose() {
-    for (final c in [_name, _phone, _province, _district, _ward, _street]) {
+    for (final c in [_name, _phone, _street]) {
       c.dispose();
     }
     super.dispose();
@@ -179,14 +190,38 @@ class _AddressFormState extends ConsumerState<_AddressForm> with SubmittingState
   static String? _required(String? v, String label, [int min = 2]) =>
       (v ?? '').trim().length < min ? 'Nhập $label' : null;
 
+  /// Địa chỉ cũ chỉ có tên Tỉnh (không có mã) ⇒ tra mã theo tên để tải Phường/Xã.
+  Future<int?> _provinceCode() async {
+    final p = _province;
+    if (p == null) return null;
+    if (p.code > 0) return p.code;
+    final all = await ref.read(shopRepositoryProvider).provinces();
+    final match = all.where((x) => VnText.fold(x.name).contains(VnText.fold(p.name))).firstOrNull;
+    if (match != null) setState(() => _province = match);
+    return match?.code;
+  }
+
+  Future<List<LocationItem>> _loadWards() async {
+    final code = await _provinceCode();
+    if (code == null) return const [];
+    return ref.read(shopRepositoryProvider).wards(code);
+  }
+
   Future<void> _save() async {
-    if (!_form.currentState!.validate()) return;
+    final formOk = _form.currentState!.validate();
+    setState(() {
+      _provinceError = _province == null ? 'Chọn Tỉnh/Thành phố' : null;
+      _wardError = _ward == null ? 'Chọn Phường/Xã' : null;
+    });
+    if (!formOk || _province == null || _ward == null) return;
     final input = AddressInput(
       recipientName: _name.text,
       phone: _phone.text.replaceAll(' ', ''),
-      province: _province.text,
-      district: _district.text,
-      ward: _ward.text,
+      province: _province!.name,
+      provinceCode: _province!.code > 0 ? _province!.code : null,
+      district: _legacyDistrict,
+      ward: _ward!.name,
+      wardCode: _ward!.code > 0 ? _ward!.code : null,
       street: _street.text,
       isDefault: _isDefault,
     );
@@ -202,6 +237,7 @@ class _AddressFormState extends ConsumerState<_AddressForm> with SubmittingState
   @override
   Widget build(BuildContext context) {
     final provinces = ref.watch(shopConfigProvider).value?.deliveryProvinces ?? const ['Hồ Chí Minh'];
+    final repo = ref.read(shopRepositoryProvider);
     return Form(
       key: _form,
       child: Column(
@@ -227,30 +263,61 @@ class _AddressFormState extends ConsumerState<_AddressForm> with SubmittingState
                 : 'Số điện thoại không hợp lệ',
           ),
           const SizedBox(height: AppSpacing.sm),
-          AppTextField(
+          SearchSelectField<LocationItem>(
             label: 'Tỉnh / Thành phố',
-            controller: _province,
             requiredField: true,
-            helper: 'Hiện giao tại: ${provinces.join(', ')}',
-            errorText: fieldErrors['province'],
-            validator: (v) => _required(v, 'tỉnh/thành phố'),
+            valueLabel: _province?.name,
+            load: repo.provinces,
+            labelOf: (p) => p.name,
+            subtitleOf: (p) => p.deliverable ? 'Có giao hàng' : 'Ngoài khu vực giao — chỉ nhận tại quầy',
+            errorText: _provinceError ?? fieldErrors['province'],
+            onChanged: (p) => setState(() {
+              if (_province?.name != p.name) {
+                _ward = null;
+                _legacyDistrict = '';
+              }
+              _province = p;
+              _provinceError = null;
+            }),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.xxs),
+            child: Text(
+              'Theo địa giới hành chính mới (từ 01/07/2025): Tỉnh/Thành phố → Phường/Xã. '
+              'Hiện giao tại: ${provinces.join(', ')}.',
+              style: context.text.caption.copyWith(color: context.colors.textMuted),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          AppTextField(
-            label: 'Quận / Huyện',
-            controller: _district,
+          SearchSelectField<LocationItem>(
+            label: 'Phường / Xã',
             requiredField: true,
-            errorText: fieldErrors['district'],
-            validator: (v) => _required(v, 'quận/huyện'),
+            enabled: _province != null,
+            disabledHint: 'Chọn Tỉnh/Thành phố trước',
+            valueLabel: _ward?.name,
+            load: _loadWards,
+            labelOf: (w) => w.name,
+            errorText: _wardError ?? fieldErrors['ward'],
+            onChanged: (w) => setState(() {
+              _ward = w;
+              _wardError = null;
+            }),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          AppTextField(label: 'Phường / Xã', controller: _ward, errorText: fieldErrors['ward']),
+          if (_legacyDistrict.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xxs),
+              child: Text(
+                'Quận/Huyện cũ: $_legacyDistrict (giữ lại để tham khảo).',
+                style: context.text.caption.copyWith(color: context.colors.textMuted),
+              ),
+            ),
           const SizedBox(height: AppSpacing.sm),
           AppTextField(
             label: 'Số nhà, tên đường',
             controller: _street,
             requiredField: true,
             errorText: fieldErrors['street'],
+            hint: 'VD: 12 Nguyễn Văn Linh, tòa A',
             validator: (v) => _required(v, 'số nhà, tên đường', 3),
           ),
           SwitchListTile.adaptive(

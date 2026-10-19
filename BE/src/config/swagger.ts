@@ -232,7 +232,7 @@ const options: swaggerJSDoc.Options = {
                   data: [
                     {
                       id: "b311dfe5-8575-4ed4-9efd-8bc81a149f14",
-                      email: "staff@sportscenter.com",
+                      email: "manager@sportscenter.com",
                       fullName: "Jane Doe",
                       phone: "0900000002",
                       gender: "FEMALE",
@@ -1123,7 +1123,7 @@ const options: swaggerJSDoc.Options = {
       { name: "Enrollments", description: "Class booking" },
       { name: "Payments", description: "Payment recording" },
       { name: "Reports", description: "Analytics & reports" },
-      { name: "Chat", description: "Real-time messaging (Manager & Staff)" },
+      { name: "Chat", description: "Real-time messaging (Member, Coach & Manager)" },
       { name: "Attendance", description: "Class attendance tracking" },
       { name: "Training", description: "Personalized training plans and results" },
       { name: "Notifications", description: "Manage user notifications" },

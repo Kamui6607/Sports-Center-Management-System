@@ -1,4 +1,5 @@
 import { Response } from "express";
+import { localizeMessage } from "./i18n.js";
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -37,7 +38,8 @@ export function sendError(
   statusCode = 500,
   errors?: unknown
 ): Response {
-  const body: ApiResponse = { success: false, message };
+  // Thông điệp lỗi luôn trả tiếng Việt (dịch thông điệp tiếng Anh cũ — xem utils/i18n.ts).
+  const body: ApiResponse = { success: false, message: localizeMessage(message) };
   if (errors) body.errors = errors;
   return res.status(statusCode).json(body);
 }

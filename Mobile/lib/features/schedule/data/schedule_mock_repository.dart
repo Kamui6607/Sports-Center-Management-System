@@ -135,11 +135,11 @@ class ScheduleMockRepository implements ScheduleRepository {
   }
 
   @override
-  Future<List<TransferOption>> transferOptions(String enrollmentId) => _server.run(() {
+  Future<TransferOptions> transferOptions(String enrollmentId) => _server.run(() {
     final member = _server.requireMember();
     final e = _server.db.enrollments.firstWhere((x) => x.id == enrollmentId);
     if (e.memberProfileId != member.id) throw const AppFailure.forbidden();
-    return _targets(e);
+    return TransferOptions(options: _targets(e));
   });
 
   @override
@@ -305,4 +305,22 @@ class ScheduleMockRepository implements ScheduleRepository {
           }
         });
       });
+
+  @override
+  Future<RescheduleResult> rescheduleSession(String sessionId, RescheduleInput input) => _server.run(() {
+    final db = _server.db;
+    final s = db.session(sessionId);
+    final now = db.now();
+    if (s.start.difference(now).inHours < kRescheduleMinNoticeHours) {
+      throw const AppFailure.business('Buổi học bắt đầu trong vòng 24 giờ tới — không thể dời lịch.');
+    }
+    if (input.start.difference(now).inHours < kRescheduleMinNoticeHours) {
+      throw const AppFailure.business('Giờ học mới phải cách hiện tại ít nhất 24 giờ.');
+    }
+    s
+      ..start = input.start
+      ..end = input.end;
+    final booked = db.enrollments.where((e) => e.sessionId == sessionId && e.status == EnrollmentStatus.booked).length;
+    return RescheduleResult(session: db.toSession(s), affectedMembers: booked);
+  });
 }

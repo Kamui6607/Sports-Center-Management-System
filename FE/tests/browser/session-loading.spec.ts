@@ -6,7 +6,6 @@ import { setup } from "./fixtures";
 for (const [role, home] of [
   ["MEMBER", "member"],
   ["MANAGER", "manager"],
-  ["STAFF", "receptionist"],
   ["COACH", "coach"],
 ]) {
   test(`shared login sends ${role} away from a stale portal URL`, async ({

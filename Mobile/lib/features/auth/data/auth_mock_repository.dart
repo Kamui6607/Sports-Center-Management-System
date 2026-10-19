@@ -129,6 +129,7 @@ class AuthMockRepository implements AuthRepository {
     if (m != null) {
       m
         ..fitnessGoal = update.fitnessGoal
+        ..fitnessGoals = update.fitnessGoals ?? m.fitnessGoals
         ..trainingLevel = update.trainingLevel
         ..trainingPreference = update.trainingPreference;
     }
