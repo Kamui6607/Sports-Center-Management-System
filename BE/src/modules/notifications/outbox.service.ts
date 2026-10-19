@@ -51,6 +51,8 @@ export interface OutboxEmailInput {
   html: string;
   /** Nhãn loại email (vd. "EMAIL_RESET_PASSWORD") để tra cứu/debug. */
   type: string;
+  /** Vết nghiệp vụ (VD người khởi tạo) — KHÔNG chứa mật khẩu/mã/token. */
+  metadata?: Record<string, unknown>;
 }
 
 /** Ghi EMAIL vào outbox (gọi được trong transaction). Worker gửi qua Brevo và retry khi lỗi. */
@@ -64,6 +66,7 @@ export async function enqueueEmail(db: DbClient, input: OutboxEmailInput) {
       title: input.subject,
       body: input.html,
       availableAt: new Date(),
+      ...(input.metadata ? { metadata: input.metadata as object } : {}),
     },
   });
 }

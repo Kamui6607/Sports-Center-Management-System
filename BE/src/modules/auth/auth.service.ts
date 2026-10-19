@@ -6,6 +6,7 @@ import {
   signRefreshToken,
   verifyRefreshToken,
   getRefreshTokenExpiryDate,
+  passwordVersion,
 } from "../../utils/jwt.js";
 import { hashToken } from "../../utils/hashToken.js";
 import { removeStoredAvatar } from "../../utils/storage.js";
@@ -39,7 +40,7 @@ function getDummyHash(): Promise<string> {
   return dummyHash;
 }
 
-function generateOtp(): string {
+export function generateOtp(): string {
   return randomInt(0, 10 ** OTP_LENGTH).toString().padStart(OTP_LENGTH, "0");
 }
 
@@ -160,9 +161,9 @@ async function resetPasswordWithToken(token: string, newPassword: string) {
 
 // ── Phiên đăng nhập ──────────────────────────────────────────────────────────
 
-/** Cấp access + refresh token (lưu HASH refresh token — BR-27). */
-async function issueSession(user: { id: string; role: string }) {
-  const payload = { id: user.id, role: user.role };
+/** Cấp access + refresh token (lưu HASH refresh token — BR-27). `pv` gắn phiên với mật khẩu hiện tại. */
+async function issueSession(user: { id: string; role: string; password: string }) {
+  const payload = { id: user.id, role: user.role, pv: passwordVersion(user.password) };
   const accessToken = signAccessToken(payload);
   const refreshToken = signRefreshToken(payload);
   await prisma.refreshToken.create({
@@ -231,7 +232,7 @@ export async function register(data: RegisterInput) {
   // Với COACH: cấp phiên giới hạn ngay dù isActive=false (BE-9: kèm refresh token) để nộp CV.
   // Token chỉ dùng được ở endpoint hồ sơ/CV (`authenticateRestricted`).
   if (role === "COACH") {
-    const tokens = await issueSession({ id: user.id, role: user.role });
+    const tokens = await issueSession({ id: user.id, role: user.role, password: hashed });
     return { ...user, ...tokens, restricted: true, requireCvUpload: true };
   }
 
@@ -256,7 +257,7 @@ export async function login(email: string, password: string) {
   const restricted = isRestrictedCoach(user);
   if (!user.isActive && !restricted) throw new AppError("Your account has been deactivated", 403);
 
-  const tokens = await issueSession({ id: user.id, role: user.role.name });
+  const tokens = await issueSession({ id: user.id, role: user.role.name, password: user.password });
   return { ...tokens, restricted };
 }
 
@@ -294,7 +295,7 @@ export async function refreshAccessToken(token: string) {
     throw new AppError("User not found or inactive", 401);
   }
 
-  const accessToken = signAccessToken({ id: user.id, role: user.role.name });
+  const accessToken = signAccessToken({ id: user.id, role: user.role.name, pv: passwordVersion(user.password) });
   return { accessToken };
 }
 

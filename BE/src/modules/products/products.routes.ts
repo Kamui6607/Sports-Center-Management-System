@@ -227,10 +227,16 @@ router.post(
  *             type: object
  *             required: [name, description, price, stockQuantity]
  *             properties:
- *               name: { type: string }
- *               description: { type: string }
- *               price: { type: number }
- *               stockQuantity: { type: integer }
+ *               name: { type: string, minLength: 2 }
+ *               description: { type: string, minLength: 5 }
+ *               price: { type: number, minimum: 0 }
+ *               stockQuantity: { type: integer, minimum: 0, description: "Tồn đầu — ghi đúng 1 dòng nhật ký kho IN" }
+ *               isActive: { type: boolean }
+ *               imageUrl: { type: string, format: uri, nullable: true }
+ *               imageUrls: { type: array, items: { type: string, format: uri }, maxItems: 10 }
+ *               maxPerOrder: { type: integer, minimum: 1 }
+ *               maxPerDay: { type: integer, minimum: 1 }
+ *               lowStockThreshold: { type: integer, minimum: 0 }
  *     responses:
  *       201:
  *         description: Created
@@ -266,9 +272,14 @@ router.post(
  *             properties:
  *               name: { type: string }
  *               description: { type: string }
- *               price: { type: number }
- *               stockQuantity: { type: integer }
- *               isActive: { type: boolean }
+ *               price: { type: number, description: "Đổi giá không ảnh hưởng OrderItem đã đặt (snapshot)" }
+ *               stockQuantity: { type: integer, description: "API cũ — nên dùng POST /shop/manage/inventory/{productId}" }
+ *               isActive: { type: boolean, description: "false = ngừng bán (giữ đơn/đánh giá/nhật ký kho)" }
+ *               imageUrl: { type: string, format: uri, nullable: true }
+ *               imageUrls: { type: array, items: { type: string, format: uri }, maxItems: 10 }
+ *               maxPerOrder: { type: integer, minimum: 1 }
+ *               maxPerDay: { type: integer, minimum: 1 }
+ *               lowStockThreshold: { type: integer, minimum: 0 }
  *     responses:
  *       200:
  *         description: OK
@@ -285,7 +296,7 @@ router.patch(
  * @swagger
  * /products/{id}:
  *   delete:
- *     summary: Delete a product (Manager only)
+ *     summary: Xóa vĩnh viễn sản phẩm chưa có đơn/đánh giá (Manager) — đã có lịch sử ⇒ 409, hãy ngừng bán
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
@@ -298,6 +309,8 @@ router.patch(
  *     responses:
  *       200:
  *         description: OK
+ *       404: { $ref: "#/components/responses/NotFound" }
+ *       409: { description: "PRODUCT_HAS_HISTORY (kèm orderItems, reviews, reservedStock)" }
  */
 router.delete(
   "/:id",

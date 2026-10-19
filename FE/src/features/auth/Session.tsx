@@ -1,17 +1,18 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShieldCheck } from "lucide-react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { authService, clearSession, hasSession } from "../../shared/api";
-import { ErrorState, Loading } from "../../shared/ui";
-import { Brand } from "../../shared/Brand";
-import { Login } from "./Login";
-import { RoleRouter } from "../../app/RoleRouter";
-import { roleHome } from "../../app/roles";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Landing } from "../public/Landing";
-import { Register } from "./Register";
+import { AdminLogin, NotManager, ResetPasswordScreen } from "../manage/AuthScreens";
+import { ErrorBox, Skeleton } from "../manage/kit";
+
+const ManagerLayout = lazy(() => import("../manage/ManagerLayout").then((m) => ({ default: m.ManagerLayout })));
+
+/**
+ * Web chỉ phục vụ MANAGER (Member/Coach dùng Mobile). Vai trò lấy từ `GET /auth/me` của BE, không tự giải mã JWT.
+ * Landing/Member/Coach/Reception giữ source nhưng không còn nằm trong luồng của Web quản trị.
+ */
 export function Session() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
   const cache = useQueryClient();
   const [session, setSession] = useState(hasSession());
@@ -28,16 +29,12 @@ export function Session() {
     const expired = (event: Event) => {
       setSession(false);
       cache.clear();
-      setError(
-        new Error(
-          (event as CustomEvent<string>).detail ||
-            "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-        ),
-      );
+      setError(new Error((event as CustomEvent<string>).detail || "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."));
     };
     window.addEventListener("session-expired", expired);
     return () => window.removeEventListener("session-expired", expired);
   }, [cache]);
+
   async function login(email: string, password: string) {
     setLoginBusy(true);
     setError(undefined);
@@ -46,8 +43,7 @@ export function Session() {
       await cache.cancelQueries();
       cache.clear();
       cache.setQueryData(["me"], profile);
-      const home = roleHome(profile.data.role);
-      navigate(home ? `${home}/dashboard` : "/login", { replace: true });
+      // Điều hướng sau đăng nhập do render quyết định (giữ `?from=` deep link) — xem nhánh cuối.
       setSession(true);
     } catch (e) {
       clearSession();
@@ -60,46 +56,56 @@ export function Session() {
     try {
       await authService.logout();
     } catch {
-      setError(
-        new Error(
-          "Đã đăng xuất trên trình duyệt. Máy chủ chưa xác nhận thu hồi phiên do lỗi kết nối.",
-        ),
-      );
+      setError(new Error("Đã đăng xuất trên trình duyệt. Máy chủ chưa xác nhận thu hồi phiên do lỗi kết nối."));
     } finally {
       setSession(false);
       cache.clear();
       navigate("/login", { replace: true });
     }
   }
-  if (pathname === "/" && !session) return <Landing signedIn={false} />;
-  if (!session && pathname === "/register") return <Register />;
-  if (!session) return <Login onLogin={login} busy={loginBusy} error={error} />;
+
+  if (pathname === "/reset-password") return <ResetPasswordScreen />;
+  if (!session) {
+    if (pathname.startsWith("/manager/") && pathname !== "/login")
+      return <Navigate replace to={`/login?from=${encodeURIComponent(pathname + search)}`} />;
+    if (pathname !== "/login") return <Navigate replace to="/login" />;
+    return <AdminLogin onLogin={login} busy={loginBusy} error={error} />;
+  }
   if (q.isPending)
     return (
-      <div className="fullscreen">
-        <Brand />
-        <Loading variant="page" />
+      <div className="cr cr-solo" style={{ padding: 40 }}>
+        <Skeleton rows={6} />
       </div>
     );
   if (q.isError)
     return (
-      <div className="fullscreen">
-        <ErrorState error={q.error} retry={() => q.refetch()} />
-        <button className="button" onClick={logout}>
-          Quay lại đăng nhập
-        </button>
+      <div className="cr cr-solo">
+        <div className="cr-fullscreen">
+          <div>
+            <ErrorBox error={q.error} retry={() => void q.refetch()} />
+            <button className="cr-btn" onClick={logout}>
+              Quay lại đăng nhập
+            </button>
+          </div>
+        </div>
       </div>
     );
-  if (!roleHome(q.data.data.role) || !q.data.data.isActive)
-    return (
-      <div className="fullscreen">
-        <ShieldCheck size={42} />
-        <h1>Không có quyền truy cập</h1>
-        <p>Tài khoản không hoạt động hoặc chưa được cấp vai trò phù hợp.</p>
-        <button className="button primary" onClick={logout}>
-          Đăng nhập tài khoản khác
-        </button>
-      </div>
-    );
-  return <RoleRouter user={q.data.data} onLogout={logout} />;
+  const me = q.data.data as typeof q.data.data & { restricted?: boolean };
+  if (me.role !== "MANAGER" || !me.isActive || me.restricted) return <NotManager name={me.fullName} onLogout={logout} />;
+  if (!pathname.startsWith("/manager")) {
+    // Vừa đăng nhập từ deep link: quay lại đúng trang quản trị đã mở.
+    const from = pathname === "/login" ? new URLSearchParams(search).get("from") : null;
+    return <Navigate replace to={from && from.startsWith("/manager/") ? from : "/manager/dashboard"} />;
+  }
+  return (
+    <Suspense
+      fallback={
+        <div className="cr cr-solo" style={{ padding: 40 }}>
+          <Skeleton rows={6} />
+        </div>
+      }
+    >
+      <ManagerLayout user={me} onLogout={logout} />
+    </Suspense>
+  );
 }

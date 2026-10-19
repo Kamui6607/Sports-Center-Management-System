@@ -58,6 +58,27 @@ export async function lockPaymentWebhook(db: DbClient, paymentId: string) {
 }
 
 /**
+ * Serialize mọi thay đổi số dư ví của MỘT HLV do Manager duyệt (rút tiền, hoàn tiền trừ ví).
+ *
+ * Hai lần duyệt cùng một lệnh rút (hoặc duyệt rút song song với duyệt hoàn) phải xếp hàng, nếu không cả
+ * hai cùng đọc lệnh PENDING / số dư cũ rồi cùng trừ ⇒ trừ ví hai lần hoặc số dư âm.
+ * Thứ tự: nếu đã giữ `lockPaymentWebhook` (duyệt hoàn) thì lấy lock ví SAU; duyệt rút chỉ lấy lock ví.
+ * Không lồng với chuỗi lock enrollment.
+ */
+export async function lockCoachWallet(db: DbClient, walletId: string) {
+  await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('wallet:coach:' || ${walletId}::text))`;
+}
+
+/**
+ * Serialize thao tác có thể làm giảm số MANAGER đang hoạt động (khóa / hạ quyền).
+ * Hai request khóa hai Manager khác nhau cùng lúc phải xếp hàng, nếu không cả hai cùng thấy "còn 2 Manager"
+ * rồi cùng commit ⇒ hệ thống không còn Manager nào. Lock đơn lẻ, không lồng với lock khác.
+ */
+export async function lockManagerRoster(db: DbClient) {
+  await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('users:active-managers'))`;
+}
+
+/**
  * Serialize việc TẠO đơn hàng của MỘT người.
  *
  * Luật: một người không được có 2 đơn PENDING cùng chứa một sản phẩm. Hai request tạo đơn song song

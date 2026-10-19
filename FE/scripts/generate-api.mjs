@@ -54,7 +54,7 @@ let ts =
 const ops = {};
 let md = `# OpenAPI endpoint inventory
 
-Source: ${openApiUrl}
+Source: docs/openapi.json — exported from the checked-out backend with \`cd BE && npm run openapi:export\` (\`--live\` downloads ${openApiUrl} instead; do not use it for an unreleased local backend).
 
 Snapshot: ${new Date().toISOString().slice(0, 10)}. Production base: https://sports-center-management-system.onrender.com/api/v1
 
@@ -98,9 +98,11 @@ const overrideUrl = new URL(
   import.meta.url,
 );
 if (fs.existsSync(overrideUrl)) {
-  Object.assign(ops, JSON.parse(fs.readFileSync(overrideUrl, "utf8")));
-  md +=
-    "\n## Verified workflow contracts\nAdditional operations and missing bodies/parameters are preserved in workflow-contract-overrides.json, checked against backend commit 9d4af0efb8c3e910af233eb3e30b4e7b04dae238. See WORKFLOW_ALIGNMENT.md.\n";
+  const overrides = JSON.parse(fs.readFileSync(overrideUrl, "utf8"));
+  Object.assign(ops, overrides);
+  if (Object.keys(overrides).length)
+    md +=
+      "\n## Contract overrides\nOperations in workflow-contract-overrides.json replace the exported snapshot. Keep only entries the backend Swagger genuinely lacks and re-check them against the router/Zod source.\n";
 }
 fs.writeFileSync(new URL("../src/shared/generated.ts", import.meta.url), ts);
 fs.writeFileSync(

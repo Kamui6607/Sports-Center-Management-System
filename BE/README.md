@@ -233,6 +233,9 @@ export async function getRoomById(req: Request, res: Response, next: NextFunctio
 Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manager** chỉ quản lý nền tảng.
 
 - **Manager — quản lý nền tảng, KHÔNG tạo/đứng lớp:** duyệt CV Coach, duyệt/từ chối lớp (`PATCH /classes/{id}/review`), quản lý phòng, sản phẩm, duyệt hoàn tiền và rút tiền ví Coach, xem báo cáo.
+- **Quản trị tài khoản (Manager):** `DELETE /users/:id` là KHÓA MỀM; `DELETE /users/:id/permanent` chỉ xóa tài khoản chưa có dữ liệu nghiệp vụ (`GET /users/:id/history`); mở khóa Coach có CV chưa APPROVED ⇒ 409 (phải duyệt CV); khóa/hạ quyền Manager cuối được serialize (`lockManagerRoster`). `POST /users/:id/password-reset` gửi email OTP (outbox) để người dùng TỰ đặt mật khẩu qua `PATCH /auth/reset-password`.
+- **Phiên đăng nhập:** access token mang `pv` (dấu vân tay hash mật khẩu, `utils/jwt.ts`); `authenticate*` + socket từ chối token cấp trước lần đổi/đặt lại mật khẩu. Ký access token mới luôn qua `issueSession`/`refreshAccessToken` để có `pv`.
+- **Contract cho FE:** `npm run openapi:export` xuất Swagger của checkout hiện tại ra `../FE/docs/openapi.json`.
 - **Chỉ Coach tạo lớp** (`POST /classes`, `POST /class-schedules/activity-plan`). Lớp mới ở trạng thái `PENDING`, Manager duyệt xong (`APPROVED`) thì Member mới mua được. Manager gọi API tạo lớp ⇒ 403.
 - **Môn tập là field của lớp:** `Class.fitness` (chuỗi bắt buộc, Coach nhập: Yoga, HIIT, Bơi...). Không có bảng bộ môn và không có quan hệ nhiều-nhiều lớp ↔ bộ môn; lọc bằng `GET /classes?fitness=Yoga`. Lớp chỉ cần `areaType` khớp phòng.
 - **Mỗi lớp đúng 1 Coach:** `Class.coachId` (bắt buộc) là Coach đã tạo và phụ trách lớp, nhận 85% doanh thu vào `CoachWallet`. **Không có** bảng `ClassMember`, không có HLV phụ/đổi HLV — đừng tạo lại.
@@ -244,6 +247,13 @@ Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manage
 - **Kiểm tra quyền Coach trên lớp:** so `class.coachId === coachProfile.id` (hoặc `where: { coach: { userId } }`).
 
 ---
+
+## Demo Mobile + Web dùng chung dữ liệu thật
+
+Xem [hướng dẫn chạy demo dữ liệu thật](../Doc/DEMO_REAL_DATA.md): cấu hình `BE/.env`, `FE/.env`,
+Mobile, tài khoản, thanh toán ngân hàng và kịch bản Coach → Manager → Member.
+Mẫu cấu hình không chứa secret: [`.env.example`](.env.example).
+Chạy thông thường bằng `npm run dev` dùng `BE/.env`, cổng 8080; `dev:local` là lựa chọn riêng cần `BE/.env.local`.
 
 ## 🛠️ Getting Started
 
@@ -259,9 +269,9 @@ Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manage
    ```
 
 2. **Environment Variables:**
-   Create a `.env` file in the root directory and add the following variables (adjust according to your setup):
+   Create `BE/.env` (not the repository root), using `.env.example` if no `.env` exists. Keep existing credentials when already configured. Adjust these variables to your setup:
    ```env
-   PORT=3000
+   PORT=8080
    DATABASE_URL="postgresql://user:password@localhost:5432/sport_center?schema=public"
    JWT_ACCESS_SECRET="your_access_secret"
    JWT_REFRESH_SECRET="your_refresh_secret"
@@ -280,7 +290,7 @@ Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manage
    SMTP_USER=""
    SMTP_PASS=""
    SMTP_FROM=""                        # tuỳ chọn, mặc định = SMTP_USER
-   FRONTEND_URL="http://localhost:3000"   # Base URL FE để dựng link reset password
+   FRONTEND_URL="http://localhost:5173"   # Base URL FE để dựng link reset password
 
    # ── Avatar upload storage (local | Cloudinary) ──
    # Bỏ trống cả 3 biến CLOUDINARY_* => avatar lưu local trong uploads/avatars (dev không cần cloud).
@@ -328,9 +338,9 @@ Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manage
    Giá trị mặc định của từng biến nằm trong `src/config/sepay.ts`.
 
    **Troubleshooting: đã chuyển khoản mà đơn vẫn `PENDING` (FE cứ "đang chờ ngân hàng xác nhận")**
-   `Payment.status` CHỈ đổi khi BE nhận được webhook từ SePay (hoặc `mock-confirm`) — BE không tự dò
-   biến động số dư. Chạy BE ở `localhost` thì SePay không gọi được vào máy bạn, nên đơn đứng nguyên
-   `PENDING` (log BE chỉ có `GET /payments/sepay/{id}` lặp lại, KHÔNG có `POST /payments/sepay/webhook`).
+   `Payment.status` đổi khi BE xử lý webhook, đối soát API SePay (nếu có `SEPAY_API_TOKEN`), hoặc `mock-confirm` khi bật mock.
+   Chạy BE ở `localhost` thì SePay không gọi trực tiếp được webhook vào máy bạn; nếu không có token đối soát,
+   đơn có thể đứng nguyên `PENDING` dù App vẫn polling `GET /payments/sepay/{id}`.
    Checklist:
 
    1. Mở tunnel tới cổng BE rồi copy URL HTTPS:
@@ -352,7 +362,7 @@ Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manage
       **"DEV: giả lập SePay đã thu tiền"** (gọi `/payments/sepay/mock-confirm`).
    7. **Không dựng tunnel vẫn muốn tiền thật tự chốt (khuyến nghị cho dev):** đặt `SEPAY_API_TOKEN`
       (my.sepay.vn → Cấu hình Công ty → API Access) ⇒ trong lúc FE polling `GET /payments/sepay/{id}`, BE gọi
-      SePay API v2 tìm giao dịch khớp mã đơn ⇒ đơn tự chuyển `SUCCESS` sau ≤ 4 giây, **không cần webhook/ngrok**.
+      SePay API v2 tìm giao dịch khớp mã đơn ⇒ đơn chuyển `SUCCESS` khi đối soát thành công, **không cần webhook/ngrok**.
       Test mode dùng token riêng + `SEPAY_API_BASE_URL="https://userapi-sandbox.sepay.vn/v2"`.
       BE chỉ chốt khi khớp CHẶT mã đơn + số tiền + tài khoản nhận, có throttle `SEPAY_RECONCILE_MIN_SECONDS`
       (SePay giới hạn 3 request/giây) và chống chốt trùng bằng advisory lock.
@@ -370,6 +380,7 @@ Nền tảng là nơi **Coach** và **Member** tương tác với nhau; **Manage
    để trống thì ảnh vẫn lưu local trong `uploads/avatars/`. Xem `src/config/storage.ts`.
 
 3. **Database Setup:**
+   Với DB đang có dữ liệu, không reset hoặc seed lại để demo. Lịch sử migration cũ có điểm thiếu khi dựng DB trắng; xem [hướng dẫn DB mới](../Doc/DEMO_REAL_DATA.md) trước khi chạy các lệnh bên dưới.
    Run Prisma migrations to set up your PostgreSQL database schema:
    ```bash
    npm run db:migrate

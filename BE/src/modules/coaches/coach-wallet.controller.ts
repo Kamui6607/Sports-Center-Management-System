@@ -26,8 +26,8 @@ export async function requestWithdrawal(req: Request, res: Response, next: NextF
 
 export async function reviewWithdrawal(req: Request, res: Response, next: NextFunction) {
   try {
-    const { action, reason } = req.body;
-    const result = await walletService.reviewWithdrawal(req.params.txId as string, action, reason);
+    const { action, reason, transactionRef } = req.body;
+    const result = await walletService.reviewWithdrawal(req.params.txId as string, action, reason, transactionRef);
     const msg = action === "APPROVE" ? "Withdrawal approved" : "Withdrawal rejected";
     sendSuccess(res, result, msg);
   } catch (err) { next(err); }

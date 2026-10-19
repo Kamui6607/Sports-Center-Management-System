@@ -5,7 +5,7 @@
  */
 import { spawnSync } from "node:child_process";
 
-const SUITES = ["auth-security", "mobile-api", "wallet-attendance", "shop"];
+const SUITES = ["auth-security", "mobile-api", "wallet-attendance", "shop", "admin-web"];
 const filter = process.argv[2];
 const selected = filter ? SUITES.filter((s) => s.includes(filter)) : SUITES;
 const results = [];

@@ -402,6 +402,7 @@ router.get("/manage/summary", ...manager, c.managerSummary);
  *       - { in: query, name: fulfillmentType, schema: { type: string, enum: [PICKUP, DELIVERY] } }
  *       - { in: query, name: search, schema: { type: string } }
  *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
  *       200: { description: Danh sách đơn }
  */
@@ -491,6 +492,8 @@ router.post("/manage/orders/:id/pickup", ...manager, pickupLimit, validate(Picku
  *     parameters:
  *       - { in: query, name: lowStock, schema: { type: string, enum: ["true", "false"] } }
  *       - { in: query, name: search, schema: { type: string } }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
  *       200: { description: "data[] + lowStockCount + pagination" }
  */
@@ -520,7 +523,10 @@ router.post("/manage/inventory/:productId", ...manager, validate(InventoryChange
  *     summary: Nhật ký kho của sản phẩm
  *     tags: [Shop]
  *     security: [{ BearerAuth: [] }]
- *     parameters: [{ in: path, name: productId, required: true, schema: { type: string } }]
+ *     parameters:
+ *       - { in: path, name: productId, required: true, schema: { type: string } }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
  *       200: { description: "[{ type, quantity, stockAfter, reservedAfter, order{code}, note, createdAt }]" }
  */
@@ -533,6 +539,11 @@ router.get("/manage/inventory/:productId/transactions", ...manager, c.listInvent
  *     summary: Đánh giá sản phẩm (lọc sản phẩm / đang ẩn)
  *     tags: [Shop]
  *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: productId, schema: { type: string } }
+ *       - { in: query, name: hidden, schema: { type: string, enum: ["true", "false"] } }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
  *       200: { description: Danh sách đánh giá }
  */

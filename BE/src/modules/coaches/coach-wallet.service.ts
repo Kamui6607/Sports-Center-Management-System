@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { createNotification } from "../notifications/notifications.service.js";
+import { lockCoachWallet } from "../../utils/dbLocks.js";
 import { computeWithdrawEligibility } from "./wallet-eligibility.service.js";
 
 /** Số ngày tối đa từ khi class COMPLETED mà coach được phép rút tiền. 0 = không giới hạn. */
@@ -194,7 +195,8 @@ export async function requestWithdrawal(coachUserId: string, data: {
 export async function reviewWithdrawal(
   transactionId: string,
   action: "APPROVE" | "REJECT",
-  reason?: string
+  reason?: string,
+  transactionRef?: string
 ) {
   const txRecord = await prisma.walletTransaction.findUnique({
     where: { id: transactionId },
@@ -215,45 +217,76 @@ export async function reviewWithdrawal(
     throw new AppError(`Transaction is already ${txRecord.status}`, 400);
   }
 
-  return prisma.$transaction(async (db) => {
+  const amount = Number(txRecord.amount);
+  const result = await prisma.$transaction(async (db) => {
+    // F-07: hai lần duyệt (hoặc duyệt rút song song duyệt hoàn tiền trừ ví) xếp hàng theo ví, rồi đọc lại SAU lock.
+    await lockCoachWallet(db, txRecord.walletId);
+    const fresh = await db.walletTransaction.findUnique({ where: { id: transactionId }, select: { status: true } });
+    if (fresh?.status !== "PENDING") {
+      throw new AppError("Lệnh rút đã được xử lý bởi thao tác khác, vui lòng tải lại.", 409, {
+        code: "WITHDRAWAL_ALREADY_PROCESSED",
+        status: fresh?.status,
+      });
+    }
+
     if (action === "APPROVE") {
       const wallet = await db.coachWallet.findUnique({ where: { id: txRecord.walletId } });
       if (!wallet) throw new AppError("Wallet not found", 404);
-      if (Number(wallet.balance) < Number(txRecord.amount)) {
-        throw new AppError("Số dư ví không đủ để duyệt yêu cầu này", 400);
+      // Giữ chính sách tạm giữ: tiền đang chờ hoàn cho hội viên không được chi cho HLV.
+      const holds = await db.refund.aggregate({
+        where: { coachWalletId: wallet.id, status: "PENDING" },
+        _sum: { coachDebitAmount: true },
+      });
+      const held = Number(holds._sum.coachDebitAmount ?? 0);
+      if (Number(wallet.balance) - held < amount) {
+        throw new AppError(
+          held > 0
+            ? `Số dư ví không đủ để duyệt: đang tạm giữ ${held.toLocaleString("vi-VN")}đ cho yêu cầu hoàn tiền chờ duyệt.`
+            : "Số dư ví không đủ để duyệt yêu cầu này",
+          400,
+          { code: held > 0 ? "BALANCE_HELD_FOR_REFUND" : "INSUFFICIENT_BALANCE", balance: Number(wallet.balance), held, amount }
+        );
       }
+      const ref = transactionRef?.trim();
+      const done = await db.walletTransaction.updateMany({
+        where: { id: transactionId, status: "PENDING" },
+        data: {
+          status: "COMPLETED",
+          note: [reason ? `Đã duyệt. ${reason}` : "Đã duyệt và chuyển tiền", ref ? `[Mã GD: ${ref}]` : ""].filter(Boolean).join(" "),
+        },
+      });
+      if (done.count !== 1) throw new AppError("Lệnh rút đã được xử lý bởi thao tác khác, vui lòng tải lại.", 409, { code: "WITHDRAWAL_ALREADY_PROCESSED" });
       await db.coachWallet.update({
         where: { id: txRecord.walletId },
-        data: { balance: { decrement: Number(txRecord.amount) } },
-      });
-      await db.walletTransaction.update({
-        where: { id: transactionId },
-        data: { status: "COMPLETED", note: reason ? `Đã duyệt. ${reason}` : "Đã duyệt và chuyển tiền" },
+        data: { balance: { decrement: amount } },
       });
     } else {
-      await db.walletTransaction.update({
-        where: { id: transactionId },
+      const done = await db.walletTransaction.updateMany({
+        where: { id: transactionId, status: "PENDING" },
         data: {
           status: "REJECTED",
           note: reason ? `Bị từ chối: ${reason}` : "Bị từ chối",
         },
       });
-    }
-
-    // Thông báo coach biết kết quả
-    const coachUserId = txRecord.wallet.coach.user?.id;
-    if (coachUserId) {
-      const notifType = action === "APPROVE" ? "WITHDRAWAL_APPROVED" : "WITHDRAWAL_REJECTED";
-      const title = action === "APPROVE" ? "Yêu cầu rút tiền được duyệt" : "Yêu cầu rút tiền bị từ chối";
-      const body =
-        action === "APPROVE"
-          ? `${Number(txRecord.amount).toLocaleString("vi-VN")}đ đã được chuyển vào tài khoản của bạn.`
-          : `Yêu cầu rút ${Number(txRecord.amount).toLocaleString("vi-VN")}đ bị từ chối.${reason ? ` Lý do: ${reason}` : ""}`;
-      createNotification(coachUserId, notifType, title, body).catch(() => {});
+      if (done.count !== 1) throw new AppError("Lệnh rút đã được xử lý bởi thao tác khác, vui lòng tải lại.", 409, { code: "WITHDRAWAL_ALREADY_PROCESSED" });
     }
 
     return db.walletTransaction.findUnique({ where: { id: transactionId } });
   });
+
+  // Thông báo coach biết kết quả — chỉ sau khi commit (không gửi khi duyệt thất bại / bị thao tác khác thắng).
+  const coachUserId = txRecord.wallet.coach.user?.id;
+  if (coachUserId) {
+    const notifType = action === "APPROVE" ? "WITHDRAWAL_APPROVED" : "WITHDRAWAL_REJECTED";
+    const title = action === "APPROVE" ? "Yêu cầu rút tiền được duyệt" : "Yêu cầu rút tiền bị từ chối";
+    const body =
+      action === "APPROVE"
+        ? `${amount.toLocaleString("vi-VN")}đ đã được chuyển vào tài khoản của bạn.`
+        : `Yêu cầu rút ${amount.toLocaleString("vi-VN")}đ bị từ chối.${reason ? ` Lý do: ${reason}` : ""}`;
+    createNotification(coachUserId, notifType, title, body).catch(() => {});
+  }
+
+  return result;
 }
 
 const WITHDRAWAL_INCLUDE = {

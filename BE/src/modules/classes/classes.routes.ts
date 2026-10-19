@@ -56,6 +56,12 @@ const router = Router();
  *           type: string
  *         description: Filter by coach (CoachProfile.id)
  *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [PENDING, APPROVED, REJECTED, COMPLETED]
+ *         description: Filter by approval status (Guest luôn chỉ thấy APPROVED)
+ *       - in: query
  *         name: isActive
  *         schema:
  *           type: string
@@ -160,7 +166,7 @@ router.get("/:id/course-plan", optionalAuthenticate, classesController.getClassC
  *   get:
  *     summary: "L12: Học viên của khóa + chuyên cần + doanh thu thật (COACH chủ khóa / MANAGER)"
  *     tags: [Classes]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ BearerAuth: [] }]
  *     responses:
  *       200: { description: "{ students[], grossRevenue, refundedAmount, coachRevenue }" }
  *       403: { description: "Không phải khóa của mình" }
@@ -317,6 +323,10 @@ router.patch(
  *                 description: "New area type. Upcoming schedules must use a matching Room."
  *               isActive:
  *                 type: boolean
+ *               price:
+ *                 type: number
+ *                 minimum: 0
+ *                 description: "Giá áp dụng cho giao dịch MỚI — Payment đã tạo giữ nguyên số tiền."
  *     responses:
  *       200: { $ref: "#/components/responses/ClassOk" }
  *       400: { $ref: "#/components/responses/BadRequest" }
@@ -331,7 +341,7 @@ router.patch(
  *   patch:
  *     summary: "BE-3: Coach sửa & gửi lại khóa PENDING/REJECTED (kèm lịch) ⇒ PENDING"
  *     tags: [Classes]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ BearerAuth: [] }]
  *     requestBody:
  *       content:
  *         application/json:

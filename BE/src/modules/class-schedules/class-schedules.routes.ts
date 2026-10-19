@@ -73,6 +73,17 @@ router.post(
  *           type: string
  *         description: Filter by room
  *       - in: query
+ *         name: coachId
+ *         schema:
+ *           type: string
+ *         description: Filter by coach (CoachProfile.id)
+ *       - in: query
+ *         name: mine
+ *         schema:
+ *           type: string
+ *           enum: ["true", "false"]
+ *         description: "Chỉ buổi của tôi (COACH: khóa mình dạy; MEMBER: buổi mình giữ chỗ)"
+ *       - in: query
  *         name: status
  *         schema:
  *           type: string

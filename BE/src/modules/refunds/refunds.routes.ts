@@ -98,6 +98,7 @@ router.get(
  *       - { in: query, name: reason, schema: { type: string, enum: [MEMBER_CANCEL_COURSE, MEMBER_CANCEL_SESSION, SESSION_CANCELLED, ORDER_CANCELLED, ORDER_NOT_PICKED_UP, ORDER_LATE_PAYMENT] } }
  *       - { in: query, name: memberId, schema: { type: string } }
  *       - { in: query, name: classId, schema: { type: string } }
+ *       - { in: query, name: orderId, schema: { type: string } }
  *       - { in: query, name: page, schema: { type: integer } }
  *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
@@ -145,7 +146,7 @@ router.get(
  *   get:
  *     summary: Thống kê số lượng & số tiền hoàn theo trạng thái và lý do (MANAGER)
  *     tags: [Refunds]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ BearerAuth: [] }]
  *     responses:
  *       200:
  *         description: "{ totalCount, pending: {count, amount}, completed: {count, amount}, rejected: {count, amount}, cancelled: {count, amount}, byReason: {...} }"
@@ -165,7 +166,7 @@ router.get(
  *   get:
  *     summary: "BE-16: Xem trước điều kiện hủy khóa (MEMBER) — không ghi dữ liệu"
  *     tags: [Refunds]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ BearerAuth: [] }]
  *     parameters:
  *       - { in: query, name: classId, required: true, schema: { type: string } }
  *     responses:
@@ -185,7 +186,7 @@ router.get(
  *   get:
  *     summary: "BE-17: Chi tiết yêu cầu hoàn tiền (MANAGER: mọi bản ghi; MEMBER: của mình)"
  *     tags: [Refunds]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ BearerAuth: [] }]
  *     responses:
  *       200: { description: "Refund kèm member, class (+coach), schedule, payment" }
  *       403: { description: "Không phải của mình" }
@@ -244,7 +245,7 @@ router.patch(
  *       - Đơn hàng: đơn quay về trạng thái trước khi xin hủy.
  *       - Đã xử lý (COMPLETED/REJECTED/CANCELLED) ⇒ 409 `REFUND_ALREADY_PROCESSED`; hoàn tiền do hệ thống tạo ⇒ 400.
  *     tags: [Refunds]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ BearerAuth: [] }]
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:

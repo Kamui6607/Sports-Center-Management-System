@@ -151,12 +151,16 @@ export async function reviewClass(classId: string, action: "APPROVE" | "REJECT",
   }
 
   const newStatus = action === "APPROVE" ? "APPROVED" : "REJECTED";
-  const updated = await prisma.class.update({
-    where: { id: classId },
+  // CAS theo status: hai Manager bấm cùng lúc ⇒ người sau nhận 409 (không duyệt/thông báo hai lần).
+  const done = await prisma.class.updateMany({
+    where: { id: classId, status: "PENDING" },
     // BE-2: lưu lý do từ chối để Coach xem & sửa (xóa khi duyệt).
     data: { status: newStatus, rejectReason: action === "REJECT" ? reason?.trim() || null : null },
-    include: classInclude,
   });
+  if (done.count === 0) {
+    throw new AppError("Khóa học đã được xử lý bởi thao tác khác, vui lòng tải lại.", 409, { code: "CLASS_ALREADY_REVIEWED" });
+  }
+  const updated = await prisma.class.findUniqueOrThrow({ where: { id: classId }, include: classInclude });
 
   // Thông báo cho Coach phụ trách lớp biết kết quả
   const notifType = action === "APPROVE" ? "CLASS_APPROVED" : "CLASS_REJECTED";

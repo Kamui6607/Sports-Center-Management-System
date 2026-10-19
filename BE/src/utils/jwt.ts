@@ -1,10 +1,26 @@
 import jwt from "jsonwebtoken";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { env } from "../config/env.js";
 
 export interface JwtPayload {
   id: string;
   role: string;
+  /** "Phiên bản mật khẩu" lúc cấp access token — xem `passwordVersion`. */
+  pv?: string;
+}
+
+/**
+ * Dấu vân tay ngắn của HASH mật khẩu hiện tại (không lộ gì về mật khẩu: hash bcrypt được băm lại).
+ * Gắn vào access token; `authenticate*` so với hash trong DB ⇒ đổi/đặt lại mật khẩu làm MỌI access token
+ * cũ hết hiệu lực ngay (refresh token cũng đã bị xóa), không cần cột/migration mới.
+ */
+export function passwordVersion(passwordHash: string): string {
+  return createHash("sha256").update(passwordHash).digest("base64url").slice(0, 16);
+}
+
+/** Access token còn khớp mật khẩu hiện tại? (token không có `pv` = cấp trước khi có cơ chế ⇒ coi như hết hạn). */
+export function isAccessTokenCurrent(payload: JwtPayload, passwordHash: string): boolean {
+  return payload.pv === passwordVersion(passwordHash);
 }
 
 export function signAccessToken(payload: JwtPayload): string {

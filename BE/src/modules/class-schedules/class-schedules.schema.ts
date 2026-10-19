@@ -235,6 +235,8 @@ export const ScheduleQuerySchema = z.object({
   limit: z.string().optional(),
   classId: z.string().min(1).optional(),
   roomId: z.string().min(1).optional(),
+  /** HLV phụ trách (CoachProfile.id). */
+  coachId: z.string().min(1).optional(),
   status: z.enum(["SCHEDULED", "CANCELLED", "COMPLETED"]).optional(),
   date: z.string().optional(),
   startAfter: z.string().optional(),

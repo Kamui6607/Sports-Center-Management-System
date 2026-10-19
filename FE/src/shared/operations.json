@@ -17,7 +17,6 @@
           "enum": [
             "MEMBER",
             "COACH",
-            "STAFF",
             "MANAGER"
           ]
         }
@@ -84,20 +83,37 @@
       ],
       "properties": {
         "email": {
-          "type": "string"
+          "type": "string",
+          "format": "email"
         },
         "password": {
-          "type": "string"
+          "type": "string",
+          "minLength": 6
         },
         "fullName": {
+          "type": "string",
+          "minLength": 2
+        },
+        "phone": {
           "type": "string"
+        },
+        "gender": {
+          "type": "string",
+          "enum": [
+            "MALE",
+            "FEMALE",
+            "OTHER"
+          ]
+        },
+        "dateOfBirth": {
+          "type": "string",
+          "format": "date"
         },
         "role": {
           "type": "string",
           "enum": [
             "MEMBER",
             "COACH",
-            "STAFF",
             "MANAGER"
           ]
         },
@@ -161,10 +177,10 @@
   "PATCH /users/{id}": {
     "path": "/users/{id}",
     "method": "PATCH",
-    "summary": "PATCH /users/{id}",
+    "summary": "Update user (thông tin / vai trò / mở khóa)",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [
@@ -181,8 +197,7 @@
       "type": "object",
       "properties": {
         "fullName": {
-          "type": "string",
-          "minLength": 2
+          "type": "string"
         },
         "phone": {
           "type": "string"
@@ -206,25 +221,24 @@
           "enum": [
             "MEMBER",
             "COACH",
-            "STAFF",
             "MANAGER"
           ]
         }
-      },
-      "required": []
+      }
     },
     "statusCodes": [
       "200",
       "400",
       "401",
       "403",
-      "404"
+      "404",
+      "500"
     ]
   },
   "DELETE /users/{id}": {
     "path": "/users/{id}",
     "method": "DELETE",
-    "summary": "Deactivate user (soft delete)",
+    "summary": "Khóa tài khoản (khóa mềm isActive=false — KHÔNG xóa dữ liệu, không hủy lớp/hoàn tiền/đơn)",
     "security": [
       {
         "BearerAuth": []
@@ -250,13 +264,116 @@
       "500"
     ]
   },
+  "POST /users/{id}/password-reset": {
+    "path": "/users/{id}/password-reset",
+    "method": "POST",
+    "summary": "Manager gửi yêu cầu đặt lại mật khẩu (email chứa mã OTP để người dùng TỰ đặt mật khẩu mới)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "202",
+      "404",
+      "409",
+      "429"
+    ]
+  },
+  "GET /users/{id}/password-reset": {
+    "path": "/users/{id}/password-reset",
+    "method": "GET",
+    "summary": "Trạng thái yêu cầu đặt lại mật khẩu gần nhất (mã còn hạn/đã dùng, email đã gửi chưa) — không lộ mã",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "404"
+    ]
+  },
+  "GET /users/{id}/history": {
+    "path": "/users/{id}/history",
+    "method": "GET",
+    "summary": "Thống kê dữ liệu nghiệp vụ của tài khoản (quyết định xóa vĩnh viễn được hay chỉ khóa)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "404"
+    ]
+  },
+  "DELETE /users/{id}/permanent": {
+    "path": "/users/{id}/permanent",
+    "method": "DELETE",
+    "summary": "XÓA VĨNH VIỄN tài khoản chưa phát sinh dữ liệu nghiệp vụ (tài khoản có lịch sử ⇒ 409, hãy khóa)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "400",
+      "404",
+      "409"
+    ]
+  },
   "GET /training-plans": {
     "path": "/training-plans",
     "method": "GET",
-    "summary": "GET /training-plans",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [
@@ -271,19 +388,15 @@
     "body": null,
     "statusCodes": [
       "200",
-      "400",
-      "401",
-      "403",
-      "404"
+      "403"
     ]
   },
   "POST /training-plans": {
     "path": "/training-plans",
     "method": "POST",
-    "summary": "POST /training-plans",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [],
@@ -291,43 +404,24 @@
       "type": "object",
       "properties": {
         "memberId": {
-          "type": "string",
-          "format": "uuid"
+          "type": "string"
         },
         "coachId": {
-          "type": "string",
-          "format": "uuid"
+          "type": "string"
         },
         "name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "description": {
           "type": "string"
         },
         "startDate": {
-          "type": "string",
-          "format": "date-time"
+          "type": "string"
         },
         "endDate": {
-          "type": "string",
-          "format": "date-time"
+          "type": "string"
         }
-      },
-      "required": [
-        "memberId",
-        "coachId",
-        "name",
-        "startDate",
-        "endDate"
-      ]
+      }
     },
     "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
+      "201"
     ]
   },
   "PATCH /training-plans/{id}": {
@@ -374,51 +468,27 @@
       "500"
     ]
   },
-  "POST /training-plans/results": {
-    "path": "/training-plans/results",
-    "method": "POST",
-    "summary": "POST /training-plans/results",
+  "GET /training-plans/{id}": {
+    "path": "/training-plans/{id}",
+    "method": "GET",
+    "summary": "BE-17: Một lộ trình kèm kết quả (MEMBER chủ plan / COACH phụ trách / MANAGER)",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [],
-    "body": {
-      "type": "object",
-      "properties": {
-        "planId": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "date": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "metrics": {
-          "type": "object"
-        },
-        "coachNote": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "planId",
-        "date"
-      ]
-    },
+    "body": null,
     "statusCodes": [
       "200",
-      "400",
-      "401",
       "403",
       "404"
     ]
   },
-  "POST /subscriptions": {
-    "path": "/subscriptions",
+  "POST /training-plans/results": {
+    "path": "/training-plans/results",
     "method": "POST",
-    "summary": "Register member to a membership plan",
+    "summary": "Coach ghi một mốc tiến độ cho kế hoạch (CHỈ Coach phụ trách plan)",
     "security": [
       {
         "BearerAuth": []
@@ -428,45 +498,137 @@
     "body": {
       "type": "object",
       "required": [
-        "memberId",
         "planId",
-        "paymentMethod"
+        "date"
       ],
       "properties": {
-        "memberId": {
-          "type": "string"
-        },
         "planId": {
-          "type": "string"
-        },
-        "startDate": {
-          "type": "string"
-        },
-        "paymentMethod": {
           "type": "string",
-          "enum": [
-            "CASH",
-            "BANK_TRANSFER"
-          ]
+          "format": "uuid"
         },
-        "note": {
-          "type": "string"
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "coachNote": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "metrics": {
+          "type": "array",
+          "maxItems": 30,
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "value"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "example": "Squat"
+              },
+              "value": {
+                "type": "number",
+                "example": 80
+              },
+              "unit": {
+                "type": "string",
+                "example": "kg"
+              },
+              "lowerIsBetter": {
+                "type": "boolean",
+                "description": "true nếu số càng nhỏ càng tốt (vd. thời gian chạy)"
+              }
+            }
+          }
         }
       }
     },
     "statusCodes": [
       "201",
       "400",
-      "401",
       "403",
-      "404",
-      "500"
+      "404"
     ]
   },
-  "POST /subscriptions/{id}/renew": {
-    "path": "/subscriptions/{id}/renew",
+  "PATCH /training-plans/results/{id}": {
+    "path": "/training-plans/results/{id}",
+    "method": "PATCH",
+    "summary": "Coach sửa một mốc tiến độ (CHỈ Coach phụ trách plan)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "description": "Cần ít nhất một trường. `metrics` nếu gửi sẽ thay toàn bộ danh sách chỉ số của mốc.",
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "coachNote": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "403",
+      "404"
+    ]
+  },
+  "DELETE /training-plans/results/{id}": {
+    "path": "/training-plans/results/{id}",
+    "method": "DELETE",
+    "summary": "Coach xóa một mốc tiến độ (CHỈ Coach phụ trách plan)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403",
+      "404"
+    ]
+  },
+  "POST /training-plans/{id}/attachments": {
+    "path": "/training-plans/{id}/attachments",
     "method": "POST",
-    "summary": "Renew a membership subscription",
+    "summary": "Coach attaches a PDF/Excel file to a training plan",
     "security": [
       {
         "BearerAuth": []
@@ -482,41 +644,18 @@
         }
       }
     ],
-    "body": {
-      "type": "object",
-      "required": [
-        "planId",
-        "paymentMethod"
-      ],
-      "properties": {
-        "planId": {
-          "type": "string"
-        },
-        "paymentMethod": {
-          "type": "string",
-          "enum": [
-            "CASH",
-            "BANK_TRANSFER"
-          ]
-        },
-        "note": {
-          "type": "string"
-        }
-      }
-    },
+    "body": null,
     "statusCodes": [
       "201",
       "400",
-      "401",
       "403",
-      "404",
-      "500"
+      "404"
     ]
   },
-  "GET /subscriptions/member/{memberId}": {
-    "path": "/subscriptions/member/{memberId}",
+  "GET /training-plans/{id}/attachments": {
+    "path": "/training-plans/{id}/attachments",
     "method": "GET",
-    "summary": "Get all subscriptions for a member",
+    "summary": "List attachments of a training plan (plan's Coach, plan's Member, Manager)",
     "security": [
       {
         "BearerAuth": []
@@ -525,23 +664,579 @@
     "parameters": [
       {
         "in": "path",
-        "name": "memberId",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403",
+      "404"
+    ]
+  },
+  "GET /training-plans/{id}/attachments/{attachmentId}": {
+    "path": "/training-plans/{id}/attachments/{attachmentId}",
+    "method": "GET",
+    "summary": "Download an attachment (authenticated)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
         "required": true,
         "schema": {
           "type": "string"
         }
       },
       {
+        "in": "path",
+        "name": "attachmentId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403",
+      "404"
+    ]
+  },
+  "DELETE /training-plans/{id}/attachments/{attachmentId}": {
+    "path": "/training-plans/{id}/attachments/{attachmentId}",
+    "method": "DELETE",
+    "summary": "Delete an attachment (plan's Coach only)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "path",
+        "name": "attachmentId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403",
+      "404"
+    ]
+  },
+  "GET /training-plans/{id}/progress": {
+    "path": "/training-plans/{id}/progress",
+    "method": "GET",
+    "summary": "Xem tiến độ của một kế hoạch (Member chủ plan, Coach phụ trách, Manager)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403",
+      "404"
+    ]
+  },
+  "GET /shop/config": {
+    "path": "/shop/config",
+    "method": "GET",
+    "summary": "Cấu hình cửa hàng (giữ hàng, phí ship, khu vực giao, giới hạn…)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "GET /shop/cart": {
+    "path": "/shop/cart",
+    "method": "GET",
+    "summary": "Giỏ hàng + cảnh báo từng dòng",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "DELETE /shop/cart": {
+    "path": "/shop/cart",
+    "method": "DELETE",
+    "summary": "Xóa toàn bộ giỏ",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /shop/cart/items": {
+    "path": "/shop/cart/items",
+    "method": "POST",
+    "summary": "Thêm sản phẩm vào giỏ (cộng dồn). Giỏ không giữ tồn kho.",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "productId"
+      ],
+      "properties": {
+        "productId": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "409",
+      "429"
+    ]
+  },
+  "PATCH /shop/cart/items/{productId}": {
+    "path": "/shop/cart/items/{productId}",
+    "method": "PATCH",
+    "summary": "Đặt lại số lượng một dòng",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "productId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "quantity"
+      ],
+      "properties": {
+        "quantity": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "DELETE /shop/cart/items/{productId}": {
+    "path": "/shop/cart/items/{productId}",
+    "method": "DELETE",
+    "summary": "Xóa một dòng",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "productId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /shop/cart/accept-prices": {
+    "path": "/shop/cart/accept-prices",
+    "method": "POST",
+    "summary": "Chấp nhận giá hiện tại cho mọi dòng (xóa cảnh báo PRICE_CHANGED)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "GET /shop/addresses": {
+    "path": "/shop/addresses",
+    "method": "GET",
+    "summary": "Sổ địa chỉ (mặc định lên đầu; `deliverable` = trong khu vực giao)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /shop/addresses": {
+    "path": "/shop/addresses",
+    "method": "POST",
+    "summary": "Thêm địa chỉ (địa chỉ đầu tiên tự là mặc định; tối đa 10)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "recipientName",
+        "phone",
+        "province",
+        "street"
+      ],
+      "properties": {
+        "recipientName": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string",
+          "example": "0901234567"
+        },
+        "province": {
+          "type": "string",
+          "example": "Hồ Chí Minh"
+        },
+        "district": {
+          "type": "string",
+          "description": "Không bắt buộc (địa giới 2 cấp)"
+        },
+        "ward": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "isDefault": {
+          "type": "boolean"
+        }
+      }
+    },
+    "statusCodes": [
+      "201"
+    ]
+  },
+  "PATCH /shop/addresses/{id}": {
+    "path": "/shop/addresses/{id}",
+    "method": "PATCH",
+    "summary": "Sửa địa chỉ của mình (không phải của mình ⇒ 404)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "DELETE /shop/addresses/{id}": {
+    "path": "/shop/addresses/{id}",
+    "method": "DELETE",
+    "summary": "Xóa địa chỉ (xóa mặc định ⇒ địa chỉ cũ nhất còn lại thành mặc định)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /shop/addresses/{id}/default": {
+    "path": "/shop/addresses/{id}/default",
+    "method": "POST",
+    "summary": "Đặt làm địa chỉ mặc định",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /shop/checkout/preview": {
+    "path": "/shop/checkout/preview",
+    "method": "POST",
+    "summary": "Xem trước đơn (không ghi) — dòng, tạm tính, phí ship, tổng, cảnh báo, canCheckout",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "mode",
+        "fulfillmentType"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "CART",
+            "BUY_NOW"
+          ]
+        },
+        "productIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "CART: chọn dòng (trống = cả giỏ)"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "integer"
+              }
+            }
+          },
+          "description": "BUY_NOW"
+        },
+        "fulfillmentType": {
+          "type": "string",
+          "enum": [
+            "PICKUP",
+            "DELIVERY"
+          ]
+        },
+        "addressId": {
+          "type": "string",
+          "description": "DELIVERY: địa chỉ trong sổ của chính mình"
+        },
+        "recipientName": {
+          "type": "string"
+        },
+        "recipientPhone": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /shop/checkout": {
+    "path": "/shop/checkout",
+    "method": "POST",
+    "summary": "Tạo đơn + giao dịch VietQR (SePay) — bắt buộc header Idempotency-Key",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "header",
+        "name": "Idempotency-Key",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 8
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "mode",
+        "fulfillmentType",
+        "expectedTotal"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "CART",
+            "BUY_NOW"
+          ]
+        },
+        "productIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "fulfillmentType": {
+          "type": "string",
+          "enum": [
+            "PICKUP",
+            "DELIVERY"
+          ]
+        },
+        "addressId": {
+          "type": "string"
+        },
+        "recipientName": {
+          "type": "string"
+        },
+        "recipientPhone": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "expectedTotal": {
+          "type": "integer"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "201",
+      "400",
+      "403",
+      "409",
+      "429",
+      "503"
+    ]
+  },
+  "GET /shop/orders": {
+    "path": "/shop/orders",
+    "method": "GET",
+    "summary": "Đơn của tôi (lọc nhóm PENDING|ACTIVE|COMPLETED|CLOSED hoặc trạng thái cụ thể)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
         "in": "query",
         "name": "status",
         "schema": {
-          "type": "string",
-          "enum": [
-            "ACTIVE",
-            "EXPIRED",
-            "CANCELLED",
-            "SUSPENDED"
-          ]
+          "type": "string"
         }
       },
       {
@@ -561,17 +1256,13 @@
     ],
     "body": null,
     "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "404",
-      "500"
+      "200"
     ]
   },
-  "GET /subscriptions/{id}": {
-    "path": "/subscriptions/{id}",
+  "GET /shop/orders/{id}": {
+    "path": "/shop/orders/{id}",
     "method": "GET",
-    "summary": "Get subscription by ID",
+    "summary": "Chi tiết đơn của tôi — items (+ quyền đánh giá), history, payment, pickup{code,qrPayload,deadline} khi READY, actions",
     "security": [
       {
         "BearerAuth": []
@@ -590,17 +1281,231 @@
     "body": null,
     "statusCodes": [
       "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "500"
+      "404"
     ]
   },
-  "PATCH /subscriptions/{id}/status": {
-    "path": "/subscriptions/{id}/status",
-    "method": "PATCH",
-    "summary": "Cập nhật trạng thái gói (Manager only)",
+  "POST /shop/orders/{id}/cancel": {
+    "path": "/shop/orders/{id}/cancel",
+    "method": "POST",
+    "summary": "Hủy đơn chờ thanh toán (nhả hàng). Đơn đã thanh toán ⇒ 409 ORDER_PAID_USE_REFUND.",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /shop/orders/{id}/request-refund": {
+    "path": "/shop/orders/{id}/request-refund",
+    "method": "POST",
+    "summary": "Đơn ĐÃ THANH TOÁN (PAID) ⇒ REFUND_REQUESTED + yêu cầu hoàn tiền (Manager duyệt)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "409"
+    ]
+  },
+  "POST /shop/orders/{id}/confirm-received": {
+    "path": "/shop/orders/{id}/confirm-received",
+    "method": "POST",
+    "summary": "Khách xác nhận đã nhận hàng (DELIVERED ⇒ COMPLETED)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /shop/order-items/{id}/review": {
+    "path": "/shop/order-items/{id}/review",
+    "method": "POST",
+    "summary": "Đánh giá một dòng đơn COMPLETED của mình (mỗi dòng tối đa 1 đánh giá)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "rating"
+      ],
+      "properties": {
+        "rating": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "comment": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "201",
+      "403",
+      "409"
+    ]
+  },
+  "GET /shop/manage/summary": {
+    "path": "/shop/manage/summary",
+    "method": "GET",
+    "summary": "Đếm đơn theo trạng thái + số sản phẩm sắp hết",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "GET /shop/manage/orders": {
+    "path": "/shop/manage/orders",
+    "method": "GET",
+    "summary": "Danh sách đơn (lọc trạng thái/nhóm, hình thức nhận, tìm mã đơn/tên/SĐT/vận đơn)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "fulfillmentType",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PICKUP",
+            "DELIVERY"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "GET /shop/manage/orders/{id}": {
+    "path": "/shop/manage/orders/{id}",
+    "method": "GET",
+    "summary": "Chi tiết đơn cho Manager (người mua, allowedTransitions; không lộ mã nhận hàng)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /shop/manage/orders/{id}/status": {
+    "path": "/shop/manage/orders/{id}/status",
+    "method": "POST",
+    "summary": "Chuyển trạng thái đơn theo máy trạng thái (SHIPPING bắt buộc trackingCode)",
     "security": [
       {
         "BearerAuth": []
@@ -625,130 +1530,36 @@
         "status": {
           "type": "string",
           "enum": [
-            "ACTIVE",
             "CANCELLED",
-            "SUSPENDED"
+            "READY_FOR_PICKUP",
+            "PROCESSING",
+            "SHIPPING",
+            "DELIVERED",
+            "COMPLETED",
+            "NOT_PICKED_UP",
+            "REFUND_REQUESTED"
           ]
-        }
-      }
-    },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "500"
-    ]
-  },
-  "PATCH /subscriptions/{id}/cancel": {
-    "path": "/subscriptions/{id}/cancel",
-    "method": "PATCH",
-    "summary": "Member tự hủy gói của mình",
-    "security": [
-      {
-        "BearerAuth": []
-      }
-    ],
-    "parameters": [
-      {
-        "in": "path",
-        "name": "id",
-        "required": true,
-        "schema": {
-          "type": "string",
-          "format": "uuid"
         },
-        "description": "Subscription ID (phải là gói của chính mình)"
-      }
-    ],
-    "body": {
-      "type": "object",
-      "properties": {
         "reason": {
-          "type": "string",
-          "maxLength": 500,
-          "description": "Lý do hủy gói (không bắt buộc)",
-          "example": "Tôi không có thời gian tập luyện nữa"
-        }
-      }
-    },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "500"
-    ]
-  },
-  "GET /sports": {
-    "path": "/sports",
-    "method": "GET",
-    "summary": "Get list of sports",
-    "security": [],
-    "parameters": [
-      {
-        "in": "query",
-        "name": "search",
-        "schema": {
           "type": "string"
         },
-        "description": "Search by name"
-      },
-      {
-        "in": "query",
-        "name": "areaType",
-        "schema": {
-          "type": "string",
-          "enum": [
-            "POOL",
-            "INDOOR",
-            "OUTDOOR"
-          ]
+        "trackingCode": {
+          "type": "string"
         },
-        "description": "Filter sports supporting an area type"
-      },
-      {
-        "in": "query",
-        "name": "isActive",
-        "schema": {
-          "type": "string",
-          "enum": [
-            "true",
-            "false"
-          ]
-        },
-        "description": "Filter by active status"
-      },
-      {
-        "in": "query",
-        "name": "page",
-        "schema": {
-          "type": "integer",
-          "default": 1
-        }
-      },
-      {
-        "in": "query",
-        "name": "limit",
-        "schema": {
-          "type": "integer",
-          "default": 10
+        "carrier": {
+          "type": "string"
         }
       }
-    ],
-    "body": null,
+    },
     "statusCodes": [
       "200",
-      "400",
-      "500"
+      "409"
     ]
   },
-  "POST /sports": {
-    "path": "/sports",
+  "POST /shop/manage/pickup/verify": {
+    "path": "/shop/manage/pickup/verify",
     "method": "POST",
-    "summary": "Create a new sport",
+    "summary": "Tra mã nhận hàng (QR `SCMS-PICKUP:<mã đơn>:<mã>` hoặc nhập tay) ⇒ tóm tắt đơn để đối chiếu",
     "security": [
       {
         "BearerAuth": []
@@ -758,72 +1569,23 @@
     "body": {
       "type": "object",
       "required": [
-        "name",
-        "areaTypes"
+        "code"
       ],
       "properties": {
-        "name": {
-          "type": "string",
-          "example": "Yoga"
-        },
-        "description": {
-          "type": "string",
-          "example": "Yoga class improves flexibility"
-        },
-        "areaTypes": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": [
-              "POOL",
-              "INDOOR",
-              "OUTDOOR"
-            ]
-          },
-          "minItems": 1,
-          "example": [
-            "INDOOR"
-          ],
-          "description": "Area types this sport supports (at least one)"
+        "code": {
+          "type": "string"
         }
       }
     },
     "statusCodes": [
-      "201",
-      "400",
-      "401",
-      "403",
-      "409",
-      "500"
-    ]
-  },
-  "GET /sports/{id}": {
-    "path": "/sports/{id}",
-    "method": "GET",
-    "summary": "View sport details",
-    "security": [],
-    "parameters": [
-      {
-        "in": "path",
-        "name": "id",
-        "required": true,
-        "schema": {
-          "type": "string"
-        }
-      }
-    ],
-    "body": null,
-    "statusCodes": [
       "200",
-      "400",
-      "404",
-      "500"
+      "400"
     ]
   },
-  "PATCH /sports/{id}": {
-    "path": "/sports/{id}",
-    "method": "PATCH",
-    "summary": "Update sport",
+  "POST /shop/manage/orders/{id}/pickup": {
+    "path": "/shop/manage/orders/{id}/pickup",
+    "method": "POST",
+    "summary": "Xác nhận giao tại quầy (mã + 4 số cuối SĐT) ⇒ COMPLETED; mã dùng một lần",
     "security": [
       {
         "BearerAuth": []
@@ -841,44 +1603,211 @@
     ],
     "body": {
       "type": "object",
+      "required": [
+        "code",
+        "phoneLast4"
+      ],
       "properties": {
-        "name": {
+        "code": {
           "type": "string"
         },
-        "description": {
+        "phoneLast4": {
           "type": "string"
-        },
-        "areaTypes": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": [
-              "POOL",
-              "INDOOR",
-              "OUTDOOR"
-            ]
-          },
-          "minItems": 1,
-          "description": "Area types this sport supports. Cannot remove a type used by an active Class."
-        },
-        "isActive": {
-          "type": "boolean"
         }
       }
     },
     "statusCodes": [
       "200",
       "400",
-      "401",
-      "403",
-      "404",
-      "500"
+      "409",
+      "423"
     ]
   },
-  "DELETE /sports/{id}": {
-    "path": "/sports/{id}",
-    "method": "DELETE",
-    "summary": "Deactivate sport (soft delete)",
+  "GET /shop/manage/inventory": {
+    "path": "/shop/manage/inventory",
+    "method": "GET",
+    "summary": "Tồn kho (stock, reserved, available, lowStock) — sắp hết lên đầu",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "lowStock",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /shop/manage/inventory/{productId}": {
+    "path": "/shop/manage/inventory/{productId}",
+    "method": "POST",
+    "summary": "Nhập hàng (IN, số dương) / điều chỉnh (ADJUST, ±) — ghi nhật ký kho",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "productId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "type",
+        "quantity",
+        "note"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "IN",
+            "ADJUST"
+          ]
+        },
+        "quantity": {
+          "type": "integer"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "409"
+    ]
+  },
+  "GET /shop/manage/inventory/{productId}/transactions": {
+    "path": "/shop/manage/inventory/{productId}/transactions",
+    "method": "GET",
+    "summary": "Nhật ký kho của sản phẩm",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "productId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "GET /shop/manage/reviews": {
+    "path": "/shop/manage/reviews",
+    "method": "GET",
+    "summary": "Đánh giá sản phẩm (lọc sản phẩm / đang ẩn)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "productId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "hidden",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "PATCH /shop/manage/reviews/{id}": {
+    "path": "/shop/manage/reviews/{id}",
+    "method": "PATCH",
+    "summary": "Ẩn / hiện đánh giá (điểm trung bình tính lại, không tính đánh giá ẩn)",
     "security": [
       {
         "BearerAuth": []
@@ -894,14 +1823,22 @@
         }
       }
     ],
-    "body": null,
+    "body": {
+      "type": "object",
+      "required": [
+        "isHidden"
+      ],
+      "properties": {
+        "isHidden": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
     "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "500"
+      "200"
     ]
   },
   "GET /rooms": {
@@ -1504,10 +2441,732 @@
       "500"
     ]
   },
+  "POST /refunds/course-cancellation": {
+    "path": "/refunds/course-cancellation",
+    "method": "POST",
+    "summary": "MEMBER xin hủy khóa học và hoàn tiền (trước khai giảng ≥ 24h)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "classId"
+      ],
+      "properties": {
+        "classId": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Lý do hủy (tuỳ chọn)"
+        },
+        "bankName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Tên ngân hàng (VD: MBBank, VCB, Techcombank)"
+        },
+        "bankAccountNumber": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Số tài khoản nhận tiền"
+        },
+        "bankAccountName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Tên chủ tài khoản"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "201",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "500"
+    ]
+  },
+  "GET /refunds/my": {
+    "path": "/refunds/my",
+    "method": "GET",
+    "summary": "MEMBER xem các yêu cầu hoàn tiền của mình",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "COMPLETED",
+            "REJECTED",
+            "CANCELLED"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
+    ]
+  },
+  "GET /refunds": {
+    "path": "/refunds",
+    "method": "GET",
+    "summary": "MANAGER xem danh sách yêu cầu hoàn tiền",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "COMPLETED",
+            "REJECTED",
+            "CANCELLED"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "reason",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "MEMBER_CANCEL_COURSE",
+            "MEMBER_CANCEL_SESSION",
+            "SESSION_CANCELLED",
+            "ORDER_CANCELLED",
+            "ORDER_NOT_PICKED_UP",
+            "ORDER_LATE_PAYMENT"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "memberId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "classId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "orderId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
+    ]
+  },
+  "PATCH /refunds/{id}/approve": {
+    "path": "/refunds/{id}/approve",
+    "method": "PATCH",
+    "summary": "MANAGER duyệt hoàn tiền (sau khi đã chuyển khoản tay cho hội viên)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "properties": {
+        "note": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Ghi chú duyệt hoàn tiền"
+        },
+        "transactionRef": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Mã giao dịch ngân hàng thực tế (FT code)"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "404",
+      "409"
+    ]
+  },
+  "GET /refunds/summary": {
+    "path": "/refunds/summary",
+    "method": "GET",
+    "summary": "Thống kê số lượng & số tiền hoàn theo trạng thái và lý do (MANAGER)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
+    ]
+  },
+  "GET /refunds/course-cancellation/preview": {
+    "path": "/refunds/course-cancellation/preview",
+    "method": "GET",
+    "summary": "BE-16: Xem trước điều kiện hủy khóa (MEMBER) — không ghi dữ liệu",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "classId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "GET /refunds/{id}": {
+    "path": "/refunds/{id}",
+    "method": "GET",
+    "summary": "BE-17: Chi tiết yêu cầu hoàn tiền (MANAGER: mọi bản ghi; MEMBER: của mình)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403",
+      "404"
+    ]
+  },
+  "PATCH /refunds/{id}/reject": {
+    "path": "/refunds/{id}/reject",
+    "method": "PATCH",
+    "summary": "MANAGER từ chối hoàn tiền (kèm lý do)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 500
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409"
+    ]
+  },
+  "PATCH /refunds/{id}/cancel": {
+    "path": "/refunds/{id}/cancel",
+    "method": "PATCH",
+    "summary": "MEMBER/COACH tự hủy yêu cầu hoàn tiền của mình khi còn PENDING",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409"
+    ]
+  },
+  "GET /products": {
+    "path": "/products",
+    "method": "GET",
+    "summary": "List products (default — only products on sale)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "isActive",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false",
+            "all"
+          ]
+        },
+        "description": "Mặc định true (đang bán). false = đã ngừng bán, all = tất cả (cho Manager)."
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /products": {
+    "path": "/products",
+    "method": "POST",
+    "summary": "Create a new product (Manager only)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "name",
+        "description",
+        "price",
+        "stockQuantity"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5
+        },
+        "price": {
+          "type": "number",
+          "minimum": 0
+        },
+        "stockQuantity": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Tồn đầu — ghi đúng 1 dòng nhật ký kho IN"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "imageUrl": {
+          "type": "string",
+          "format": "uri",
+          "nullable": true
+        },
+        "imageUrls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          },
+          "maxItems": 10
+        },
+        "maxPerOrder": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxPerDay": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lowStockThreshold": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "statusCodes": [
+      "201"
+    ]
+  },
+  "GET /products/{id}": {
+    "path": "/products/{id}",
+    "method": "GET",
+    "summary": "Get product details by ID",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "PATCH /products/{id}": {
+    "path": "/products/{id}",
+    "method": "PATCH",
+    "summary": "Update an existing product (Manager only)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "price": {
+          "type": "number",
+          "description": "Đổi giá không ảnh hưởng OrderItem đã đặt (snapshot)"
+        },
+        "stockQuantity": {
+          "type": "integer",
+          "description": "API cũ — nên dùng POST /shop/manage/inventory/{productId}"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "false = ngừng bán (giữ đơn/đánh giá/nhật ký kho)"
+        },
+        "imageUrl": {
+          "type": "string",
+          "format": "uri",
+          "nullable": true
+        },
+        "imageUrls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          },
+          "maxItems": 10
+        },
+        "maxPerOrder": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxPerDay": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lowStockThreshold": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "DELETE /products/{id}": {
+    "path": "/products/{id}",
+    "method": "DELETE",
+    "summary": "Xóa vĩnh viễn sản phẩm chưa có đơn/đánh giá (Manager) — đã có lịch sử ⇒ 409, hãy ngừng bán",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "404",
+      "409"
+    ]
+  },
+  "POST /products/orders": {
+    "path": "/products/orders",
+    "method": "POST",
+    "summary": "Create an order (multiple products) and its SePay (VietQR) payment",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Các sản phẩm trong đơn (cùng productId lặp lại sẽ được cộng dồn số lượng)",
+          "items": {
+            "type": "object",
+            "required": [
+              "productId",
+              "quantity"
+            ],
+            "properties": {
+              "productId": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "statusCodes": [
+      "201",
+      "400",
+      "401",
+      "403",
+      "404",
+      "500",
+      "503"
+    ]
+  },
+  "POST /products/orders/{id}/cancel": {
+    "path": "/products/orders/{id}/cancel",
+    "method": "POST",
+    "summary": "Cancel a PENDING_PAYMENT order (releases reserved stock)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "500"
+    ]
+  },
+  "GET /products/my/orders": {
+    "path": "/products/my/orders",
+    "method": "GET",
+    "summary": "Get my orders (with items)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /products/{id}/reviews": {
+    "path": "/products/{id}/reviews",
+    "method": "POST",
+    "summary": "Add a review for a product",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "rating"
+      ],
+      "properties": {
+        "rating": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "comment": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "201"
+    ]
+  },
   "POST /payments": {
     "path": "/payments",
     "method": "POST",
-    "summary": "Record a payment (auto-creates invoice on SUCCESS)",
+    "summary": "Ghi nhận thanh toán khóa học tại quầy (Manager only)",
     "security": [
       {
         "BearerAuth": []
@@ -1523,13 +3182,16 @@
       ],
       "properties": {
         "memberId": {
-          "type": "string"
+          "type": "string",
+          "description": "MemberProfile.id hoặc User.id"
         },
-        "subscriptionId": {
-          "type": "string"
+        "classId": {
+          "type": "string",
+          "description": "Class.id (lớp APPROVED)"
         },
         "amount": {
-          "type": "number"
+          "type": "number",
+          "description": "Bằng đúng giá khóa học (VND)"
         },
         "method": {
           "type": "string",
@@ -1544,7 +3206,8 @@
             "PENDING",
             "SUCCESS",
             "FAILED"
-          ]
+          ],
+          "default": "SUCCESS"
         },
         "note": {
           "type": "string"
@@ -1600,7 +3263,8 @@
           "type": "string",
           "enum": [
             "CASH",
-            "BANK_TRANSFER"
+            "BANK_TRANSFER",
+            "SEPAY"
           ]
         }
       },
@@ -1671,10 +3335,65 @@
       "500"
     ]
   },
+  "GET /payments/my": {
+    "path": "/payments/my",
+    "method": "GET",
+    "summary": "BE-6: Lịch sử thanh toán của tôi (MEMBER: khóa học + đơn hàng; COACH: đơn hàng)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "type",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "CLASS",
+            "ORDER",
+            "MEMBERSHIP"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "SUCCESS",
+            "FAILED",
+            "REFUNDED"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
   "PATCH /payments/{id}/status": {
     "path": "/payments/{id}/status",
     "method": "PATCH",
-    "summary": "Update payment status",
+    "summary": "Update payment status (thanh toán tại quầy)",
     "security": [
       {
         "BearerAuth": []
@@ -1716,99 +3435,13 @@
       "500"
     ]
   },
-  "GET /notifications": {
-    "path": "/notifications",
-    "method": "GET",
-    "summary": "GET /notifications",
+  "POST /payments/{id}/retry-activation": {
+    "path": "/payments/{id}/retry-activation",
+    "method": "POST",
+    "summary": "Kích hoạt bù khóa học cho giao dịch SePay đã thu tiền nhưng chưa ghi danh (Manager only)",
     "security": [
       {
-        "bearerAuth": []
-      }
-    ],
-    "parameters": [
-      {
-        "in": "query",
-        "name": "page",
-        "schema": {
-          "type": "string"
-        }
-      },
-      {
-        "in": "query",
-        "name": "limit",
-        "schema": {
-          "type": "string"
-        }
-      },
-      {
-        "in": "query",
-        "name": "type",
-        "schema": {
-          "type": "string"
-        }
-      },
-      {
-        "in": "query",
-        "name": "isRead",
-        "schema": {
-          "type": "string"
-        }
-      }
-    ],
-    "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
-  },
-  "GET /notifications/unread-count": {
-    "path": "/notifications/unread-count",
-    "method": "GET",
-    "summary": "GET /notifications/unread-count",
-    "security": [
-      {
-        "bearerAuth": []
-      }
-    ],
-    "parameters": [],
-    "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
-  },
-  "PATCH /notifications/mark-all-read": {
-    "path": "/notifications/mark-all-read",
-    "method": "PATCH",
-    "summary": "PATCH /notifications/mark-all-read",
-    "security": [
-      {
-        "bearerAuth": []
-      }
-    ],
-    "parameters": [],
-    "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
-  },
-  "PATCH /notifications/{id}/read": {
-    "path": "/notifications/{id}/read",
-    "method": "PATCH",
-    "summary": "PATCH /notifications/{id}/read",
-    "security": [
-      {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [
@@ -1827,82 +3460,380 @@
       "400",
       "401",
       "403",
-      "404"
+      "404",
+      "409",
+      "500"
     ]
   },
-  "POST /notifications/trigger-upcoming-reminders": {
-    "path": "/notifications/trigger-upcoming-reminders",
+  "POST /payments/sepay/checkout": {
+    "path": "/payments/sepay/checkout",
     "method": "POST",
-    "summary": "POST /notifications/trigger-upcoming-reminders",
+    "summary": "Member tạo đơn chuyển khoản VietQR (SePay) để tự mua khóa học",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [],
-    "body": null,
+    "body": {
+      "type": "object",
+      "required": [
+        "classId"
+      ],
+      "properties": {
+        "classId": {
+          "type": "string",
+          "description": "Class.id (lớp APPROVED, giá > 0)"
+        }
+      }
+    },
+    "statusCodes": [
+      "201",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "500",
+      "503"
+    ]
+  },
+  "POST /payments/sepay/webhook": {
+    "path": "/payments/sepay/webhook",
+    "method": "POST",
+    "summary": "SePay gọi server-to-server khi phát hiện giao dịch chuyển khoản",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "header",
+        "name": "Authorization",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "`Apikey <SEPAY_WEBHOOK_API_KEY>` (phương thức API Key)"
+      },
+      {
+        "in": "header",
+        "name": "X-SePay-Signature",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "`sha256={hex}` — chữ ký HMAC-SHA256 (phương thức HMAC)"
+      },
+      {
+        "in": "header",
+        "name": "X-SePay-Timestamp",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Unix timestamp (seconds) khi SePay ký — tham gia nội dung ký"
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "id",
+        "transferType",
+        "transferAmount",
+        "accountNumber"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "ID giao dịch trên SePay — khoá chống trùng"
+        },
+        "gateway": {
+          "type": "string",
+          "description": "Tên ngân hàng, VD SACOMBANK"
+        },
+        "transactionDate": {
+          "type": "string",
+          "description": "YYYY-MM-DD HH:mm:ss (giờ VN)"
+        },
+        "accountNumber": {
+          "type": "string"
+        },
+        "subAccount": {
+          "type": "string",
+          "description": "Số VA nếu có, rỗng nếu không"
+        },
+        "code": {
+          "type": "string",
+          "nullable": true,
+          "description": "Mã thanh toán SePay bóc tách được, VD SEVQR12345678"
+        },
+        "content": {
+          "type": "string",
+          "description": "Nội dung chuyển khoản gốc"
+        },
+        "transferType": {
+          "type": "string",
+          "enum": [
+            "in",
+            "out"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "transferAmount": {
+          "type": "integer"
+        },
+        "accumulated": {
+          "type": "integer"
+        },
+        "referenceCode": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "500",
+      "503"
+    ]
+  },
+  "POST /payments/sepay/mock-confirm": {
+    "path": "/payments/sepay/mock-confirm",
+    "method": "POST",
+    "summary": "DEV/DEMO — mô phỏng SePay xác nhận đã thu tiền (chỉ khi SEPAY_MOCK_MODE=true)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "paymentId"
+      ],
+      "properties": {
+        "paymentId": {
+          "type": "string"
+        }
+      }
+    },
     "statusCodes": [
       "200",
       "400",
       "401",
       "403",
-      "404"
+      "404",
+      "500"
     ]
   },
-  "GET /membership-plans": {
-    "path": "/membership-plans",
+  "GET /payments/sepay/{id}": {
+    "path": "/payments/sepay/{id}",
     "method": "GET",
-    "summary": "List membership plans (public)",
-    "security": [],
+    "summary": "Xem trạng thái giao dịch chuyển khoản SePay (FE polling sau khi hội viên CK)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Payment.id nhận được từ `POST /payments/sepay/checkout` hoặc `POST /products/orders`"
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "404",
+      "500"
+    ]
+  },
+  "GET /notifications": {
+    "path": "/notifications",
+    "method": "GET",
+    "summary": "Get my notifications",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
     "parameters": [
       {
         "in": "query",
-        "name": "tier",
+        "name": "type",
         "schema": {
           "type": "string",
           "enum": [
-            "MEMBERSHIP",
-            "PREMIUM"
+            "MEMBER_REGISTERED",
+            "CHAT_MESSAGE",
+            "SUBSCRIPTION_EXPIRING",
+            "SUBSCRIPTION_EXPIRED",
+            "SUBSCRIPTION_CANCELLED",
+            "UPCOMING_CLASS",
+            "SCHEDULE_CANCELLED",
+            "SCHEDULE_UPDATED",
+            "ENROLLMENT_CONFIRMED",
+            "ENROLLMENT_CANCELLED",
+            "TRAINING_PLAN_ASSIGNED",
+            "NEW_CLASS",
+            "COACH_CHANGED",
+            "PAYMENT_SUCCESS",
+            "PAYMENT_REFUNDED",
+            "PAYMENT_FAILED"
           ]
-        }
+        },
+        "description": "Filter by notification type"
       },
       {
         "in": "query",
-        "name": "isActive",
+        "name": "isRead",
         "schema": {
           "type": "string",
           "enum": [
             "true",
             "false"
           ]
-        }
+        },
+        "description": "Filter by read status"
       },
       {
         "in": "query",
         "name": "page",
         "schema": {
-          "type": "integer"
+          "type": "integer",
+          "default": 1
         }
       },
       {
         "in": "query",
         "name": "limit",
         "schema": {
-          "type": "integer"
+          "type": "integer",
+          "default": 20
         }
       }
     ],
     "body": null,
     "statusCodes": [
       "200",
-      "400",
+      "401",
       "500"
+    ]
+  },
+  "GET /notifications/unread-count": {
+    "path": "/notifications/unread-count",
+    "method": "GET",
+    "summary": "Get count of unread notifications",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "500"
+    ]
+  },
+  "PATCH /notifications/mark-all-read": {
+    "path": "/notifications/mark-all-read",
+    "method": "PATCH",
+    "summary": "Mark all my notifications as read",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "500"
+    ]
+  },
+  "PATCH /notifications/{id}/read": {
+    "path": "/notifications/{id}/read",
+    "method": "PATCH",
+    "summary": "Mark a specific notification as read",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Notification ID"
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "404",
+      "500"
+    ]
+  },
+  "POST /notifications/trigger-upcoming-reminders": {
+    "path": "/notifications/trigger-upcoming-reminders",
+    "method": "POST",
+    "summary": "Manually trigger upcoming class reminders (within 24h)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "500"
+    ]
+  },
+  "GET /membership-plans": {
+    "path": "/membership-plans",
+    "method": "GET",
+    "summary": "Danh sách gói thành viên đang bán (giá tăng dần)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401"
     ]
   },
   "POST /membership-plans": {
     "path": "/membership-plans",
     "method": "POST",
-    "summary": "Create membership plan",
+    "summary": "MANAGER tạo gói thành viên",
     "security": [
       {
         "BearerAuth": []
@@ -1913,34 +3844,24 @@
       "type": "object",
       "required": [
         "name",
-        "price",
         "durationDays",
-        "tier"
+        "price"
       ],
       "properties": {
         "name": {
-          "type": "string"
+          "type": "string",
+          "example": "Gói 1 tháng"
+        },
+        "durationDays": {
+          "type": "integer",
+          "example": 30
+        },
+        "price": {
+          "type": "integer",
+          "example": 500000
         },
         "description": {
           "type": "string"
-        },
-        "price": {
-          "type": "number"
-        },
-        "durationDays": {
-          "type": "integer"
-        },
-        "tier": {
-          "type": "string",
-          "enum": [
-            "MEMBERSHIP",
-            "PREMIUM"
-          ]
-        },
-        "maxConcurrentClasses": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Quota số Class KHÁC NHAU được giữ đồng thời; bỏ trống = mặc định theo tier"
         }
       }
     },
@@ -1948,94 +3869,13 @@
       "201",
       "400",
       "401",
-      "403",
-      "409",
-      "500"
+      "403"
     ]
   },
-  "GET /membership-plans/{id}": {
-    "path": "/membership-plans/{id}",
-    "method": "GET",
-    "summary": "Get plan details (public)",
-    "security": [],
-    "parameters": [
-      {
-        "in": "path",
-        "name": "id",
-        "required": true,
-        "schema": {
-          "type": "string"
-        }
-      }
-    ],
-    "body": null,
-    "statusCodes": [
-      "200",
-      "400",
-      "404",
-      "500"
-    ]
-  },
-  "PATCH /membership-plans/{id}": {
-    "path": "/membership-plans/{id}",
+  "PATCH /membership-plans/{id}/toggle": {
+    "path": "/membership-plans/{id}/toggle",
     "method": "PATCH",
-    "summary": "PATCH /membership-plans/{id}",
-    "security": [
-      {
-        "bearerAuth": []
-      }
-    ],
-    "parameters": [
-      {
-        "in": "path",
-        "name": "id",
-        "required": true,
-        "schema": {
-          "type": "string"
-        }
-      }
-    ],
-    "body": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 2
-        },
-        "description": {
-          "type": "string"
-        },
-        "price": {
-          "type": "number"
-        },
-        "durationDays": {
-          "type": "integer"
-        },
-        "tier": {
-          "type": "string",
-          "enum": [
-            "MEMBERSHIP",
-            "PREMIUM"
-          ]
-        },
-        "isActive": {
-          "type": "boolean"
-        }
-      },
-      "required": []
-    },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
-  },
-  "DELETE /membership-plans/{id}": {
-    "path": "/membership-plans/{id}",
-    "method": "DELETE",
-    "summary": "Deactivate membership plan",
+    "summary": "MANAGER bật/tắt gói (bỏ trống isActive ⇒ đảo trạng thái)",
     "security": [
       {
         "BearerAuth": []
@@ -2051,14 +3891,137 @@
         }
       }
     ],
-    "body": null,
+    "body": {
+      "type": "object",
+      "properties": {
+        "isActive": {
+          "type": "boolean"
+        }
+      }
+    },
     "statusCodes": [
       "200",
-      "400",
+      "401",
+      "403",
+      "404"
+    ]
+  },
+  "POST /memberships/purchase": {
+    "path": "/memberships/purchase",
+    "method": "POST",
+    "summary": "MEMBER mua gói — tạo giao dịch VietQR (SePay) chờ chuyển khoản",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "planId"
+      ],
+      "properties": {
+        "planId": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "201",
       "401",
       "403",
       "404",
-      "500"
+      "409",
+      "503"
+    ]
+  },
+  "GET /memberships/my": {
+    "path": "/memberships/my",
+    "method": "GET",
+    "summary": "Gói thành viên đang hiệu lực của tôi",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
+    ]
+  },
+  "GET /memberships/verify/{userId}": {
+    "path": "/memberships/verify/{userId}",
+    "method": "GET",
+    "summary": "COACH/MANAGER quét QR (userId) của hội viên ⇒ gói còn / hết hạn",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "userId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "404"
+    ]
+  },
+  "GET /memberships": {
+    "path": "/memberships",
+    "method": "GET",
+    "summary": "MANAGER xem danh sách membership",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "EXPIRED",
+            "CANCELLED"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
     ]
   },
   "GET /members": {
@@ -2145,10 +4108,10 @@
   "PATCH /members/{id}": {
     "path": "/members/{id}",
     "method": "PATCH",
-    "summary": "PATCH /members/{id}",
+    "summary": "Update member info",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [
@@ -2165,8 +4128,7 @@
       "type": "object",
       "properties": {
         "fullName": {
-          "type": "string",
-          "minLength": 2
+          "type": "string"
         },
         "phone": {
           "type": "string"
@@ -2196,15 +4158,15 @@
         "trainingPreference": {
           "type": "string"
         }
-      },
-      "required": []
+      }
     },
     "statusCodes": [
       "200",
       "400",
       "401",
       "403",
-      "404"
+      "404",
+      "500"
     ]
   },
   "GET /members/{id}/membership-status": {
@@ -2236,76 +4198,26 @@
       "500"
     ]
   },
-  "GET /invoices": {
-    "path": "/invoices",
+  "GET /locations/provinces": {
+    "path": "/locations/provinces",
     "method": "GET",
-    "summary": "List all invoices",
+    "summary": "Danh sách Tỉnh/Thành (địa giới 2 cấp, kèm `deliverable` = trong khu vực giao hàng)",
     "security": [
       {
         "BearerAuth": []
       }
     ],
-    "parameters": [
-      {
-        "in": "query",
-        "name": "memberId",
-        "schema": {
-          "type": "string"
-        }
-      },
-      {
-        "in": "query",
-        "name": "status",
-        "schema": {
-          "type": "string",
-          "enum": [
-            "ISSUED",
-            "CANCELLED"
-          ]
-        }
-      },
-      {
-        "in": "query",
-        "name": "startDate",
-        "schema": {
-          "type": "string"
-        }
-      },
-      {
-        "in": "query",
-        "name": "endDate",
-        "schema": {
-          "type": "string"
-        }
-      },
-      {
-        "in": "query",
-        "name": "page",
-        "schema": {
-          "type": "integer"
-        }
-      },
-      {
-        "in": "query",
-        "name": "limit",
-        "schema": {
-          "type": "integer"
-        }
-      }
-    ],
+    "parameters": [],
     "body": null,
     "statusCodes": [
       "200",
-      "400",
-      "401",
-      "403",
-      "500"
+      "503"
     ]
   },
-  "GET /invoices/member/{memberId}": {
-    "path": "/invoices/member/{memberId}",
+  "GET /locations/provinces/{code}/wards": {
+    "path": "/locations/provinces/{code}/wards",
     "method": "GET",
-    "summary": "Get invoices for a specific member",
+    "summary": "Phường/Xã của một Tỉnh/Thành (cấp 2)",
     "security": [
       {
         "BearerAuth": []
@@ -2314,41 +4226,24 @@
     "parameters": [
       {
         "in": "path",
-        "name": "memberId",
+        "name": "code",
         "required": true,
         "schema": {
-          "type": "string"
-        }
-      },
-      {
-        "in": "query",
-        "name": "page",
-        "schema": {
           "type": "integer"
-        }
-      },
-      {
-        "in": "query",
-        "name": "limit",
-        "schema": {
-          "type": "integer"
-        }
+        },
+        "description": "code từ /locations/provinces"
       }
     ],
     "body": null,
     "statusCodes": [
       "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "500"
+      "404"
     ]
   },
-  "GET /invoices/{id}": {
-    "path": "/invoices/{id}",
+  "GET /locations/provinces/{code}/districts": {
+    "path": "/locations/provinces/{code}/districts",
     "method": "GET",
-    "summary": "Get invoice by ID",
+    "summary": "Quận/Huyện (TÙY CHỌN, cấp cũ) của Tỉnh/Thành",
     "security": [
       {
         "BearerAuth": []
@@ -2357,21 +4252,17 @@
     "parameters": [
       {
         "in": "path",
-        "name": "id",
+        "name": "code",
         "required": true,
         "schema": {
-          "type": "string"
+          "type": "integer"
         }
       }
     ],
     "body": null,
     "statusCodes": [
       "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "500"
+      "404"
     ]
   },
   "POST /feedbacks": {
@@ -2621,19 +4512,17 @@
         }
       },
       {
-        "name": "page",
         "in": "query",
+        "name": "page",
         "schema": {
-          "type": "integer",
-          "default": 1
+          "type": "integer"
         }
       },
       {
-        "name": "limit",
         "in": "query",
+        "name": "limit",
         "schema": {
-          "type": "integer",
-          "default": 10
+          "type": "integer"
         }
       }
     ],
@@ -2644,6 +4533,58 @@
       "401",
       "403",
       "500"
+    ]
+  },
+  "GET /enrollments/my/courses": {
+    "path": "/enrollments/my/courses",
+    "method": "GET",
+    "summary": "My courses — in-payment / ongoing at the top, purchase history below (Member only)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "group",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "active",
+            "history"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string"
+        },
+        "example": "ONGOING,UPCOMING"
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "404"
     ]
   },
   "GET /enrollments/my/quota": {
@@ -2662,6 +4603,42 @@
       "401",
       "403",
       "404",
+      "500"
+    ]
+  },
+  "POST /enrollments/bulk": {
+    "path": "/enrollments/bulk",
+    "method": "POST",
+    "summary": "Enroll in a WHOLE course (all upcoming sessions of a class) — Member self-enrolls; Staff/Manager for a member",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "classId"
+      ],
+      "properties": {
+        "classId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "memberId": {
+          "type": "string",
+          "description": "Required when enrolled by Staff/Manager (nhận cả userId hoặc MemberProfile.id)"
+        }
+      }
+    },
+    "statusCodes": [
+      "201",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
       "500"
     ]
   },
@@ -2685,6 +4662,18 @@
       },
       {
         "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "BOOKED",
+            "CANCELLED",
+            "COMPLETED"
+          ]
+        }
+      },
+      {
+        "in": "query",
         "name": "page",
         "schema": {
           "type": "integer"
@@ -2707,10 +4696,53 @@
       "500"
     ]
   },
+  "GET /enrollments/{id}/transfer-options": {
+    "path": "/enrollments/{id}/transfer-options",
+    "method": "GET",
+    "summary": "Sessions of the same course a booking can be moved to (free slots, weekday, room, conflicts)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "date",
+        "schema": {
+          "type": "string"
+        },
+        "example": "2026-10-20"
+      },
+      {
+        "in": "query",
+        "name": "weekday",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403",
+      "404"
+    ]
+  },
   "DELETE /enrollments/{id}": {
     "path": "/enrollments/{id}",
     "method": "DELETE",
-    "summary": "Cancel an enrollment",
+    "summary": "Cancel an enrollment (Member cancelling ≥24h before start → 80% session refund request)",
     "security": [
       {
         "BearerAuth": []
@@ -2785,7 +4817,7 @@
     "summary": "List all coaches",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [
@@ -2831,13 +4863,279 @@
       "500"
     ]
   },
+  "GET /coaches/me/wallet": {
+    "path": "/coaches/me/wallet",
+    "method": "GET",
+    "summary": "Coach xem ví của chính mình",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403",
+      "404"
+    ]
+  },
+  "GET /coaches/me/wallet/transactions": {
+    "path": "/coaches/me/wallet/transactions",
+    "method": "GET",
+    "summary": "Coach xem lịch sử giao dịch ví",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /coaches/me/wallet/withdraw": {
+    "path": "/coaches/me/wallet/withdraw",
+    "method": "POST",
+    "summary": "Coach yêu cầu rút tiền (chỉ khi tất cả class đã COMPLETED)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "amount",
+        "bankInfo"
+      ],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "description": "Số tiền muốn rút (VND)"
+        },
+        "bankInfo": {
+          "type": "object",
+          "description": "Thông tin ngân hàng nhận tiền",
+          "properties": {
+            "bankName": {
+              "type": "string"
+            },
+            "accountNumber": {
+              "type": "string"
+            },
+            "accountName": {
+              "type": "string"
+            }
+          }
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "201",
+      "400",
+      "401",
+      "403",
+      "409"
+    ]
+  },
+  "PATCH /coaches/wallet/transactions/{txId}/review": {
+    "path": "/coaches/wallet/transactions/{txId}/review",
+    "method": "PATCH",
+    "summary": "Manager duyệt hoặc từ chối yêu cầu rút tiền của Coach",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "txId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "APPROVE",
+            "REJECT"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404"
+    ]
+  },
+  "GET /coaches/wallet/transactions": {
+    "path": "/coaches/wallet/transactions",
+    "method": "GET",
+    "summary": "BE-7: MANAGER liệt kê lệnh rút tiền (kèm HLV, số dư & tiền tạm giữ của ví)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "type",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "WITHDRAWAL",
+            "DEPOSIT",
+            "REFUND_DEBIT"
+          ],
+          "default": "WITHDRAWAL"
+        }
+      },
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "COMPLETED",
+            "REJECTED",
+            "FAILED"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "coachId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "GET /coaches/wallet/transactions/{txId}": {
+    "path": "/coaches/wallet/transactions/{txId}",
+    "method": "GET",
+    "summary": "BE-7: MANAGER xem chi tiết lệnh rút tiền",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "404"
+    ]
+  },
+  "GET /coaches/me/students/{memberId}": {
+    "path": "/coaches/me/students/{memberId}",
+    "method": "GET",
+    "summary": "BE-19: Hồ sơ học viên trong các khóa của tôi + chuyên cần từng khóa + lộ trình",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403"
+    ]
+  },
+  "GET /coaches/cv/pending": {
+    "path": "/coaches/cv/pending",
+    "method": "GET",
+    "summary": "Manager lấy danh sách hồ sơ CV theo trạng thái (mặc định PENDING)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "APPROVED",
+            "REJECTED"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "400"
+    ]
+  },
   "GET /coaches/{id}": {
     "path": "/coaches/{id}",
     "method": "GET",
     "summary": "Get coach by ID",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [
@@ -2863,10 +5161,10 @@
   "PATCH /coaches/{id}": {
     "path": "/coaches/{id}",
     "method": "PATCH",
-    "summary": "Update coach profile",
+    "summary": "Update coach profile (Manager update any; Coach updates own profile)",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [
@@ -2920,6 +5218,127 @@
       "500"
     ]
   },
+  "GET /coaches/{id}/upcoming-sessions": {
+    "path": "/coaches/{id}/upcoming-sessions",
+    "method": "GET",
+    "summary": "Upcoming sessions of a coach (for the coach info panel in course detail)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Coach user ID"
+      },
+      {
+        "in": "query",
+        "name": "classId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "404"
+    ]
+  },
+  "POST /coaches/me/cv": {
+    "path": "/coaches/me/cv",
+    "method": "POST",
+    "summary": "Coach nộp CV (PDF)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "PATCH /coaches/{profileId}/cv/review": {
+    "path": "/coaches/{profileId}/cv/review",
+    "method": "PATCH",
+    "summary": "Manager duyệt hoặc từ chối CV của Coach",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "profileId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "APPROVE",
+            "REJECT"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "GET /coaches/{profileId}/cv/file": {
+    "path": "/coaches/{profileId}/cv/file",
+    "method": "GET",
+    "summary": "BE-8: Tải file CV (PDF) — MANAGER hoặc chính HLV",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403",
+      "404"
+    ]
+  },
   "GET /classes": {
     "path": "/classes",
     "method": "GET",
@@ -2940,11 +5359,11 @@
       },
       {
         "in": "query",
-        "name": "sportId",
+        "name": "fitness",
         "schema": {
           "type": "string"
         },
-        "description": "Filter by sport"
+        "description": "Lọc theo môn tập (không phân biệt hoa/thường, khớp đúng tên môn)"
       },
       {
         "in": "query",
@@ -2978,6 +5397,20 @@
           "type": "string"
         },
         "description": "Filter by coach (CoachProfile.id)"
+      },
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "APPROVED",
+            "REJECTED",
+            "COMPLETED"
+          ]
+        },
+        "description": "Filter by approval status (Guest luôn chỉ thấy APPROVED)"
       },
       {
         "in": "query",
@@ -3018,7 +5451,7 @@
   "POST /classes": {
     "path": "/classes",
     "method": "POST",
-    "summary": "Create a new class",
+    "summary": "Coach tạo lớp học mới (chờ Manager duyệt)",
     "security": [
       {
         "BearerAuth": []
@@ -3029,7 +5462,7 @@
       "type": "object",
       "required": [
         "name",
-        "sportIds",
+        "fitness",
         "capacity",
         "areaType"
       ],
@@ -3038,15 +5471,19 @@
           "type": "string",
           "example": "Morning Yoga"
         },
+        "fitness": {
+          "type": "string",
+          "example": "Yoga",
+          "description": "Môn tập của lớp (Yoga, HIIT, Bơi...). Nhập tự do, 2-60 ký tự."
+        },
         "description": {
           "type": "string"
         },
-        "sportIds": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "format": "uuid"
-          }
+        "goal": {
+          "type": "string",
+          "maxLength": 1000,
+          "example": "Giảm 3-5kg sau 8 tuần, cải thiện sức bền",
+          "description": "Mục tiêu của lớp để Member xem và tự đánh giá trước khi enroll (tùy chọn)."
         },
         "capacity": {
           "type": "integer",
@@ -3069,7 +5506,7 @@
             "OUTDOOR"
           ],
           "example": "INDOOR",
-          "description": "Area type required by this class. Every selected sport must support it."
+          "description": "Area type required by this class (phải khớp areaType của phòng khi xếp lịch)."
         }
       }
     },
@@ -3080,6 +5517,17 @@
       "403",
       "404",
       "500"
+    ]
+  },
+  "GET /classes/fitness": {
+    "path": "/classes/fitness",
+    "method": "GET",
+    "summary": "BE-11: Danh mục bộ môn (distinct Class.fitness của khóa đã duyệt) — công khai",
+    "security": [],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
     ]
   },
   "GET /classes/{id}": {
@@ -3135,15 +5583,18 @@
         "name": {
           "type": "string"
         },
+        "fitness": {
+          "type": "string",
+          "description": "Môn tập của lớp (2-60 ký tự)."
+        },
         "description": {
           "type": "string"
         },
-        "sportIds": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "format": "uuid"
-          }
+        "goal": {
+          "type": "string",
+          "maxLength": 1000,
+          "example": "Giảm 3-5kg sau 8 tuần, cải thiện sức bền",
+          "description": "Mục tiêu của lớp để Member xem và tự đánh giá trước khi enroll (tùy chọn)."
         },
         "capacity": {
           "type": "integer"
@@ -3162,10 +5613,15 @@
             "INDOOR",
             "OUTDOOR"
           ],
-          "description": "New area type. All sports of this class must support it, and upcoming schedules must use a matching Room."
+          "description": "New area type. Upcoming schedules must use a matching Room."
         },
         "isActive": {
           "type": "boolean"
+        },
+        "price": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Giá áp dụng cho giao dịch MỚI — Payment đã tạo giữ nguyên số tiền."
         }
       }
     },
@@ -3207,10 +5663,10 @@
       "500"
     ]
   },
-  "POST /classes/{id}/coaches": {
-    "path": "/classes/{id}/coaches",
-    "method": "POST",
-    "summary": "Assign coach to class (Sends COACH_CHANGED notification to enrolled members)",
+  "GET /classes/{id}/course-plan": {
+    "path": "/classes/{id}/course-plan",
+    "method": "GET",
+    "summary": "View a class as ONE course (grouped recurring timetable) + whole-course enrollment eligibility",
     "security": [
       {
         "BearerAuth": []
@@ -3225,113 +5681,120 @@
           "type": "string"
         },
         "description": "Class ID"
-      }
-    ],
-    "body": {
-      "type": "object",
-      "required": [
-        "coachId"
-      ],
-      "properties": {
-        "coachId": {
-          "type": "string",
-          "description": "CoachProfile ID"
-        },
-        "isPrimary": {
-          "type": "boolean",
-          "default": false,
-          "description": "Set as primary coach"
-        }
-      }
-    },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "500"
-    ]
-  },
-  "POST /classes/{id}/coaches/support": {
-    "path": "/classes/{id}/coaches/support",
-    "method": "POST",
-    "summary": "Assign a support coach to class (Sends COACH_CHANGED notification to enrolled members)",
-    "security": [
-      {
-        "BearerAuth": []
-      }
-    ],
-    "parameters": [
-      {
-        "in": "path",
-        "name": "id",
-        "required": true,
-        "schema": {
-          "type": "string"
-        },
-        "description": "Class ID"
-      }
-    ],
-    "body": {
-      "type": "object",
-      "required": [
-        "coachId"
-      ],
-      "properties": {
-        "coachId": {
-          "type": "string",
-          "description": "CoachProfile ID"
-        }
-      }
-    },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "409",
-      "500"
-    ]
-  },
-  "DELETE /classes/{id}/coaches/{coachId}": {
-    "path": "/classes/{id}/coaches/{coachId}",
-    "method": "DELETE",
-    "summary": "Remove coach from class (Sends COACH_CHANGED notification to enrolled members)",
-    "security": [
-      {
-        "BearerAuth": []
-      }
-    ],
-    "parameters": [
-      {
-        "in": "path",
-        "name": "id",
-        "required": true,
-        "schema": {
-          "type": "string"
-        },
-        "description": "Class ID"
-      },
-      {
-        "in": "path",
-        "name": "coachId",
-        "required": true,
-        "schema": {
-          "type": "string"
-        },
-        "description": "CoachProfile ID"
       }
     ],
     "body": null,
     "statusCodes": [
       "200",
+      "401",
+      "404",
+      "500"
+    ]
+  },
+  "GET /classes/{id}/students": {
+    "path": "/classes/{id}/students",
+    "method": "GET",
+    "summary": "L12: Học viên của khóa + chuyên cần + doanh thu thật (COACH chủ khóa / MANAGER)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403"
+    ]
+  },
+  "PATCH /classes/{id}/review": {
+    "path": "/classes/{id}/review",
+    "method": "PATCH",
+    "summary": "Manager duyệt hoặc từ chối class do Coach tạo (PENDING → APPROVED/REJECTED)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "APPROVE",
+            "REJECT"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Lý do từ chối (tùy chọn)"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
       "400",
       "401",
       "403",
       "404",
       "500"
+    ]
+  },
+  "PATCH /classes/{id}/resubmit": {
+    "path": "/classes/{id}/resubmit",
+    "method": "PATCH",
+    "summary": "BE-3: Coach sửa & gửi lại khóa PENDING/REJECTED (kèm lịch) ⇒ PENDING",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "description": "Giống body POST /class-schedules/activity-plan: { class, roomId, schedules[] } hoặc { class, roomId, recurrence }"
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "403",
+      "409"
+    ]
+  },
+  "POST /class-schedules/activity-plan": {
+    "path": "/class-schedules/activity-plan",
+    "method": "POST",
+    "summary": "Coach tạo nhanh lớp học (có phòng) — lớp PENDING chờ Manager duyệt",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object"
+    },
+    "statusCodes": [
+      "201",
+      "400",
+      "401",
+      "403",
+      "409"
     ]
   },
   "GET /class-schedules": {
@@ -3359,6 +5822,26 @@
           "type": "string"
         },
         "description": "Filter by room"
+      },
+      {
+        "in": "query",
+        "name": "coachId",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Filter by coach (CoachProfile.id)"
+      },
+      {
+        "in": "query",
+        "name": "mine",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false"
+          ]
+        },
+        "description": "Chỉ buổi của tôi (COACH: khóa mình dạy; MEMBER: buổi mình giữ chỗ)"
       },
       {
         "in": "query",
@@ -3579,7 +6062,7 @@
             "SCHEDULED",
             "CANCELLED"
           ],
-          "description": "If set to CANCELLED, all BOOKED enrollments are cancelled automatically. COMPLETED must use /complete."
+          "description": "CANCELLED chỉ dùng được khi buổi CHƯA có ai đặt chỗ; buổi đã có người đặt phải hủy qua POST /class-schedules/{id}/cancel (dạy bù / hoàn tiền), nếu không ⇒ 400 SCHEDULE_CANCEL_RESOLUTION_REQUIRED. COMPLETED must use /complete."
         },
         "reason": {
           "type": "string",
@@ -3601,7 +6084,7 @@
   "DELETE /class-schedules/{id}": {
     "path": "/class-schedules/{id}",
     "method": "DELETE",
-    "summary": "Cancel schedule (automatically cancels all BOOKED enrollments)",
+    "summary": "Cancel a schedule that has NO bookings",
     "security": [
       {
         "BearerAuth": []
@@ -3627,13 +6110,80 @@
       "500"
     ]
   },
+  "POST /class-schedules/{id}/cancel": {
+    "path": "/class-schedules/{id}/cancel",
+    "method": "POST",
+    "summary": "Hủy buổi học kèm DẠY BÙ hoặc HOÀN TIỀN cho hội viên đã đặt chỗ",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "resolution": {
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "MAKEUP",
+                "REFUND"
+              ]
+            },
+            "startTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Bắt buộc với MAKEUP"
+            },
+            "endTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Bắt buộc với MAKEUP"
+            },
+            "roomId": {
+              "type": "string",
+              "description": "Tuỳ chọn với MAKEUP"
+            }
+          }
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "500"
+    ]
+  },
   "PATCH /class-schedules/{id}/complete": {
     "path": "/class-schedules/{id}/complete",
     "method": "PATCH",
-    "summary": "PATCH /class-schedules/{id}/complete",
+    "summary": "Mark a schedule as COMPLETED (only after endTime)",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [
@@ -3652,54 +6202,50 @@
       "400",
       "401",
       "403",
-      "404"
+      "404",
+      "500"
     ]
   },
   "GET /chat/contacts": {
     "path": "/chat/contacts",
     "method": "GET",
-    "summary": "GET /chat/contacts",
+    "summary": "Get eligible chat contacts",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [],
     "body": null,
     "statusCodes": [
       "200",
-      "400",
-      "401",
-      "403",
-      "404"
+      "401"
     ]
   },
   "GET /chat/conversations": {
     "path": "/chat/conversations",
     "method": "GET",
-    "summary": "GET /chat/conversations",
+    "summary": "Get list of conversations",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [],
     "body": null,
     "statusCodes": [
       "200",
-      "400",
       "401",
-      "403",
-      "404"
+      "403"
     ]
   },
   "GET /chat/messages": {
     "path": "/chat/messages",
     "method": "GET",
-    "summary": "GET /chat/messages",
+    "summary": "Get chat messages",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [
@@ -3708,48 +6254,58 @@
         "name": "targetId",
         "schema": {
           "type": "string"
+        },
+        "description": "Optional ID of the user to get private messages with"
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
+    ]
+  },
+  "POST /chat/messages": {
+    "path": "/chat/messages",
+    "method": "POST",
+    "summary": "Send a message",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "201",
+      "400",
+      "401",
+      "403"
+    ]
+  },
+  "GET /chat/attachments/{id}": {
+    "path": "/chat/attachments/{id}",
+    "method": "GET",
+    "summary": "Tải file đính kèm của tin nhắn (yêu cầu đăng nhập + phân quyền)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
         }
       }
     ],
     "body": null,
     "statusCodes": [
       "200",
-      "400",
-      "401",
-      "403",
-      "404"
-    ]
-  },
-  "POST /chat/messages": {
-    "path": "/chat/messages",
-    "method": "POST",
-    "summary": "POST /chat/messages",
-    "security": [
-      {
-        "bearerAuth": []
-      }
-    ],
-    "parameters": [],
-    "body": {
-      "type": "object",
-      "properties": {
-        "receiverId": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "content": {
-          "type": "string"
-        },
-        "file": {
-          "type": "string",
-          "format": "binary"
-        }
-      },
-      "required": []
-    },
-    "statusCodes": [
-      "200",
-      "400",
       "401",
       "403",
       "404"
@@ -3758,10 +6314,10 @@
   "PATCH /chat/messages/read": {
     "path": "/chat/messages/read",
     "method": "PATCH",
-    "summary": "PATCH /chat/messages/read",
+    "summary": "Mark messages as read",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [],
@@ -3770,36 +6326,31 @@
       "properties": {
         "targetId": {
           "type": "string",
-          "format": "uuid"
+          "description": "ID of the sender whose messages are being read"
         }
-      },
-      "required": []
+      }
     },
     "statusCodes": [
       "200",
-      "400",
       "401",
-      "403",
-      "404"
+      "403"
     ]
   },
   "GET /chat/messages/unread-count": {
     "path": "/chat/messages/unread-count",
     "method": "GET",
-    "summary": "GET /chat/messages/unread-count",
+    "summary": "Get global unread message count",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [],
     "body": null,
     "statusCodes": [
       "200",
-      "400",
       "401",
-      "403",
-      "404"
+      "403"
     ]
   },
   "POST /auth/register": {
@@ -3938,6 +6489,66 @@
       "500"
     ]
   },
+  "POST /auth/forgot-password": {
+    "path": "/auth/forgot-password",
+    "method": "POST",
+    "summary": "Request a password reset link (Token is returned in response for testing)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "email"
+      ],
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      }
+    },
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "PATCH /auth/reset-password": {
+    "path": "/auth/reset-password",
+    "method": "PATCH",
+    "summary": "Đặt lại mật khẩu: { token, newPassword } (liên kết Web) HOẶC { email, otp, newPassword } (mã 6 số — Mobile)",
+    "security": [],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "newPassword"
+      ],
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "otp": {
+          "type": "string",
+          "pattern": "^[0-9]{6}$"
+        },
+        "newPassword": {
+          "type": "string",
+          "minLength": 6
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400"
+    ]
+  },
   "GET /auth/me": {
     "path": "/auth/me",
     "method": "GET",
@@ -4015,6 +6626,25 @@
       "500"
     ]
   },
+  "POST /auth/me/avatar": {
+    "path": "/auth/me/avatar",
+    "method": "POST",
+    "summary": "Upload avatar image for the current user profile",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "400",
+      "401",
+      "404",
+      "500"
+    ]
+  },
   "PATCH /auth/me/change-password": {
     "path": "/auth/me/change-password",
     "method": "PATCH",
@@ -4052,16 +6682,17 @@
   "GET /attendance": {
     "path": "/attendance",
     "method": "GET",
-    "summary": "GET /attendance",
+    "summary": "Get attendance roster of a schedule (MANAGER: full roster; COACH: only own classes; MEMBER: only own records)",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [
       {
         "in": "query",
         "name": "scheduleId",
+        "required": true,
         "schema": {
           "type": "string"
         }
@@ -4073,16 +6704,17 @@
       "400",
       "401",
       "403",
-      "404"
+      "404",
+      "500"
     ]
   },
   "POST /attendance": {
     "path": "/attendance",
     "method": "POST",
-    "summary": "POST /attendance",
+    "summary": "Record attendance for a member in a schedule (COACH: own classes; MANAGER: any class)",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [],
@@ -4090,12 +6722,10 @@
       "type": "object",
       "properties": {
         "scheduleId": {
-          "type": "string",
-          "format": "uuid"
+          "type": "string"
         },
         "memberId": {
-          "type": "string",
-          "format": "uuid"
+          "type": "string"
         },
         "status": {
           "type": "string",
@@ -4105,32 +6735,20 @@
             "LATE",
             "EXCUSED"
           ]
-        },
-        "note": {
-          "type": "string"
         }
-      },
-      "required": [
-        "scheduleId",
-        "memberId",
-        "status"
-      ]
+      }
     },
     "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404"
+      "201"
     ]
   },
   "PATCH /attendance/{id}": {
     "path": "/attendance/{id}",
     "method": "PATCH",
-    "summary": "PATCH /attendance/{id}",
+    "summary": "Update an attendance record",
     "security": [
       {
-        "bearerAuth": []
+        "BearerAuth": []
       }
     ],
     "parameters": [
@@ -4154,19 +6772,69 @@
             "LATE",
             "EXCUSED"
           ]
-        },
-        "note": {
-          "type": "string"
         }
-      },
-      "required": []
+      }
+    },
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "PUT /attendance/schedule/{scheduleId}": {
+    "path": "/attendance/schedule/{scheduleId}",
+    "method": "PUT",
+    "summary": "BE-18: Ghi điểm danh cả danh sách một buổi (COACH phụ trách / MANAGER) — 1 giao dịch",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "memberId": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "PRESENT",
+                  "ABSENT",
+                  "LATE",
+                  "EXCUSED"
+                ]
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
     },
     "statusCodes": [
       "200",
-      "400",
-      "401",
-      "403",
-      "404"
+      "400"
+    ]
+  },
+  "DELETE /attendance/qr/{scheduleId}": {
+    "path": "/attendance/qr/{scheduleId}",
+    "method": "DELETE",
+    "summary": "BE-18: Thu hồi mã dự phòng còn hiệu lực của buổi (QR JWT tự hết hạn theo TTL)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
     ]
   },
   "POST /attendance/generate-qr": {
@@ -4535,180 +7203,6 @@
     },
     "statusCodes": [
       "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "409",
-      "500"
-    ]
-  },
-  "POST /payments/sepay/checkout": {
-    "path": "/payments/sepay/checkout",
-    "method": "POST",
-    "summary": "Create a SePay VietQR membership checkout",
-    "security": [
-      {
-        "bearerAuth": []
-      }
-    ],
-    "parameters": [],
-    "body": {
-      "type": "object",
-      "properties": {
-        "planId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "planId"
-      ]
-    },
-    "statusCodes": [
-      "201",
-      "400",
-      "401",
-      "403",
-      "404",
-      "409",
-      "500",
-      "503"
-    ]
-  },
-  "GET /payments/sepay/{id}": {
-    "path": "/payments/sepay/{id}",
-    "method": "GET",
-    "summary": "Get a SePay membership checkout",
-    "security": [
-      {
-        "bearerAuth": []
-      }
-    ],
-    "parameters": [
-      {
-        "in": "path",
-        "name": "id",
-        "required": true,
-        "schema": {
-          "type": "string"
-        }
-      }
-    ],
-    "body": null,
-    "statusCodes": [
-      "200",
-      "401",
-      "403",
-      "404",
-      "500"
-    ]
-  },
-  "POST /payments/sepay/mock-confirm": {
-    "path": "/payments/sepay/mock-confirm",
-    "method": "POST",
-    "summary": "DEV/DEMO confirm a SePay membership checkout",
-    "security": [
-      {
-        "bearerAuth": []
-      }
-    ],
-    "parameters": [],
-    "body": {
-      "type": "object",
-      "properties": {
-        "paymentId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "paymentId"
-      ]
-    },
-    "statusCodes": [
-      "200",
-      "400",
-      "401",
-      "403",
-      "404",
-      "500"
-    ]
-  },
-  "GET /classes/{id}/course-plan": {
-    "path": "/classes/{id}/course-plan",
-    "method": "GET",
-    "summary": "View a class as ONE course (grouped timetable) + enrollment eligibility",
-    "security": [
-      {
-        "bearerAuth": []
-      }
-    ],
-    "parameters": [
-      {
-        "in": "path",
-        "name": "id",
-        "required": true,
-        "schema": {
-          "type": "string"
-        }
-      }
-    ],
-    "body": null,
-    "statusCodes": [
-      "200",
-      "401",
-      "404",
-      "500"
-    ]
-  },
-  "POST /enrollments/bulk": {
-    "path": "/enrollments/bulk",
-    "method": "POST",
-    "summary": "Enroll in a whole course (all upcoming sessions)",
-    "security": [
-      {
-        "bearerAuth": []
-      }
-    ],
-    "parameters": [],
-    "body": {
-      "type": "object",
-      "properties": {
-        "classId": {
-          "type": "string"
-        },
-        "memberId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "classId"
-      ]
-    },
-    "statusCodes": [
-      "201",
-      "400",
-      "401",
-      "403",
-      "404",
-      "409",
-      "500"
-    ]
-  },
-  "POST /class-schedules/activity-plan": {
-    "path": "/class-schedules/activity-plan",
-    "method": "POST",
-    "summary": "Atomically create a complete activity plan",
-    "security": [
-      {
-        "BearerAuth": []
-      }
-    ],
-    "parameters": [],
-    "body": {
-      "type": "object"
-    },
-    "statusCodes": [
-      "201",
       "400",
       "401",
       "403",

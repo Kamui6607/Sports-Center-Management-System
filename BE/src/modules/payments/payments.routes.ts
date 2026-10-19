@@ -83,6 +83,8 @@ router.post(
  *       - in: query
  *         name: endDate
  *         schema: { type: string }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
  *       200: { $ref: "#/components/responses/PaymentListOk" }
  *       400: { $ref: "#/components/responses/BadRequest" }
@@ -122,7 +124,7 @@ router.get(
  *   get:
  *     summary: "BE-6: Lịch sử thanh toán của tôi (MEMBER: khóa học + đơn hàng; COACH: đơn hàng)"
  *     tags: [Payments]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ BearerAuth: [] }]
  *     parameters:
  *       - { in: query, name: type, schema: { type: string, enum: [CLASS, ORDER, MEMBERSHIP] } }
  *       - { in: query, name: status, schema: { type: string, enum: [PENDING, SUCCESS, FAILED, REFUNDED] } }

@@ -1,10 +1,8 @@
-# Sports Center Web — Role-based features
+# Pulse — Web quản trị (Manager)
 
-Frontend gồm manager hiện có, reception thuộc Member03, layout coach và user. Xem [kiến trúc và phạm vi Member03](docs/ARCHITECTURE.md). Sử dụng Vite, React, TypeScript, React Router và TanStack Query. CSS responsive riêng với Lucide icons, bảng màu xanh đậm/lime, họa tiết đường chạy và hỗ trợ reduced motion.
+Web chỉ phục vụ **MANAGER** (Hội viên/HLV dùng ứng dụng Mobile; chung BE và tài khoản). Vite + React + TypeScript + React Router + TanStack Query. Giao diện quản trị "Pulse Control Room" nằm ở `src/features/manage/` (CSS scope `.cr` trong `admin.css`). Source landing/member/coach/reception cũ vẫn giữ nhưng không còn trong luồng điều hướng.
 
 ## Chạy ứng dụng
-
-Yêu cầu Node.js 22+ và npm.
 
 ```powershell
 cd FE
@@ -12,7 +10,23 @@ npm ci
 npm run dev
 ```
 
-Mở http://127.0.0.1:5173 để xem landing page. `/register` tạo tài khoản hội viên; `/login` đăng nhập và chuyển vào portal theo MANAGER, STAFF, COACH hoặc MEMBER. Người đã đăng nhập được đưa về portal khi mở `/`. Không có tài khoản/mật khẩu mặc định trong FE.
+Đặt `VITE_API_BASE_URL` trong `FE/.env` (VD BE local `http://localhost:8080/api/v1`). `/` và đường dẫn lạ → `/login`; deep link `/manager/...` khi chưa đăng nhập → đăng nhập xong quay lại đúng trang. `/reset-password` là trang công khai tối thiểu để người nhận email đặt lại mật khẩu (email + mã OTP). Hướng dẫn demo: `Doc/ADMIN_WEB_DEMO_GUIDE.md`.
+
+## Các màn hình Manager
+
+| Route | Chức năng (API thật) |
+| --- | --- |
+| `/manager/dashboard` | KPI thu tháng, CV/khóa chờ duyệt, sắp hết hàng, hội viên; lịch hôm nay |
+| `/manager/users`, `/manager/users/:id` | Lọc/tìm/phân trang, tạo, sửa, hồ sơ hội viên, đổi vai trò, khóa/mở khóa (khóa mềm), cấp lại mật khẩu (email OTP + trạng thái), xóa vĩnh viễn (chỉ tài khoản chưa có dữ liệu) |
+| `/manager/coaches`, `/manager/coaches/:id` | Danh sách HLV, hàng chờ CV, xem CV (tải có xác thực), duyệt/từ chối, sửa hồ sơ chuyên môn, khóa học & buổi dạy sắp tới |
+| `/manager/rooms`, `/manager/rooms/:id` | CRUD phòng, ngừng/mở lại, lịch tuần của phòng, chuyển lịch (xem trước xung đột) |
+| `/manager/classes`, `/manager/classes/:id` | Lọc khóa theo duyệt/HLV/môn/khu vực, duyệt/từ chối, sửa nội dung/giá/sức chứa, ngừng/mở bán, buổi học & học viên |
+| `/manager/schedules` | Lịch tuần + bảng, lọc phòng/HLV/khóa/trạng thái/khoảng ngày, chi tiết buổi (dạy bù/hủy) & học viên |
+| `/manager/products`, `/manager/products/:id` | CRUD sản phẩm (ảnh qua URL), ngừng bán, nhập/điều chỉnh kho + nhật ký, ẩn/hiện đánh giá |
+| `/manager/revenue` | Báo cáo theo kỳ (giờ VN): tổng thu/hoàn/ròng theo API, biểu đồ, danh sách giao dịch phân trang, xuất CSV đủ dữ liệu |
+| `/manager/profile` | Sửa thông tin, đổi mật khẩu |
+
+Mỗi màn có loading/lỗi + thử lại/rỗng; bộ lọc + trang lưu trên URL; mutation chặn bấm lặp và làm mới cache liên quan; thao tác khóa/xóa/ngừng có hộp xác nhận nêu đối tượng và hậu quả.
 
 ## Landing page và đăng ký
 
@@ -24,27 +38,6 @@ Mở http://127.0.0.1:5173 để xem landing page. `/register` tạo tài khoả
 - `npx playwright test public.spec.ts` kiểm tra đăng ký, điều hướng, preview tabs, responsive và axe accessibility ở 375/768/1440px. Ảnh kiểm tra nằm trong `artifacts/landing-*.png` và `artifacts/register-*.png`.
 
 Base URL mặc định: `https://sports-center-management-system.onrender.com/api/v1` — đúng Production Server (Render) trong ảnh. Có thể sao chép `.env.example` thành `.env` để cấu hình `VITE_API_BASE_URL`. Không thêm `/api/v1` lần nữa vào endpoint.
-
-## Các màn hình manager hiện có
-
-| Route | Chức năng đã nối API |
-| --- | --- |
-| `/manager/dashboard` | 4 báo cáo thật, lọc ngày, biểu đồ phương thức thanh toán/hạng hội viên, lịch hôm nay |
-| `/manager/users` | Tìm kiếm, vai trò, trạng thái, phân trang, chi tiết, tạo tài khoản, ngừng hoạt động |
-| `/manager/members` | Tìm kiếm, trình độ, phân trang, tạo MEMBER, chi tiết và tình trạng gói |
-| `/manager/coaches` | Tìm kiếm/chuyên môn, phân trang, tạo COACH, chi tiết, sửa hồ sơ chuyên môn |
-| `/manager/staff` | GET /users với role=STAFF; tạo lễ tân, chi tiết, ngừng hoạt động |
-| `/manager/membership-plans` | Danh sách, lọc hạng/trạng thái, chi tiết, tạo, ngừng hoạt động |
-| `/manager/sports` | Tìm kiếm/lọc, phân trang, chi tiết, tạo, sửa, ngừng hoạt động |
-| `/manager/rooms` | Tìm kiếm/lọc, phân trang, chi tiết, tạo, sửa, ngừng hoạt động |
-| `/manager/classes` | Tìm kiếm/lọc, phân trang, chi tiết, tạo, sửa, ngừng hoạt động, phân công/gỡ coach |
-| `/manager/schedules` | Lọc ngày/phòng/lớp/trạng thái/thời gian, phân trang, tạo/sửa/hủy lịch, xem người đăng ký |
-| `/manager/reports` | Doanh thu, hội viên, đăng ký lớp, gói thành viên; xuất CSV từ số liệu đã tải |
-| `/manager/profile` | Xem/sửa hồ sơ hiện tại, đổi mật khẩu |
-| `/manager/roles` | Hiển thị 4 vai trò backend; giải thích chưa có quyền tùy chỉnh |
-| `/manager/audit-logs` | Trạng thái chưa khả dụng do thiếu API |
-
-Mỗi truy vấn có loading, empty, error/retry. Mutation có trạng thái chờ, thông báo thành công và lỗi backend, tự làm mới dữ liệu. Xác nhận trước khi ngừng hoạt động/hủy lịch. Khi hủy lịch, UI giải thích tác động hủy các enrollment BOOKED.
 
 ## Hợp đồng API và giới hạn
 
@@ -82,7 +75,9 @@ npm run test:ui
 
 ## Cập nhật snapshot
 
-Lấy lại `swaggerDoc` từ Swagger của backend, thay `docs/openapi.json`, rồi chạy `npm run generate:api`. Generator chỉ dùng JSON, không chạy mã từ server. Review diff của schema trước khi mở tính năng mới. Nếu Swagger thêm JSON URL trực tiếp, ưu tiên tải URL JSON đó. Không thêm endpoint theo tài liệu phân công nếu Swagger chưa có.
+Xuất contract từ BE đang checkout: `cd BE && npm run openapi:export` (ghi `FE/docs/openapi.json`), rồi `cd FE && npm run generate:api` và review diff. Không dùng `--live` (tải Swagger Render cũ) cho BE local chưa deploy. `docs/workflow-contract-overrides.json` hiện rỗng — chỉ thêm mục khi Swagger BE thật sự thiếu và đã đối chiếu router/Zod. Client chặn operation/query chưa khai báo trong `src/shared/operations.json`.
+
+Kiểm thử trình duyệt với BE + DB test thật: `npx playwright test -c playwright.real.config.ts` (biến môi trường xem đầu file config và `Doc/ADMIN_WEB_DEMO_GUIDE.md`). Các spec trong `tests/browser` dùng intercept theo contract cũ, không phải bằng chứng tích hợp.
 
 ## Deploy
 

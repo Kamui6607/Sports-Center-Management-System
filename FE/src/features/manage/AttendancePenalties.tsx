@@ -84,7 +84,7 @@ export function AttendancePenalties() {
         </section>
       )}
       <section className="panel">
-        <div className="panel-heading"><div><h2>Lịch sử quyết định</h2><p>Trạng thái mới nhất từ backend.</p></div></div>
+        <div className="panel-heading"><div><h2>Lịch sử quyết định</h2></div></div>
         {penalties.isPending ? <Loading /> : penalties.isError ? <ErrorState error={penalties.error} retry={() => penalties.refetch()} /> : !penalties.data.data.length ? <Empty text="Chưa có quyết định chuyên cần." /> : (
           <div className="detail-list">
             {penalties.data.data.map((penalty) => (

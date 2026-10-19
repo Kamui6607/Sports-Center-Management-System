@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyAccessToken } from "../utils/jwt.js";
+import { isAccessTokenCurrent, verifyAccessToken } from "../utils/jwt.js";
 import { sendError } from "../utils/response.js";
 import { prisma } from "../config/prisma.js";
 import { ROLE_NAME_SELECT, type RoleName } from "../utils/roles.js";
@@ -26,11 +26,15 @@ export async function authenticateIncludingInactive(
 
     const user = await prisma.user.findUnique({
       where: { id: payload.id },
-      select: { id: true, role: ROLE_NAME_SELECT, isActive: true },
+      select: { id: true, role: ROLE_NAME_SELECT, isActive: true, password: true },
     });
 
     if (!user) {
       sendError(res, "Unauthorized: user not found", 401);
+      return;
+    }
+    if (!isAccessTokenCurrent(payload, user.password)) {
+      sendError(res, "Unauthorized: invalid or expired token", 401);
       return;
     }
 

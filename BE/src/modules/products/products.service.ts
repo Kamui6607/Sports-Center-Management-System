@@ -116,9 +116,24 @@ export async function updateProduct(id: string, data: any, actorId?: string) {
   });
 }
 
+/**
+ * Xóa VĨNH VIỄN sản phẩm — chỉ khi chưa từng được đặt/đánh giá và không còn hàng đang giữ (VD tạo nhầm).
+ * Sản phẩm đã có đơn/đánh giá phải "ngừng bán" (`PATCH { isActive:false }`) để giữ lịch sử đơn, đánh giá
+ * và nhật ký kho (xóa cứng sẽ cascade mất review + InventoryTransaction).
+ */
 export async function deleteProduct(id: string) {
-  const product = await prisma.product.findUnique({ where: { id } });
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: { _count: { select: { orderItems: true, reviews: true } } },
+  });
   if (!product) throw new AppError("Product not found", 404);
+  if (product._count.orderItems > 0 || product._count.reviews > 0 || product.reservedStock > 0) {
+    throw new AppError(
+      "Sản phẩm đã có đơn hàng hoặc đánh giá — không thể xóa vĩnh viễn. Hãy ngừng bán để giữ lịch sử.",
+      409,
+      { code: "PRODUCT_HAS_HISTORY", orderItems: product._count.orderItems, reviews: product._count.reviews, reservedStock: product.reservedStock }
+    );
+  }
 
   return prisma.product.delete({ where: { id } });
 }

@@ -1,6 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { prisma } from "../../config/prisma.js";
-import { verifyAccessToken } from "../../utils/jwt.js";
+import { isAccessTokenCurrent, verifyAccessToken } from "../../utils/jwt.js";
 import { chatService } from "./chat.service.js";
 import { ROLE_NAME_SELECT } from "../../utils/roles.js";
 import { setRealtimeServer } from "../../utils/realtime.js";
@@ -46,9 +46,9 @@ export const setupSocket = (io: Server) => {
       const payload = verifyAccessToken(tokenFrom(socket));
       const user = await prisma.user.findUnique({
         where: { id: payload.id },
-        select: { id: true, role: ROLE_NAME_SELECT, isActive: true },
+        select: { id: true, role: ROLE_NAME_SELECT, isActive: true, password: true },
       });
-      if (!user?.isActive || user.role.name !== payload.role)
+      if (!user?.isActive || user.role.name !== payload.role || !isAccessTokenCurrent(payload, user.password))
         return next(new Error("Unauthorized"));
       socket.data.user = { id: user.id, role: user.role.name } satisfies SocketUser;
       next();

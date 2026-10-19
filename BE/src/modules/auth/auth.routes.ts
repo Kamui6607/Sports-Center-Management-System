@@ -146,17 +146,21 @@ router.post("/forgot-password", validate(ForgotPasswordSchema), authController.f
  * @swagger
  * /auth/reset-password:
  *   patch:
- *     summary: Reset password using the token
+ *     summary: "Đặt lại mật khẩu: { token, newPassword } (liên kết Web) HOẶC { email, otp, newPassword } (mã 6 số — Mobile)"
+ *     description: "Thành công ⇒ thu hồi mọi refresh token, ngắt socket và access token phát hành trước thời điểm đổi bị từ chối."
  *     tags: [Auth]
+ *     security: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [token, newPassword]
+ *             required: [newPassword]
  *             properties:
  *               token: { type: string }
+ *               email: { type: string, format: email }
+ *               otp: { type: string, pattern: "^[0-9]{6}$" }
  *               newPassword: { type: string, minLength: 6 }
  *     responses:
  *       200: { $ref: "#/components/responses/MessageOk" }

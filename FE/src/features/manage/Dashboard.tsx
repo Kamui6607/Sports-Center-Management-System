@@ -18,8 +18,9 @@ import type {
   RevenueReportOk,
   MemberReportOk,
   EnrollmentReportOk,
-  MembershipReportOk,
 } from "../../shared/generated";
+// Màn legacy (không còn mount trong ManagerLayout). Swagger BE hiện không còn ví dụ MembershipReportOk.
+type MembershipReportOk = { data: Record<string, number | Record<string, number>> };
 import { display, label, money } from "../../shared/config";
 import { Empty, ErrorState, Loading } from "../../shared/ui";
 function dateString(d: Date) {

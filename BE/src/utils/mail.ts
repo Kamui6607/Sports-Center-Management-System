@@ -177,6 +177,36 @@ export function buildResetPasswordEmail(resetLink: string, otp?: string): { subj
 }
 
 /**
+ * Email đặt lại mật khẩu do QUẢN LÝ khởi tạo: mã OTP + liên kết tới trang `/reset-password` của Web (nhập
+ * email + mã + mật khẩu mới). Mã cũng dùng được ở màn "Quên mật khẩu" của ứng dụng Mobile.
+ * Liên kết KHÔNG chứa mã/token — lộ link không đủ để đổi mật khẩu. Không bao giờ chứa mật khẩu.
+ */
+export function buildAdminResetPasswordEmail(fullName: string, otp: string, resetUrl: string): { subject: string; html: string } {
+  const safeName = fullName.replace(/[<>&"]/g, "");
+  return {
+    subject: "Yêu cầu đặt lại mật khẩu - Pulse Sports Center",
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;border:1px solid #eee;border-radius:8px;">
+        <h2 style="color:#203D31;">Đặt lại mật khẩu</h2>
+        <p>Xin chào ${safeName},</p>
+        <p>Quản lý trung tâm <strong>Pulse Sports Center</strong> vừa gửi cho bạn yêu cầu đặt lại mật khẩu. Mật khẩu hiện tại <strong>chưa thay đổi</strong> cho tới khi bạn tự đặt mật khẩu mới.</p>
+        <p>Mã xác nhận của bạn:</p>
+        <p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:12px 0;color:#203D31;">${otp}</p>
+        <a href="${resetUrl}"
+           style="display:inline-block;padding:12px 24px;background:#203D31;color:#fff;text-decoration:none;border-radius:6px;margin:8px 0;font-weight:bold;">
+          Đặt mật khẩu mới
+        </a>
+        <p>Mở liên kết trên (hoặc ứng dụng Pulse → <strong>Quên mật khẩu</strong>), nhập email và mã rồi đặt mật khẩu mới. Sau khi đổi, mọi phiên đăng nhập cũ sẽ bị đăng xuất.</p>
+        <p style="color:#666;font-size:13px;">Mã có hiệu lực trong <strong>15 phút</strong>, dùng một lần, khóa sau 5 lần nhập sai. Không chia sẻ mã này với bất kỳ ai — nhân viên trung tâm cũng không bao giờ hỏi mã.</p>
+        <p style="color:#666;font-size:13px;">Nếu bạn không yêu cầu, hãy bỏ qua email này hoặc liên hệ trung tâm.</p>
+        <hr style="border:none;border-top:1px solid #eee;margin:16px 0;"/>
+        <p style="color:#aaa;font-size:12px;">Pulse Sports Center</p>
+      </div>
+    `,
+  };
+}
+
+/**
  * Email thông báo chung (gửi qua outbox).
  * Dùng khi một sự kiện nghiệp vụ cần gửi cả notification in-app lẫn email.
  */

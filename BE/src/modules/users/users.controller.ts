@@ -30,6 +30,34 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
   } catch (err) { next(err); }
 }
 
+export async function deleteUserPermanently(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await usersService.deleteUserPermanently(req.params.id as string, req.user!.id);
+    sendSuccess(res, result, "User deleted permanently");
+  } catch (err) { next(err); }
+}
+
+export async function getUserHistory(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await usersService.getUserHistory(req.params.id as string);
+    sendSuccess(res, result, "User history retrieved successfully");
+  } catch (err) { next(err); }
+}
+
+export async function requestPasswordReset(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await usersService.requestPasswordResetByManager(req.params.id as string, req.user!.id);
+    sendSuccess(res, result, result.message, 202);
+  } catch (err) { next(err); }
+}
+
+export async function getPasswordResetStatus(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await usersService.getPasswordResetStatus(req.params.id as string);
+    sendSuccess(res, result, "Password reset status retrieved successfully");
+  } catch (err) { next(err); }
+}
+
 export async function deactivateUser(req: Request, res: Response, next: NextFunction) {
   try {
     const user = await usersService.deactivateUser(req.params.id as string, req.user!.id);

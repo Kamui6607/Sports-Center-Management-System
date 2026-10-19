@@ -61,7 +61,7 @@ describe("API client contract and authentication", () => {
     });
     vi.stubGlobal("fetch", fetch);
     const { allPages } = await import("../src/shared/pagedApi");
-    expect((await allPages("GET /membership-plans")).data).toEqual([
+    expect((await allPages("GET /users")).data).toEqual([
       { id: "1" },
       { id: "2" },
     ]);
@@ -75,7 +75,7 @@ describe("API client contract and authentication", () => {
           }),
         ),
     );
-    await expect(allPages("GET /membership-plans")).rejects.toThrow(
+    await expect(allPages("GET /users")).rejects.toThrow(
       "sai trang",
     );
   });
@@ -169,7 +169,7 @@ describe("API client contract and authentication", () => {
       ),
     );
     const { api } = await import("../src/shared/api");
-    await expect(api("GET /sports")).rejects.toMatchObject({ status: 502 });
+    await expect(api("GET /rooms")).rejects.toMatchObject({ status: 502 });
   });
 });
 

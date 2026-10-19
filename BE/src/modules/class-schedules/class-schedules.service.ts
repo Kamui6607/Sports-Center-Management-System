@@ -183,6 +183,12 @@ export async function listSchedules(query: any, actor?: ScheduleActor) {
   if (query.classId) where.classId = query.classId;
   if (query.roomId) where.roomId = query.roomId;
   if (query.status) where.status = query.status;
+  // Lọc theo HLV (CoachProfile.id) — quy về danh sách classId để dùng chung cả nhánh SQL lọc thứ trong tuần.
+  if (query.coachId) {
+    const own = await prisma.class.findMany({ where: { coachId: query.coachId }, select: { id: true } });
+    const ids = own.map((c) => c.id).filter((id) => !query.classId || id === query.classId);
+    where.classId = { in: ids };
+  }
   // BE-15: `mine=true` — COACH: buổi các khóa mình phụ trách; MEMBER: buổi mình đang/đã giữ chỗ.
   if (query.mine === "true" && actor) {
     if (actor.role === "COACH") {
@@ -235,7 +241,8 @@ export async function listSchedules(query: any, actor?: ScheduleActor) {
     : undefined;
 
   const include = {
-    class: true,
+    // Kèm HLV phụ trách (chỉ THÊM field `class.coach`) để màn lịch hiển thị/lọc theo HLV.
+    class: { include: { coach: { select: { id: true, user: { select: { id: true, fullName: true } } } } } },
     room: true,
     _count: {
       select: {
@@ -556,6 +563,9 @@ export async function getScheduleById(id: string) {
     include: {
       class: { include: { coach: { include: { user: { select: { fullName: true } } } } } },
       room: true,
+      // Buổi bù / buổi bị thay thế (chỉ THÊM field) — màn quản trị theo dõi hủy & dạy bù.
+      makeupFor: { select: { id: true, startTime: true, endTime: true, status: true } },
+      makeup: { select: { id: true, startTime: true, endTime: true, status: true } },
       _count: { select: { enrollments: { where: { status: { in: ["BOOKED", "COMPLETED"] } } } } },
     },
   });

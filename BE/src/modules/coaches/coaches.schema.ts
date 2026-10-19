@@ -17,5 +17,12 @@ export const CoachQuerySchema = z.object({
   specialization: z.string().optional(),
 });
 
+/** `GET /coaches/cv/pending` — trạng thái lạ trước đây lọt xuống Prisma ⇒ 500. */
+export const CvQuerySchema = z.object({
+  status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
 export type UpdateCoachInput = z.infer<typeof UpdateCoachSchema>;
 export type CoachQueryInput = z.infer<typeof CoachQuerySchema>;

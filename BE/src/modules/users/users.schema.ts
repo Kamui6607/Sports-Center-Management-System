@@ -7,7 +7,8 @@ export const CreateUserSchema = z.object({
   phone: z.string().regex(/^[0-9+\-() ]*$/, "Phone must not contain special characters").optional(),
   gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
   dateOfBirth: z.string().optional(),
-  role: z.enum(["MEMBER", "COACH", "MANAGER"]),
+  // Quản lý chỉ tạo tài khoản Hội viên/HLV; tài khoản Quản lý không được tạo qua API này.
+  role: z.enum(["MEMBER", "COACH"]),
   fitnessGoal: z.string().optional(),
   trainingLevel: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]).optional(),
   trainingPreference: z.string().optional(),

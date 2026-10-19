@@ -857,7 +857,7 @@ function CoachAssignments({
                 {confirm === coachId ? "Xác nhận gỡ" : "Gỡ phân công"}
               </button>
             ) : (
-              <small>API chưa trả mã hồ sơ để gỡ phân công.</small>
+              <small>Chưa thể gỡ phân công.</small>
             )}
           </div>
         );

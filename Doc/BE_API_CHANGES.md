@@ -128,7 +128,7 @@ Hạ tầng mới (cùng phong cách `tests/*.e2e.ts`: tsx + HTTP thật + Prism
 docker run -d --name scms_pg_local -e POSTGRES_USER=scms -e POSTGRES_PASSWORD=scms_local -e POSTGRES_DB=scms_local -p 5440:5432 postgres:15-alpine
 ```
 
-`BE/.env.local` (đã có, nằm trong `.gitignore` qua `.env.*`) trỏ DB trên, tắt SMTP/Cloudinary/SePay thật, `SEPAY_MOCK_MODE=true`, cổng 8081. Mọi script local chạy qua `scripts/with-local-env.mjs` (đè `.env`, **từ chối** nếu DB không phải localhost):
+`BE/.env.local` không được track và không được đảm bảo có trên máy: cần tự tạo nếu chọn DB Docker trên, tắt SMTP/Cloudinary/SePay thật, `SEPAY_MOCK_MODE=true`, cổng 8081. Đây là môi trường test riêng; demo Web + Mobile cùng DB dùng [hướng dẫn 8080](DEMO_REAL_DATA.md). Mọi script local chạy qua `scripts/with-local-env.mjs` (đè `.env`, **từ chối** nếu DB không phải localhost):
 
 | Script | Việc |
 |---|---|

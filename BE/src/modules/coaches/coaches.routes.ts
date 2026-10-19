@@ -4,7 +4,7 @@ import { authenticateRestricted } from "../../middlewares/authenticateRestricted
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
 import { cvUpload } from "../../middlewares/upload.js";
-import { CoachQuerySchema, UpdateCoachSchema } from "./coaches.schema.js";
+import { CoachQuerySchema, CvQuerySchema, UpdateCoachSchema } from "./coaches.schema.js";
 import * as coachController from "./coaches.controller.js";
 import * as walletController from "./coach-wallet.controller.js";
 import { z } from "zod";
@@ -189,7 +189,7 @@ router.post(
  *   get:
  *     summary: "BE-7: MANAGER liệt kê lệnh rút tiền (kèm HLV, số dư & tiền tạm giữ của ví)"
  *     tags: [Coaches]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ BearerAuth: [] }]
  *     parameters:
  *       - { in: query, name: type, schema: { type: string, enum: [WITHDRAWAL, DEPOSIT, REFUND_DEBIT], default: WITHDRAWAL } }
  *       - { in: query, name: status, schema: { type: string, enum: [PENDING, COMPLETED, REJECTED, FAILED] } }
@@ -219,7 +219,7 @@ router.get(
  *   get:
  *     summary: "BE-7: MANAGER xem chi tiết lệnh rút tiền"
  *     tags: [Coaches]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ BearerAuth: [] }]
  *     responses:
  *       200: { description: "Lệnh rút + coach + wallet" }
  *       404: { description: "Không tìm thấy" }
@@ -232,7 +232,7 @@ router.get("/wallet/transactions/:txId", authenticate, authorize("MANAGER"), wal
  *   get:
  *     summary: "BE-19: Hồ sơ học viên trong các khóa của tôi + chuyên cần từng khóa + lộ trình"
  *     tags: [Coaches]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ BearerAuth: [] }]
  *     responses:
  *       200: { description: "{ member, attendedCount, pastSessionCount, classes[], plans[] }" }
  *       403: { description: "Học viên không thuộc khóa của tôi" }
@@ -257,18 +257,24 @@ router.patch(
  * @swagger
  * /coaches/cv/pending:
  *   get:
- *     summary: Manager lấy danh sách các HLV đang chờ duyệt CV
+ *     summary: Manager lấy danh sách hồ sơ CV theo trạng thái (mặc định PENDING)
  *     tags: [Coaches]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - { in: query, name: status, schema: { type: string, enum: [PENDING, APPROVED, REJECTED] } }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
  *       200:
  *         description: OK
+ *       400: { $ref: "#/components/responses/BadRequest" }
  */
 router.get(
   "/cv/pending",
   authenticate,
   authorize("MANAGER"),
+  validate(CvQuerySchema, "query"),
   coachController.listPendingCoachCVs
 );
 
@@ -437,7 +443,7 @@ router.post(
  *   get:
  *     summary: "BE-8: Tải file CV (PDF) — MANAGER hoặc chính HLV"
  *     tags: [Coaches]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ BearerAuth: [] }]
  *     responses:
  *       200: { description: "application/pdf" }
  *       403: { description: "Không có quyền" }

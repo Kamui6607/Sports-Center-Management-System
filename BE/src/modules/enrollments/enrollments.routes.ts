@@ -93,6 +93,8 @@ router.post(
  *       - in: query
  *         name: status
  *         schema: { type: string, enum: [BOOKED, CANCELLED, COMPLETED] }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
  *       200: { $ref: "#/components/responses/EnrollmentListOk" }
  *       400: { $ref: "#/components/responses/BadRequest" }
@@ -284,6 +286,9 @@ router.post(
  *         name: scheduleId
  *         required: true
  *         schema: { type: string }
+ *       - { in: query, name: status, schema: { type: string, enum: [BOOKED, CANCELLED, COMPLETED] } }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
  *       200: { $ref: "#/components/responses/EnrollmentListOk" }
  *       400: { $ref: "#/components/responses/BadRequest" }
