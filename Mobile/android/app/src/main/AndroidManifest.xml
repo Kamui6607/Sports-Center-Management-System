@@ -45,6 +45,98 @@
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
         <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <!-- Ngân hàng & ví điện tử phổ biến tại VN để mở App-to-App -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="mbmobile" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="vcb" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="vietcombank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="bidvsmartbanking" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="vietinbankipay" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tcb" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="vpbankneo" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tpbank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="acbone" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="agribank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="cake" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="timo" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="shb" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="ocb" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="hdbank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="momo" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="zalopay" />
+        </intent>
+        <!-- Package names for direct queries on Android -->
+        <package android:name="com.mbmobile" />
+        <package android:name="com.VCB" />
+        <package android:name="com.vnpay.bidv" />
+        <package android:name="com.vietinbank.ipay" />
+        <package android:name="com.techcombank.mobile" />
+        <package android:name="com.vnpay.vpbankonline" />
+        <package android:name="com.tpbank.mobile" />
+        <package android:name="mobile.acb.com.vn" />
+        <package android:name="com.vnpay.agribank" />
+        <package android:name="xyz.be.cake" />
+        <package android:name="com.vnpay.ocb" />
+        <package android:name="vn.timo.mobile" />
+        <package android:name="com.mservice.momotransfer" />
+        <package android:name="vn.com.vng.zalopay" />
+        <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>

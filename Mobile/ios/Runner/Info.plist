@@ -77,5 +77,29 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+		<string>mbmobile</string>
+		<string>vcb</string>
+		<string>vietcombank</string>
+		<string>vcbdigibank</string>
+		<string>bidvsmartbanking</string>
+		<string>vietinbankipay</string>
+		<string>tcb</string>
+		<string>techcombank</string>
+		<string>vpbankneo</string>
+		<string>tpbank</string>
+		<string>acbone</string>
+		<string>agribank</string>
+		<string>cake</string>
+		<string>timo</string>
+		<string>shb</string>
+		<string>ocb</string>
+		<string>hdbank</string>
+		<string>momo</string>
+		<string>zalopay</string>
+	</array>
 </dict>
 </plist>

@@ -49,6 +49,7 @@ dependencies:
   dio: ^5.11.1
   flutter_secure_storage: ^11.2.0
   socket_io_client: ^3.1.6
+  url_launcher: ^6.3.3
 
 dev_dependencies:
   flutter_test:

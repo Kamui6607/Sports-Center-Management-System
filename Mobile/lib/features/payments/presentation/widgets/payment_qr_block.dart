@@ -11,6 +11,7 @@ import '../../../../core/utils/money.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../domain/entities/payment.dart';
 import '../providers/payment_providers.dart';
+import 'bank_app_picker_sheet.dart';
 
 /// Ảnh QR + đếm ngược + Lưu ảnh / Chia sẻ (Q11).
 class PaymentQrBlock extends ConsumerStatefulWidget {
@@ -91,6 +92,13 @@ class _PaymentQrBlockState extends ConsumerState<PaymentQrBlock> {
             style: context.text.small.copyWith(color: col.textMuted, fontFeatures: kTabularFigures),
           ),
           const SizedBox(height: AppSpacing.md),
+          AppButton(
+            label: 'Mở ứng dụng ngân hàng',
+            icon: AppIcons.bank,
+            expand: true,
+            onPressed: () => BankAppPickerSheet.show(context: context, checkout: c),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
               Expanded(
