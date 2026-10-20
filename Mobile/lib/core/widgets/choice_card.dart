@@ -15,6 +15,7 @@ class ChoiceCard extends StatelessWidget {
     required this.description,
     required this.selected,
     required this.onTap,
+    this.enabled = true,
   });
 
   final IconData icon;
@@ -23,14 +24,18 @@ class ChoiceCard extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  /// false ⇒ mờ đi, không bấm được (VD lựa chọn không khả dụng — [description] nêu lý do).
+  final bool enabled;
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Semantics(
+    final card = Semantics(
       selected: selected,
+      enabled: enabled,
       inMutuallyExclusiveGroup: true,
       child: AppCard(
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
         borderColor: selected ? c.primary : null,
         color: selected ? context.tones.of(StatusTone.brand).background : null,
         child: Row(
@@ -58,5 +63,6 @@ class ChoiceCard extends StatelessWidget {
         ),
       ),
     );
+    return enabled ? card : Opacity(opacity: 0.55, child: card);
   }
 }

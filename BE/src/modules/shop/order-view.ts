@@ -1,6 +1,8 @@
 import { Prisma, type OrderStatus } from "@prisma/client";
-import { MANAGER_TRANSITIONS, ORDER_STATUS_LABEL } from "./order-state.js";
+import { shopConfig } from "../../config/shop.js";
+import { isUnpaidCash, managerTransitionsFor, ORDER_STATUS_LABEL } from "./order-state.js";
 import { maskPhone, pickupCodeFor, pickupQrPayload } from "./pickup-code.js";
+import { vnDateString } from "./pickup-schedule.js";
 
 /** Số tiền VND (số nguyên) — Decimal của Prisma trả về object/string. */
 export function money(value: unknown): number {
@@ -10,7 +12,7 @@ export function money(value: unknown): number {
 /** Nhóm trạng thái cho tab "Đơn của tôi" / lọc của Manager. */
 export const ORDER_STATUS_GROUPS: Record<string, OrderStatus[]> = {
   PENDING: ["PENDING_PAYMENT"],
-  ACTIVE: ["PAID", "PROCESSING", "READY_FOR_PICKUP", "SHIPPING", "DELIVERED", "REFUND_REQUESTED"],
+  ACTIVE: ["CONFIRMED", "PAID", "PROCESSING", "READY_FOR_PICKUP", "SHIPPING", "DELIVERED", "REFUND_REQUESTED"],
   COMPLETED: ["COMPLETED"],
   CLOSED: ["EXPIRED", "CANCELLED", "NOT_PICKED_UP", "REFUNDED"],
 };
@@ -31,7 +33,24 @@ export const ORDER_DETAIL_INCLUDE = {
   history: { orderBy: { createdAt: "asc" as const } },
   refunds: {
     orderBy: { createdAt: "desc" as const },
-    select: { id: true, status: true, amount: true, reason: true, rejectReason: true, managerNote: true, createdAt: true, processedAt: true },
+    select: {
+      id: true,
+      status: true,
+      amount: true,
+      grossAmount: true,
+      feePercent: true,
+      reason: true,
+      note: true,
+      rejectReason: true,
+      managerNote: true,
+      bankName: true,
+      bankAccountNumber: true,
+      bankAccountName: true,
+      payoutMethod: true,
+      bankInfoRequestedAt: true,
+      createdAt: true,
+      processedAt: true,
+    },
   },
   user: { select: { id: true, fullName: true, email: true, phone: true, avatarUrl: true } },
 } satisfies Prisma.OrderInclude;
@@ -59,6 +78,9 @@ export function orderSummaryView(o: ListOrder) {
     status: o.status,
     statusLabel: ORDER_STATUS_LABEL[o.status],
     fulfillmentType: o.fulfillmentType,
+    /** SEPAY = đã/đang chuyển khoản trước; CASH = trả tiền khi nhận tại quầy. */
+    paymentMethod: o.paymentMethod,
+    isPaid: o.paidAt !== null,
     subtotal: money(o.subtotal),
     shippingFee: money(o.shippingFee),
     total: money(o.totalPrice),
@@ -69,6 +91,8 @@ export function orderSummaryView(o: ListOrder) {
     trackingCode: o.trackingCode,
     paymentExpiresAt: o.paymentExpiresAt,
     pickupDeadline: o.pickupDeadline,
+    /** Ngày khách hẹn đến lấy "YYYY-MM-DD" (giờ VN). */
+    preferredPickupDate: o.preferredPickupDate ? vnDateString(o.preferredPickupDate) : null,
     paymentId: o.payment?.id ?? null,
     payment: o.payment,
     cancelReason: o.cancelReason,
@@ -77,7 +101,24 @@ export function orderSummaryView(o: ListOrder) {
   };
 }
 
-function baseDetail(o: DetailOrder) {
+type RefundRow = DetailOrder["refunds"][number];
+
+/** Hoàn tiền của đơn + cờ xử lý: chờ khách gửi STK, chờ quá lâu (tồn đọng). */
+function refundView(r: RefundRow, now: Date) {
+  const pending = r.status === "PENDING";
+  const ageDays = Math.floor((now.getTime() - r.createdAt.getTime()) / 86_400_000);
+  return {
+    ...r,
+    amount: money(r.amount),
+    grossAmount: r.grossAmount === null ? null : money(r.grossAmount),
+    hasBankInfo: !!r.bankAccountNumber?.trim(),
+    awaitingBankInfo: pending && !r.bankAccountNumber?.trim(),
+    pendingDays: pending ? ageDays : null,
+    isStale: pending && ageDays >= shopConfig().staleRefundDays,
+  };
+}
+
+function baseDetail(o: DetailOrder, now = new Date()) {
   return {
     ...orderSummaryView(o as unknown as ListOrder),
     recipientPhone: o.recipientPhone,
@@ -109,7 +150,10 @@ function baseDetail(o: DetailOrder) {
       bySystem: h.actorId === null,
       createdAt: h.createdAt,
     })),
-    refunds: o.refunds.map((r) => ({ ...r, amount: money(r.amount) })),
+    refunds: o.refunds.map((r) => refundView(r, now)),
+    pickupRescheduleCount: o.pickupRescheduleCount,
+    /** Số tiền khách cần trả khi nhận (đơn trả tại quầy chưa thu). */
+    amountDueAtCounter: isUnpaidCash(o) ? money(o.totalPrice) : 0,
     payment: o.payment
       ? {
           id: o.payment.id,
@@ -128,8 +172,10 @@ function baseDetail(o: DetailOrder) {
 export function orderOwnerView(o: DetailOrder, now = new Date()) {
   const pickupReady = o.status === "READY_FOR_PICKUP" && o.pickupCodeNonce;
   const pickupCode = pickupReady ? pickupCodeFor(o.id, o.pickupCodeNonce!) : null;
+  const cfg = shopConfig();
+  const unpaidCash = isUnpaidCash(o);
   return {
-    ...baseDetail(o),
+    ...baseDetail(o, now),
     items: o.items.map((i) => ({
       ...itemView(i),
       review: i.review
@@ -143,29 +189,47 @@ export function orderOwnerView(o: DetailOrder, now = new Date()) {
         : null,
     actions: {
       canPay: o.status === "PENDING_PAYMENT" && !!o.paymentExpiresAt && o.paymentExpiresAt > now && !!o.payment,
-      canCancel: o.status === "PENDING_PAYMENT",
+      // Đơn trả tại quầy chưa thu tiền: hủy được tới trước khi nhận (không mất phí).
+      canCancel: o.status === "PENDING_PAYMENT" || (unpaidCash && (o.status === "CONFIRMED" || o.status === "READY_FOR_PICKUP")),
       canRequestRefund: o.status === "PAID",
       canConfirmReceived: o.status === "DELIVERED",
+      canReschedulePickup:
+        o.fulfillmentType === "PICKUP" &&
+        ["CONFIRMED", "PAID", "READY_FOR_PICKUP"].includes(o.status) &&
+        o.pickupRescheduleCount < cfg.pickupMaxReschedules &&
+        (!o.pickupDeadline || o.pickupDeadline > now),
+      canUpdateRefundBank: o.refunds.some((r) => r.status === "PENDING"),
     },
   };
 }
 
 /** Chi tiết đơn cho MANAGER: thông tin người mua, chuyển trạng thái được phép; KHÔNG lộ mã nhận hàng. */
-export function orderManagerView(o: DetailOrder, now = new Date()) {
-  const allowed = MANAGER_TRANSITIONS[o.fulfillmentType][o.status] ?? [];
+export function orderManagerView(o: DetailOrder, now = new Date(), buyerStats?: { noShowCount: number; cashPickupLockedUntil: Date | null }) {
+  const allowed = managerTransitionsFor(o);
   return {
-    ...baseDetail(o),
+    ...baseDetail(o, now),
     items: o.items.map((i) => ({
       ...itemView(i),
       review: i.review ? { id: i.review.id, rating: i.review.rating, comment: i.review.comment, isHidden: i.review.isHidden } : null,
     })),
-    buyer: { id: o.user.id, fullName: o.user.fullName, email: o.user.email, phone: o.user.phone, avatarUrl: o.user.avatarUrl },
+    buyer: {
+      id: o.user.id,
+      fullName: o.user.fullName,
+      email: o.user.email,
+      phone: o.user.phone,
+      avatarUrl: o.user.avatarUrl,
+      /** Số lần không đến lấy hàng trong SHOP_NO_SHOW_WINDOW_DAYS ngày gần nhất. */
+      noShowCount: buyerStats?.noShowCount ?? 0,
+      cashPickupLockedUntil: buyerStats?.cashPickupLockedUntil ?? null,
+    },
     recipientPhoneMasked: maskPhone(o.recipientPhone),
     allowedTransitions: allowed.map((s) => ({ status: s, label: ORDER_STATUS_LABEL[s], requiresTrackingCode: s === "SHIPPING" })),
     pickup:
       o.status === "READY_FOR_PICKUP"
         ? {
             deadline: o.pickupDeadline,
+            /** Đơn trả tại quầy: Manager phải thu tiền mặt khi giao. */
+            requiresCashCollection: isUnpaidCash(o),
             failedAttempts: o.pickupFailedAttempts,
             lockedUntil: o.pickupLockedUntil && o.pickupLockedUntil > now ? o.pickupLockedUntil : null,
           }

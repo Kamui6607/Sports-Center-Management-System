@@ -148,11 +148,12 @@ export async function createLegacyOrder(user: { id: string; role: string }, item
     idempotencyKey ?? `legacy-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     { legacy: true }
   );
-  // Giữ đúng shape cũ: view QR + `order{ id, totalPrice, status, items[] }`.
+  // Giữ đúng shape cũ: view QR + `order{ id, totalPrice, status, items[] }` (API cũ luôn là SePay ⇒ luôn có checkout).
+  const checkout = result.checkout!;
   return {
-    ...result.checkout,
+    ...checkout,
     order: {
-      ...result.checkout.order,
+      ...checkout.order,
       items: result.order.items.map((i) => ({
         productId: i.productId,
         productName: i.productName,

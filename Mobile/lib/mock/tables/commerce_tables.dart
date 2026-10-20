@@ -143,6 +143,13 @@ class RefundRow {
   DateTime? processedAt;
   String? processedNote;
   String? rejectReason;
+
+  /// Hoàn đơn hàng: phí giữ hàng khi bùng nhiều lần + STK khách bổ sung.
+  int? grossAmount;
+  int? feePercent;
+  String? bankName;
+  String? bankAccountNumber;
+  String? bankAccountName;
 }
 
 class ProductRow {
@@ -281,12 +288,21 @@ class ShopOrderRow {
     this.shippingAddress,
     this.note,
     this.idempotencyKey,
+    this.paymentMethod = ShopPaymentMethod.sepay,
+    this.preferredPickupDate,
   });
 
   final String id;
   final String code;
   final String userId;
   final FulfillmentType fulfillmentType;
+
+  /// Trả tại quầy ⇒ chưa có giao dịch tới khi Manager thu tiền ([paidAt]).
+  final ShopPaymentMethod paymentMethod;
+  DateTime? preferredPickupDate;
+  int pickupRescheduleCount = 0;
+  DateTime? paidAt;
+  DateTime? notPickedUpAt;
   final List<OrderLineRow> lines;
   final int shippingFee;
   final DateTime createdAt;

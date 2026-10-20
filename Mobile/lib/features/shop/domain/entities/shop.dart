@@ -4,6 +4,9 @@ library;
 /// Trạng thái đơn (`OrderStatus` của BE).
 enum ShopOrderStatus {
   pendingPayment,
+
+  /// Đơn trả tiền tại quầy: đã giữ hàng, chờ Trung tâm chuẩn bị (chưa thu tiền).
+  confirmed,
   paid,
   processing,
   readyForPickup,
@@ -17,8 +20,11 @@ enum ShopOrderStatus {
   refunded,
 }
 
-/// Hình thức nhận hàng — luôn trả trước qua VietQR (không COD).
+/// Hình thức nhận hàng.
 enum FulfillmentType { pickup, delivery }
+
+/// Cách thanh toán: chuyển khoản trước (VietQR/SePay) hoặc trả tiền khi nhận tại quầy (chỉ [FulfillmentType.pickup]).
+enum ShopPaymentMethod { sepay, cash }
 
 /// Nhóm trạng thái cho tab "Đơn của tôi" / lọc của Manager (`status=PENDING|ACTIVE|COMPLETED|CLOSED`).
 enum OrderGroup { pending, active, completed, closed }
@@ -54,14 +60,30 @@ class ShopConfig {
     this.holdMinutes = 15,
     this.maxPendingOrders = 2,
     this.pickupDays = 3,
-    this.shippingFee = 30000,
+    this.shippingFee = 15000,
     this.freeShippingThreshold = 500000,
     this.deliveryProvinces = const ['Hồ Chí Minh'],
+    this.pickupMaxDaysAhead = 7,
+    this.pickupMaxReschedules = 1,
+    this.pickupRescheduleMaxDays = 3,
+    this.cashMaxOrderValue = 2000000,
   });
 
   final int holdMinutes;
   final int maxPendingOrders;
+
+  /// Hạn nhận = cuối ngày (ngày hẹn + [pickupDays]).
   final int pickupDays;
+
+  /// Ngày hẹn lấy chọn trong [hôm nay, hôm nay + N].
+  final int pickupMaxDaysAhead;
+
+  /// Số lần được đổi ngày lấy / mỗi lần dời tối đa N ngày.
+  final int pickupMaxReschedules;
+  final int pickupRescheduleMaxDays;
+
+  /// Đơn trả tại quầy tối đa (VND).
+  final int cashMaxOrderValue;
   final int shippingFee;
   final int freeShippingThreshold;
   final List<String> deliveryProvinces;
@@ -206,10 +228,16 @@ class CheckoutRequest {
     this.recipientName,
     this.recipientPhone,
     this.note,
+    this.paymentMethod = ShopPaymentMethod.sepay,
+    this.pickupDate,
   });
 
   final CheckoutMode mode;
   final FulfillmentType fulfillmentType;
+  final ShopPaymentMethod paymentMethod;
+
+  /// Ngày dự định lấy (chỉ phần ngày, giờ VN) — chỉ với nhận tại quầy.
+  final DateTime? pickupDate;
 
   /// Giỏ: các dòng được chọn (rỗng = cả giỏ).
   final List<String> productIds;
@@ -227,10 +255,14 @@ class CheckoutRequest {
     String? recipientName,
     String? recipientPhone,
     String? note,
+    ShopPaymentMethod? paymentMethod,
+    DateTime? pickupDate,
     bool clearAddress = false,
   }) => CheckoutRequest(
     mode: mode,
     fulfillmentType: fulfillmentType ?? this.fulfillmentType,
+    paymentMethod: paymentMethod ?? this.paymentMethod,
+    pickupDate: pickupDate ?? this.pickupDate,
     productIds: productIds,
     items: items,
     addressId: clearAddress ? null : (addressId ?? this.addressId),
@@ -278,7 +310,21 @@ class CheckoutPreview {
     this.maxPendingOrders = 2,
     this.holdMinutes = 15,
     this.freeShippingThreshold = 0,
+    this.pickupDateMin,
+    this.pickupDateMax,
+    this.pickupDays = 3,
+    this.cashAvailable = false,
+    this.cashUnavailableReason,
   });
+
+  /// Khoảng ngày được chọn làm ngày hẹn lấy (nhận tại quầy).
+  final DateTime? pickupDateMin;
+  final DateTime? pickupDateMax;
+  final int pickupDays;
+
+  /// Có được chọn "trả tiền tại quầy" không (+ lý do khi không).
+  final bool cashAvailable;
+  final String? cashUnavailableReason;
 
   final List<CheckoutLine> lines;
   final int subtotal;
@@ -301,14 +347,16 @@ class CheckoutPreview {
   List<ShopWarning> get allWarnings => [...warnings, for (final l in lines) ...l.warnings];
 }
 
-/// Kết quả đặt hàng: chuyển sang màn VietQR có sẵn.
+/// Kết quả đặt hàng: chuyển khoản ⇒ màn VietQR; trả tại quầy ([paymentId] null) ⇒ chi tiết đơn.
 class PlacedOrder {
-  const PlacedOrder({required this.orderId, required this.orderCode, required this.paymentId, this.replayed = false});
+  const PlacedOrder({required this.orderId, required this.orderCode, this.paymentId, this.replayed = false});
 
   final String orderId;
   final String orderCode;
-  final String paymentId;
+  final String? paymentId;
   final bool replayed;
+
+  bool get payAtCounter => paymentId == null;
 }
 
 class OrderLineReview {
@@ -380,6 +428,12 @@ class OrderRefundInfo {
     required this.amount,
     required this.reason,
     this.rejectReason,
+    this.grossAmount,
+    this.feePercent,
+    this.bankName,
+    this.bankAccountNumber,
+    this.bankAccountName,
+    this.payoutMethod,
   });
 
   /// `PENDING` | `COMPLETED` | `REJECTED`.
@@ -387,9 +441,33 @@ class OrderRefundInfo {
   final String id;
   final int amount;
 
+  /// Trước khi trừ phí giữ hàng (bùng hàng nhiều lần) — null khi không trừ phí.
+  final int? grossAmount;
+  final int? feePercent;
+
+  /// STK nhận hoàn khách đã cung cấp.
+  final String? bankName;
+  final String? bankAccountNumber;
+  final String? bankAccountName;
+
+  /// `BANK_TRANSFER` | `CASH` khi đã hoàn.
+  final String? payoutMethod;
+
+  bool get isPending => status == 'PENDING';
+  bool get hasBankInfo => (bankAccountNumber ?? '').trim().isNotEmpty;
+
   /// `ORDER_CANCELLED` | `ORDER_NOT_PICKED_UP` | `ORDER_LATE_PAYMENT`.
   final String reason;
   final String? rejectReason;
+}
+
+/// STK khách nhận tiền hoàn.
+class RefundBankInput {
+  const RefundBankInput({required this.bankName, required this.accountNumber, required this.accountName});
+
+  final String bankName;
+  final String accountNumber;
+  final String accountName;
 }
 
 /// Đơn hàng (danh sách: [lines], [history]… có thể rỗng; chi tiết: đầy đủ).
@@ -426,7 +504,28 @@ class ShopOrder {
     this.buyerPhone,
     this.allowedTransitions = const [],
     this.paymentRequiresReview = false,
+    this.paymentMethod = ShopPaymentMethod.sepay,
+    this.isPaid = false,
+    this.preferredPickupDate,
+    this.pickupRescheduleCount = 0,
+    this.amountDueAtCounter = 0,
+    this.canReschedulePickup = false,
+    this.canUpdateRefundBank = false,
   });
+
+  final ShopPaymentMethod paymentMethod;
+  final bool isPaid;
+
+  /// Ngày hẹn lấy (chỉ phần ngày).
+  final DateTime? preferredPickupDate;
+  final int pickupRescheduleCount;
+
+  /// Số tiền phải trả khi nhận tại quầy (0 nếu đã trả trước).
+  final int amountDueAtCounter;
+  final bool canReschedulePickup;
+  final bool canUpdateRefundBank;
+
+  OrderRefundInfo? get pendingRefund => refunds.where((r) => r.isPending).firstOrNull;
 
   final String id;
   final String code;

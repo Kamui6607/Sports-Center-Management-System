@@ -33,6 +33,8 @@ export const ApproveRefundSchema = z.object({
   transactionRef: z.string().trim().max(100).optional(),
   /** Hoàn ngoại lệ (MEMBER_CANCEL_COURSE_LATE): % phí chiết khấu Manager chốt (0–99, mặc định theo yêu cầu). */
   feePercent: z.number().int().min(0).max(99).optional(),
+  /** Cách trả tiền hoàn: BANK_TRANSFER (mặc định — hoàn đơn hàng cần STK của khách) hoặc CASH (tiền mặt tại quầy). */
+  payoutMethod: z.enum(["BANK_TRANSFER", "CASH"]).optional(),
 });
 
 export const RejectRefundSchema = z.object({

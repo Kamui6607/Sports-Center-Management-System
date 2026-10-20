@@ -105,6 +105,23 @@ class ShopApiRepository implements ShopRepository {
       ShopJson.order((await _api.post('/shop/orders/$id/confirm-received')).json);
 
   @override
+  Future<ShopOrder> reschedulePickup(String id, DateTime pickupDate) async => ShopJson.order(
+    (await _api.post('/shop/orders/$id/reschedule-pickup', body: {'pickupDate': ShopJson.dayString(pickupDate)})).json,
+  );
+
+  @override
+  Future<ShopOrder> updateRefundBank(String id, RefundBankInput bank) async => ShopJson.order(
+    (await _api.put(
+      '/shop/orders/$id/refund-bank',
+      body: {
+        'bankName': bank.bankName.trim(),
+        'bankAccountNumber': bank.accountNumber.trim(),
+        'bankAccountName': bank.accountName.trim(),
+      },
+    )).json,
+  );
+
+  @override
   Future<void> reviewItem(String orderItemId, int rating, String? comment) => _api.post(
     '/shop/order-items/$orderItemId/review',
     body: {'rating': rating, if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim()},

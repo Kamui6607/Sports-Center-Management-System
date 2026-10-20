@@ -1136,7 +1136,7 @@
   "POST /shop/checkout": {
     "path": "/shop/checkout",
     "method": "POST",
-    "summary": "Tạo đơn + giao dịch VietQR (SePay) — bắt buộc header Idempotency-Key",
+    "summary": "Tạo đơn + giao dịch VietQR (SePay) hoặc đơn trả tại quầy (CASH) — bắt buộc header Idempotency-Key",
     "security": [
       {
         "BearerAuth": []
@@ -1194,6 +1194,18 @@
             "PICKUP",
             "DELIVERY"
           ]
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": [
+            "SEPAY",
+            "CASH"
+          ],
+          "default": "SEPAY"
+        },
+        "pickupDate": {
+          "type": "string",
+          "format": "date"
         },
         "addressId": {
           "type": "string"
@@ -1367,6 +1379,86 @@
       "200"
     ]
   },
+  "POST /shop/orders/{id}/reschedule-pickup": {
+    "path": "/shop/orders/{id}/reschedule-pickup",
+    "method": "POST",
+    "summary": "Đổi ngày nhận / gia hạn tại quầy (tối đa SHOP_PICKUP_MAX_RESCHEDULES lần, dời ≤ SHOP_PICKUP_RESCHEDULE_MAX_DAYS ngày) — đơn đã sẵn sàng thì tính lại hạn nhận",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "pickupDate"
+      ],
+      "properties": {
+        "pickupDate": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "409"
+    ]
+  },
+  "PUT /shop/orders/{id}/refund-bank": {
+    "path": "/shop/orders/{id}/refund-bank",
+    "method": "PUT",
+    "summary": "Khách bổ sung / sửa số tài khoản nhận tiền hoàn của yêu cầu hoàn đang chờ",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "bankName",
+        "bankAccountNumber",
+        "bankAccountName"
+      ],
+      "properties": {
+        "bankName": {
+          "type": "string"
+        },
+        "bankAccountNumber": {
+          "type": "string"
+        },
+        "bankAccountName": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "409"
+    ]
+  },
   "POST /shop/order-items/{id}/review": {
     "path": "/shop/order-items/{id}/review",
     "method": "POST",
@@ -1456,6 +1548,18 @@
         "name": "search",
         "schema": {
           "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "queue",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PICKUP_TODAY",
+            "REFUND_PENDING",
+            "STALE_REFUND"
+          ]
         }
       },
       {
@@ -1613,6 +1717,10 @@
         },
         "phoneLast4": {
           "type": "string"
+        },
+        "cashCollected": {
+          "type": "boolean",
+          "description": "Đơn trả tại quầy: đã thu đủ tiền mặt"
         }
       }
     },
@@ -1621,6 +1729,32 @@
       "400",
       "409",
       "423"
+    ]
+  },
+  "POST /shop/manage/orders/{id}/remind-refund-bank": {
+    "path": "/shop/manage/orders/{id}/remind-refund-bank",
+    "method": "POST",
+    "summary": "Nhắc khách gửi số tài khoản nhận hoàn (yêu cầu hoàn đang chờ, chưa có STK) — tối đa 1 lần/giờ",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "409",
+      "429"
     ]
   },
   "GET /shop/manage/inventory": {
@@ -2674,6 +2808,14 @@
           "minimum": 0,
           "maximum": 99,
           "description": "Chỉ với MEMBER_CANCEL_COURSE_LATE: % phí chiết khấu chốt khi duyệt (hoàn = grossAmount × (100 − phí)%)"
+        },
+        "payoutMethod": {
+          "type": "string",
+          "enum": [
+            "BANK_TRANSFER",
+            "CASH"
+          ],
+          "description": "Cách trả tiền hoàn (mặc định BANK_TRANSFER). Hoàn đơn hàng bằng chuyển khoản cần khách đã gửi STK — thiếu ⇒ 409 REFUND_BANK_INFO_REQUIRED"
         }
       }
     },

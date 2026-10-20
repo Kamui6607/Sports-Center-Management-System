@@ -79,13 +79,21 @@ là kết thúc, giữ quyền đánh giá), `CANCELLED` có `cancelReason = EXP
 |---|---|---|
 | `SHOP_HOLD_MINUTES` | `VIETQR_PAYMENT_TTL_MINUTES` (15) | Thời gian giữ hàng chờ thanh toán |
 | `SHOP_MAX_PENDING_ORDERS` | 2 | Số đơn chờ thanh toán tối đa / người |
-| `SHOP_PICKUP_DAYS` | 3 | Số ngày giữ hàng tại quầy |
-| `SHOP_SHIPPING_FEE` | 30000 | Phí giao hàng |
+| `SHOP_PICKUP_DAYS` | 3 | Hạn nhận = cuối ngày (max(ngày hẹn lấy, ngày báo sẵn sàng) + N) |
+| `SHOP_PICKUP_MAX_DAYS_AHEAD` | 7 | Ngày hẹn lấy chọn trong [hôm nay, hôm nay + N] |
+| `SHOP_PICKUP_MAX_RESCHEDULES` / `SHOP_PICKUP_RESCHEDULE_MAX_DAYS` | 1 / 3 | Khách đổi ngày / gia hạn lấy N lần, mỗi lần dời tối đa M ngày |
+| `SHOP_PICKUP_REMINDER_HOURS` | 24 | Nhắc khách trước hạn nhận N giờ (1 lần) |
+| `SHOP_SHIPPING_FEE` | 15000 | Phí giao hàng (20/10/2026: 30.000 ⇒ 15.000) |
 | `SHOP_FREE_SHIPPING_THRESHOLD` | 500000 | Miễn phí ship khi tạm tính ≥ ngưỡng (0 = tắt) |
 | `SHOP_DELIVERY_PROVINCES` | `Hồ Chí Minh` | Khu vực giao (phân tách `,`, so khớp không dấu) |
 | `SHOP_EXPIRE_LOCK_THRESHOLD` | 3 | Số đơn để hết hạn trong 24h ⇒ khóa |
 | `SHOP_EXPIRE_LOCK_HOURS` | 24 | Thời gian khóa đặt hàng |
-| `SHOP_NOT_PICKED_UP_REFUND_PERCENT` | 100 | % tiền hoàn khi khách không đến lấy |
+| `SHOP_NOT_PICKED_UP_REFUND_PERCENT` | 100 | % tiền hoàn khi khách không đến lấy (trước khi trừ phí giữ hàng) |
+| `SHOP_CASH_MAX_ORDER_VALUE` / `SHOP_CASH_MAX_OPEN_ORDERS` | 2000000 / 1 | Trả tại quầy: giá trị đơn tối đa / số đơn trả tại quầy đang mở |
+| `SHOP_NO_SHOW_WINDOW_DAYS` | 90 | Cửa sổ đếm số lần "bùng hàng" (đơn vào NOT_PICKED_UP) |
+| `SHOP_NO_SHOW_CASH_LOCK_THRESHOLD` / `SHOP_CASH_LOCK_DAYS` | 2 / 30 | Từ lần bùng thứ N ⇒ khóa trả tại quầy M ngày |
+| `SHOP_NO_SHOW_FEE_THRESHOLD` / `SHOP_NO_SHOW_FEE_PERCENT` | 3 / 10 | Từ lần bùng thứ N (đơn đã trả) ⇒ trừ M% phí giữ hàng khi hoàn |
+| `SHOP_STALE_REFUND_DAYS` | 30 | Yêu cầu hoàn đơn hàng chờ quá N ngày ⇒ cờ "tồn đọng" trên web |
 | `SHOP_AUTO_COMPLETE_DAYS` | 3 | DELIVERED quá N ngày ⇒ tự COMPLETED |
 | `SHOP_PICKUP_MAX_ATTEMPTS` / `SHOP_PICKUP_LOCK_MINUTES` | 5 / 15 | Khóa xác nhận nhận hàng sau N lần sai |
 
@@ -127,7 +135,8 @@ Bảng chuyển hợp lệ (mọi thứ khác ⇒ `409 ORDER_INVALID_TRANSITION`
 Mỗi lần chuyển: `UPDATE … WHERE id = ? AND status = <from>` (CAS, chống 2 thao tác đồng thời) + ghi `OrderStatusHistory` +
 outbox notification `ORDER_UPDATED` cho người mua (socket `notification:new`).
 
-**Thanh toán**: bắt buộc trả trước VietQR/SePay cho cả PICKUP và DELIVERY. **Không** COD, **không** "đặt trước trả tại quầy".
+**Thanh toán** (cập nhật 20/10/2026 — xem §10): DELIVERY bắt buộc trả trước VietQR/SePay. PICKUP chọn trả trước **hoặc**
+trả tiền mặt khi nhận tại quầy (`paymentMethod: CASH` ⇒ đơn bắt đầu ở `CONFIRMED`, chưa có `Payment`).
 
 **Hủy**: trước PAID ⇒ khách hủy tự do, nhả hàng. PAID (chưa PROCESSING/READY) ⇒ khách gửi yêu cầu hoàn tiền (luồng `Refund`
 có sẵn, Manager chuyển khoản tay rồi duyệt). Từ PROCESSING/READY trở đi khách không tự hủy; từ SHIPPING không ai hủy được.
@@ -265,3 +274,41 @@ Webhook/`mock-confirm`/`GET /payments/sepay/:id` không đổi hợp đồng; v�
 | X1 | API cũ `POST /products/orders` không có SĐT người nhận | Cho phép thiếu SĐT; khi giao tại quầy chỉ đối chiếu mã (vẫn hash + dùng một lần + khóa sau 5 lần sai) | Giữ tương thích; app mới luôn gửi SĐT |
 | X2 | Giới hạn số đơn chờ thanh toán | Kiểm tra trong transaction sau `lockUserOrder` (trả kèm danh sách đơn chờ để app mở lại) — xem trước chỉ cảnh báo | Tránh 2 request song song cùng lọt |
 | X3 | Rate limit | Theo user, trong bộ nhớ; tắt được bằng `RATE_LIMIT_DISABLED=true` (chỉ dùng khi test tải) | D7 |
+
+---
+
+## 10. Nhận tại quầy: ngày hẹn lấy, trả tại quầy, quá hạn & hoàn tiền (20/10/2026)
+
+Migration `20261020000000_shop_pickup_cash` (enum `OrderStatus.CONFIRMED`; `Order.paymentMethod / preferredPickupDate /
+pickupRescheduleCount / pickupReminderSentAt`; `Refund.payoutMethod / bankInfoRequestedAt`; `User.cashPickupLockedUntil`).
+
+**Ngày hẹn lấy** — checkout PICKUP gửi `pickupDate` (YYYY-MM-DD, giờ VN) trong [hôm nay, +7]. Khách **lấy sớm được** ngay khi đơn
+`READY_FOR_PICKUP`. Hạn nhận = 23:59:59 của (max(ngày hẹn, ngày báo sẵn sàng) + 3). Khách đổi ngày / gia hạn **1 lần**, dời tối đa
+3 ngày (`POST /shop/orders/:id/reschedule-pickup`); đơn đã sẵn sàng thì tính lại hạn. Job nhắc 1 lần khi còn ≤ 24h.
+
+**Trả tại quầy (CASH, chỉ PICKUP)** — `CONFIRMED` (giữ hàng RESERVE, không hạn chuyển khoản) → Manager báo sẵn sàng → khi khách đến,
+Manager nhập mã + 4 số SĐT + tick "đã thu đủ tiền mặt" (`cashCollected: true`) ⇒ tạo `Payment` CASH SUCCESS, SALE, `COMPLETED`.
+Khách/Manager hủy trước khi nhận ⇒ `CANCELLED` + RELEASE (không có gì để hoàn). Giới hạn: đơn ≤ 2.000.000đ, 1 đơn trả tại quầy đang mở.
+
+```
+CONFIRMED ──(Manager)──► READY_FOR_PICKUP ──(mã + SĐT + đã thu tiền)──► COMPLETED
+    │                         ├──(quá hạn)──► NOT_PICKED_UP (nhả hàng, không hoàn)
+    └──(khách/Manager hủy)──► CANCELLED ◄──(hủy trước khi nhận)──┘
+```
+
+**Quá hạn không đến lấy** — mỗi lần đơn vào `NOT_PICKED_UP` = 1 lần "bùng hàng" (đếm trong 90 ngày, Manager thấy trên chi tiết đơn):
+
+| | Chưa thanh toán (trả tại quầy) | Đã thanh toán (SePay) |
+|---|---|---|
+| Trước hạn 24h | Nhắc khách (kèm số tiền cần mang) | Nhắc khách |
+| Đến hạn | Hủy đơn, nhả hàng (RELEASE), không hoàn | Trả hàng lên kệ (RETURN), Refund `ORDER_NOT_PICKED_UP` 100% |
+| Lần bùng thứ 2 / 90 ngày | Khóa trả tại quầy 30 ngày (vẫn mua được nếu chuyển khoản trước) | như bên trái |
+| Lần bùng thứ 3+ / 90 ngày | — | Hoàn 90% (trừ 10% phí giữ hàng; `grossAmount` + `feePercent` trên Refund) |
+| Hoàn chờ quá 30 ngày | — | Cờ "Hoàn tiền tồn đọng" (web: hàng đợi `STALE_REFUND`) để Manager liên hệ |
+
+**Hoàn tiền đơn đã thanh toán (web quản lý — popup đơn hàng)** — khối *Thanh toán* (phương thức, trạng thái, mã GD) + khối *Hoàn tiền*
+(số tiền, phí, số ngày chờ, STK khách). Duyệt ngay trong đơn bằng `PATCH /refunds/:id/approve { payoutMethod }`:
+`BANK_TRANSFER` (bắt buộc khách đã gửi STK — thiếu ⇒ `409 REFUND_BANK_INFO_REQUIRED`) hoặc `CASH` (trả tiền mặt tại quầy).
+Chưa có STK ⇒ nút "Nhắc khách gửi STK" (`POST /shop/manage/orders/:id/remind-refund-bank`, tối đa 1 lần/giờ); khách nhập STK trong
+app (`PUT /shop/orders/:id/refund-bank`). Manager "Hủy & hoàn tiền" bắt buộc ghi lý do (`400 CANCEL_REASON_REQUIRED`).
+Danh sách đơn có hàng đợi `queue=PICKUP_TODAY | REFUND_PENDING | STALE_REFUND` và cờ `pendingRefund{ awaitingBankInfo, isStale }`.

@@ -51,6 +51,9 @@ class MockDatabase {
 
   /// Khóa đặt hàng do để đơn hết hạn nhiều lần (userId ⇒ mở lại lúc).
   final checkoutLocks = <String, DateTime>{};
+
+  /// Khóa "trả tiền tại quầy" (bùng hàng nhiều lần).
+  final cashLocks = <String, DateTime>{};
   final chatMessages = <ChatMessageRow>[];
 
   /// Tỷ lệ HLV nhận (85%).

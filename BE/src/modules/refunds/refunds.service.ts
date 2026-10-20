@@ -603,7 +603,8 @@ export async function approveRefund(
   managerUserId: string,
   note?: string,
   transactionRef?: string,
-  feePercent?: number
+  feePercent?: number,
+  payoutMethod: "BANK_TRANSFER" | "CASH" = "BANK_TRANSFER"
 ) {
   const approved = await prisma.$transaction(async (tx) => {
     const current = await tx.refund.findUnique({ where: { id: refundId }, select: { paymentId: true } });
@@ -624,6 +625,13 @@ export async function approveRefund(
       throw new AppError("Yêu cầu hoàn tiền đã được xử lý.", 409, {
         code: "REFUND_ALREADY_PROCESSED",
         status: refund.status,
+      });
+    }
+
+    // Hoàn tiền đơn hàng bằng chuyển khoản: phải có STK của khách (khách bổ sung trong app hoặc chọn hoàn tiền mặt tại quầy).
+    if (refund.orderId && payoutMethod === "BANK_TRANSFER" && !refund.bankAccountNumber?.trim()) {
+      throw new AppError("Khách chưa cung cấp số tài khoản nhận hoàn — hãy nhắc khách hoặc chọn hoàn tiền mặt tại quầy.", 409, {
+        code: "REFUND_BANK_INFO_REQUIRED",
       });
     }
 
@@ -713,6 +721,7 @@ export async function approveRefund(
       where: { id: refund.id },
       data: {
         status: "COMPLETED",
+        payoutMethod,
         processedById: managerUserId,
         processedAt: new Date(),
         ...(finalNote ? { note: finalNote, managerNote: finalNote } : {}),
@@ -727,7 +736,9 @@ export async function approveRefund(
         type: "PAYMENT_REFUNDED",
         title: "Bạn đã được hoàn tiền",
         body: refund.order
-          ? `Đơn hàng ${refund.order.code} đã được hoàn ${vnd(amount)} cho bạn.`
+          ? payoutMethod === "CASH"
+            ? `Đơn hàng ${refund.order.code} đã được hoàn ${vnd(amount)} tiền mặt tại quầy.`
+            : `Đơn hàng ${refund.order.code} đã được hoàn ${vnd(amount)} vào tài khoản của bạn.`
           : refund.reason === "MEMBER_CANCEL_COURSE"
             ? `Yêu cầu hủy khóa "${className}" đã được duyệt. ${vnd(amount)} đã được hoàn cho bạn.`
             : refund.reason === "MEMBER_CANCEL_COURSE_LATE"

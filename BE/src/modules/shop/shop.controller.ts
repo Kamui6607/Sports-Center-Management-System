@@ -60,7 +60,7 @@ export const createOrder = wrap(async (req, res) => {
   const key = (req.header("Idempotency-Key") ?? req.body.idempotencyKey) as string | undefined;
   const result = await checkout.createOrder(req.user!, req.body, key);
   if (result.replayed) sendSuccess(res, result, "Order already created (idempotent replay)");
-  else sendCreated(res, result, "Order created — waiting for SePay transfer");
+  else sendCreated(res, result, result.checkout ? "Order created — waiting for SePay transfer" : "Order confirmed — pay at the counter on pickup");
 });
 
 // ── Đơn của tôi ──────────────────────────────────────────────────────────────
@@ -83,6 +83,12 @@ export const requestRefund = wrap(async (req, res) =>
     "Refund requested"
   )
 );
+export const reschedulePickup = wrap(async (req, res) =>
+  sendSuccess(res, await orders.reschedulePickup(req.user!.id, id(req), req.body.pickupDate), "Pickup date updated")
+);
+export const updateRefundBank = wrap(async (req, res) =>
+  sendSuccess(res, await orders.updateRefundBank(req.user!.id, id(req), req.body), "Refund bank info updated")
+);
 export const confirmReceived = wrap(async (req, res) =>
   sendSuccess(res, await orders.confirmReceived(req.user!.id, id(req)), "Order completed")
 );
@@ -102,7 +108,10 @@ export const managerTransition = wrap(async (req, res) =>
 );
 export const verifyPickup = wrap(async (req, res) => sendSuccess(res, await orders.verifyPickupCode(req.body.code), "Pickup code valid"));
 export const confirmPickup = wrap(async (req, res) =>
-  sendSuccess(res, await orders.confirmPickup(req.user!, id(req), req.body.code, req.body.phoneLast4), "Order picked up")
+  sendSuccess(res, await orders.confirmPickup(req.user!, id(req), req.body.code, req.body.phoneLast4, req.body.cashCollected === true), "Order picked up")
+);
+export const remindRefundBank = wrap(async (req, res) =>
+  sendSuccess(res, await orders.remindRefundBank(req.user!, id(req)), "Customer reminded")
 );
 export const listInventory = wrap(async (req, res) => {
   const { items, lowStockCount, pagination } = await orders.listInventory(req.query as Record<string, string>);

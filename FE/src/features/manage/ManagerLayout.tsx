@@ -1,26 +1,31 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import {
   Activity,
   Building2,
   CalendarDays,
   CalendarClock,
+  BookOpen,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   DoorOpen,
   Dumbbell,
   GraduationCap,
   LayoutGrid,
   LogOut,
   Menu,
+  Landmark,
   Package,
-  PanelLeftClose,
   ReceiptText,
   Undo2,
   Banknote,
-  PanelLeftOpen,
   Settings,
+  Settings2,
+  Store,
   UserRound,
   Users,
+  UsersRound,
   WalletCards,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -52,10 +57,12 @@ const OrdersPage = lazy(() => import("./pages/OrdersPage"));
 const CenterSettingsPage = lazy(() => import("./pages/CenterSettingsPage"));
 
 type NavItem = [path: string, label: string, icon: LucideIcon];
-const NAV: { title: string; items: NavItem[] }[] = [
-  { title: "", items: [["dashboard", "Tổng quan", LayoutGrid]] },
+type NavGroup = { title: string; icon: LucideIcon; items: NavItem[] };
+const HOME: NavItem = ["dashboard", "Tổng quan", LayoutGrid];
+const NAV: NavGroup[] = [
   {
     title: "Con người",
+    icon: UsersRound,
     items: [
       ["users", "Người dùng", Users],
       ["coaches", "Huấn luyện viên", Dumbbell],
@@ -63,6 +70,7 @@ const NAV: { title: string; items: NavItem[] }[] = [
   },
   {
     title: "Đào tạo",
+    icon: BookOpen,
     items: [
       ["classes", "Khóa học & lớp", GraduationCap],
       ["schedules", "Lịch học", CalendarDays],
@@ -71,6 +79,7 @@ const NAV: { title: string; items: NavItem[] }[] = [
   },
   {
     title: "Kinh doanh",
+    icon: Store,
     items: [
       ["products", "Sản phẩm", Package],
       ["orders", "Đơn hàng", ReceiptText],
@@ -79,20 +88,86 @@ const NAV: { title: string; items: NavItem[] }[] = [
   },
   {
     title: "Tài chính",
+    icon: Landmark,
     items: [
       ["refunds", "Hoàn tiền", Undo2],
       ["withdrawals", "Rút tiền HLV", Banknote],
     ],
   },
-  { title: "Hệ thống", items: [["center", "Cài đặt trung tâm", Building2]] },
+  { title: "Hệ thống", icon: Settings2, items: [["center", "Cài đặt trung tâm", Building2]] },
 ];
+
+const SIDEBAR_KEY = "pulse.sidebar";
+const GROUPS_KEY = "pulse.sidebar.groups";
+const WIDE_QUERY = "(min-width: 901px)";
 
 function readCollapsed() {
   try {
-    return localStorage.getItem("pulse.sidebar") === "collapsed";
+    return localStorage.getItem(SIDEBAR_KEY) === "collapsed";
   } catch {
     return false;
   }
+}
+
+/** Các nhóm menu người dùng đã mở — giữ lại giữa các lần tải trang. */
+function readOpenGroups(): string[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(GROUPS_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+const isOn = (pathname: string, path: string) => pathname === `/manager/${path}` || pathname.startsWith(`/manager/${path}/`);
+
+/** Chế độ "rail" (chỉ icon) chỉ dùng trên màn rộng; màn hẹp luôn là ngăn kéo đầy đủ. */
+function useWide() {
+  const [wide, setWide] = useState(() => matchMedia(WIDE_QUERY).matches);
+  useEffect(() => {
+    const m = matchMedia(WIDE_QUERY);
+    const update = () => setWide(m.matches);
+    m.addEventListener("change", update);
+    return () => m.removeEventListener("change", update);
+  }, []);
+  return wide;
+}
+
+/** Mục cha (nhóm) thu gọn/mở được; ở chế độ rail chỉ hiện icon các mục con. */
+function NavSection({ group, open, rail, active, onToggle }: { group: NavGroup; open: boolean; rail: boolean; active: boolean; onToggle: () => void }) {
+  const listId = useId();
+  const Icon = group.icon;
+  const shown = open;
+  return (
+    <div className={"cr-group" + (shown ? " open" : "") + (active ? " has-active" : "")}>
+      <button
+        type="button"
+        className="cr-group-btn"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-label={rail ? group.title : undefined}
+        title={rail ? group.title : undefined}
+        onClick={onToggle}
+      >
+        <span className="cr-group-icon" aria-hidden="true">
+          <Icon size={17} strokeWidth={2} />
+        </span>
+        <span className="cr-group-label">{group.title}</span>
+        {active && !open && <span className="cr-group-dot" title="Chứa trang đang mở" />}
+        <ChevronRight size={16} strokeWidth={2.2} className="cr-group-chevron" aria-hidden="true" />
+      </button>
+      <div className="cr-sub" id={listId} inert={!shown}>
+        <div className="cr-sub-inner">
+          {group.items.map(([path, label, ItemIcon]) => (
+            <NavLink key={path} to={`/manager/${path}`} className="cr-sub-link" title={rail ? label : undefined}>
+              <ItemIcon size={19} strokeWidth={1.8} aria-hidden="true" />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const initials = (name: string) =>
@@ -213,10 +288,29 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
   useThemePref();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
-  const found = NAV.flatMap((g) => g.items.map((i) => [g.title, ...i] as const)).find(
-    ([, p]) => pathname === `/manager/${p}` || pathname.startsWith(`/manager/${p}/`),
-  );
-  const section = found?.[2] ?? (pathname.startsWith("/manager/profile") ? "Tài khoản của tôi" : "Quản trị");
+  const wide = useWide();
+  const rail = collapsed && wide;
+  const sideId = useId();
+  const activeGroup = NAV.find((g) => g.items.some(([p]) => isOn(pathname, p)));
+  const found = [HOME, ...NAV.flatMap((g) => g.items)].find(([p]) => isOn(pathname, p));
+  const section = found?.[1] ?? (pathname.startsWith("/manager/profile") ? "Tài khoản của tôi" : "Quản trị");
+  const [openGroups, setOpenGroups] = useState<string[]>(readOpenGroups);
+  // Mặc định mở nhóm chứa trang đang xem (cả khi điều hướng sang nhóm khác).
+  useEffect(() => {
+    if (activeGroup) setOpenGroups((g) => (g.includes(activeGroup.title) ? g : [...g, activeGroup.title]));
+  }, [activeGroup]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(GROUPS_KEY, JSON.stringify(openGroups));
+    } catch {
+      /* bỏ qua khi storage bị chặn */
+    }
+  }, [openGroups]);
+  const toggleGroup = (title: string) =>
+    setOpenGroups((g) => (g.includes(title) ? g.filter((t) => t !== title) : [...g, title]));
+  // Thanh bên thu gọn (rail): mọi nhóm thu lại; bấm icon cha chỉ bung nhóm đó (không đổi trạng thái của chế độ mở rộng).
+  const [railGroup, setRailGroup] = useState<string | null>(null);
+  useEffect(() => setRailGroup(null), [rail]);
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
     document.title = `${section} · Pulse Manager`;
@@ -227,27 +321,28 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
-  const toggleCollapsed = () => {
+  function toggleCollapsed() {
     setCollapsed((v) => {
       try {
-        localStorage.setItem("pulse.sidebar", v ? "expanded" : "collapsed");
+        localStorage.setItem(SIDEBAR_KEY, v ? "expanded" : "collapsed");
       } catch {
         /* bỏ qua khi storage bị chặn */
       }
       return !v;
     });
-  };
+  }
 
-  const pages = NAV.flatMap((g) => g.items.map(([path, label, icon]) => ({ path, label, icon })));
+  const pages = [HOME, ...NAV.flatMap((g) => g.items)].map(([path, label, icon]) => ({ path, label, icon }));
   const [loggingOut, setLoggingOut] = useState(false);
 
   return (
-    <div className={"cr" + (collapsed ? " collapsed" : "")}>
+    <div className={"cr" + (rail ? " collapsed" : "")}>
       <a className="skip-link" href="#cr-main">
         Đến nội dung chính
       </a>
       {open && <button className="cr-scrim" aria-label="Đóng menu" onClick={() => setOpen(false)} />}
-      <aside className={"cr-side" + (open ? " open" : "")} aria-label="Điều hướng quản trị">
+      <div className="cr-side-wrap">
+      <aside id={sideId} className={"cr-side" + (open ? " open" : "")} aria-label="Điều hướng quản trị">
         <Link to="/manager/dashboard" className="cr-brand" title="Pulse — Quản lý trung tâm thể thao">
           <span className="cr-brand-mark" aria-hidden="true">
             <Activity size={19} strokeWidth={2.4} />
@@ -258,20 +353,25 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
           </span>
         </Link>
         <nav className="cr-nav" aria-label="Menu chính">
+          <NavLink to={`/manager/${HOME[0]}`} className="cr-top-link" title={rail ? HOME[1] : undefined}>
+            <span className="cr-group-icon" aria-hidden="true">
+              <LayoutGrid size={17} strokeWidth={2} />
+            </span>
+            <span className="cr-group-label">{HOME[1]}</span>
+          </NavLink>
           {NAV.map((g) => (
-            <div key={g.title || "home"} style={{ display: "grid", gap: 2 }}>
-              {g.title && <div className="cr-nav-title">{g.title}</div>}
-              {g.items.map(([path, label, Icon]) => (
-                <NavLink key={path} to={`/manager/${path}`} title={collapsed ? label : undefined}>
-                  <Icon size={19} strokeWidth={1.8} aria-hidden="true" />
-                  <span>{label}</span>
-                </NavLink>
-              ))}
-            </div>
+            <NavSection
+              key={g.title}
+              group={g}
+              rail={rail}
+              open={rail ? railGroup === g.title : openGroups.includes(g.title)}
+              active={activeGroup === g}
+              onToggle={() => (rail ? setRailGroup((t) => (t === g.title ? null : g.title)) : toggleGroup(g.title))}
+            />
           ))}
         </nav>
         <div className="cr-side-foot">
-          <NavLink to="/manager/profile" className={({ isActive }) => "cr-side-link" + (isActive ? " active" : "")} title={collapsed ? "Cài đặt tài khoản" : undefined}>
+          <NavLink to="/manager/profile" className={({ isActive }) => "cr-side-link" + (isActive ? " active" : "")} title={rail ? "Cài đặt tài khoản" : undefined}>
             <Settings size={19} strokeWidth={1.8} aria-hidden="true" />
             <span>Cài đặt tài khoản</span>
           </NavLink>
@@ -279,7 +379,7 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
             type="button"
             className="cr-side-link logout"
             disabled={loggingOut}
-            title={collapsed ? "Đăng xuất" : undefined}
+            title={rail ? "Đăng xuất" : undefined}
             onClick={async () => {
               setLoggingOut(true);
               try {
@@ -295,18 +395,23 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
           <TodayCard />
         </div>
       </aside>
+        {/* Nút tròn nằm đè lên đường kẻ ngăn sidebar / nội dung, căn giữa theo chiều dọc. */}
+        <button
+          type="button"
+          className="cr-side-toggle"
+          onClick={toggleCollapsed}
+          aria-controls={sideId}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
+          title={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
+        >
+          {collapsed ? <ChevronRight size={14} strokeWidth={2.5} /> : <ChevronLeft size={14} strokeWidth={2.5} />}
+        </button>
+      </div>
       <div className="cr-main">
         <header className="cr-top">
           <button className="cr-round cr-burger" aria-label="Mở menu" aria-expanded={open} onClick={() => setOpen(true)}>
             <Menu size={18} />
-          </button>
-          <button
-            className="cr-round cr-collapse-btn"
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
-            title={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
-          >
-            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
           <GlobalSearch pages={pages} />
           <div className="cr-top-actions">

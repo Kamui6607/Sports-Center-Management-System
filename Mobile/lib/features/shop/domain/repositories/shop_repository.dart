@@ -65,6 +65,12 @@ abstract interface class ShopRepository {
   /// `POST /shop/orders/:id/confirm-received`.
   Future<ShopOrder> confirmReceived(String id);
 
+  /// `POST /shop/orders/:id/reschedule-pickup` — đổi ngày lấy / gia hạn (giới hạn số lần + số ngày dời).
+  Future<ShopOrder> reschedulePickup(String id, DateTime pickupDate);
+
+  /// `PUT /shop/orders/:id/refund-bank` — STK nhận tiền hoàn của yêu cầu hoàn đang chờ.
+  Future<ShopOrder> updateRefundBank(String id, RefundBankInput bank);
+
   /// `POST /shop/order-items/:id/review`.
   Future<void> reviewItem(String orderItemId, int rating, String? comment);
 

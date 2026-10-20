@@ -7,7 +7,7 @@ import { buildPaginationMeta } from "../../utils/pagination.js";
 import { enqueueNotification, flushNotificationOutbox } from "../notifications/outbox.service.js";
 import { notifyManagersNewRefunds, type PayoutBankDetails } from "../refunds/refunds.service.js";
 import { applyInventory, availableOf } from "./inventory.js";
-import { MANAGER_TRANSITIONS, ORDER_STATUS_LABEL, transitionOrderTx } from "./order-state.js";
+import { isUnpaidCash, managerTransitionsFor, ORDER_STATUS_LABEL, transitionOrderTx } from "./order-state.js";
 import {
   money,
   ORDER_DETAIL_INCLUDE,
@@ -18,6 +18,7 @@ import {
   orderSummaryView,
 } from "./order-view.js";
 import { hashPickupCode, maskPhone, newPickupNonce, parsePickupInput, phoneLast4, pickupCodeFor } from "./pickup-code.js";
+import { addDays, formatVnDate, parseVnDate, pickupDeadlineFor, vnDayStart } from "./pickup-schedule.js";
 
 type Tx = Prisma.TransactionClient;
 type Actor = { id: string; role: string };
@@ -153,8 +154,45 @@ async function applyExpireLockTx(tx: Tx, userId: string) {
   }
 }
 
+/**
+ * Hủy đơn TRẢ TẠI QUẦY chưa thu tiền (CONFIRMED / READY_FOR_PICKUP): đơn → CANCELLED, nhả hàng đang giữ (RELEASE),
+ * vô hiệu mã nhận hàng. Không có giao dịch nên không có gì để hoàn. CAS trong `transitionOrderTx` chống hủy trùng.
+ * @returns `true` nếu đơn được hủy trong lần gọi này.
+ */
+async function cancelUnpaidCashOrder(orderId: string, by: "BUYER" | "MANAGER", opts: { actorId: string; note?: string | null }) {
+  const cancelled = await prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
+    if (!order || !isUnpaidCash(order) || (order.status !== "CONFIRMED" && order.status !== "READY_FOR_PICKUP")) return false;
+    await transitionOrderTx(tx, order, "CANCELLED", {
+      actorId: opts.actorId,
+      reason: opts.note ?? (by === "MANAGER" ? "Quản lý hủy đơn" : "Khách hủy đơn"),
+      data: { cancelReason: by, cancelledById: opts.actorId, cancelNote: opts.note ?? null, pickupCodeHash: null },
+      notify: by === "BUYER" ? false : undefined,
+    });
+    for (const item of [...order.items].sort((a, b) => a.productId.localeCompare(b.productId))) {
+      await applyInventory(tx, {
+        productId: item.productId,
+        type: "RELEASE",
+        quantity: item.quantity,
+        orderId: order.id,
+        actorId: opts.actorId,
+        note: `Đơn ${order.code} (trả tại quầy) bị hủy`,
+      });
+    }
+    return true;
+  });
+  if (cancelled) await flushNotificationOutbox().catch(() => {});
+  return cancelled;
+}
+
 export async function cancelMyOrder(userId: string, orderId: string, reason?: string) {
   const order = await ownOrder(userId, orderId);
+  if (isUnpaidCash(order) && (order.status === "CONFIRMED" || order.status === "READY_FOR_PICKUP")) {
+    if (!(await cancelUnpaidCashOrder(orderId, "BUYER", { actorId: userId, note: reason ?? null }))) {
+      throw new AppError("Đơn vừa thay đổi trạng thái — không thể hủy.", 409, { code: "ORDER_STATE_CHANGED" });
+    }
+    return detailForOwner(orderId);
+  }
   if (order.status !== "PENDING_PAYMENT") {
     throw new AppError(
       order.status === "PAID"
@@ -180,7 +218,8 @@ async function createOrderRefundTx(
   amount: number,
   requestedById: string | null,
   note: string | null,
-  bankInfo?: PayoutBankDetails
+  bankInfo?: PayoutBankDetails,
+  fee?: { grossAmount: number; feePercent: number }
 ) {
   const existing = await tx.refund.findFirst({
     where: { orderId: order.id, reason, status: { not: "REJECTED" } },
@@ -201,6 +240,7 @@ async function createOrderRefundTx(
       reason,
       amount,
       coachDebitAmount: 0,
+      ...(fee && fee.feePercent > 0 ? { grossAmount: fee.grossAmount, feePercent: fee.feePercent } : {}),
       note,
       memberNote: requestedById ? note : null,
       // Lưu bank info vào cột riêng nếu có.
@@ -243,6 +283,71 @@ export async function requestOrderRefund(
   void notifyManagersNewRefunds(`Khách yêu cầu hủy đơn ${owned.code} — cần hoàn ${money(refund.amount).toLocaleString("vi-VN")}đ.`, {
     refundId: refund.id,
     orderId,
+  });
+  return detailForOwner(orderId);
+}
+
+/**
+ * Khách đổi ngày lấy hàng / gia hạn (PICKUP, trước hạn nhận): tối đa `SHOP_PICKUP_MAX_RESCHEDULES` lần, ngày mới trong
+ * [hôm nay, max(ngày hẹn cũ, hôm nay) + SHOP_PICKUP_RESCHEDULE_MAX_DAYS]. Đơn đã sẵn sàng ⇒ tính lại hạn nhận.
+ */
+export async function reschedulePickup(userId: string, orderId: string, pickupDate: string) {
+  const cfg = shopConfig();
+  const order = await ownOrder(userId, orderId);
+  const now = new Date();
+  if (order.fulfillmentType !== "PICKUP" || !["CONFIRMED", "PAID", "READY_FOR_PICKUP"].includes(order.status)) {
+    throw new AppError(`Đơn ở trạng thái "${ORDER_STATUS_LABEL[order.status]}" không đổi được ngày nhận.`, 409, {
+      code: "PICKUP_NOT_RESCHEDULABLE",
+      status: order.status,
+    });
+  }
+  if (order.pickupDeadline && order.pickupDeadline <= now) {
+    throw new AppError("Đơn đã quá hạn nhận hàng.", 409, { code: "PICKUP_DEADLINE_PASSED" });
+  }
+  if (order.pickupRescheduleCount >= cfg.pickupMaxReschedules) {
+    throw new AppError(`Bạn chỉ được đổi ngày nhận hàng ${cfg.pickupMaxReschedules} lần cho mỗi đơn.`, 409, {
+      code: "PICKUP_RESCHEDULE_LIMIT",
+      maxReschedules: cfg.pickupMaxReschedules,
+    });
+  }
+  const newDate = parseVnDate(pickupDate);
+  const today = vnDayStart(now);
+  const current = order.preferredPickupDate ?? vnDayStart(order.createdAt);
+  const latest = addDays(current > today ? current : today, cfg.pickupRescheduleMaxDays);
+  if (newDate < today || newDate > latest) {
+    throw new AppError(`Chọn ngày nhận từ ${formatVnDate(today)} đến ${formatVnDate(latest)}.`, 400, {
+      code: "PICKUP_DATE_OUT_OF_RANGE",
+      minDate: today,
+      maxDate: latest,
+    });
+  }
+  const deadline = order.status === "READY_FOR_PICKUP" && order.readyAt ? pickupDeadlineFor(newDate, order.readyAt, cfg.pickupDays) : null;
+  const updated = await prisma.order.updateMany({
+    where: { id: order.id, status: order.status, pickupRescheduleCount: order.pickupRescheduleCount },
+    data: {
+      preferredPickupDate: newDate,
+      pickupRescheduleCount: { increment: 1 },
+      ...(deadline ? { pickupDeadline: deadline, pickupReminderSentAt: null } : {}),
+    },
+  });
+  if (updated.count === 0) {
+    throw new AppError("Đơn vừa được cập nhật bởi thao tác khác, vui lòng tải lại.", 409, { code: "ORDER_STATE_CHANGED" });
+  }
+  return detailForOwner(orderId);
+}
+
+/** Khách bổ sung / sửa số tài khoản nhận hoàn cho yêu cầu hoàn tiền ĐANG CHỜ của đơn. */
+export async function updateRefundBank(userId: string, orderId: string, bank: Required<PayoutBankDetails>) {
+  await ownOrder(userId, orderId);
+  const refund = await prisma.refund.findFirst({ where: { orderId, status: "PENDING" }, orderBy: { createdAt: "desc" } });
+  if (!refund) throw new AppError("Đơn không có yêu cầu hoàn tiền đang chờ.", 409, { code: "REFUND_NOT_PENDING" });
+  await prisma.refund.update({
+    where: { id: refund.id },
+    data: {
+      bankName: bank.bankName.trim(),
+      bankAccountNumber: bank.bankAccountNumber.replace(/\s+/g, ""),
+      bankAccountName: bank.bankAccountName.trim().toUpperCase(),
+    },
   });
   return detailForOwner(orderId);
 }
@@ -352,11 +457,40 @@ export async function listReviewsForManager(query: { page?: string; limit?: stri
 
 // ── Manager ──────────────────────────────────────────────────────────────────
 
-export async function listOrdersForManager(query: { page?: string; limit?: string; status?: string; fulfillmentType?: "PICKUP" | "DELIVERY"; search?: string }) {
+/** Hàng đợi xử lý của Manager (lọc nhanh trên trang Đơn hàng). */
+function queueFilter(queue?: string, now = new Date()): Prisma.OrderWhereInput {
+  const today = vnDayStart(now);
+  switch (queue) {
+    case "PICKUP_TODAY":
+      return {
+        fulfillmentType: "PICKUP",
+        status: { in: ["CONFIRMED", "PAID", "READY_FOR_PICKUP"] },
+        preferredPickupDate: { gte: today, lt: addDays(today, 1) },
+      };
+    case "REFUND_PENDING":
+      return { refunds: { some: { status: "PENDING" } } };
+    case "STALE_REFUND":
+      return { refunds: { some: { status: "PENDING", createdAt: { lt: addDays(now, -shopConfig().staleRefundDays) } } } };
+    default:
+      return {};
+  }
+}
+
+export async function listOrdersForManager(query: {
+  page?: string;
+  limit?: string;
+  status?: string;
+  fulfillmentType?: "PICKUP" | "DELIVERY";
+  search?: string;
+  queue?: string;
+}) {
   const { page: p, limit, skip } = page(query);
   const search = query.search?.trim();
+  const now = new Date();
+  const staleBefore = addDays(now, -shopConfig().staleRefundDays);
   const where: Prisma.OrderWhereInput = {
     ...statusFilter(query.status),
+    ...queueFilter(query.queue, now),
     ...(query.fulfillmentType ? { fulfillmentType: query.fulfillmentType } : {}),
     ...(search
       ? {
@@ -373,14 +507,28 @@ export async function listOrdersForManager(query: { page?: string; limit?: strin
     prisma.order.count({ where }),
     prisma.order.findMany({
       where,
-      include: { ...ORDER_LIST_INCLUDE, user: { select: { id: true, fullName: true } } },
-      orderBy: { createdAt: "desc" },
+      include: {
+        ...ORDER_LIST_INCLUDE,
+        user: { select: { id: true, fullName: true } },
+        refunds: { where: { status: "PENDING" }, select: { id: true, amount: true, createdAt: true, bankAccountNumber: true } },
+      },
+      orderBy: query.queue === "PICKUP_TODAY" ? { preferredPickupDate: "asc" } : { createdAt: "desc" },
       skip,
       take: limit,
     }),
   ]);
   return {
-    orders: orders.map((o) => ({ ...orderSummaryView(o), buyer: o.user })),
+    orders: orders.map((o) => {
+      const r = o.refunds[0];
+      return {
+        ...orderSummaryView(o),
+        buyer: o.user,
+        // Yêu cầu hoàn đang chờ: cờ "chờ STK" + "tồn đọng" để Manager ưu tiên.
+        pendingRefund: r
+          ? { id: r.id, amount: money(r.amount), awaitingBankInfo: !r.bankAccountNumber?.trim(), isStale: r.createdAt < staleBefore, createdAt: r.createdAt }
+          : null,
+      };
+    }),
     pagination: buildPaginationMeta(total, p, limit),
   };
 }
@@ -388,21 +536,40 @@ export async function listOrdersForManager(query: { page?: string; limit?: strin
 export async function getOrderForManager(orderId: string) {
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: ORDER_DETAIL_INCLUDE });
   if (!order) throw new AppError("Order not found", 404, { code: "ORDER_NOT_FOUND" });
-  return orderManagerView(order);
+  const [noShowCount, buyer] = await Promise.all([
+    countNoShows(prisma, order.userId),
+    prisma.user.findUnique({ where: { id: order.userId }, select: { cashPickupLockedUntil: true } }),
+  ]);
+  const lock = buyer?.cashPickupLockedUntil && buyer.cashPickupLockedUntil > new Date() ? buyer.cashPickupLockedUntil : null;
+  return orderManagerView(order, new Date(), { noShowCount, cashPickupLockedUntil: lock });
+}
+
+/** Số lần bùng hàng (đơn chuyển NOT_PICKED_UP) của một người trong `SHOP_NO_SHOW_WINDOW_DAYS` ngày gần nhất. */
+async function countNoShows(db: Tx | typeof prisma, userId: string, now = new Date()) {
+  return db.order.count({ where: { userId, notPickedUpAt: { gte: addDays(now, -shopConfig().noShowWindowDays) } } });
 }
 
 export async function managerSummary() {
-  const [counts, products] = await Promise.all([
+  const now = new Date();
+  const [counts, products, pickupToday, refundPending, staleRefunds, awaitingBankInfo] = await Promise.all([
     prisma.order.groupBy({ by: ["status"], _count: true }),
     prisma.product.findMany({ where: { isActive: true }, select: { stockQuantity: true, reservedStock: true, lowStockThreshold: true } }),
+    prisma.order.count({ where: queueFilter("PICKUP_TODAY", now) }),
+    prisma.refund.count({ where: { orderId: { not: null }, status: "PENDING" } }),
+    prisma.refund.count({ where: { orderId: { not: null }, status: "PENDING", createdAt: { lt: addDays(now, -shopConfig().staleRefundDays) } } }),
+    prisma.refund.count({ where: { orderId: { not: null }, status: "PENDING", bankAccountNumber: null } }),
   ]);
   const byStatus: Record<string, number> = Object.fromEntries(counts.map((c) => [c.status, c._count]));
   const needsAction =
-    (byStatus.PAID ?? 0) + (byStatus.PROCESSING ?? 0) + (byStatus.SHIPPING ?? 0) + (byStatus.READY_FOR_PICKUP ?? 0);
+    (byStatus.CONFIRMED ?? 0) + (byStatus.PAID ?? 0) + (byStatus.PROCESSING ?? 0) + (byStatus.SHIPPING ?? 0) + (byStatus.READY_FOR_PICKUP ?? 0);
   return {
     byStatus,
     needsAction,
-    toPrepare: (byStatus.PAID ?? 0) + (byStatus.PROCESSING ?? 0),
+    toPrepare: (byStatus.CONFIRMED ?? 0) + (byStatus.PAID ?? 0) + (byStatus.PROCESSING ?? 0),
+    pickupToday,
+    refundPending,
+    staleRefunds,
+    awaitingBankInfo,
     readyForPickup: byStatus.READY_FOR_PICKUP ?? 0,
     shipping: byStatus.SHIPPING ?? 0,
     refundRequested: byStatus.REFUND_REQUESTED ?? 0,
@@ -426,7 +593,7 @@ export async function managerTransition(
 ) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) throw new AppError("Order not found", 404, { code: "ORDER_NOT_FOUND" });
-  const allowed = MANAGER_TRANSITIONS[order.fulfillmentType][order.status] ?? [];
+  const allowed = managerTransitionsFor(order);
   if (!allowed.includes(body.status)) {
     throw new AppError(
       `Không thể chuyển đơn từ "${ORDER_STATUS_LABEL[order.status]}" sang "${ORDER_STATUS_LABEL[body.status]}".`,
@@ -436,9 +603,15 @@ export async function managerTransition(
   }
 
   if (body.status === "CANCELLED") {
-    const closed = await closePendingOrder(orderId, "MANAGER", { actorId: manager.id, note: body.reason ?? null });
+    const closed =
+      order.status === "PENDING_PAYMENT"
+        ? await closePendingOrder(orderId, "MANAGER", { actorId: manager.id, note: body.reason ?? null })
+        : await cancelUnpaidCashOrder(orderId, "MANAGER", { actorId: manager.id, note: body.reason ?? null });
     if (!closed) throw new AppError("Đơn vừa thay đổi trạng thái, vui lòng tải lại.", 409, { code: "ORDER_STATE_CHANGED" });
     return getOrderForManager(orderId);
+  }
+  if (body.status === "REFUND_REQUESTED" && (body.reason?.trim().length ?? 0) < 3) {
+    throw new AppError("Vui lòng nhập lý do hủy đơn (khách sẽ nhận được lý do này).", 400, { code: "CANCEL_REASON_REQUIRED" });
   }
   if (body.status === "SHIPPING" && !body.trackingCode) {
     throw new AppError("Vui lòng nhập mã vận đơn trước khi chuyển sang Đang giao.", 400, { code: "TRACKING_CODE_REQUIRED" });
@@ -454,15 +627,22 @@ export async function managerTransition(
     switch (body.status) {
       case "READY_FOR_PICKUP": {
         const nonce = newPickupNonce();
+        // Hạn nhận tính từ ngày khách hẹn (hoặc hôm nay nếu báo sẵn sàng muộn hơn) — khách vẫn lấy sớm được.
+        const deadline = pickupDeadlineFor(fresh.preferredPickupDate, new Date(), shopConfig().pickupDays);
+        const due = isUnpaidCash(fresh) ? ` Thanh toán ${money(fresh.totalPrice).toLocaleString("vi-VN")}đ khi nhận.` : "";
         await transitionOrderTx(tx, fresh, "READY_FOR_PICKUP", {
           actorId: manager.id,
           reason,
           data: {
             pickupCodeNonce: nonce,
             pickupCodeHash: hashPickupCode(pickupCodeFor(fresh.id, nonce)),
-            pickupDeadline: new Date(Date.now() + shopConfig().pickupDays * 86_400_000),
+            pickupDeadline: deadline,
+            pickupReminderSentAt: null,
             pickupFailedAttempts: 0,
             pickupLockedUntil: null,
+          },
+          notify: {
+            body: `Đơn ${fresh.code} đã sẵn sàng. Mang mã nhận hàng tới quầy trước hết ngày ${formatVnDate(deadline)}.${due}`,
           },
         });
         break;
@@ -481,7 +661,9 @@ export async function managerTransition(
           actorId: manager.id,
           reason: reason ?? "Trung tâm hủy đơn",
           data: { cancelReason: "MANAGER", cancelledById: manager.id, cancelNote: reason },
-          notify: { body: `Trung tâm đã hủy đơn ${fresh.code}${reason ? ` (${reason})` : ""}. Bạn sẽ được hoàn ${money(payment.amount).toLocaleString("vi-VN")}đ.` },
+          notify: {
+            body: `Trung tâm đã hủy đơn ${fresh.code}${reason ? ` (${reason})` : ""}. Bạn sẽ được hoàn ${money(payment.amount).toLocaleString("vi-VN")}đ — vui lòng cập nhật số tài khoản nhận hoàn trong chi tiết đơn.`,
+          },
         });
         refundCreated = await createOrderRefundTx(tx, fresh, payment, "ORDER_CANCELLED", money(payment.amount), manager.id, reason ?? "Trung tâm hủy đơn");
         break;
@@ -501,7 +683,13 @@ export async function managerTransition(
   return getOrderForManager(orderId);
 }
 
-/** READY_FOR_PICKUP → NOT_PICKED_UP: trả hàng lên kệ (RETURN) + Refund theo chính sách (nếu > 0). */
+/**
+ * READY_FOR_PICKUP → NOT_PICKED_UP (quá hạn / Manager xác nhận khách không đến) — ghi nhận 1 lần "bùng hàng":
+ * - ĐÃ thanh toán: trả hàng lên kệ (RETURN) + Refund `SHOP_NOT_PICKED_UP_REFUND_PERCENT`%; từ lần bùng thứ
+ *   `SHOP_NO_SHOW_FEE_THRESHOLD` trong cửa sổ ⇒ trừ `SHOP_NO_SHOW_FEE_PERCENT`% phí giữ hàng. Khách gửi STK trong app.
+ * - CHƯA thanh toán (trả tại quầy): nhả hàng đang giữ (RELEASE), không có gì để hoàn.
+ * - Từ lần bùng thứ `SHOP_NO_SHOW_CASH_LOCK_THRESHOLD` ⇒ khóa "trả tại quầy" `SHOP_CASH_LOCK_DAYS` ngày.
+ */
 async function markNotPickedUpTx(
   tx: Tx,
   order: { id: string; code: string; userId: string; status: OrderStatus; items: { productId: string; quantity: number }[] },
@@ -509,8 +697,15 @@ async function markNotPickedUpTx(
   actorId: string | null,
   reason: string
 ) {
-  const percent = shopConfig().notPickedUpRefundPercent;
-  const amount = payment && payment.status === "SUCCESS" ? Math.round((money(payment.amount) * percent) / 100) : 0;
+  const cfg = shopConfig();
+  const now = new Date();
+  const paid = payment?.status === "SUCCESS";
+  const noShowCount = (await countNoShows(tx, order.userId, now)) + 1;
+  const gross = paid ? Math.round((money(payment!.amount) * cfg.notPickedUpRefundPercent) / 100) : 0;
+  const feePercent = paid && noShowCount >= cfg.noShowFeeThreshold ? cfg.noShowFeePercent : 0;
+  const amount = Math.round((gross * (100 - feePercent)) / 100);
+  const feeText = feePercent > 0 ? ` (đã trừ ${feePercent}% phí giữ hàng do không đến lấy ${noShowCount} lần trong ${cfg.noShowWindowDays} ngày)` : "";
+
   await transitionOrderTx(tx, order, "NOT_PICKED_UP", {
     actorId,
     reason,
@@ -518,17 +713,80 @@ async function markNotPickedUpTx(
     notify: {
       body:
         amount > 0
-          ? `Đơn ${order.code} đã quá hạn nhận tại quầy. Trung tâm sẽ hoàn ${amount.toLocaleString("vi-VN")}đ (${percent}%) cho bạn.`
-          : `Đơn ${order.code} đã quá hạn nhận tại quầy.`,
+          ? `Đơn ${order.code} đã quá hạn nhận tại quầy. Trung tâm sẽ hoàn ${amount.toLocaleString("vi-VN")}đ${feeText} — vui lòng cập nhật số tài khoản nhận hoàn trong chi tiết đơn.`
+          : `Đơn ${order.code} đã quá hạn nhận tại quầy nên đã bị hủy, hàng giữ cho bạn đã được nhả.`,
     },
   });
   for (const item of [...order.items].sort((a, b) => a.productId.localeCompare(b.productId))) {
-    await applyInventory(tx, { productId: item.productId, type: "RETURN", quantity: item.quantity, orderId: order.id, actorId, note: `Đơn ${order.code} không đến lấy — trả hàng lên kệ` });
+    await applyInventory(tx, {
+      productId: item.productId,
+      // Đã bán (SALE) ⇒ trả lên kệ; chưa thanh toán thì hàng mới chỉ được giữ ⇒ nhả.
+      type: paid ? "RETURN" : "RELEASE",
+      quantity: item.quantity,
+      orderId: order.id,
+      actorId,
+      note: paid ? `Đơn ${order.code} không đến lấy — trả hàng lên kệ` : `Đơn ${order.code} (trả tại quầy) không đến lấy — nhả hàng`,
+    });
   }
+
+  if (noShowCount >= cfg.noShowCashLockThreshold) {
+    const until = addDays(now, cfg.cashLockDays);
+    const user = await tx.user.findUnique({ where: { id: order.userId }, select: { cashPickupLockedUntil: true } });
+    if (!user?.cashPickupLockedUntil || user.cashPickupLockedUntil < until) {
+      await tx.user.update({ where: { id: order.userId }, data: { cashPickupLockedUntil: until } });
+      await enqueueNotification(tx, {
+        userId: order.userId,
+        type: "ORDER_UPDATED",
+        title: "Tạm khóa thanh toán tại quầy",
+        body: `Bạn đã không đến lấy hàng ${noShowCount} lần trong ${cfg.noShowWindowDays} ngày. Tới ${formatVnDate(until)} bạn cần chuyển khoản trước khi đặt hàng.`,
+        metadata: { cashPickupLockedUntil: until.toISOString(), noShowCount },
+      });
+    }
+  }
+
   if (amount > 0 && payment) {
-    return createOrderRefundTx(tx, order, payment, "ORDER_NOT_PICKED_UP", amount, null, `Không đến lấy hàng — hoàn ${percent}%`);
+    return createOrderRefundTx(
+      tx,
+      order,
+      payment,
+      "ORDER_NOT_PICKED_UP",
+      amount,
+      null,
+      `Không đến lấy hàng (lần ${noShowCount}) — hoàn ${amount.toLocaleString("vi-VN")}đ${feeText}`,
+      undefined,
+      { grossAmount: gross, feePercent }
+    );
   }
   return null;
+}
+
+/** Manager nhắc khách gửi số tài khoản nhận hoàn (yêu cầu hoàn đang chờ, chưa có STK). */
+export async function remindRefundBank(manager: Actor, orderId: string) {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) throw new AppError("Order not found", 404, { code: "ORDER_NOT_FOUND" });
+  const refund = await prisma.refund.findFirst({ where: { orderId, status: "PENDING" }, orderBy: { createdAt: "desc" } });
+  if (!refund) throw new AppError("Đơn không có yêu cầu hoàn tiền đang chờ.", 409, { code: "REFUND_NOT_PENDING" });
+  if (refund.bankAccountNumber?.trim()) {
+    throw new AppError("Khách đã cung cấp số tài khoản.", 409, { code: "REFUND_BANK_INFO_PRESENT" });
+  }
+  if (refund.bankInfoRequestedAt && refund.bankInfoRequestedAt > new Date(Date.now() - 3_600_000)) {
+    throw new AppError("Vừa nhắc khách gần đây — vui lòng đợi ít nhất 1 giờ trước khi nhắc lại.", 429, {
+      code: "REFUND_REMINDER_TOO_SOON",
+      lastRemindedAt: refund.bankInfoRequestedAt,
+    });
+  }
+  await prisma.$transaction(async (tx) => {
+    await tx.refund.update({ where: { id: refund.id }, data: { bankInfoRequestedAt: new Date() } });
+    await enqueueNotification(tx, {
+      userId: order.userId,
+      type: "ORDER_UPDATED",
+      title: `Đơn hàng ${order.code}: cần số tài khoản nhận hoàn`,
+      body: `Trung tâm cần số tài khoản để hoàn ${money(refund.amount).toLocaleString("vi-VN")}đ cho đơn ${order.code}. Vui lòng cập nhật trong chi tiết đơn, hoặc đến quầy nhận tiền mặt.`,
+      metadata: { orderId: order.id, orderCode: order.code, refundId: refund.id, actorId: manager.id },
+    });
+  });
+  await flushNotificationOutbox().catch(() => {});
+  return getOrderForManager(orderId);
 }
 
 /** Tra mã nhận hàng (QR hoặc nhập tay) ⇒ tóm tắt đơn để đối chiếu (SĐT đã che). Không đổi dữ liệu. */
@@ -549,7 +807,7 @@ export async function verifyPickupCode(raw: string) {
  * Xác nhận giao hàng tại quầy: mã đúng (hash) + 4 số cuối SĐT người nhận ⇒ COMPLETED (mã bị xóa ⇒ dùng một lần).
  * Sai mã/SĐT ⇒ tăng `pickupFailedAttempts`; đủ `SHOP_PICKUP_MAX_ATTEMPTS` ⇒ khóa `SHOP_PICKUP_LOCK_MINUTES` (423).
  */
-export async function confirmPickup(manager: Actor, orderId: string, rawCode: string, last4: string) {
+export async function confirmPickup(manager: Actor, orderId: string, rawCode: string, last4: string, cashCollected = false) {
   const cfg = shopConfig();
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) throw new AppError("Order not found", 404, { code: "ORDER_NOT_FOUND" });
@@ -562,6 +820,13 @@ export async function confirmPickup(manager: Actor, orderId: string, rawCode: st
   }
   if (order.pickupLockedUntil && order.pickupLockedUntil > new Date()) {
     throw new AppError("Nhập sai quá nhiều lần — tạm khóa xác nhận đơn này.", 423, { code: "PICKUP_LOCKED", lockedUntil: order.pickupLockedUntil });
+  }
+  const collectCash = isUnpaidCash(order);
+  if (collectCash && !cashCollected) {
+    throw new AppError(`Đơn trả tại quầy — xác nhận đã thu ${money(order.totalPrice).toLocaleString("vi-VN")}đ tiền mặt trước khi giao.`, 400, {
+      code: "CASH_COLLECTION_REQUIRED",
+      amountDue: money(order.totalPrice),
+    });
   }
 
   const { orderCode, code } = parsePickupInput(rawCode);
@@ -586,15 +851,38 @@ export async function confirmPickup(manager: Actor, orderId: string, rawCode: st
     );
   }
 
-  await prisma.$transaction((tx) =>
-    transitionOrderTx(tx, order, "COMPLETED", {
+  await prisma.$transaction(async (tx) => {
+    const now = new Date();
+    const total = money(order.totalPrice);
+    await transitionOrderTx(tx, order, "COMPLETED", {
       actorId: manager.id,
-      reason: "Giao hàng tại quầy (đã đối chiếu mã + SĐT)",
+      reason: collectCash ? `Giao hàng tại quầy + thu tiền mặt ${total.toLocaleString("vi-VN")}đ (đã đối chiếu mã + SĐT)` : "Giao hàng tại quầy (đã đối chiếu mã + SĐT)",
       // Dùng một lần: xóa hash ⇒ mã cũ không còn tra được.
-      data: { pickupCodeHash: null, pickupFailedAttempts: 0, pickupLockedUntil: null },
+      data: { pickupCodeHash: null, pickupFailedAttempts: 0, pickupLockedUntil: null, ...(collectCash ? { paidAt: now } : {}) },
       notify: { body: `Bạn đã nhận đơn ${order.code} tại quầy. Cảm ơn bạn! Hãy đánh giá sản phẩm nhé.` },
-    })
-  );
+    });
+    if (!collectCash) return;
+    // Thu tiền mặt: ghi giao dịch CASH + trừ hẳn tồn đang giữ (SALE).
+    const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
+    for (const item of [...items].sort((a, b) => a.productId.localeCompare(b.productId))) {
+      const sold = await applyInventory(tx, { productId: item.productId, type: "SALE", quantity: item.quantity, orderId: order.id, actorId: manager.id, note: `Đơn ${order.code} giao tại quầy, thu tiền mặt` });
+      if (!sold) throw new AppError(`Tồn kho không nhất quán khi giao đơn ${order.code}.`, 500, { code: "INVENTORY_INCONSISTENT" });
+    }
+    const member = await tx.memberProfile.findUnique({ where: { userId: order.userId }, select: { id: true } });
+    await tx.payment.create({
+      data: {
+        memberId: member?.id ?? null,
+        orderId: order.id,
+        amount: total,
+        method: "CASH",
+        status: "SUCCESS",
+        paidAt: now,
+        activationStatus: "ACTIVATED",
+        createdById: manager.id,
+        note: `Thu tiền mặt tại quầy cho đơn ${order.code}`,
+      },
+    });
+  });
   await flushNotificationOutbox().catch(() => {});
   return getOrderForManager(orderId);
 }
@@ -668,12 +956,13 @@ export async function listInventoryTransactions(productId: string, query: { page
  * Worker (server.ts, mỗi 60s). Idempotent & an toàn nhiều instance: mỗi đơn xử lý trong transaction riêng,
  * kiểm tra lại trạng thái sau lock / CAS `WHERE status = …` — instance chậm chân chỉ nhận "đã xử lý" và bỏ qua.
  * 1. PENDING_PAYMENT quá `paymentExpiresAt` ⇒ EXPIRED + nhả hàng (+ khóa đặt hàng nếu vượt ngưỡng).
- * 2. READY_FOR_PICKUP quá `pickupDeadline` ⇒ NOT_PICKED_UP + trả hàng + Refund theo chính sách.
- * 3. DELIVERED quá `SHOP_AUTO_COMPLETE_DAYS` ⇒ COMPLETED.
+ * 2. READY_FOR_PICKUP sắp hết hạn (trong `SHOP_PICKUP_REMINDER_HOURS`) ⇒ nhắc khách một lần.
+ * 3. READY_FOR_PICKUP quá `pickupDeadline` ⇒ NOT_PICKED_UP (đã trả: trả hàng + Refund; chưa trả: nhả hàng) + ghi nhận bùng hàng.
+ * 4. DELIVERED quá `SHOP_AUTO_COMPLETE_DAYS` ⇒ COMPLETED.
  */
 export async function runShopMaintenance(limit = 50) {
   const now = new Date();
-  const result = { expired: 0, notPickedUp: 0, autoCompleted: 0 };
+  const result = { expired: 0, reminded: 0, notPickedUp: 0, autoCompleted: 0 };
 
   const stale = await prisma.order.findMany({
     where: { status: "PENDING_PAYMENT", paymentExpiresAt: { lt: now } },
@@ -683,6 +972,31 @@ export async function runShopMaintenance(limit = 50) {
   });
   for (const { id } of stale) {
     if (await closePendingOrder(id, "EXPIRED")) result.expired += 1;
+  }
+
+  const soon = await prisma.order.findMany({
+    where: {
+      status: "READY_FOR_PICKUP",
+      pickupReminderSentAt: null,
+      pickupDeadline: { gt: now, lte: new Date(now.getTime() + shopConfig().pickupReminderHours * 3_600_000) },
+    },
+    take: limit,
+  });
+  for (const o of soon) {
+    const sent = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.order.updateMany({ where: { id: o.id, status: "READY_FOR_PICKUP", pickupReminderSentAt: null }, data: { pickupReminderSentAt: now } });
+      if (claimed.count === 0) return false;
+      const due = isUnpaidCash(o) ? ` Nhớ mang ${money(o.totalPrice).toLocaleString("vi-VN")}đ để thanh toán.` : "";
+      await enqueueNotification(tx, {
+        userId: o.userId,
+        type: "ORDER_UPDATED",
+        title: `Đơn hàng ${o.code}: sắp hết hạn nhận`,
+        body: `Đơn ${o.code} đang chờ bạn tại quầy tới hết ngày ${formatVnDate(o.pickupDeadline!)}.${due} Bận đột xuất? Bạn có thể đổi ngày nhận trong chi tiết đơn.`,
+        metadata: { orderId: o.id, orderCode: o.code, status: o.status },
+      });
+      return true;
+    });
+    if (sent) result.reminded += 1;
   }
 
   const overdue = await prisma.order.findMany({
@@ -722,7 +1036,7 @@ export async function runShopMaintenance(limit = 50) {
     }
   }
 
-  if (result.notPickedUp || result.autoCompleted) await flushNotificationOutbox().catch(() => {});
+  if (result.reminded || result.notPickedUp || result.autoCompleted) await flushNotificationOutbox().catch(() => {});
   return result;
 }
 

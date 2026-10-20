@@ -32,7 +32,14 @@ class OrderHeaderCard extends StatelessWidget {
           ),
           CopyableField(label: 'Mã đơn', value: o.code, emphasize: true),
           InfoRow(icon: o.fulfillmentType.icon, text: o.fulfillmentType.label),
-          InfoRow(icon: AppIcons.calendar, text: 'Đặt lúc ${VnTime.dateTime(o.createdAt)}'),
+          if (o.isPickup) InfoRow(icon: o.paymentMethod.icon, text: o.paymentMethod.label),
+          if (o.isPickup && o.preferredPickupDate != null)
+            InfoRow(
+              icon: AppIcons.calendar,
+              text:
+                  'Hẹn lấy ngày ${shopDayLabel(o.preferredPickupDate!)}${o.pickupRescheduleCount > 0 ? ' (đã đổi ngày)' : ''}',
+            ),
+          InfoRow(icon: AppIcons.time, text: 'Đặt lúc ${VnTime.dateTime(o.createdAt)}'),
           if (o.paymentRequiresReview)
             const Padding(
               padding: EdgeInsets.only(top: AppSpacing.xs),
@@ -193,6 +200,22 @@ class OrderRefundsCard extends StatelessWidget {
                     children: [
                       Text(refundReasonLabel(r.reason), style: context.text.label),
                       Text(Money.format(r.amount), style: context.text.small),
+                      if ((r.feePercent ?? 0) > 0 && r.grossAmount != null)
+                        Text(
+                          'Đã trừ ${r.feePercent}% phí giữ hàng (giá trị ${Money.format(r.grossAmount!)})',
+                          style: context.text.caption.copyWith(color: context.colors.textMuted),
+                        ),
+                      if (r.hasBankInfo)
+                        Text(
+                          'Nhận hoàn: ${r.bankName} · ${r.bankAccountNumber} · ${r.bankAccountName}',
+                          style: context.text.caption.copyWith(color: context.colors.textMuted),
+                        )
+                      else if (r.isPending)
+                        Text(
+                          'Chưa có số tài khoản nhận hoàn',
+                          style: context.text.caption.copyWith(color: context.colors.warningText),
+                        ),
+                      if (r.payoutMethod == 'CASH') Text('Đã hoàn tiền mặt tại quầy', style: context.text.caption),
                       if (r.rejectReason != null) Text('Lý do từ chối: ${r.rejectReason}', style: context.text.caption),
                     ],
                   ),

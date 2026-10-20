@@ -14,7 +14,17 @@ abstract final class MockShopConfig {
   static const holdMinutes = 15;
   static const maxPendingOrders = 2;
   static const pickupDays = 3;
-  static const shippingFee = 30000;
+  static const pickupMaxDaysAhead = 7;
+  static const pickupMaxReschedules = 1;
+  static const pickupRescheduleMaxDays = 3;
+  static const cashMaxOrderValue = 2000000;
+  static const cashMaxOpenOrders = 1;
+  static const noShowWindowDays = 90;
+  static const noShowCashLockThreshold = 2;
+  static const cashLockDays = 30;
+  static const noShowFeeThreshold = 3;
+  static const noShowFeePercent = 10;
+  static const shippingFee = 15000;
   static const freeShippingThreshold = 500000;
   static const deliveryProvinces = ['Hồ Chí Minh'];
   static const expireLockThreshold = 3;
@@ -26,12 +36,14 @@ abstract final class MockShopConfig {
 
 const _transitions = <ShopOrderStatus, List<ShopOrderStatus>>{
   ShopOrderStatus.pendingPayment: [ShopOrderStatus.paid, ShopOrderStatus.expired, ShopOrderStatus.cancelled],
+  ShopOrderStatus.confirmed: [ShopOrderStatus.readyForPickup, ShopOrderStatus.cancelled],
   ShopOrderStatus.paid: [ShopOrderStatus.readyForPickup, ShopOrderStatus.processing, ShopOrderStatus.refundRequested],
   ShopOrderStatus.processing: [ShopOrderStatus.shipping, ShopOrderStatus.refundRequested],
   ShopOrderStatus.readyForPickup: [
     ShopOrderStatus.completed,
     ShopOrderStatus.notPickedUp,
     ShopOrderStatus.refundRequested,
+    ShopOrderStatus.cancelled,
   ],
   ShopOrderStatus.shipping: [ShopOrderStatus.delivered],
   ShopOrderStatus.delivered: [ShopOrderStatus.completed],
@@ -48,6 +60,7 @@ const _transitions = <ShopOrderStatus, List<ShopOrderStatus>>{
 const mockManagerTransitions = <FulfillmentType, Map<ShopOrderStatus, List<ShopOrderStatus>>>{
   FulfillmentType.pickup: {
     ShopOrderStatus.pendingPayment: [ShopOrderStatus.cancelled],
+    ShopOrderStatus.confirmed: [ShopOrderStatus.readyForPickup, ShopOrderStatus.cancelled],
     ShopOrderStatus.paid: [ShopOrderStatus.readyForPickup, ShopOrderStatus.refundRequested],
     ShopOrderStatus.readyForPickup: [ShopOrderStatus.notPickedUp, ShopOrderStatus.refundRequested],
   },
@@ -129,6 +142,8 @@ extension MockShopOperations on MockDatabase {
     o.status = to;
     if (to == ShopOrderStatus.delivered) o.deliveredAt = now();
     if (to == ShopOrderStatus.expired) o.expiredAt = now();
+    if (to == ShopOrderStatus.paid) o.paidAt = now();
+    if (to == ShopOrderStatus.notPickedUp) o.notPickedUpAt = now();
     if (notifyBuyer) {
       notify(
         o.userId,
@@ -141,6 +156,42 @@ extension MockShopOperations on MockDatabase {
   }
 
   PaymentRow? paymentOfOrder(String orderId) => payments.where((p) => p.productOrderId == orderId).firstOrNull;
+
+  /// Đơn trả tại quầy chưa thu tiền.
+  bool isUnpaidCash(ShopOrderRow o) => o.paymentMethod == ShopPaymentMethod.cash && o.paidAt == null;
+
+  /// Số lần bùng hàng trong [MockShopConfig.noShowWindowDays] ngày.
+  int noShowCount(String userId) {
+    final since = now().subtract(const Duration(days: MockShopConfig.noShowWindowDays));
+    return shopOrders
+        .where((o) => o.userId == userId && o.notPickedUpAt != null && o.notPickedUpAt!.isAfter(since))
+        .length;
+  }
+
+  /// Hạn nhận = cuối ngày (max(ngày hẹn, hôm nay) + pickupDays).
+  DateTime pickupDeadlineFor(DateTime? preferred) {
+    final today = DateTime(now().year, now().month, now().day);
+    final base = preferred != null && preferred.isAfter(today) ? preferred : today;
+    return base.add(const Duration(days: MockShopConfig.pickupDays + 1)).subtract(const Duration(seconds: 1));
+  }
+
+  /// Hủy đơn trả tại quầy chưa thu tiền + nhả hàng.
+  void cancelUnpaidCashOrder(ShopOrderRow o, {required String actorId, String? note}) {
+    o
+      ..cancelNote = note
+      ..pickupCode = null;
+    transitionOrder(
+      o,
+      ShopOrderStatus.cancelled,
+      actorId: actorId,
+      reason: note ?? 'Hủy đơn',
+      notice: 'Đơn ${o.code} đã bị hủy.',
+      notifyBuyer: actorId != o.userId,
+    );
+    for (final l in o.lines) {
+      applyInventory(l.productId, InventoryTxType.release, l.quantity, orderId: o.id, note: 'Nhả hàng đơn ${o.code}');
+    }
+  }
 
   /// Đóng đơn chờ thanh toán (hết hạn / hủy) + nhả hàng.
   void closePendingOrder(ShopOrderRow o, {required bool expired, String? actorId, String? note}) {
@@ -184,44 +235,73 @@ extension MockShopOperations on MockDatabase {
     }
   }
 
-  RefundRow createOrderRefund(ShopOrderRow o, RefundReason reason, int amount, {String? note}) {
+  RefundRow createOrderRefund(
+    ShopOrderRow o,
+    RefundReason reason,
+    int amount, {
+    String? note,
+    int? grossAmount,
+    int? feePercent,
+  }) {
     final pay = paymentOfOrder(o.id)!;
-    final row = RefundRow(
-      id: nextId('rf'),
-      paymentId: pay.id,
-      memberProfileId: pay.memberProfileId,
-      reason: reason,
-      amount: amount,
-      createdAt: now(),
-      orderId: o.id,
-      buyerUserId: o.userId,
-      note: note,
-    );
+    final row =
+        RefundRow(
+            id: nextId('rf'),
+            paymentId: pay.id,
+            memberProfileId: pay.memberProfileId,
+            reason: reason,
+            amount: amount,
+            createdAt: now(),
+            orderId: o.id,
+            buyerUserId: o.userId,
+            note: note,
+          )
+          ..grossAmount = grossAmount
+          ..feePercent = feePercent;
     refunds.add(row);
     notifyManagers('Yêu cầu hoàn tiền mới', 'Đơn ${o.code} cần hoàn tiền.', metadata: {'refundId': row.id});
     return row;
   }
 
-  /// READY quá hạn ⇒ NOT_PICKED_UP + trả hàng + hoàn tiền 100%.
+  /// READY quá hạn ⇒ NOT_PICKED_UP + ghi nhận bùng hàng. Đã trả: trả hàng + hoàn (trừ phí từ lần thứ 3);
+  /// chưa trả (tại quầy): nhả hàng. Từ lần thứ 2 ⇒ khóa trả tại quầy (giống `markNotPickedUpTx` của BE).
   void markNotPickedUp(ShopOrderRow o, {String? actorId}) {
+    final paid = !isUnpaidCash(o) && paymentOfOrder(o.id)?.status == PaymentStatus.success;
+    final count = noShowCount(o.userId) + 1;
+    final fee = paid && count >= MockShopConfig.noShowFeeThreshold ? MockShopConfig.noShowFeePercent : 0;
+    final amount = paid ? (o.total * (100 - fee) / 100).round() : 0;
     transitionOrder(
       o,
       ShopOrderStatus.notPickedUp,
       actorId: actorId,
       reason: 'Quá hạn nhận hàng tại quầy',
-      notice: 'Đơn ${o.code} đã quá hạn nhận. Trung tâm sẽ hoàn tiền cho bạn.',
+      notice: paid
+          ? 'Đơn ${o.code} đã quá hạn nhận. Trung tâm sẽ hoàn tiền — vui lòng cập nhật số tài khoản trong chi tiết đơn.'
+          : 'Đơn ${o.code} đã quá hạn nhận tại quầy nên đã bị hủy.',
     );
     o.pickupCode = null;
     for (final l in o.lines) {
       applyInventory(
         l.productId,
-        InventoryTxType.returned,
+        paid ? InventoryTxType.returned : InventoryTxType.release,
         l.quantity,
         orderId: o.id,
-        note: 'Không đến lấy — trả lên kệ',
+        note: paid ? 'Không đến lấy — trả lên kệ' : 'Không đến lấy — nhả hàng',
       );
     }
-    createOrderRefund(o, RefundReason.orderNotPickedUp, o.total, note: 'Không đến lấy hàng — hoàn 100%');
+    if (count >= MockShopConfig.noShowCashLockThreshold) {
+      cashLocks[o.userId] = now().add(const Duration(days: MockShopConfig.cashLockDays));
+    }
+    if (paid) {
+      createOrderRefund(
+        o,
+        RefundReason.orderNotPickedUp,
+        amount,
+        note: 'Không đến lấy hàng (lần $count)',
+        grossAmount: fee > 0 ? o.total : null,
+        feePercent: fee > 0 ? fee : null,
+      );
+    }
   }
 
   void onOrderRefundApproved(RefundRow r) {
