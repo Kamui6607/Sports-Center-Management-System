@@ -21,7 +21,20 @@ abstract final class ShopJson {
     shippingFee: j.money('shippingFee'),
     freeShippingThreshold: j.money('freeShippingThreshold'),
     deliveryProvinces: j.strList('deliveryProvinces'),
+    pickupMaxDaysAhead: j.integer('pickupMaxDaysAhead', 7),
+    pickupMaxReschedules: j.integer('pickupMaxReschedules', 1),
+    pickupRescheduleMaxDays: j.integer('pickupRescheduleMaxDays', 3),
+    cashMaxOrderValue: j.money('cashMaxOrderValue'),
   );
+
+  /// "YYYY-MM-DD" (ngày theo giờ VN) ⇒ DateTime chỉ phần ngày.
+  static DateTime? day(String? raw) {
+    final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(raw ?? '');
+    return m == null ? null : DateTime(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!));
+  }
+
+  static String dayString(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   static Cart cart(Json j) => Cart(
     lines: [
@@ -79,6 +92,10 @@ abstract final class ShopJson {
         for (final e in r.items.entries) {'productId': e.key, 'quantity': e.value},
       ],
     'fulfillmentType': r.fulfillmentType == FulfillmentType.pickup ? 'PICKUP' : 'DELIVERY',
+    if (r.fulfillmentType == FulfillmentType.pickup) ...{
+      'paymentMethod': r.paymentMethod == ShopPaymentMethod.cash ? 'CASH' : 'SEPAY',
+      if (r.pickupDate != null) 'pickupDate': dayString(r.pickupDate!),
+    },
     if (r.fulfillmentType == FulfillmentType.delivery && r.addressId != null) 'addressId': r.addressId,
     if (r.recipientName != null && r.recipientName!.trim().isNotEmpty) 'recipientName': r.recipientName!.trim(),
     if (r.recipientPhone != null && r.recipientPhone!.trim().isNotEmpty) 'recipientPhone': r.recipientPhone!.trim(),
@@ -88,6 +105,8 @@ abstract final class ShopJson {
   static CheckoutPreview preview(Json j) {
     final recipient = j.obj('recipient');
     final address = j.objOrNull('address');
+    final range = j.objOrNull('pickupDateRange');
+    final cash = j.objOrNull('cash');
     return CheckoutPreview(
       lines: [
         for (final l in j.objList('lines'))
@@ -115,16 +134,22 @@ abstract final class ShopJson {
       maxPendingOrders: j.integer('maxPendingOrders', 2),
       holdMinutes: j.integer('holdMinutes', 15),
       freeShippingThreshold: j.money('freeShippingThreshold'),
+      pickupDateMin: day(range?.strOrNull('min')),
+      pickupDateMax: day(range?.strOrNull('max')),
+      pickupDays: j.integer('pickupDays', 3),
+      cashAvailable: cash?.boolean('available') ?? false,
+      cashUnavailableReason: cash?.strOrNull('reason'),
     );
   }
 
   static PlacedOrder placed(Json j) {
     final order = j.obj('order');
-    final checkout = j.obj('checkout');
+    // Đơn trả tại quầy: `checkout = null` (không có QR).
+    final checkout = j.objOrNull('checkout');
     return PlacedOrder(
       orderId: order.str('id'),
       orderCode: order.str('code'),
-      paymentId: checkout.str('paymentId'),
+      paymentId: checkout?.strOrNull('paymentId'),
       replayed: j.boolean('replayed'),
     );
   }
@@ -198,6 +223,12 @@ abstract final class ShopJson {
             amount: r.money('amount'),
             reason: r.str('reason'),
             rejectReason: r.strOrNull('rejectReason'),
+            grossAmount: r.intOrNull('grossAmount'),
+            feePercent: r.intOrNull('feePercent'),
+            bankName: r.strOrNull('bankName'),
+            bankAccountNumber: r.strOrNull('bankAccountNumber'),
+            bankAccountName: r.strOrNull('bankAccountName'),
+            payoutMethod: r.strOrNull('payoutMethod'),
           ),
       ],
       pickup: pickup == null
@@ -217,6 +248,13 @@ abstract final class ShopJson {
       buyerPhone: buyer?.strOrNull('phone'),
       allowedTransitions: [for (final t in j.objList('allowedTransitions')) status(t.strOrNull('status'))],
       paymentRequiresReview: payment?.boolean('requiresReview') ?? false,
+      paymentMethod: j.strOrNull('paymentMethod') == 'CASH' ? ShopPaymentMethod.cash : ShopPaymentMethod.sepay,
+      isPaid: j.boolean('isPaid'),
+      preferredPickupDate: day(j.strOrNull('preferredPickupDate')),
+      pickupRescheduleCount: j.integer('pickupRescheduleCount'),
+      amountDueAtCounter: j.money('amountDueAtCounter'),
+      canReschedulePickup: actions.boolean('canReschedulePickup'),
+      canUpdateRefundBank: actions.boolean('canUpdateRefundBank'),
     );
   }
 

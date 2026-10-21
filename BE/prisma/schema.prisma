@@ -149,6 +149,8 @@ model User {
   isActive    Boolean   @default(true)
   /// Cửa hàng: tạm khóa đặt hàng tới thời điểm này (để đơn hết hạn quá nhiều lần) — null = không khóa.
   checkoutLockedUntil DateTime?
+  /// Cửa hàng: tạm khóa hình thức "thanh toán tại quầy" tới thời điểm này (bùng hàng nhiều lần) — null = không khóa.
+  cashPickupLockedUntil DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @default(now()) @updatedAt
 
@@ -949,12 +951,16 @@ model Refund {
   memberNote       String?
   /// L8: ghi chú của Manager khi duyệt (VD mã giao dịch chuyển khoản hoàn tiền).
   managerNote      String?
-  /// Ngân hàng nhận tiền hoàn (tên hoặc mã, VD: MBBank, VCB). Null với hoàn tiền đơn hàng.
+  /// Ngân hàng nhận tiền hoàn (tên hoặc mã, VD: MBBank, VCB). Đơn hàng: khách bổ sung sau qua app nếu chưa có.
   bankName         String?
   /// Số tài khoản nhận tiền hoàn.
   bankAccountNumber String?
   /// Tên chủ tài khoản nhận tiền hoàn (in hoa).
   bankAccountName  String?
+  /// Cách Manager trả tiền hoàn khi duyệt: BANK_TRANSFER (chuyển khoản tay) hoặc CASH (tiền mặt tại quầy).
+  payoutMethod     PaymentMethod?
+  /// Lần gần nhất Manager nhắc khách cung cấp số tài khoản nhận hoàn.
+  bankInfoRequestedAt DateTime?
   status           RefundStatus  @default(PENDING)
   requestedById    String?
   requestedBy      User?         @relation("RefundRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
@@ -1095,6 +1101,8 @@ model Order {
   userId      String
   user        User        @relation("OrderUser", fields: [userId], references: [id])
   fulfillmentType FulfillmentType @default(PICKUP)
+  /// SEPAY = chuyển khoản trước; CASH = trả tiền khi nhận tại quầy (chỉ PICKUP, đơn bắt đầu ở CONFIRMED, chưa có Payment).
+  paymentMethod   PaymentMethod   @default(SEPAY)
   /// Tạm tính = Σ `OrderItem.totalAmount` (server tính).
   subtotal    Decimal     @db.Decimal(12, 2)
   shippingFee Decimal     @default(0) @db.Decimal(12, 2)
@@ -1114,6 +1122,12 @@ model Order {
   pickupCodeHash       String?  @unique
   pickupCodeNonce      String?
   pickupDeadline       DateTime?
+  /// Ngày khách dự định đến lấy (00:00 giờ VN). Hạn nhận = cuối ngày (max(ngày dự định, ngày sẵn sàng) + SHOP_PICKUP_DAYS).
+  preferredPickupDate  DateTime?
+  /// Số lần khách đã đổi ngày/gia hạn lấy hàng (tối đa SHOP_PICKUP_MAX_RESCHEDULES).
+  pickupRescheduleCount Int     @default(0)
+  /// Đã gửi nhắc "sắp hết hạn nhận hàng" (job) — tránh nhắc lặp.
+  pickupReminderSentAt DateTime?
   pickupFailedAttempts Int      @default(0)
   pickupLockedUntil    DateTime?
   trackingCode String?
@@ -1231,6 +1245,7 @@ enum OrderCancelReason {
 /// Xem máy trạng thái ở Doc/SHOP_FLOW_DESIGN.md §3.
 enum OrderStatus {
   PENDING_PAYMENT
+  CONFIRMED // Đơn trả tiền tại quầy: đã giữ hàng, chờ Trung tâm chuẩn bị (chưa thu tiền)
   PAID
   PROCESSING
   READY_FOR_PICKUP

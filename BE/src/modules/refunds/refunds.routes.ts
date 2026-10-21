@@ -137,6 +137,7 @@ router.get(
  *               note: { type: string, maxLength: 500, description: "Ghi chú duyệt hoàn tiền" }
  *               transactionRef: { type: string, maxLength: 100, description: "Mã giao dịch ngân hàng thực tế (FT code)" }
  *               feePercent: { type: integer, minimum: 0, maximum: 99, description: "Chỉ với MEMBER_CANCEL_COURSE_LATE: % phí chiết khấu chốt khi duyệt (hoàn = grossAmount × (100 − phí)%)" }
+ *               payoutMethod: { type: string, enum: [BANK_TRANSFER, CASH], description: "Cách trả tiền hoàn (mặc định BANK_TRANSFER). Hoàn đơn hàng bằng chuyển khoản cần khách đã gửi STK — thiếu ⇒ 409 REFUND_BANK_INFO_REQUIRED" }
  *     responses:
  *       200: { description: Đã duyệt }
  *       401: { $ref: "#/components/responses/Unauthorized" }

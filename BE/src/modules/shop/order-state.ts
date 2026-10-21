@@ -10,9 +10,12 @@ type Tx = Prisma.TransactionClient;
  */
 export const ORDER_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   PENDING_PAYMENT: ["PAID", "EXPIRED", "CANCELLED"],
+  // Đơn trả tiền tại quầy (CASH): chưa có Payment, hàng đang giữ (RESERVE).
+  CONFIRMED: ["READY_FOR_PICKUP", "CANCELLED"],
   PAID: ["READY_FOR_PICKUP", "PROCESSING", "REFUND_REQUESTED"],
   PROCESSING: ["SHIPPING", "REFUND_REQUESTED"],
-  READY_FOR_PICKUP: ["COMPLETED", "NOT_PICKED_UP", "REFUND_REQUESTED"],
+  // CANCELLED chỉ cho đơn CASH chưa thu tiền (khách/Manager hủy trước khi nhận).
+  READY_FOR_PICKUP: ["COMPLETED", "NOT_PICKED_UP", "REFUND_REQUESTED", "CANCELLED"],
   SHIPPING: ["DELIVERED"],
   DELIVERED: ["COMPLETED"],
   COMPLETED: [],
@@ -28,6 +31,7 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
 export const MANAGER_TRANSITIONS: Record<"PICKUP" | "DELIVERY", Partial<Record<OrderStatus, OrderStatus[]>>> = {
   PICKUP: {
     PENDING_PAYMENT: ["CANCELLED"],
+    CONFIRMED: ["READY_FOR_PICKUP", "CANCELLED"],
     PAID: ["READY_FOR_PICKUP", "REFUND_REQUESTED"],
     READY_FOR_PICKUP: ["NOT_PICKED_UP", "REFUND_REQUESTED"],
   },
@@ -39,6 +43,23 @@ export const MANAGER_TRANSITIONS: Record<"PICKUP" | "DELIVERY", Partial<Record<O
     DELIVERED: ["COMPLETED"],
   },
 };
+
+/** Đơn trả tại quầy và CHƯA thu tiền (không có gì để hoàn). */
+export function isUnpaidCash(order: { paymentMethod: string; paidAt: Date | null }): boolean {
+  return order.paymentMethod === "CASH" && order.paidAt === null;
+}
+
+/** Chuyển Manager được bấm cho MỘT đơn cụ thể: đơn CASH chưa thu tiền thì "hủy" thay cho "hủy & hoàn tiền". */
+export function managerTransitionsFor(order: {
+  fulfillmentType: "PICKUP" | "DELIVERY";
+  status: OrderStatus;
+  paymentMethod: string;
+  paidAt: Date | null;
+}): OrderStatus[] {
+  const base = MANAGER_TRANSITIONS[order.fulfillmentType][order.status] ?? [];
+  if (!isUnpaidCash(order)) return base;
+  return base.map((s) => (s === "REFUND_REQUESTED" ? "CANCELLED" : s));
+}
 
 /** Cột mốc thời gian ghi khi vào trạng thái. */
 const TIMESTAMP: Partial<Record<OrderStatus, keyof Prisma.OrderUncheckedUpdateManyInput>> = {
@@ -57,6 +78,7 @@ const TIMESTAMP: Partial<Record<OrderStatus, keyof Prisma.OrderUncheckedUpdateMa
 /** Nhãn tiếng Việt của trạng thái (thông báo, lỗi). */
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING_PAYMENT: "Chờ thanh toán",
+  CONFIRMED: "Đã xác nhận – trả tiền khi nhận",
   PAID: "Đã thanh toán",
   PROCESSING: "Đang chuẩn bị hàng",
   READY_FOR_PICKUP: "Sẵn sàng nhận tại quầy",
@@ -73,6 +95,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 function defaultNotice(code: string, to: OrderStatus): { title: string; body: string } {
   const body: Record<OrderStatus, string> = {
     PENDING_PAYMENT: `Đơn ${code} đã được tạo, vui lòng chuyển khoản trong thời hạn giữ hàng.`,
+    CONFIRMED: `Đơn ${code} đã được xác nhận. Bạn thanh toán khi nhận hàng tại quầy.`,
     PAID: `Đơn ${code} đã được thanh toán. Trung tâm sẽ chuẩn bị hàng cho bạn.`,
     PROCESSING: `Đơn ${code} đang được chuẩn bị để giao.`,
     READY_FOR_PICKUP: `Đơn ${code} đã sẵn sàng. Mang mã nhận hàng tới quầy để nhận.`,

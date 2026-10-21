@@ -10,6 +10,7 @@ import '../domain/entities/shop.dart';
 extension ShopOrderStatusLabel on ShopOrderStatus {
   StatusLabel get status => switch (this) {
     ShopOrderStatus.pendingPayment => const StatusLabel('Chờ thanh toán', StatusTone.warning),
+    ShopOrderStatus.confirmed => const StatusLabel('Chờ chuẩn bị · trả tại quầy', StatusTone.info),
     ShopOrderStatus.paid => const StatusLabel('Đã thanh toán', StatusTone.info),
     ShopOrderStatus.processing => const StatusLabel('Đang chuẩn bị', StatusTone.info),
     ShopOrderStatus.readyForPickup => const StatusLabel('Sẵn sàng nhận', StatusTone.brand),
@@ -52,6 +53,22 @@ extension FulfillmentTypeLabel on FulfillmentType {
   IconData get icon => switch (this) {
     FulfillmentType.pickup => AppIcons.shop,
     FulfillmentType.delivery => AppIcons.truck,
+  };
+}
+
+/// Ngày (chỉ phần ngày, không đổi múi giờ) — ngày hẹn lấy hàng: "dd/MM/yyyy".
+String shopDayLabel(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+extension ShopPaymentMethodLabel on ShopPaymentMethod {
+  String get label => switch (this) {
+    ShopPaymentMethod.sepay => 'Chuyển khoản trước (VietQR)',
+    ShopPaymentMethod.cash => 'Thanh toán khi nhận tại quầy',
+  };
+
+  IconData get icon => switch (this) {
+    ShopPaymentMethod.sepay => AppIcons.qr,
+    ShopPaymentMethod.cash => AppIcons.wallet,
   };
 }
 

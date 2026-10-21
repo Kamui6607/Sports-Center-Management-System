@@ -54,7 +54,8 @@ export async function approveRefund(req: Request, res: Response, next: NextFunct
       req.user!.id,
       req.body.note,
       req.body.transactionRef,
-      req.body.feePercent
+      req.body.feePercent,
+      req.body.payoutMethod
     );
     sendSuccess(res, refund, "Refund approved");
   } catch (err) { next(err); }

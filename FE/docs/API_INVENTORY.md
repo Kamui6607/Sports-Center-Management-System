@@ -2405,7 +2405,7 @@ Responses/status codes:
 ```
 
 ## POST /shop/checkout
-Tạo đơn + giao dịch VietQR (SePay) — bắt buộc header Idempotency-Key
+Tạo đơn + giao dịch VietQR (SePay) hoặc đơn trả tại quầy (CASH) — bắt buộc header Idempotency-Key
 
 Authentication: [{"BearerAuth":[]}]
 
@@ -2467,6 +2467,18 @@ Request body:
         "DELIVERY"
       ]
     },
+    "paymentMethod": {
+      "type": "string",
+      "enum": [
+        "SEPAY",
+        "CASH"
+      ],
+      "default": "SEPAY"
+    },
+    "pickupDate": {
+      "type": "string",
+      "format": "date"
+    },
     "addressId": {
       "type": "string"
     },
@@ -2495,13 +2507,13 @@ Responses/status codes:
     "description": "{ order, checkout: { paymentId, orderCode, amount, qrUrl, expiresAt, bank, order{ id, code } } }"
   },
   "400": {
-    "description": "CART_EMPTY / ADDRESS_REQUIRED / DELIVERY_NOT_AVAILABLE / MAX_PER_ORDER_EXCEEDED / DAILY_LIMIT_EXCEEDED / PRODUCT_INACTIVE / IDEMPOTENCY_KEY_REQUIRED"
+    "description": "CART_EMPTY / ADDRESS_REQUIRED / DELIVERY_NOT_AVAILABLE / MAX_PER_ORDER_EXCEEDED / DAILY_LIMIT_EXCEEDED / PRODUCT_INACTIVE / IDEMPOTENCY_KEY_REQUIRED / PICKUP_DATE_OUT_OF_RANGE / CASH_ORDER_TOO_LARGE"
   },
   "403": {
-    "description": "CHECKOUT_LOCKED (kèm lockedUntil)"
+    "description": "CHECKOUT_LOCKED (kèm lockedUntil) / CASH_PAYMENT_LOCKED"
   },
   "409": {
-    "description": "OUT_OF_STOCK / INSUFFICIENT_STOCK / PRICE_CHANGED / PENDING_ORDER_LIMIT / IDEMPOTENCY_KEY_REUSED"
+    "description": "OUT_OF_STOCK / INSUFFICIENT_STOCK / PRICE_CHANGED / PENDING_ORDER_LIMIT / CASH_ORDER_LIMIT / IDEMPOTENCY_KEY_REUSED"
   },
   "429": {
     "description": "RATE_LIMITED"
@@ -2696,6 +2708,106 @@ Responses/status codes:
 }
 ```
 
+## POST /shop/orders/{id}/reschedule-pickup
+Đổi ngày nhận / gia hạn tại quầy (tối đa SHOP_PICKUP_MAX_RESCHEDULES lần, dời ≤ SHOP_PICKUP_RESCHEDULE_MAX_DAYS ngày) — đơn đã sẵn sàng thì tính lại hạn nhận
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "pickupDate"
+  ],
+  "properties": {
+    "pickupDate": {
+      "type": "string",
+      "format": "date"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Chi tiết đơn sau khi đổi"
+  },
+  "400": {
+    "description": "PICKUP_DATE_OUT_OF_RANGE / PICKUP_DATE_INVALID"
+  },
+  "409": {
+    "description": "PICKUP_NOT_RESCHEDULABLE / PICKUP_RESCHEDULE_LIMIT / PICKUP_DEADLINE_PASSED / ORDER_STATE_CHANGED"
+  }
+}
+```
+
+## PUT /shop/orders/{id}/refund-bank
+Khách bổ sung / sửa số tài khoản nhận tiền hoàn của yêu cầu hoàn đang chờ
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "bankName",
+    "bankAccountNumber",
+    "bankAccountName"
+  ],
+  "properties": {
+    "bankName": {
+      "type": "string"
+    },
+    "bankAccountNumber": {
+      "type": "string"
+    },
+    "bankAccountName": {
+      "type": "string"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Chi tiết đơn"
+  },
+  "409": {
+    "description": "REFUND_NOT_PENDING"
+  }
+}
+```
+
 ## POST /shop/order-items/{id}/review
 Đánh giá một dòng đơn COMPLETED của mình (mỗi dòng tối đa 1 đánh giá)
 
@@ -2805,6 +2917,18 @@ Parameters:
   },
   {
     "in": "query",
+    "name": "queue",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "PICKUP_TODAY",
+        "REFUND_PENDING",
+        "STALE_REFUND"
+      ]
+    }
+  },
+  {
+    "in": "query",
     "name": "page",
     "schema": {
       "type": "integer"
@@ -2827,7 +2951,7 @@ Responses/status codes:
 ```json
 {
   "200": {
-    "description": "Danh sách đơn"
+    "description": "Danh sách đơn (kèm pendingRefund{ awaitingBankInfo, isStale })"
   }
 }
 ```
@@ -2993,6 +3117,10 @@ Request body:
     },
     "phoneLast4": {
       "type": "string"
+    },
+    "cashCollected": {
+      "type": "boolean",
+      "description": "Đơn trả tại quầy: đã thu đủ tiền mặt"
     }
   }
 }
@@ -3004,13 +3132,50 @@ Responses/status codes:
     "description": "Đơn hoàn tất"
   },
   "400": {
-    "description": "PICKUP_CODE_INVALID / PHONE_MISMATCH (kèm remainingAttempts)"
+    "description": "PICKUP_CODE_INVALID / PHONE_MISMATCH (kèm remainingAttempts) / CASH_COLLECTION_REQUIRED"
   },
   "409": {
     "description": "PICKUP_CODE_USED / ORDER_NOT_READY"
   },
   "423": {
     "description": "PICKUP_LOCKED (kèm lockedUntil)"
+  }
+}
+```
+
+## POST /shop/manage/orders/{id}/remind-refund-bank
+Nhắc khách gửi số tài khoản nhận hoàn (yêu cầu hoàn đang chờ, chưa có STK) — tối đa 1 lần/giờ
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Chi tiết đơn (Manager)"
+  },
+  "409": {
+    "description": "REFUND_NOT_PENDING / REFUND_BANK_INFO_PRESENT"
+  },
+  "429": {
+    "description": "REFUND_REMINDER_TOO_SOON"
   }
 }
 ```
@@ -5395,6 +5560,14 @@ Request body:
       "minimum": 0,
       "maximum": 99,
       "description": "Chỉ với MEMBER_CANCEL_COURSE_LATE: % phí chiết khấu chốt khi duyệt (hoàn = grossAmount × (100 − phí)%)"
+    },
+    "payoutMethod": {
+      "type": "string",
+      "enum": [
+        "BANK_TRANSFER",
+        "CASH"
+      ],
+      "description": "Cách trả tiền hoàn (mặc định BANK_TRANSFER). Hoàn đơn hàng bằng chuyển khoản cần khách đã gửi STK — thiếu ⇒ 409 REFUND_BANK_INFO_REQUIRED"
     }
   }
 }

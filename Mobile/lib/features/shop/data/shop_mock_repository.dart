@@ -39,8 +39,19 @@ class ShopMockRepository implements ShopRepository {
       shippingFee: MockShopConfig.shippingFee,
       freeShippingThreshold: MockShopConfig.freeShippingThreshold,
       deliveryProvinces: MockShopConfig.deliveryProvinces,
+      pickupMaxDaysAhead: MockShopConfig.pickupMaxDaysAhead,
+      pickupMaxReschedules: MockShopConfig.pickupMaxReschedules,
+      pickupRescheduleMaxDays: MockShopConfig.pickupRescheduleMaxDays,
+      cashMaxOrderValue: MockShopConfig.cashMaxOrderValue,
     ),
   );
+
+  DateTime _today() {
+    final n = _db.now();
+    return DateTime(n.year, n.month, n.day);
+  }
+
+  DateTime _dayOf(DateTime d) => DateTime(d.year, d.month, d.day);
 
   // ── Giỏ hàng ─────────────────────────────────────────────────────────
 
@@ -401,8 +412,42 @@ class ShopMockRepository implements ShopRepository {
     if (phone == null || phone.isEmpty) {
       fail(const AppFailure.business('Vui lòng nhập số điện thoại người nhận.', code: 'RECIPIENT_PHONE_REQUIRED'));
     }
+    // Ngày hẹn lấy + trả tại quầy (giống `evaluate` của BE).
+    final today = _today();
+    final maxDate = today.add(const Duration(days: MockShopConfig.pickupMaxDaysAhead));
+    final pickup = r.fulfillmentType == FulfillmentType.pickup;
+    final pickupDate = pickup ? _dayOf(r.pickupDate ?? today) : null;
+    if (pickupDate != null && (pickupDate.isBefore(today) || pickupDate.isAfter(maxDate))) {
+      fail(
+        AppFailure.business(
+          'Chọn ngày nhận hàng từ ${VnTime.date(today)} đến ${VnTime.date(maxDate)}.',
+          code: 'PICKUP_DATE_OUT_OF_RANGE',
+        ),
+      );
+    }
+    final cashLock = _db.cashLocks[u.id];
+    final openCash = _db.shopOrders
+        .where(
+          (o) =>
+              o.userId == u.id &&
+              _db.isUnpaidCash(o) &&
+              (o.status == ShopOrderStatus.confirmed || o.status == ShopOrderStatus.readyForPickup),
+        )
+        .length;
+    final cashIssue = !pickup
+        ? 'Thanh toán tại quầy chỉ áp dụng khi nhận hàng tại quầy.'
+        : cashLock != null && _db.now().isBefore(cashLock)
+        ? 'Bạn đã nhiều lần không đến lấy hàng nên tạm thời không được trả tiền tại quầy tới ${VnTime.date(cashLock)}.'
+        : subtotal > MockShopConfig.cashMaxOrderValue
+        ? 'Đơn trên ${Money.format(MockShopConfig.cashMaxOrderValue)} cần chuyển khoản trước.'
+        : openCash >= MockShopConfig.cashMaxOpenOrders
+        ? 'Bạn đang có $openCash đơn trả tại quầy chưa nhận.'
+        : null;
+    final cash = r.paymentMethod == ShopPaymentMethod.cash;
+    if (cash && cashIssue != null) fail(AppFailure.business(cashIssue, code: 'CASH_NOT_AVAILABLE'));
+
     final pending = _pendingCount(u.id);
-    if (pending >= MockShopConfig.maxPendingOrders) {
+    if (!cash && pending >= MockShopConfig.maxPendingOrders) {
       fail(
         AppFailure.conflict(
           'Bạn đang có $pending đơn chờ thanh toán. Vui lòng thanh toán hoặc hủy bớt trước khi đặt đơn mới.',
@@ -427,6 +472,11 @@ class ShopMockRepository implements ShopRepository {
       maxPendingOrders: MockShopConfig.maxPendingOrders,
       holdMinutes: MockShopConfig.holdMinutes,
       freeShippingThreshold: MockShopConfig.freeShippingThreshold,
+      pickupDateMin: pickup ? today : null,
+      pickupDateMax: pickup ? maxDate : null,
+      pickupDays: MockShopConfig.pickupDays,
+      cashAvailable: cashIssue == null,
+      cashUnavailableReason: cashIssue,
     );
   }
 
@@ -446,7 +496,7 @@ class ShopMockRepository implements ShopRepository {
       return PlacedOrder(
         orderId: dup.id,
         orderCode: dup.code,
-        paymentId: _db.paymentOfOrder(dup.id)!.id,
+        paymentId: _db.paymentOfOrder(dup.id)?.id,
         replayed: true,
       );
     }
@@ -471,7 +521,11 @@ class ShopMockRepository implements ShopRepository {
     }
     final now = _db.now();
     final addr = request.fulfillmentType == FulfillmentType.delivery ? e.addressText : null;
+    final cash = request.paymentMethod == ShopPaymentMethod.cash;
     final o = ShopOrderRow(
+      paymentMethod: cash ? ShopPaymentMethod.cash : ShopPaymentMethod.sepay,
+      preferredPickupDate: e.pickupDateMin == null ? null : _dayOf(request.pickupDate ?? now),
+      status: cash ? ShopOrderStatus.confirmed : ShopOrderStatus.pendingPayment,
       id: _db.nextId('ord'),
       code: _db.newShopOrderCode(),
       userId: u.id,
@@ -495,7 +549,14 @@ class ShopMockRepository implements ShopRepository {
       note: request.note,
       idempotencyKey: idempotencyKey,
     );
-    o.history.add(OrderHistoryRow(to: ShopOrderStatus.pendingPayment, at: now, actorId: u.id, reason: 'Tạo đơn'));
+    o.history.add(
+      OrderHistoryRow(
+        to: o.status,
+        at: now,
+        actorId: u.id,
+        reason: cash ? 'Tạo đơn — thanh toán khi nhận tại quầy' : 'Tạo đơn',
+      ),
+    );
     _db.shopOrders.add(o);
     for (final l in e.lines) {
       _db.inventoryTxs.add(
@@ -512,16 +573,18 @@ class ShopMockRepository implements ShopRepository {
         ),
       );
     }
-    final pay = _db.createPendingPayment(
-      userId: u.id,
-      memberProfileId: _db.memberOfUser(u.id)?.id,
-      amount: o.total,
-      productOrderId: o.id,
-    );
+    final pay = cash
+        ? null
+        : _db.createPendingPayment(
+            userId: u.id,
+            memberProfileId: _db.memberOfUser(u.id)?.id,
+            amount: o.total,
+            productOrderId: o.id,
+          );
     if (request.mode == CheckoutMode.cart) {
       _db.cartItems.removeWhere((c) => c.userId == u.id && e.lines.any((l) => l.productId == c.productId));
     }
-    return PlacedOrder(orderId: o.id, orderCode: o.code, paymentId: pay.id);
+    return PlacedOrder(orderId: o.id, orderCode: o.code, paymentId: pay?.id);
   });
 
   // ── Đơn hàng ─────────────────────────────────────────────────────────
@@ -529,6 +592,7 @@ class ShopMockRepository implements ShopRepository {
   static const _groups = <OrderGroup, Set<ShopOrderStatus>>{
     OrderGroup.pending: {ShopOrderStatus.pendingPayment},
     OrderGroup.active: {
+      ShopOrderStatus.confirmed,
       ShopOrderStatus.paid,
       ShopOrderStatus.processing,
       ShopOrderStatus.readyForPickup,
@@ -619,6 +683,11 @@ class ShopMockRepository implements ShopRepository {
               _ => 'ORDER_CANCELLED',
             },
             rejectReason: r.rejectReason,
+            grossAmount: r.grossAmount,
+            feePercent: r.feePercent,
+            bankName: r.bankName,
+            bankAccountNumber: r.bankAccountNumber,
+            bankAccountName: r.bankAccountName,
           ),
       ],
       pickup: pickupReady
@@ -633,7 +702,22 @@ class ShopMockRepository implements ShopRepository {
             )
           : null,
       canPay: owner && o.status == ShopOrderStatus.pendingPayment && now.isBefore(o.paymentExpiresAt),
-      canCancel: owner && o.status == ShopOrderStatus.pendingPayment,
+      canCancel:
+          owner &&
+          (o.status == ShopOrderStatus.pendingPayment ||
+              (_db.isUnpaidCash(o) &&
+                  (o.status == ShopOrderStatus.confirmed || o.status == ShopOrderStatus.readyForPickup))),
+      canReschedulePickup:
+          owner &&
+          o.fulfillmentType == FulfillmentType.pickup &&
+          const [ShopOrderStatus.confirmed, ShopOrderStatus.paid, ShopOrderStatus.readyForPickup].contains(o.status) &&
+          o.pickupRescheduleCount < MockShopConfig.pickupMaxReschedules,
+      canUpdateRefundBank: owner && _db.refunds.any((r) => r.orderId == o.id && r.status == RefundStatus.pending),
+      paymentMethod: o.paymentMethod,
+      isPaid: o.paidAt != null,
+      preferredPickupDate: o.preferredPickupDate,
+      pickupRescheduleCount: o.pickupRescheduleCount,
+      amountDueAtCounter: _db.isUnpaidCash(o) ? o.total : 0,
       canRequestRefund: owner && o.status == ShopOrderStatus.paid,
       canConfirmReceived: owner && o.status == ShopOrderStatus.delivered,
       buyerName: manager ? buyer.fullName : null,
@@ -673,6 +757,10 @@ class ShopMockRepository implements ShopRepository {
   Future<ShopOrder> cancelOrder(String id, {String? reason}) => _server.run(() {
     final u = _buyer();
     final o = _own(u.id, id);
+    if (_db.isUnpaidCash(o) && (o.status == ShopOrderStatus.confirmed || o.status == ShopOrderStatus.readyForPickup)) {
+      _db.cancelUnpaidCashOrder(o, actorId: u.id, note: reason);
+      return _toOrder(o, owner: true);
+    }
     if (o.status != ShopOrderStatus.pendingPayment) {
       throw AppFailure.conflict(
         o.status == ShopOrderStatus.paid
@@ -697,6 +785,63 @@ class ShopMockRepository implements ShopRepository {
     }
     _db.transitionOrder(o, ShopOrderStatus.refundRequested, actorId: u.id, reason: reason, notifyBuyer: false);
     _db.createOrderRefund(o, RefundReason.orderCancelled, o.total, note: reason);
+    return _toOrder(o, owner: true);
+  });
+
+  @override
+  Future<ShopOrder> reschedulePickup(String id, DateTime pickupDate) => _server.run(() {
+    final u = _buyer();
+    final o = _own(u.id, id);
+    if (o.fulfillmentType != FulfillmentType.pickup ||
+        !const [ShopOrderStatus.confirmed, ShopOrderStatus.paid, ShopOrderStatus.readyForPickup].contains(o.status)) {
+      throw const AppFailure.conflict(
+        'Đơn ở trạng thái này không đổi được ngày nhận.',
+        code: 'PICKUP_NOT_RESCHEDULABLE',
+      );
+    }
+    if (o.pickupRescheduleCount >= MockShopConfig.pickupMaxReschedules) {
+      throw const AppFailure.conflict(
+        'Bạn chỉ được đổi ngày nhận hàng ${MockShopConfig.pickupMaxReschedules} lần cho mỗi đơn.',
+        code: 'PICKUP_RESCHEDULE_LIMIT',
+      );
+    }
+    final today = _today();
+    final current = o.preferredPickupDate ?? _dayOf(o.createdAt);
+    final latest = (current.isAfter(today) ? current : today).add(
+      const Duration(days: MockShopConfig.pickupRescheduleMaxDays),
+    );
+    final d = _dayOf(pickupDate);
+    if (d.isBefore(today) || d.isAfter(latest)) {
+      throw AppFailure.business(
+        'Chọn ngày nhận từ ${VnTime.date(today)} đến ${VnTime.date(latest)}.',
+        code: 'PICKUP_DATE_OUT_OF_RANGE',
+      );
+    }
+    o
+      ..preferredPickupDate = d
+      ..pickupRescheduleCount += 1;
+    if (o.status == ShopOrderStatus.readyForPickup) o.pickupDeadline = _db.pickupDeadlineFor(d);
+    return _toOrder(o, owner: true);
+  });
+
+  @override
+  Future<ShopOrder> updateRefundBank(String id, RefundBankInput bank) => _server.run(() {
+    final u = _buyer();
+    final o = _own(u.id, id);
+    final r = _db.refunds.where((x) => x.orderId == o.id && x.status == RefundStatus.pending).firstOrNull;
+    if (r == null) {
+      throw const AppFailure.conflict('Đơn không có yêu cầu hoàn tiền đang chờ.', code: 'REFUND_NOT_PENDING');
+    }
+    final number = bank.accountNumber.replaceAll(RegExp(r'\s'), '');
+    if (bank.bankName.trim().length < 2 ||
+        !RegExp(r'^\d{6,30}$').hasMatch(number) ||
+        bank.accountName.trim().length < 2) {
+      throw const AppFailure.validation('Thông tin tài khoản chưa hợp lệ.');
+    }
+    r
+      ..bankName = bank.bankName.trim()
+      ..bankAccountNumber = number
+      ..bankAccountName = bank.accountName.trim().toUpperCase();
     return _toOrder(o, owner: true);
   });
 
@@ -818,11 +963,15 @@ class ShopMockRepository implements ShopRepository {
     }
     switch (to) {
       case ShopOrderStatus.cancelled:
-        _db.closePendingOrder(o, expired: false, actorId: m.id, note: reason ?? 'Quản lý hủy đơn');
+        if (o.status == ShopOrderStatus.pendingPayment) {
+          _db.closePendingOrder(o, expired: false, actorId: m.id, note: reason ?? 'Quản lý hủy đơn');
+        } else {
+          _db.cancelUnpaidCashOrder(o, actorId: m.id, note: reason ?? 'Quản lý hủy đơn');
+        }
       case ShopOrderStatus.readyForPickup:
         o
           ..pickupCode = _db.newPickupCode()
-          ..pickupDeadline = _db.now().add(const Duration(days: MockShopConfig.pickupDays))
+          ..pickupDeadline = _db.pickupDeadlineFor(o.preferredPickupDate)
           ..pickupFailedAttempts = 0
           ..pickupLockedUntil = null;
         _db.transitionOrder(
@@ -930,6 +1079,20 @@ class ShopMockRepository implements ShopRepository {
       );
     }
     o.pickupCode = null;
+    if (_db.isUnpaidCash(o)) {
+      // Thu tiền mặt tại quầy: ghi giao dịch + trừ hẳn tồn đang giữ.
+      final pay = _db.createPendingPayment(
+        userId: o.userId,
+        memberProfileId: _db.memberOfUser(o.userId)?.id,
+        amount: o.total,
+        productOrderId: o.id,
+      )..status = PaymentStatus.success;
+      pay.paidAt = now;
+      o.paidAt = now;
+      for (final l in o.lines) {
+        _db.applyInventory(l.productId, InventoryTxType.sale, l.quantity, orderId: o.id, note: 'Thu tiền mặt tại quầy');
+      }
+    }
     _db.transitionOrder(
       o,
       ShopOrderStatus.completed,

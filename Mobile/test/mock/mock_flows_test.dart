@@ -235,7 +235,7 @@ void main() {
       final replay = await shop.placeOrder(pickupReq, expectedTotal: preview.total, idempotencyKey: 'k-1');
       expect(replay.orderId, placed.orderId, reason: 'cùng Idempotency-Key ⇒ cùng đơn');
 
-      await PaymentMockRepository(server).simulatePaid(placed.paymentId);
+      await PaymentMockRepository(server).simulatePaid(placed.paymentId!);
       expect((await shop.myOrder(placed.orderId)).status, ShopOrderStatus.paid);
       expect(mat.stockQuantity, stock - 2);
       expect(mat.reservedStock, 0);
@@ -271,6 +271,66 @@ void main() {
       await shop.reviewItem(line.id, 5, 'Tốt');
       await expectLater(shop.reviewItem(line.id, 4, null), throwsA(isA<AppFailure>()));
     });
+
+    test(
+      'trả tại quầy: giữ hàng, đổi ngày 1 lần, quá hạn ⇒ nhả hàng không hoàn; bùng 2 lần ⇒ khóa trả tại quầy',
+      () async {
+        await login('member@demo.vn');
+        final shop = ShopMockRepository(server);
+        final now = server.db.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final req = CheckoutRequest(
+          mode: CheckoutMode.buyNow,
+          fulfillmentType: FulfillmentType.pickup,
+          items: const {'p-water': 1},
+          paymentMethod: ShopPaymentMethod.cash,
+          pickupDate: today.add(const Duration(days: 1)),
+        );
+        final water = server.db.products.firstWhere((p) => p.id == 'p-water');
+        Future<String> noShow() async {
+          final p = await shop.preview(req);
+          expect(p.cashAvailable, isTrue);
+          final placed = await shop.placeOrder(
+            req,
+            expectedTotal: p.total,
+            idempotencyKey: 'cash-${server.db.nextId('k')}',
+          );
+          expect(placed.payAtCounter, isTrue, reason: 'trả tại quầy ⇒ không có QR');
+          await login('manager@demo.vn');
+          await shop.transition(placed.orderId, ShopOrderStatus.readyForPickup);
+          await login('member@demo.vn');
+          return placed.orderId;
+        }
+
+        final reserved = water.reservedStock;
+        final first = await noShow();
+        expect(water.reservedStock, reserved + 1);
+        final o = await shop.myOrder(first);
+        expect(o.amountDueAtCounter, o.total);
+        expect(o.canReschedulePickup, isTrue);
+        final moved = await shop.reschedulePickup(first, today.add(const Duration(days: 3)));
+        expect(moved.pickupRescheduleCount, 1);
+        await expectLater(
+          shop.reschedulePickup(first, today.add(const Duration(days: 2))),
+          throwsA(isA<AppFailure>().having((f) => f.code, 'code', 'PICKUP_RESCHEDULE_LIMIT')),
+        );
+        server.db.shopOrders.firstWhere((x) => x.id == first).pickupDeadline = now.subtract(const Duration(seconds: 1));
+        server.db.runShopJobs();
+        final missed = await shop.myOrder(first);
+        expect(missed.status, ShopOrderStatus.notPickedUp);
+        expect(missed.refunds, isEmpty, reason: 'chưa thu tiền ⇒ không có gì để hoàn');
+        expect(water.reservedStock, reserved, reason: 'nhả hàng đang giữ');
+
+        final second = await noShow();
+        server.db.shopOrders.firstWhere((x) => x.id == second).pickupDeadline = now.subtract(
+          const Duration(seconds: 1),
+        );
+        server.db.runShopJobs();
+        final locked = await shop.preview(req);
+        expect(locked.cashAvailable, isFalse, reason: 'bùng 2 lần trong 90 ngày ⇒ khóa trả tại quầy');
+        expect(locked.canCheckout, isFalse);
+      },
+    );
 
     test('hết hạn ⇒ nhả hàng; 3 lần/24h ⇒ khóa đặt hàng', () async {
       await login('member@demo.vn');

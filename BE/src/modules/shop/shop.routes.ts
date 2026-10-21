@@ -15,7 +15,9 @@ import {
   OrderQuerySchema,
   PickupConfirmSchema,
   PickupVerifySchema,
+  RefundBankSchema,
   RequestRefundSchema,
+  ReschedulePickupSchema,
   ReviewOrderItemSchema,
   ReviewQuerySchema,
   ReviewVisibilitySchema,
@@ -38,7 +40,7 @@ const pickupLimit = rateLimit({ name: "pickup", windowMs: 60_000, max: 30 });
  * tags:
  *   name: Shop
  *   description: |
- *     Cửa hàng — giỏ hàng, sổ địa chỉ, checkout (VietQR/SePay bắt buộc trả trước), đơn hàng theo máy trạng thái,
+ *     Cửa hàng — giỏ hàng, sổ địa chỉ, checkout (VietQR/SePay trả trước, hoặc trả tiền mặt khi nhận tại quầy), đơn hàng theo máy trạng thái,
  *     xử lý đơn / mã nhận hàng / tồn kho / ẩn đánh giá cho Manager. Thiết kế: Doc/SHOP_FLOW_DESIGN.md.
  *     Lỗi nghiệp vụ trả `errors.code` (VD OUT_OF_STOCK, PRICE_CHANGED, PENDING_ORDER_LIMIT, CHECKOUT_LOCKED,
  *     DAILY_LIMIT_EXCEEDED, MAX_PER_ORDER_EXCEEDED, IDEMPOTENCY_KEY_REUSED, ORDER_INVALID_TRANSITION, PICKUP_CODE_INVALID,
@@ -243,11 +245,14 @@ router.post("/checkout/preview", ...buyer, cartLimit, validate(CheckoutPreviewSc
  * @swagger
  * /shop/checkout:
  *   post:
- *     summary: Tạo đơn + giao dịch VietQR (SePay) — bắt buộc header Idempotency-Key
+ *     summary: Tạo đơn + giao dịch VietQR (SePay) hoặc đơn trả tại quầy (CASH) — bắt buộc header Idempotency-Key
  *     description: |
  *       Server tự tính giá/tổng; `expectedTotal` là tổng khách đã xem ở bước xem trước — lệch ⇒ 409 PRICE_CHANGED (kèm `preview` mới).
  *       Giữ hàng có điều kiện trong transaction (hai người cùng mua món cuối: chỉ một thành công — 409 OUT_OF_STOCK).
  *       CART chỉ xóa các dòng đã đặt; BUY_NOW không đụng giỏ. Cùng Idempotency-Key ⇒ trả lại đơn cũ (200).
+ *       PICKUP: `pickupDate` (YYYY-MM-DD, trong [hôm nay, hôm nay + SHOP_PICKUP_MAX_DAYS_AHEAD]) — lấy sớm hơn vẫn được khi đơn đã sẵn sàng.
+ *       `paymentMethod: CASH` (chỉ PICKUP) ⇒ đơn CONFIRMED, không có QR (`checkout: null`), giữ hàng tới hạn nhận; giới hạn
+ *       giá trị đơn (SHOP_CASH_MAX_ORDER_VALUE), số đơn trả tại quầy đang mở (SHOP_CASH_MAX_OPEN_ORDERS) và khóa khi bùng hàng nhiều lần.
  *     tags: [Shop]
  *     security: [{ BearerAuth: [] }]
  *     parameters:
@@ -267,6 +272,8 @@ router.post("/checkout/preview", ...buyer, cartLimit, validate(CheckoutPreviewSc
  *               productIds: { type: array, items: { type: string } }
  *               items: { type: array, items: { type: object, properties: { productId: { type: string }, quantity: { type: integer } } } }
  *               fulfillmentType: { type: string, enum: [PICKUP, DELIVERY] }
+ *               paymentMethod: { type: string, enum: [SEPAY, CASH], default: SEPAY }
+ *               pickupDate: { type: string, format: date }
  *               addressId: { type: string }
  *               recipientName: { type: string }
  *               recipientPhone: { type: string }
@@ -275,9 +282,9 @@ router.post("/checkout/preview", ...buyer, cartLimit, validate(CheckoutPreviewSc
  *     responses:
  *       201: { description: "{ order, checkout: { paymentId, orderCode, amount, qrUrl, expiresAt, bank, order{ id, code } } }" }
  *       200: { description: Idempotent replay (đơn đã tạo với cùng khóa) }
- *       400: { description: "CART_EMPTY / ADDRESS_REQUIRED / DELIVERY_NOT_AVAILABLE / MAX_PER_ORDER_EXCEEDED / DAILY_LIMIT_EXCEEDED / PRODUCT_INACTIVE / IDEMPOTENCY_KEY_REQUIRED" }
- *       403: { description: "CHECKOUT_LOCKED (kèm lockedUntil)" }
- *       409: { description: "OUT_OF_STOCK / INSUFFICIENT_STOCK / PRICE_CHANGED / PENDING_ORDER_LIMIT / IDEMPOTENCY_KEY_REUSED" }
+ *       400: { description: "CART_EMPTY / ADDRESS_REQUIRED / DELIVERY_NOT_AVAILABLE / MAX_PER_ORDER_EXCEEDED / DAILY_LIMIT_EXCEEDED / PRODUCT_INACTIVE / IDEMPOTENCY_KEY_REQUIRED / PICKUP_DATE_OUT_OF_RANGE / CASH_ORDER_TOO_LARGE" }
+ *       403: { description: "CHECKOUT_LOCKED (kèm lockedUntil) / CASH_PAYMENT_LOCKED" }
+ *       409: { description: "OUT_OF_STOCK / INSUFFICIENT_STOCK / PRICE_CHANGED / PENDING_ORDER_LIMIT / CASH_ORDER_LIMIT / IDEMPOTENCY_KEY_REUSED" }
  *       429: { description: RATE_LIMITED }
  *       503: { description: SEPAY_NOT_CONFIGURED }
  */
@@ -360,6 +367,46 @@ router.post("/orders/:id/confirm-received", ...buyer, c.confirmReceived);
 
 /**
  * @swagger
+ * /shop/orders/{id}/reschedule-pickup:
+ *   post:
+ *     summary: Đổi ngày nhận / gia hạn tại quầy (tối đa SHOP_PICKUP_MAX_RESCHEDULES lần, dời ≤ SHOP_PICKUP_RESCHEDULE_MAX_DAYS ngày) — đơn đã sẵn sàng thì tính lại hạn nhận
+ *     tags: [Shop]
+ *     security: [{ BearerAuth: [] }]
+ *     parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+ *     requestBody:
+ *       required: true
+ *       content: { application/json: { schema: { type: object, required: [pickupDate], properties: { pickupDate: { type: string, format: date } } } } }
+ *     responses:
+ *       200: { description: Chi tiết đơn sau khi đổi }
+ *       400: { description: "PICKUP_DATE_OUT_OF_RANGE / PICKUP_DATE_INVALID" }
+ *       409: { description: "PICKUP_NOT_RESCHEDULABLE / PICKUP_RESCHEDULE_LIMIT / PICKUP_DEADLINE_PASSED / ORDER_STATE_CHANGED" }
+ */
+router.post("/orders/:id/reschedule-pickup", ...buyer, validate(ReschedulePickupSchema), c.reschedulePickup);
+
+/**
+ * @swagger
+ * /shop/orders/{id}/refund-bank:
+ *   put:
+ *     summary: Khách bổ sung / sửa số tài khoản nhận tiền hoàn của yêu cầu hoàn đang chờ
+ *     tags: [Shop]
+ *     security: [{ BearerAuth: [] }]
+ *     parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [bankName, bankAccountNumber, bankAccountName]
+ *             properties: { bankName: { type: string }, bankAccountNumber: { type: string }, bankAccountName: { type: string } }
+ *     responses:
+ *       200: { description: Chi tiết đơn }
+ *       409: { description: REFUND_NOT_PENDING }
+ */
+router.put("/orders/:id/refund-bank", ...buyer, validate(RefundBankSchema), c.updateRefundBank);
+
+/**
+ * @swagger
  * /shop/order-items/{id}/review:
  *   post:
  *     summary: Đánh giá một dòng đơn COMPLETED của mình (mỗi dòng tối đa 1 đánh giá)
@@ -401,10 +448,11 @@ router.get("/manage/summary", ...manager, c.managerSummary);
  *       - { in: query, name: status, schema: { type: string } }
  *       - { in: query, name: fulfillmentType, schema: { type: string, enum: [PICKUP, DELIVERY] } }
  *       - { in: query, name: search, schema: { type: string } }
+ *       - { in: query, name: queue, schema: { type: string, enum: [PICKUP_TODAY, REFUND_PENDING, STALE_REFUND] } }
  *       - { in: query, name: page, schema: { type: integer } }
  *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
- *       200: { description: Danh sách đơn }
+ *       200: { description: "Danh sách đơn (kèm pendingRefund{ awaitingBankInfo, isStale })" }
  */
 router.get("/manage/orders", ...manager, validate(OrderQuerySchema, "query"), c.managerListOrders);
 
@@ -473,14 +521,29 @@ router.post("/manage/pickup/verify", ...manager, pickupLimit, validate(PickupVer
  *     parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
  *     requestBody:
  *       required: true
- *       content: { application/json: { schema: { type: object, required: [code, phoneLast4], properties: { code: { type: string }, phoneLast4: { type: string } } } } }
+ *       content: { application/json: { schema: { type: object, required: [code, phoneLast4], properties: { code: { type: string }, phoneLast4: { type: string }, cashCollected: { type: boolean, description: "Đơn trả tại quầy: đã thu đủ tiền mặt" } } } } }
  *     responses:
  *       200: { description: Đơn hoàn tất }
- *       400: { description: "PICKUP_CODE_INVALID / PHONE_MISMATCH (kèm remainingAttempts)" }
+ *       400: { description: "PICKUP_CODE_INVALID / PHONE_MISMATCH (kèm remainingAttempts) / CASH_COLLECTION_REQUIRED" }
  *       409: { description: "PICKUP_CODE_USED / ORDER_NOT_READY" }
  *       423: { description: "PICKUP_LOCKED (kèm lockedUntil)" }
  */
 router.post("/manage/orders/:id/pickup", ...manager, pickupLimit, validate(PickupConfirmSchema), c.confirmPickup);
+
+/**
+ * @swagger
+ * /shop/manage/orders/{id}/remind-refund-bank:
+ *   post:
+ *     summary: Nhắc khách gửi số tài khoản nhận hoàn (yêu cầu hoàn đang chờ, chưa có STK) — tối đa 1 lần/giờ
+ *     tags: [Shop]
+ *     security: [{ BearerAuth: [] }]
+ *     parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+ *     responses:
+ *       200: { description: Chi tiết đơn (Manager) }
+ *       409: { description: "REFUND_NOT_PENDING / REFUND_BANK_INFO_PRESENT" }
+ *       429: { description: REFUND_REMINDER_TOO_SOON }
+ */
+router.post("/manage/orders/:id/remind-refund-bank", ...manager, c.remindRefundBank);
 
 /**
  * @swagger

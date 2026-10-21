@@ -11,16 +11,19 @@ import { formatAddress } from "./address.service.js";
 import { lineWarnings, type CartWarning } from "./cart.service.js";
 import { applyInventory, availableOf } from "./inventory.js";
 import { money, ORDER_DETAIL_INCLUDE, orderOwnerView } from "./order-view.js";
+import { formatVnDate, parseVnDate, pickupDateRange, vnDateString } from "./pickup-schedule.js";
 import type { CheckoutInput } from "./shop.schema.js";
 
 /**
  * Checkout cửa hàng (Doc/SHOP_FLOW_DESIGN.md §4–§6):
- * xem trước (không ghi) → tạo đơn: giữ hàng có điều kiện trong transaction + Payment SePay PENDING.
+ * xem trước (không ghi) → tạo đơn: giữ hàng có điều kiện trong transaction + Payment SePay PENDING
+ * (hoặc đơn CONFIRMED chưa có Payment khi khách chọn trả tiền tại quầy — chỉ PICKUP).
  * Server tự tính đơn giá/tạm tính/phí ship/tổng — mọi giá từ client bị bỏ qua.
  */
 
 const ACTIVE_ORDER_STATUSES = [
   "PENDING_PAYMENT",
+  "CONFIRMED",
   "PAID",
   "PROCESSING",
   "READY_FOR_PICKUP",
@@ -91,6 +94,51 @@ async function countPending(db: Prisma.TransactionClient | typeof prisma, userId
   });
 }
 
+/** Đơn trả tại quầy đang mở (chưa nhận / chưa hủy) của một người. */
+async function countOpenCashOrders(db: Prisma.TransactionClient | typeof prisma, userId: string) {
+  return db.order.count({
+    where: { userId, paymentMethod: "CASH", status: { in: ["CONFIRMED", "READY_FOR_PICKUP"] }, paidAt: null },
+  });
+}
+
+/** Lý do không cho chọn "trả tiền tại quầy" (null = được phép). */
+function cashBlock(
+  cfg: ReturnType<typeof shopConfig>,
+  fulfillmentType: string,
+  total: number,
+  lockedUntil: Date | null,
+  openCash: number
+): { code: string; status: number; message: string; extra?: Record<string, unknown> } | null {
+  if (fulfillmentType !== "PICKUP") {
+    return { code: "CASH_PICKUP_ONLY", status: 400, message: "Thanh toán tại quầy chỉ áp dụng khi nhận hàng tại quầy." };
+  }
+  if (lockedUntil) {
+    return {
+      code: "CASH_PAYMENT_LOCKED",
+      status: 403,
+      message: `Bạn đã nhiều lần không đến lấy hàng nên tạm thời không được trả tiền tại quầy tới ${formatVnDate(lockedUntil)}. Vui lòng chuyển khoản trước.`,
+      extra: { lockedUntil },
+    };
+  }
+  if (cfg.cashMaxOrderValue > 0 && total > cfg.cashMaxOrderValue) {
+    return {
+      code: "CASH_ORDER_TOO_LARGE",
+      status: 400,
+      message: `Đơn trên ${cfg.cashMaxOrderValue.toLocaleString("vi-VN")}đ cần chuyển khoản trước.`,
+      extra: { cashMaxOrderValue: cfg.cashMaxOrderValue },
+    };
+  }
+  if (openCash >= cfg.cashMaxOpenOrders) {
+    return {
+      code: "CASH_ORDER_LIMIT",
+      status: 409,
+      message: `Bạn đang có ${openCash} đơn trả tại quầy chưa nhận. Hãy nhận hoặc hủy đơn đó trước, hoặc chuyển khoản trước.`,
+      extra: { cashMaxOpenOrders: cfg.cashMaxOpenOrders },
+    };
+  }
+  return null;
+}
+
 interface Recipient {
   recipientName: string | null;
   recipientPhone: string | null;
@@ -115,7 +163,7 @@ async function evaluate(userId: string, input: CheckoutInput, strict: boolean, l
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { fullName: true, phone: true, checkoutLockedUntil: true },
+    select: { fullName: true, phone: true, checkoutLockedUntil: true, cashPickupLockedUntil: true },
   });
   const lockedUntil = user?.checkoutLockedUntil && user.checkoutLockedUntil > new Date() ? user.checkoutLockedUntil : null;
   if (lockedUntil) {
@@ -209,9 +257,29 @@ async function evaluate(userId: string, input: CheckoutInput, strict: boolean, l
     fail(400, "RECIPIENT_PHONE_REQUIRED", "Vui lòng nhập số điện thoại người nhận (dùng để đối chiếu khi nhận hàng).");
   }
 
+  // Ngày dự định lấy (PICKUP): trong [hôm nay, hôm nay + N]; bỏ trống = hôm nay.
+  const paymentMethod = input.paymentMethod ?? "SEPAY";
+  const range = pickupDateRange(cfg.pickupMaxDaysAhead);
+  let pickupDate: Date | null = null;
+  if (input.fulfillmentType === "PICKUP") {
+    pickupDate = input.pickupDate ? parseVnDate(input.pickupDate) : range.min;
+    if (pickupDate < range.min || pickupDate > range.max) {
+      fail(400, "PICKUP_DATE_OUT_OF_RANGE", `Chọn ngày nhận hàng từ ${formatVnDate(range.min)} đến ${formatVnDate(range.max)}.`, {
+        minDate: vnDateString(range.min),
+        maxDate: vnDateString(range.max),
+      });
+    }
+  }
+
+  // Trả tại quầy: luôn trả về trạng thái (app bật/tắt lựa chọn); chỉ chặn khi khách đang chọn CASH.
+  const cashLockedUntil = user?.cashPickupLockedUntil && user.cashPickupLockedUntil > new Date() ? user.cashPickupLockedUntil : null;
+  const openCash = await countOpenCashOrders(prisma, userId);
+  const cashIssue = cashBlock(cfg, input.fulfillmentType, total, cashLockedUntil, openCash);
+  if (paymentMethod === "CASH" && cashIssue) fail(cashIssue.status, cashIssue.code, cashIssue.message, cashIssue.extra);
+
   const pendingOrders = await countPending(prisma, userId);
   // Lúc đặt thật, giới hạn đơn chờ được kiểm tra trong transaction (sau lock, kèm danh sách đơn chờ).
-  if (!strict && pendingOrders >= cfg.maxPendingOrders) {
+  if (!strict && paymentMethod === "SEPAY" && pendingOrders >= cfg.maxPendingOrders) {
     fail(409, "PENDING_ORDER_LIMIT", `Bạn đang có ${pendingOrders} đơn chờ thanh toán. Vui lòng thanh toán hoặc hủy bớt trước khi đặt đơn mới.`, {
       maxPendingOrders: cfg.maxPendingOrders,
     });
@@ -224,6 +292,17 @@ async function evaluate(userId: string, input: CheckoutInput, strict: boolean, l
     shippingFee,
     total,
     fulfillmentType: input.fulfillmentType,
+    paymentMethod,
+    pickupDate: pickupDate ? vnDateString(pickupDate) : null,
+    pickupDateRange: input.fulfillmentType === "PICKUP" ? { min: vnDateString(range.min), max: vnDateString(range.max) } : null,
+    pickupDays: cfg.pickupDays,
+    cash: {
+      available: cashIssue === null,
+      reason: cashIssue?.message ?? null,
+      code: cashIssue?.code ?? null,
+      lockedUntil: cashLockedUntil,
+      maxOrderValue: cfg.cashMaxOrderValue,
+    },
     recipient,
     address,
     freeShippingThreshold: cfg.freeShippingThreshold,
@@ -246,6 +325,8 @@ function requestHash(input: CheckoutInput): string {
     productIds: [...(input.productIds ?? [])].sort(),
     items: [...(input.items ?? [])].sort((a, b) => a.productId.localeCompare(b.productId)),
     fulfillmentType: input.fulfillmentType,
+    paymentMethod: input.paymentMethod ?? "SEPAY",
+    pickupDate: input.pickupDate ?? null,
     addressId: input.addressId ?? null,
     expectedTotal: input.expectedTotal ?? null,
   };
@@ -254,13 +335,16 @@ function requestHash(input: CheckoutInput): string {
 
 async function checkoutResult(orderId: string, replayed: boolean) {
   const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_DETAIL_INCLUDE });
-  const payment = await prisma.payment.findUniqueOrThrow({ where: { orderId } });
+  const payment = await prisma.payment.findUnique({ where: { orderId } });
   return {
     order: orderOwnerView(order),
-    checkout: {
-      ...buildSepayCheckoutView(payment, null, order.paymentExpiresAt ?? undefined),
-      order: { id: order.id, code: order.code, totalPrice: money(order.totalPrice), status: order.status, fulfillmentType: order.fulfillmentType },
-    },
+    // Đơn trả tại quầy (CASH) chưa có giao dịch ⇒ không có QR.
+    checkout: payment
+      ? {
+          ...buildSepayCheckoutView(payment, null, order.paymentExpiresAt ?? undefined),
+          order: { id: order.id, code: order.code, totalPrice: money(order.totalPrice), status: order.status, fulfillmentType: order.fulfillmentType },
+        }
+      : null,
     replayed,
   };
 }
@@ -279,7 +363,8 @@ export async function createOrder(
   if (user.role !== "MEMBER" && user.role !== "COACH") {
     throw new AppError("Forbidden: only MEMBER or COACH can buy products", 403);
   }
-  if (!isSepayConfigured()) {
+  const cash = input.paymentMethod === "CASH";
+  if (!cash && !isSepayConfigured()) {
     throw new AppError("Cổng thanh toán SePay chưa được cấu hình. Vui lòng liên hệ quản lý.", 503, {
       code: "SEPAY_NOT_CONFIGURED",
       gateway: SEPAY_GATEWAY,
@@ -333,7 +418,17 @@ export async function createOrder(
           return dup.id;
         }
 
-        const pending = await countPending(tx, user.id);
+        if (cash) {
+          // Kiểm tra lại sau lock: hai request song song không vượt giới hạn đơn trả tại quầy.
+          const openCash = await countOpenCashOrders(tx, user.id);
+          if (openCash >= cfg.cashMaxOpenOrders) {
+            throw new AppError(`Bạn đang có ${openCash} đơn trả tại quầy chưa nhận.`, 409, {
+              code: "CASH_ORDER_LIMIT",
+              cashMaxOpenOrders: cfg.cashMaxOpenOrders,
+            });
+          }
+        }
+        const pending = cash ? 0 : await countPending(tx, user.id);
         if (pending >= cfg.maxPendingOrders) {
           const open = await tx.order.findMany({
             where: { userId: user.id, status: "PENDING_PAYMENT", paymentExpiresAt: { gt: new Date() } },
@@ -369,13 +464,16 @@ export async function createOrder(
             code: orderCode,
             userId: user.id,
             fulfillmentType: evaluated.fulfillmentType,
+            paymentMethod: cash ? "CASH" : "SEPAY",
+            preferredPickupDate: evaluated.pickupDate ? parseVnDate(evaluated.pickupDate) : null,
             subtotal: evaluated.subtotal,
             shippingFee: evaluated.shippingFee,
             totalPrice: evaluated.total,
-            status: "PENDING_PAYMENT",
+            status: cash ? "CONFIRMED" : "PENDING_PAYMENT",
             ...evaluated.recipient,
             note: input.note ?? null,
-            paymentExpiresAt: new Date(now.getTime() + cfg.holdMinutes * 60_000),
+            // Đơn trả tại quầy không có hạn chuyển khoản — hàng được giữ tới hạn nhận.
+            paymentExpiresAt: cash ? null : new Date(now.getTime() + cfg.holdMinutes * 60_000),
             idempotencyKey: key,
             idempotencyHash: hash,
             items: {
@@ -388,7 +486,14 @@ export async function createOrder(
                 totalAmount: l.lineTotal,
               })),
             },
-            history: { create: { fromStatus: null, toStatus: "PENDING_PAYMENT", actorId: user.id, reason: "Tạo đơn" } },
+            history: {
+              create: {
+                fromStatus: null,
+                toStatus: cash ? "CONFIRMED" : "PENDING_PAYMENT",
+                actorId: user.id,
+                reason: cash ? "Tạo đơn — thanh toán khi nhận tại quầy" : "Tạo đơn",
+              },
+            },
           },
         });
 
@@ -414,7 +519,7 @@ export async function createOrder(
         }
 
         const summary = evaluated.lines.map((l) => `${l.productName} × ${l.quantity}`).join(", ");
-        await tx.payment.create({
+        if (!cash) await tx.payment.create({
           data: {
             memberId: memberProfile?.id ?? null,
             orderId: order.id,
