@@ -3,6 +3,7 @@ import { authenticate } from "../../middlewares/authenticate.js";
 import { optionalAuthenticate } from "../../middlewares/optionalAuthenticate.js";
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
+import { productImageUpload } from "../../middlewares/upload.js";
 import {
   CreateProductSchema,
   UpdateProductSchema,
@@ -232,7 +233,7 @@ router.post(
  *               price: { type: number, minimum: 0 }
  *               stockQuantity: { type: integer, minimum: 0, description: "Tồn đầu — ghi đúng 1 dòng nhật ký kho IN" }
  *               isActive: { type: boolean }
- *               imageUrl: { type: string, format: uri, nullable: true }
+ *               imageUrl: { type: string, format: binary, description: "Chọn file ảnh hoặc truyền URL string" }
  *               imageUrls: { type: array, items: { type: string, format: uri }, maxItems: 10 }
  *               maxPerOrder: { type: integer, minimum: 1 }
  *               maxPerDay: { type: integer, minimum: 1 }
@@ -241,10 +242,43 @@ router.post(
  *       201:
  *         description: Created
  */
+/**
+ * @swagger
+ * /products/upload-image:
+ *   post:
+ *     summary: Upload product image file (Manager only)
+ *     tags: [Products]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [imageUrl]
+ *             properties:
+ *               imageUrl:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image file (jpeg, jpg, png, webp, gif), max 10MB
+ *     responses:
+ *       200:
+ *         description: OK
+ * */
+router.post(
+  "/upload-image",
+  authenticate,
+  authorize("MANAGER"),
+  productImageUpload,
+  productsController.uploadProductImage
+);
+
 router.post(
   "/",
   authenticate,
   authorize("MANAGER"),
+  productImageUpload,
   validate(CreateProductSchema),
   productsController.createProduct
 );
@@ -288,6 +322,7 @@ router.patch(
   "/:id",
   authenticate,
   authorize("MANAGER"),
+  productImageUpload,
   validate(UpdateProductSchema),
   productsController.updateProduct
 );

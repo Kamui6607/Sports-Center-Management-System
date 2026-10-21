@@ -3,7 +3,9 @@ import 'package:sports_center_mobile/core/error/app_failure.dart';
 import 'package:sports_center_mobile/features/attendance/data/attendance_mock_repository.dart';
 import 'package:sports_center_mobile/features/auth/data/auth_mock_repository.dart';
 import 'package:sports_center_mobile/features/classes/data/course_mock_repository.dart';
+import 'package:sports_center_mobile/features/catalog/domain/entities/catalog.dart';
 import 'package:sports_center_mobile/features/classes/domain/entities/course.dart';
+import 'package:sports_center_mobile/mock/mock_tables.dart';
 import 'package:sports_center_mobile/features/coach/data/coach_mock_repository.dart';
 import 'package:sports_center_mobile/features/coach/domain/entities/wallet.dart';
 import 'package:sports_center_mobile/features/manager/data/manager_mock_repository.dart';
@@ -70,6 +72,27 @@ void main() {
       await login('member@demo.vn');
       final detail = await CourseMockRepository(server).detail('c10');
       expect(detail.purchase.blockers.map((b) => b.code), contains('SCHEDULE_CONFLICT'));
+    });
+
+    test('khóa học không có buổi khả dụng bị ẩn khi khám phá (0 buổi hoặc không còn buổi sắp tới)', () async {
+      final courses = CourseMockRepository(server);
+      server.db.classes.add(
+        ClassRow(
+          id: 'c-empty',
+          name: 'Khóa không có buổi',
+          sportIds: ['sp-yoga'],
+          price: 500000,
+          status: ClassStatus.approved,
+          coachProfileId: 'cp-1',
+          capacity: 10,
+          classType: ClassType.regular,
+          areaType: AreaType.indoor,
+          createdAt: DateTime.now(),
+        ),
+      );
+      final paged = await courses.browse(const ClassQuery());
+      expect(paged.items.any((c) => c.id == 'c-empty'), isFalse);
+      expect(paged.items.every((c) => c.hasAvailableSessions), isTrue);
     });
   });
 

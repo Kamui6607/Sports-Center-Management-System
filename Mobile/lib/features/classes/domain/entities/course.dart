@@ -121,6 +121,9 @@ class CourseClass {
   List<String> get goalLabels => goalTags.map(goalLabel).toList();
 
   bool get isFull => minRemainingSlots == 0;
+
+  /// Khóa học có buổi học khả dụng để đăng ký (tổng số buổi > 0 và còn buổi sắp tới).
+  bool get hasAvailableSessions => mainSessionCount > 0 && upcomingSessionCount > 0;
 }
 
 /// Khung lịch lặp (gom buổi cùng thứ + giờ + phòng) — từ `course-plan` của BE.

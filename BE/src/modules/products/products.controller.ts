@@ -1,10 +1,18 @@
 import { Request, Response, NextFunction } from "express";
 import * as productsService from "./products.service.js";
-import { sendSuccess, sendCreated } from "../../utils/response.js";
+import { sendSuccess, sendCreated, sendError } from "../../utils/response.js";
+import { storeProductImage } from "../../utils/storage.js";
 
 export async function createProduct(req: Request, res: Response, next: NextFunction) {
   try {
-    const product = await productsService.createProduct(req.body, req.user!.id);
+    let imageUrl = req.body.imageUrl || null;
+    if (req.file) {
+      imageUrl = await storeProductImage(req.file, {
+        publicBaseUrl: `${req.protocol}://${req.get("host")}`,
+      });
+    }
+    const data = { ...req.body, imageUrl: imageUrl || null };
+    const product = await productsService.createProduct(data, req.user!.id);
     sendCreated(res, product, "Product created successfully");
   } catch (err) {
     next(err);
@@ -31,8 +39,34 @@ export async function getProductById(req: Request, res: Response, next: NextFunc
 
 export async function updateProduct(req: Request, res: Response, next: NextFunction) {
   try {
-    const product = await productsService.updateProduct(req.params.id as string, req.body, req.user?.id);
+    let imageUrl = req.body.imageUrl !== undefined ? (req.body.imageUrl || null) : undefined;
+    if (req.file) {
+      imageUrl = await storeProductImage(req.file, {
+        productId: req.params.id as string,
+        publicBaseUrl: `${req.protocol}://${req.get("host")}`,
+      });
+    }
+    const data = { ...req.body };
+    if (imageUrl !== undefined) {
+      data.imageUrl = imageUrl;
+    }
+    const product = await productsService.updateProduct(req.params.id as string, data, req.user?.id);
     sendSuccess(res, product, "Product updated successfully");
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function uploadProductImage(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) {
+      sendError(res, "Product image file is required", 400);
+      return;
+    }
+    const imageUrl = await storeProductImage(req.file, {
+      publicBaseUrl: `${req.protocol}://${req.get("host")}`,
+    });
+    sendSuccess(res, { imageUrl }, "Product image uploaded successfully");
   } catch (err) {
     next(err);
   }

@@ -197,3 +197,52 @@ export function planAttachmentUploadSingle(field: string) {
     });
   };
 }
+
+// ── Product image upload ───────────────────────────────────
+export const PRODUCT_UPLOAD_DIR = path.join(uploadDir, "products");
+if (!fs.existsSync(PRODUCT_UPLOAD_DIR)) {
+  fs.mkdirSync(PRODUCT_UPLOAD_DIR, { recursive: true });
+}
+
+const productMulter = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (_req, file, cb) => {
+    if (!AVATAR_MIME_TYPES.has(file.mimetype)) {
+      cb(new AppError("Product image must be an image (jpeg, png, webp or gif)", 400));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+export function productImageUpload(req: Request, res: Response, next: NextFunction) {
+  productMulter.fields([
+    { name: "imageUrl", maxCount: 1 },
+    { name: "image", maxCount: 1 },
+    { name: "file", maxCount: 1 },
+  ])(req, res, (err: unknown) => {
+    if (err) {
+      if (err instanceof AppError) return next(err);
+      if (err instanceof multer.MulterError) {
+        const message =
+          err.code === "LIMIT_FILE_SIZE"
+            ? "Product image must be at most 10MB"
+            : `Product image upload failed: ${err.message}`;
+        return next(new AppError(message, 400));
+      }
+      return next(err as Error);
+    }
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const file =
+      files?.["imageUrl"]?.[0] ?? files?.["image"]?.[0] ?? files?.["file"]?.[0] ?? (req as any).file;
+    if (file) {
+      const sniffed = sniffMime(file.buffer);
+      if (!sniffed || !(ALLOWED_AVATAR_MIMES as readonly string[]).includes(sniffed)) {
+        return next(new AppError("Product image content is invalid (jpeg, png, webp or gif)", 400));
+      }
+      (req as any).file = file;
+    }
+    return next();
+  });
+}

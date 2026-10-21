@@ -114,6 +114,16 @@ export async function listClasses(query: any, actor?: Actor) {
     where.goalTags = member.fitnessGoals.length ? { hasSome: member.fitnessGoals } : { has: "__none__" };
   }
 
+  // Chỉ lấy khóa có buổi học SCHEDULED sắp tới chưa diễn ra (Mobile)
+  if (query.hasUpcomingSchedules === "true") {
+    where.schedules = {
+      some: {
+        status: "SCHEDULED",
+        startTime: { gt: new Date() },
+      },
+    };
+  }
+
   // Tìm không dấu: so khớp tên đã bỏ dấu (PostgreSQL chưa bật unaccent) — số khóa học nhỏ nên lọc trong bộ nhớ.
   if (query.search && String(query.search).trim()) {
     const needle = foldVietnamese(String(query.search));

@@ -104,6 +104,28 @@ void main() {
       expect(c.coach.avatarUrl, endsWith('/uploads/avatars/c.png'));
     });
 
+    test('browse: ẩn các khóa học không có buổi khả dụng (0 buổi hoặc không còn buổi sắp tới)', () async {
+      final api = FakeApi();
+      final validClass = _class();
+      final noSessionsClass = Map<String, Object?>.from(_class())..['id'] = 'c-no-sessions'..['summary'] = {
+        'mainSessionCount': 0,
+        'completedSessionCount': 0,
+        'upcomingSessionCount': 0,
+        'studentCount': 0,
+      };
+      final endedClass = Map<String, Object?>.from(_class())..['id'] = 'c-ended'..['summary'] = {
+        'mainSessionCount': 10,
+        'completedSessionCount': 10,
+        'upcomingSessionCount': 0,
+        'studentCount': 5,
+      };
+      api.backend.on('GET /classes', (r) async => FakeReply.ok([validClass, noSessionsClass, endedClass], pagination: _paged));
+      final page = await CourseApiRepository(api.client, api.tokens).browse(const ClassQuery());
+      expect(page.items, hasLength(1));
+      expect(page.items.single.id, 'c1');
+      expect(api.backend.requests.single.query['hasUpcomingSchedules'], 'true');
+    });
+
     test('chi tiết: PENDING_PAYMENT (BE-13) ⇒ tiếp tục thanh toán', () async {
       final api = FakeApi(storedTokens: authed);
       api.backend

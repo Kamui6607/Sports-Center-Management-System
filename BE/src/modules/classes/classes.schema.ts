@@ -74,4 +74,6 @@ export const ClassQuerySchema = z.object({
   coachId: z.string().optional(),
   status: z.enum(["DRAFT", "PENDING", "APPROVED", "REJECTED", "COMPLETED"]).optional(),
   createdByMe: z.string().optional(), // "true" → chỉ trả lớp Coach đã tạo
+  /** "true" ⇒ chỉ lấy khóa học có ít nhất 1 buổi học SCHEDULED sắp tới chưa diễn ra. */
+  hasUpcomingSchedules: z.enum(["true", "false"]).optional(),
 });

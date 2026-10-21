@@ -143,3 +143,66 @@ export function removeStoredAvatar(avatarUrl: string | null): void {
   fs.promises.unlink(path.join(AVATAR_DIR, filename)).catch(() => {});
 }
 
+
+/** Thư mục lưu ảnh sản phẩm khi dùng driver `local` (phục vụ tĩnh qua app.ts: `/uploads/products/...`). */
+export const PRODUCT_DIR = path.join("uploads", "products");
+const PRODUCT_URL_MARKER = "/uploads/products/";
+
+export async function storeProductImage(
+  file: Express.Multer.File,
+  options: { productId?: string; publicBaseUrl: string }
+): Promise<string> {
+  return resolveDriver() === "cloudinary"
+    ? uploadProductToCloudinary(file, options.productId)
+    : saveLocalProductImage(file, options.publicBaseUrl);
+}
+
+async function uploadProductToCloudinary(file: Express.Multer.File, productId?: string): Promise<string> {
+  const cfg = cloudinaryConfig();
+  cloudinary.config({
+    cloud_name: cfg.cloudName,
+    api_key: cfg.apiKey,
+    api_secret: cfg.apiSecret,
+    secure: true,
+  });
+
+  const dataUri = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+  try {
+    const result = await cloudinary.uploader.upload(dataUri, {
+      folder: `${cfg.folder}/products`,
+      public_id: productId ?? `prod-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+      overwrite: true,
+      invalidate: true,
+      resource_type: "image",
+      transformation: [{ width: 1024, height: 1024, crop: "limit" }],
+      quality: "auto",
+      fetch_format: "auto",
+    });
+    if (!result.secure_url) throw new Error("Cloudinary response is missing secure_url");
+    return result.secure_url;
+  } catch (err) {
+    const detail = cloudinaryErrorDetail(err);
+    throw new AppError(`Product image upload to Cloudinary failed: ${detail}`, 502);
+  }
+}
+
+async function saveLocalProductImage(file: Express.Multer.File, publicBaseUrl: string): Promise<string> {
+  fs.mkdirSync(PRODUCT_DIR, { recursive: true });
+
+  const ext = MIME_EXT[file.mimetype] ?? ".jpg";
+  const filename = `product-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+  await fs.promises.writeFile(path.join(PRODUCT_DIR, filename), file.buffer);
+
+  return `${publicBaseUrl}${PRODUCT_URL_MARKER}${filename}`;
+}
+
+export function removeStoredProductImage(imageUrl: string | null): void {
+  if (!imageUrl) return;
+  const markerIndex = imageUrl.indexOf(PRODUCT_URL_MARKER);
+  if (markerIndex === -1) return;
+  const filename = path.basename(imageUrl.slice(markerIndex + PRODUCT_URL_MARKER.length));
+  const fullPath = path.join(PRODUCT_DIR, filename);
+  if (fs.existsSync(fullPath)) {
+    fs.unlink(fullPath, () => {});
+  }
+}

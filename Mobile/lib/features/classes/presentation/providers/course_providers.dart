@@ -44,7 +44,11 @@ class BrowseNotifier extends AsyncNotifier<BrowseState> {
     ref.watch(dataRevisionProvider);
     final q = ref.watch(classQueryProvider);
     final page = await ref.read(courseRepositoryProvider).browse(q.copyWith(page: 1));
-    return BrowseState(items: page.items, page: 1, hasMore: page.hasMore);
+    return BrowseState(
+      items: page.items.where((c) => c.hasAvailableSessions).toList(),
+      page: 1,
+      hasMore: page.hasMore,
+    );
   }
 
   Future<void> loadMore() async {
@@ -54,7 +58,8 @@ class BrowseNotifier extends AsyncNotifier<BrowseState> {
     try {
       final q = ref.read(classQueryProvider).copyWith(page: current.page + 1);
       final next = await ref.read(courseRepositoryProvider).browse(q);
-      state = AsyncData(BrowseState(items: [...current.items, ...next.items], page: next.page, hasMore: next.hasMore));
+      final newItems = next.items.where((c) => c.hasAvailableSessions).toList();
+      state = AsyncData(BrowseState(items: [...current.items, ...newItems], page: next.page, hasMore: next.hasMore));
     } on Object {
       // Giữ danh sách hiện có; lần cuộn sau sẽ thử tải lại.
       state = AsyncData(BrowseState(items: current.items, page: current.page, hasMore: current.hasMore));

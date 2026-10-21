@@ -31,6 +31,7 @@ class CourseMockRepository implements CourseRepository {
             .where((c) => q.classType == null || c.classType == q.classType)
             .where((c) => q.areaType == null || c.areaType == q.areaType)
             .map(db.toCourse)
+            .where((c) => c.hasAvailableSessions)
             .where(
               (c) =>
                   keyword.isEmpty ||
@@ -280,7 +281,7 @@ class CourseMockRepository implements CourseRepository {
     final courses = db.classes.where((c) => c.coachProfileId == coachProfileId).map(db.toCourse).toList();
     if (courses.isEmpty) throw const AppFailure.notFound('Không tìm thấy huấn luyện viên.');
     final coach = courses.first.coach;
-    final open = courses.where((c) => c.status == ClassStatus.approved).toList();
+    final open = courses.where((c) => c.status == ClassStatus.approved && c.hasAvailableSessions).toList();
     return CoachPublicProfile(
       coachProfileId: coachProfileId,
       userId: coach.userId,

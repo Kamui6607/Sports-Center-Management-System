@@ -139,6 +139,8 @@ const urlOk = (u: string) => /^https?:\/\/\S+$/i.test(u);
 
 export function ProductDialog({ product, onClose }: { product: Row | null; onClose: () => void }) {
   const editing = Boolean(product);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [f, setF] = useState({
     name: str(product?.name),
     description: str(product?.description),
@@ -160,15 +162,38 @@ export function ProductDialog({ product, onClose }: { product: Row | null; onClo
     description: f.description.trim().length < 5 ? "Tối thiểu 5 ký tự." : "",
     price: !(f.price !== "" && Number(f.price) >= 0) ? "Giá không âm." : "",
     stockQuantity: !editing && !intOk(f.stockQuantity, 0) ? "Số nguyên ≥ 0." : "",
-    imageUrl: f.imageUrl && !urlOk(f.imageUrl) ? "URL ảnh phải bắt đầu bằng http:// hoặc https://" : "",
+    imageUrl: !imageFile && f.imageUrl && !urlOk(f.imageUrl) ? "URL ảnh phải bắt đầu bằng http:// hoặc https://" : "",
     extraImages: extra.some((u) => !urlOk(u)) ? "Mỗi dòng là một URL http(s)." : extra.length > 9 ? "Tối đa 9 ảnh phụ." : "",
     maxPerOrder: !intOk(f.maxPerOrder, 1) ? "Số nguyên ≥ 1." : "",
     maxPerDay: !intOk(f.maxPerDay, 1) ? "Số nguyên ≥ 1." : "",
     lowStockThreshold: !intOk(f.lowStockThreshold, 0) ? "Số nguyên ≥ 0." : "",
   };
   const invalid = Object.values(problems).some(Boolean);
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+      setF((prev) => ({ ...prev, imageUrl: "" }));
+    }
+  };
+
   const m = useMutation({
     mutationFn: () => {
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append("name", f.name.trim());
+        formData.append("description", f.description.trim());
+        formData.append("price", String(Number(f.price)));
+        if (!editing) formData.append("stockQuantity", String(Number(f.stockQuantity)));
+        formData.append("maxPerOrder", String(Number(f.maxPerOrder)));
+        formData.append("maxPerDay", String(Number(f.maxPerDay)));
+        formData.append("lowStockThreshold", String(Number(f.lowStockThreshold)));
+        formData.append("isActive", String(f.isActive));
+        formData.append("imageUrl", imageFile);
+        if (extra.length > 0) formData.append("imageUrls", JSON.stringify(extra));
+        return editing ? api<Row>("PATCH /products/{id}", { params: { id: str(product!.id) }, body: formData as any }) : api<Row>("POST /products", { body: formData as any });
+      }
       const imageUrl = f.imageUrl.trim() || null;
       const body: Record<string, unknown> = {
         name: f.name.trim(),
@@ -237,10 +262,21 @@ export function ProductDialog({ product, onClose }: { product: Row | null; onClo
         <Field label="Tối đa / người / ngày" error={show("maxPerDay", true)}>
           <input type="number" min={1} value={f.maxPerDay} onChange={set("maxPerDay")} />
         </Field>
-        <Field label="URL ảnh chính" wide error={show("imageUrl", true)} hint="Dán đường dẫn ảnh (https://…)">
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <ProductThumb url={urlOk(f.imageUrl) ? f.imageUrl : null} size={40} />
-            <input value={f.imageUrl} onChange={set("imageUrl")} placeholder="https://…" />
+        <Field label="Ảnh chính sản phẩm" wide error={show("imageUrl", true)} hint="Chọn tệp ảnh (JPEG, PNG, WEBP, GIF) hoặc dán đường dẫn ảnh">
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <ProductThumb url={imagePreview || (urlOk(f.imageUrl) ? f.imageUrl : null)} size={44} />
+            <input type="file" accept="image/*" onChange={onFileChange} style={{ maxWidth: 220 }} />
+            <span style={{ fontSize: "12px", color: "#888" }}>hoặc dán URL:</span>
+            <input
+              value={f.imageUrl}
+              onChange={(e) => {
+                setImageFile(null);
+                setImagePreview(null);
+                setF({ ...f, imageUrl: e.target.value });
+              }}
+              placeholder="https://…"
+              style={{ flex: 1, minWidth: 160 }}
+            />
           </div>
         </Field>
         <Field label="Ảnh phụ (mỗi dòng một URL)" wide error={show("extraImages", true)}>

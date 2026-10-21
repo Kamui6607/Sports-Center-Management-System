@@ -61,7 +61,7 @@ class _Content extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = profile;
     final c = context.colors;
-    final others = p.courses.where((x) => x.id != currentClassId).toList();
+    final others = p.courses.where((x) => x.id != currentClassId && x.upcomingSessions > 0).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

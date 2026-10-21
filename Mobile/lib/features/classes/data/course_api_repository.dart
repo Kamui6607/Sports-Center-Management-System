@@ -41,11 +41,18 @@ class CourseApiRepository implements CourseRepository {
         'areaType': q.areaType,
         'goal': q.goal,
         if (q.matchMyGoals) 'matchMyGoals': 'true',
+        'hasUpcomingSchedules': 'true',
         'status': 'APPROVED',
         'isActive': 'true',
       },
     );
-    return res.paged((c) => ClassJson.course(c), page: q.page, limit: _pageSize);
+    final paged = res.paged((c) => ClassJson.course(c), page: q.page, limit: _pageSize);
+    return Paged(
+      items: paged.items.where((c) => c.hasAvailableSessions).toList(),
+      page: paged.page,
+      limit: paged.limit,
+      total: paged.total,
+    );
   }
 
   @override

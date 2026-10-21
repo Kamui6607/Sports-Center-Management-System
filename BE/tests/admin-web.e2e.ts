@@ -239,6 +239,30 @@ async function main() {
   check("tồn đầu ghi đúng 1 dòng IN", ledger0.length === 1 && ledger0[0].type === "IN" && ledger0[0].quantity === 12, ledger0.map((l) => l.type));
   const badUrl = await http("POST", "/products", { token: manager.token, body: { name: `${RUN}-x`, description: "xxxxxx", price: -1, stockQuantity: 0, imageUrl: "abc" } });
   check("giá âm / URL ảnh sai ⇒ 400", badUrl.status === 400, badUrl.status);
+
+  // Upload file ảnh sản phẩm (multipart/form-data)
+  const pngBuf = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+  const fileForm = new FormData();
+  fileForm.append("name", `${RUN}-Áo thun`);
+  fileForm.append("description", "Áo thun tập luyện thoáng khí");
+  fileForm.append("price", "250000");
+  fileForm.append("stockQuantity", "15");
+  fileForm.append("imageUrl", new Blob([pngBuf], { type: "image/png" }), "tshirt.png");
+  const prodWithFile = await http("POST", "/products", { token: manager.token, form: fileForm });
+  check("tạo sản phẩm với file ảnh (imageUrl) ⇒ 201, có URL ảnh", prodWithFile.status === 201 && typeof prodWithFile.body.data.imageUrl === "string" && prodWithFile.body.data.imageUrl.includes("/uploads/products/"), prodWithFile.body);
+
+  const imgForm = new FormData();
+  imgForm.append("imageUrl", new Blob([pngBuf], { type: "image/png" }), "upload_test.png");
+  const uploadedImg = await http("POST", "/products/upload-image", { token: manager.token, form: imgForm });
+  check("POST /products/upload-image ⇒ 200, trả imageUrl", uploadedImg.status === 200 && typeof uploadedImg.body.data.imageUrl === "string" && uploadedImg.body.data.imageUrl.includes("/uploads/products/"), uploadedImg.body);
+
+  if (prodWithFile.body?.data?.id) {
+    const patchForm = new FormData();
+    patchForm.append("imageUrl", new Blob([pngBuf], { type: "image/png" }), "tshirt_updated.png");
+    const patchWithFile = await http("PATCH", `/products/${prodWithFile.body.data.id}`, { token: manager.token, form: patchForm });
+    check("PATCH sản phẩm với file ảnh (imageUrl) ⇒ 200, cập nhật URL", patchWithFile.status === 200 && typeof patchWithFile.body.data.imageUrl === "string", patchWithFile.body);
+    await prisma.product.delete({ where: { id: prodWithFile.body.data.id } });
+  }
   const adj = await http("POST", `/shop/manage/inventory/${pid}`, { token: manager.token, body: { type: "ADJUST", quantity: -2, note: "Hư hỏng" } });
   check("điều chỉnh kho ⇒ tồn 10 + dòng ADJUST", adj.status === 200 && adj.body.data.stockQuantity === 10, adj.body);
   const below = await http("POST", `/shop/manage/inventory/${pid}`, { token: manager.token, body: { type: "ADJUST", quantity: -50, note: "Sai" } });

@@ -1,20 +1,48 @@
+const numberCoerce = z.preprocess((val) => {
+  if (typeof val === "string" && val.trim() !== "") {
+    const num = Number(val);
+    if (!Number.isNaN(num)) return num;
+  }
+  return val;
+}, z.number());
+
+const booleanCoerce = z.preprocess((val) => {
+  if (typeof val === "string") {
+    if (val.toLowerCase() === "true") return true;
+    if (val.toLowerCase() === "false") return false;
+  }
+  return val;
+}, z.boolean());
+
+const imageUrlsCoerce = z.preprocess((val) => {
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return val.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  return val;
+}, z.array(z.string().trim().url().max(500)).max(10));
+
 import { z } from "zod";
 
 export const CreateProductSchema = z.object({
   name: z.string().min(2),
   description: z.string().min(5),
-  price: z.number().min(0),
-  stockQuantity: z.number().int().min(0),
-  isActive: z.boolean().default(true),
+  price: numberCoerce.pipe(z.number().min(0)),
+  stockQuantity: numberCoerce.pipe(z.number().int().min(0)),
+  isActive: booleanCoerce.pipe(z.boolean()).default(true),
   /** BE-6: ảnh sản phẩm (URL http/https). */
-  imageUrl: z.string().trim().url().max(500).nullable().optional(),
+  imageUrl: z.string().trim().url().max(500).nullable().optional().or(z.literal("")),
   /** Bộ ảnh phụ. */
-  imageUrls: z.array(z.string().trim().url().max(500)).max(10).optional(),
+  imageUrls: imageUrlsCoerce.optional(),
   /** Giới hạn chống gom hàng: tối đa mỗi đơn / mỗi người mỗi ngày. */
-  maxPerOrder: z.number().int().min(1).max(999).optional(),
-  maxPerDay: z.number().int().min(1).max(9999).optional(),
+  maxPerOrder: numberCoerce.pipe(z.number().int().min(1).max(999)).optional(),
+  maxPerDay: numberCoerce.pipe(z.number().int().min(1).max(9999)).optional(),
   /** Ngưỡng cảnh báo sắp hết hàng. */
-  lowStockThreshold: z.number().int().min(0).max(100000).optional(),
+  lowStockThreshold: numberCoerce.pipe(z.number().int().min(0).max(100000)).optional(),
 });
 
 export const UpdateProductSchema = CreateProductSchema.partial();
