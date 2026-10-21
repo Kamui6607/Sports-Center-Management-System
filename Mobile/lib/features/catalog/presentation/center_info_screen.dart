@@ -48,10 +48,12 @@ class CenterInfoScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ContactCard(center: center),
-                  const SizedBox(height: AppSpacing.lg),
-                  const LocationCard(),
-                  const SizedBox(height: AppSpacing.lg),
+                  // Banner đã có tên, địa chỉ, giờ mở cửa và nút bản đồ ⇒ không lặp lại LocationCard ở đây.
+                  // Không có thông tin liên hệ ⇒ không chừa khoảng trống.
+                  if (_hasContact(center)) ...[
+                    _ContactCard(center: center),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
                   SectionHeader(title: 'Phòng tập (${rooms.length})'),
                   const SizedBox(height: AppSpacing.xs),
                   if (rooms.isEmpty)
@@ -177,15 +179,6 @@ class _CenterHeroBanner extends StatelessWidget {
                       }
                     },
                   ),
-                  if (center.hotline != null)
-                    _HeroChipButton(
-                      icon: AppIcons.phone,
-                      label: 'Gọi ngay',
-                      onTap: () => openExternal(
-                        context,
-                        Uri(scheme: 'tel', path: center.hotline),
-                      ),
-                    ),
                 ],
               ),
             ],
@@ -239,6 +232,10 @@ class _HeroChipButton extends StatelessWidget {
 
 // ─── Contact Card ─────────────────────────────────────────────────────────────
 
+/// Trung tâm có ít nhất một thông tin liên hệ / tiện ích để hiển thị trong [_ContactCard].
+bool _hasContact(CenterInfo center) =>
+    center.hotline != null || center.email != null || center.parkingNote != null || center.description != null;
+
 class _ContactCard extends StatelessWidget {
   const _ContactCard({required this.center});
   final CenterInfo center;
@@ -246,10 +243,8 @@ class _ContactCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final hasContact =
-        center.hotline != null || center.email != null || center.parkingNote != null || center.description != null;
 
-    if (!hasContact) return const SizedBox.shrink();
+    if (!_hasContact(center)) return const SizedBox.shrink();
 
     return AppCard(
       child: Column(
