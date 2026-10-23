@@ -12,6 +12,8 @@ import {
   OUTBOX_FLUSH_INTERVAL_MS,
 } from "./modules/notifications/outbox.service.js";
 import { runShopMaintenance } from "./modules/shop/orders.service.js";
+import { runTermMaintenance } from "./modules/terms/term-notifications.js";
+import { COACH_TERM } from "./config/coach-term.js";
 
 /** Nhịp job cửa hàng: đơn hết hạn thanh toán, quá hạn nhận tại quầy, tự hoàn tất (ms). */
 const PRODUCT_ORDER_EXPIRY_INTERVAL_MS = 60_000;
@@ -56,6 +58,14 @@ async function main() {
     );
   }, PRODUCT_ORDER_EXPIRY_INTERVAL_MS);
   productOrderTimer.unref();
+
+  // Kỳ học của Coach (Doc/COACH_TERMS.md): đánh giá + nhắc + báo cáo Manager. Idempotent (CAS theo bậc nhắc) nên an toàn khi
+  // chạy lặp / nhiều instance. Timer chỉ chạy khi process đang thức — Manager vẫn gọi tay được qua POST /terms/maintenance.
+  const termJob = () =>
+    void runTermMaintenance().catch((err: any) => console.warn("[TERMS] job kỳ học lỗi:", (err as Error).message));
+  const termTimer = setInterval(termJob, COACH_TERM.MAINTENANCE_INTERVAL_MS);
+  termTimer.unref();
+  setTimeout(termJob, 30_000).unref();
 
   server.listen(env.PORT, () => {
     console.log(`Server health running at http://localhost:${env.PORT}/api/v1/health`);

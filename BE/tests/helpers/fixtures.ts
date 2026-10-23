@@ -188,5 +188,6 @@ export async function cleanupRun(): Promise<void> {
   await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.notificationOutbox.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.room.deleteMany({ where: { name: { startsWith: RUN } } });
+  await prisma.academicTerm.deleteMany({ where: { name: { startsWith: RUN } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 }

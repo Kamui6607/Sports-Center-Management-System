@@ -773,6 +773,525 @@
       "404"
     ]
   },
+  "GET /terms": {
+    "path": "/terms",
+    "method": "GET",
+    "summary": "Danh sách kỳ học (năm trước, năm nay, năm sau)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
+    ]
+  },
+  "GET /terms/current": {
+    "path": "/terms/current",
+    "method": "GET",
+    "summary": "Kỳ học hiện tại",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
+    ]
+  },
+  "GET /terms/me": {
+    "path": "/terms/me",
+    "method": "GET",
+    "summary": "COACH — trạng thái của tôi trong kỳ hiện tại",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
+    ]
+  },
+  "GET /terms/me/pass": {
+    "path": "/terms/me/pass",
+    "method": "GET",
+    "summary": "COACH — mã thẻ ra vào (JWT sống ~60 giây, app tự làm mới)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
+    ]
+  },
+  "GET /terms/me/leaves": {
+    "path": "/terms/me/leaves",
+    "method": "GET",
+    "summary": "COACH — đơn nghỉ phép của tôi",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
+    ]
+  },
+  "POST /terms/me/leaves": {
+    "path": "/terms/me/leaves",
+    "method": "POST",
+    "summary": "COACH — xin nghỉ phép/ốm",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "startDate",
+        "endDate",
+        "reason"
+      ],
+      "properties": {
+        "startDate": {
+          "type": "string",
+          "example": "2026-11-02",
+          "description": "YYYY-MM-DD (giờ VN)"
+        },
+        "endDate": {
+          "type": "string",
+          "example": "2026-11-09"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "SICK",
+            "PERSONAL",
+            "OTHER"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 500
+        }
+      }
+    },
+    "statusCodes": [
+      "201",
+      "400",
+      "409"
+    ]
+  },
+  "DELETE /terms/me/leaves/{id}": {
+    "path": "/terms/me/leaves/{id}",
+    "method": "DELETE",
+    "summary": "COACH — hủy đơn nghỉ (đang chờ duyệt, hoặc đã duyệt nhưng chưa bắt đầu)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "404",
+      "409"
+    ]
+  },
+  "GET /terms/leaves": {
+    "path": "/terms/leaves",
+    "method": "GET",
+    "summary": "MANAGER — danh sách đơn nghỉ phép của Coach",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "APPROVED",
+            "REJECTED",
+            "CANCELLED"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "401",
+      "403"
+    ]
+  },
+  "PATCH /terms/leaves/{id}/review": {
+    "path": "/terms/leaves/{id}/review",
+    "method": "PATCH",
+    "summary": "MANAGER — duyệt / từ chối đơn nghỉ phép",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "APPROVE",
+            "REJECT"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 300
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "404",
+      "409"
+    ]
+  },
+  "POST /terms/pass/verify": {
+    "path": "/terms/pass/verify",
+    "method": "POST",
+    "summary": "MANAGER — quét thẻ ra vào của Coach ⇒ hợp lệ hay không (ghi nhật ký)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "token"
+      ],
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "403"
+    ]
+  },
+  "GET /terms/pass/scans": {
+    "path": "/terms/pass/scans",
+    "method": "GET",
+    "summary": "MANAGER — nhật ký quét thẻ Coach",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "valid",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403"
+    ]
+  },
+  "POST /terms/maintenance": {
+    "path": "/terms/maintenance",
+    "method": "POST",
+    "summary": "MANAGER — chạy ngay job nhắc & đánh giá kỳ (cũng chạy định kỳ ở server)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403"
+    ]
+  },
+  "PATCH /terms/{id}": {
+    "path": "/terms/{id}",
+    "method": "PATCH",
+    "summary": "MANAGER — chỉnh số ngày ân hạn của kỳ (0–60)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "graceDays"
+      ],
+      "properties": {
+        "graceDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "404",
+      "409"
+    ]
+  },
+  "GET /terms/{id}/coaches": {
+    "path": "/terms/{id}/coaches",
+    "method": "GET",
+    "summary": "MANAGER — bảng Coach × kỳ (đạt / chưa đạt / chờ / miễn) kèm số liệu",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "state",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "COMPLIANT",
+            "NON_COMPLIANT",
+            "EXEMPT"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "404"
+    ]
+  },
+  "POST /terms/{id}/evaluate": {
+    "path": "/terms/{id}/evaluate",
+    "method": "POST",
+    "summary": "MANAGER — đánh giá và LƯU kết quả cả kỳ (idempotent)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "404"
+    ]
+  },
+  "PUT /terms/{id}/coaches/{coachId}/exempt": {
+    "path": "/terms/{id}/coaches/{coachId}/exempt",
+    "method": "PUT",
+    "summary": "MANAGER — miễn trừ một Coach trong kỳ (kèm lý do)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "path",
+        "name": "coachId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 300
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "404"
+    ]
+  },
+  "DELETE /terms/{id}/coaches/{coachId}/exempt": {
+    "path": "/terms/{id}/coaches/{coachId}/exempt",
+    "method": "DELETE",
+    "summary": "MANAGER — bỏ miễn trừ",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "path",
+        "name": "coachId",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "404"
+    ]
+  },
   "GET /shop/config": {
     "path": "/shop/config",
     "method": "GET",
@@ -3046,8 +3565,8 @@
         },
         "imageUrl": {
           "type": "string",
-          "format": "uri",
-          "nullable": true
+          "format": "binary",
+          "description": "Chọn file ảnh hoặc truyền URL string"
         },
         "imageUrls": {
           "type": "array",
@@ -3327,6 +3846,21 @@
     },
     "statusCodes": [
       "201"
+    ]
+  },
+  "POST /products/upload-image": {
+    "path": "/products/upload-image",
+    "method": "POST",
+    "summary": "Upload product image file (Manager only)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
     ]
   },
   "POST /payments": {

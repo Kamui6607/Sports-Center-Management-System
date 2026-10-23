@@ -2,7 +2,7 @@
 
 Source: docs/openapi.json — exported from the checked-out backend with `cd BE && npm run openapi:export` (`--live` downloads https://sports-center-management-system.onrender.com/api/v1/docs/swagger-ui-init.js instead; do not use it for an unreleased local backend).
 
-Snapshot: 2026-10-19. Production base: https://sports-center-management-system.onrender.com/api/v1
+Snapshot: 2026-10-23. Production base: https://sports-center-management-system.onrender.com/api/v1
 
 Response examples are documentation only, never application data. The client sends the documented HTTP Bearer token.
 
@@ -1929,6 +1929,959 @@ Responses/status codes:
         }
       }
     }
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /terms
+Danh sách kỳ học (năm trước, năm nay, năm sau)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "[{ id, name, year, seq, startDate, endDate, graceDays, graceDeadline, phase, daysToStart, daysToEnd }]"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /terms/current
+Kỳ học hiện tại
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Kỳ chứa thời điểm hiện tại (giờ Việt Nam)"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /terms/me
+COACH — trạng thái của tôi trong kỳ hiện tại
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /terms/me/pass
+COACH — mã thẻ ra vào (JWT sống ~60 giây, app tự làm mới)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /terms/me/leaves
+COACH — đơn nghỉ phép của tôi
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## POST /terms/me/leaves
+COACH — xin nghỉ phép/ốm
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "startDate",
+    "endDate",
+    "reason"
+  ],
+  "properties": {
+    "startDate": {
+      "type": "string",
+      "example": "2026-11-02",
+      "description": "YYYY-MM-DD (giờ VN)"
+    },
+    "endDate": {
+      "type": "string",
+      "example": "2026-11-09"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "SICK",
+        "PERSONAL",
+        "OTHER"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 500
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "201": {
+    "description": "Created"
+  },
+  "400": {
+    "description": "Bad request (validation or malformed body)",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Validation failed",
+            "errors": [
+              {
+                "field": "email",
+                "message": "Invalid email address"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "409": {
+    "description": "LEAVE_OVERLAP — trùng đơn nghỉ khác"
+  }
+}
+```
+
+## DELETE /terms/me/leaves/{id}
+COACH — hủy đơn nghỉ (đang chờ duyệt, hoặc đã duyệt nhưng chưa bắt đầu)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  },
+  "409": {
+    "description": "LEAVE_NOT_CANCELLABLE"
+  }
+}
+```
+
+## GET /terms/leaves
+MANAGER — danh sách đơn nghỉ phép của Coach
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "query",
+    "name": "status",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "APPROVED",
+        "REJECTED",
+        "CANCELLED"
+      ]
+    }
+  },
+  {
+    "in": "query",
+    "name": "page",
+    "schema": {
+      "type": "integer"
+    }
+  },
+  {
+    "in": "query",
+    "name": "limit",
+    "schema": {
+      "type": "integer"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "401": {
+    "description": "Missing, invalid or expired token",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Unauthorized: invalid or expired token"
+          }
+        }
+      }
+    }
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## PATCH /terms/leaves/{id}/review
+MANAGER — duyệt / từ chối đơn nghỉ phép
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "action"
+  ],
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "APPROVE",
+        "REJECT"
+      ]
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 300
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  },
+  "409": {
+    "description": "LEAVE_ALREADY_REVIEWED"
+  }
+}
+```
+
+## POST /terms/pass/verify
+MANAGER — quét thẻ ra vào của Coach ⇒ hợp lệ hay không (ghi nhật ký)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "token"
+  ],
+  "properties": {
+    "token": {
+      "type": "string"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "400": {
+    "description": "PASS_EXPIRED | PASS_INVALID"
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /terms/pass/scans
+MANAGER — nhật ký quét thẻ Coach
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "query",
+    "name": "valid",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "true",
+        "false"
+      ]
+    }
+  },
+  {
+    "in": "query",
+    "name": "page",
+    "schema": {
+      "type": "integer"
+    }
+  },
+  {
+    "in": "query",
+    "name": "limit",
+    "schema": {
+      "type": "integer"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## POST /terms/maintenance
+MANAGER — chạy ngay job nhắc & đánh giá kỳ (cũng chạy định kỳ ở server)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## PATCH /terms/{id}
+MANAGER — chỉnh số ngày ân hạn của kỳ (0–60)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "graceDays"
+  ],
+  "properties": {
+    "graceDays": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 60
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  },
+  "409": {
+    "description": "Kỳ đã kết thúc"
+  }
+}
+```
+
+## GET /terms/{id}/coaches
+MANAGER — bảng Coach × kỳ (đạt / chưa đạt / chờ / miễn) kèm số liệu
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "in": "query",
+    "name": "state",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "COMPLIANT",
+        "NON_COMPLIANT",
+        "EXEMPT"
+      ]
+    }
+  },
+  {
+    "in": "query",
+    "name": "search",
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## POST /terms/{id}/evaluate
+MANAGER — đánh giá và LƯU kết quả cả kỳ (idempotent)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ term, summary, evaluatedAt }"
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## PUT /terms/{id}/coaches/{coachId}/exempt
+MANAGER — miễn trừ một Coach trong kỳ (kèm lý do)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "in": "path",
+    "name": "coachId",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "reason"
+  ],
+  "properties": {
+    "reason": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 300
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## DELETE /terms/{id}/coaches/{coachId}/exempt
+MANAGER — bỏ miễn trừ
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "in": "path",
+    "name": "coachId",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
   },
   "404": {
     "description": "Resource not found",
@@ -6071,8 +7024,8 @@ Request body:
     },
     "imageUrl": {
       "type": "string",
-      "format": "uri",
-      "nullable": true
+      "format": "binary",
+      "description": "Chọn file ảnh hoặc truyền URL string"
     },
     "imageUrls": {
       "type": "array",
@@ -6577,6 +7530,28 @@ Responses/status codes:
 {
   "201": {
     "description": "Created"
+  }
+}
+```
+
+## POST /products/upload-image
+Upload product image file (Manager only)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
   }
 }
 ```

@@ -48,6 +48,7 @@ class MockDatabase {
   final inventoryTxs = <InventoryTxRow>[];
   final membershipPlans = <MembershipPlanRow>[];
   final memberships = <MembershipRow>[];
+  final coachLeaves = <CoachLeaveRow>[];
 
   /// Khóa đặt hàng do để đơn hết hạn nhiều lần (userId ⇒ mở lại lúc).
   final checkoutLocks = <String, DateTime>{};

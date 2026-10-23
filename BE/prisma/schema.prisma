@@ -257,6 +257,10 @@ model CoachProfile {
   wallet        CoachWallet?
   trainingPlans TrainingPlan[]
   feedbacks     CoachFeedback[]
+  /// Kết quả "đạt kỳ" theo từng kỳ học, đơn xin nghỉ phép và nhật ký quét thẻ Coach.
+  termStatuses  CoachTermStatus[]
+  leaves        CoachLeave[]
+  passScans     CoachPassScan[]
 }
 
 /// Hồ sơ chứng nhận HLV (CV) để Manager xét duyệt — 1–1 với CoachProfile.
@@ -1321,4 +1325,117 @@ model CenterSetting {
   description  String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now()) @updatedAt
+}
+
+// ── Kỳ học & quyền lợi của Coach (Doc/COACH_TERMS.md) ──────────────────────────
+// Quyền tập gym miễn phí của Coach gắn với việc dạy thật: mỗi kỳ (4 tháng, 3 kỳ/năm) Coach phải
+// có khóa học hợp lệ trong hạn ân hạn và dạy đủ buổi. Hệ thống chỉ ĐÁNH GIÁ + BÁO CÁO + NHẮC;
+// việc từ chối vào cửa do người quét thẻ Coach quyết định (không tự khóa tài khoản).
+
+enum CoachTermState {
+  /// Chưa đủ điều kiện nhưng còn trong thời gian (trước hạn ân hạn hoặc kỳ chưa kết thúc).
+  PENDING
+  COMPLIANT
+  NON_COMPLIANT
+  /// Được miễn kỳ (Manager miễn trừ hoặc nghỉ phép được duyệt ≥ 50% kỳ).
+  EXEMPT
+}
+
+enum CoachLeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// Kỳ học: 3 kỳ/năm dương lịch (T1–4, T5–8, T9–12), tạo tự động. Mốc thời gian theo giờ Việt Nam.
+model AcademicTerm {
+  id        String   @id @default(uuid())
+  /// VD "Kỳ 3/2026".
+  name      String
+  year      Int
+  /// Thứ tự kỳ trong năm: 1..3.
+  seq       Int
+  /// 00:00 giờ VN của ngày đầu kỳ.
+  startDate DateTime
+  /// 23:59:59.999 giờ VN của ngày cuối kỳ.
+  endDate   DateTime
+  /// Số ngày ân hạn kể từ đầu kỳ để Coach có khóa học hợp lệ.
+  graceDays Int      @default(14)
+  /// Bậc báo cáo tổng hợp đã gửi cho Manager (0 = chưa gửi) — chống gửi trùng.
+  managerReportStage Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  coachStatuses CoachTermStatus[]
+
+  @@unique([year, seq])
+  @@index([startDate, endDate])
+}
+
+/// Kết quả đánh giá của một Coach trong một kỳ (1 dòng / Coach × kỳ), ghi lại khi chạy đánh giá.
+model CoachTermStatus {
+  id          String         @id @default(uuid())
+  termId      String
+  term        AcademicTerm   @relation(fields: [termId], references: [id], onDelete: Cascade)
+  coachId     String
+  coach       CoachProfile   @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  state       CoachTermState @default(PENDING)
+  /// Manager miễn trừ thủ công — đánh giá tự động không ghi đè.
+  manualExempt Boolean       @default(false)
+  exemptReason String?
+  exemptBy     String?
+  exemptAt     DateTime?
+  /// Ảnh chụp số liệu lúc đánh giá (số buổi, tỷ lệ, lý do...).
+  metrics     Json?
+  evaluatedAt DateTime?
+  /// Bậc nhắc cuối đã gửi cho Coach (0 = chưa gửi) — chống gửi trùng.
+  lastReminderStage Int       @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @default(now()) @updatedAt
+
+  @@unique([termId, coachId])
+  @@index([termId, state])
+  @@index([coachId])
+}
+
+/// Đơn xin nghỉ phép/ốm của Coach — nghỉ được duyệt: gia hạn ân hạn, không tính buổi hủy trong thời gian nghỉ,
+/// nghỉ ≥ 50% kỳ thì miễn cả kỳ.
+model CoachLeave {
+  id         String           @id @default(uuid())
+  coachId    String
+  coach      CoachProfile     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  /// 00:00 giờ VN của ngày bắt đầu nghỉ.
+  startDate  DateTime
+  /// 23:59:59.999 giờ VN của ngày kết thúc nghỉ.
+  endDate    DateTime
+  /// SICK | PERSONAL | OTHER.
+  kind       String           @default("PERSONAL")
+  reason     String
+  status     CoachLeaveStatus @default(PENDING)
+  reviewedBy String?
+  reviewedAt DateTime?
+  reviewNote String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @default(now()) @updatedAt
+
+  @@index([coachId, status])
+  @@index([status, createdAt])
+}
+
+/// Nhật ký quét thẻ Coach ở cửa (người quét là Manager) — để đối chiếu, không dùng để tự động khóa.
+model CoachPassScan {
+  id        String          @id @default(uuid())
+  coachId   String
+  coach     CoachProfile    @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  scannedBy String
+  valid     Boolean
+  state     CoachTermState?
+  termId    String?
+  reason    String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @default(now()) @updatedAt
+
+  @@index([coachId, createdAt])
+  @@index([createdAt])
 }

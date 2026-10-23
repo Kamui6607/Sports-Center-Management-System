@@ -81,6 +81,9 @@ abstract final class AppRoutes {
   static String coachPlan(String planId) => '/coach/training/$planId';
   static const withdraw = '/coach/withdraw';
   static const coachFeedback = '/coach/feedback';
+  static const coachTerm = '/coach/term';
+  static const coachLeaveForm = '/coach/term/leave';
+  static const coachPass = '/coach/pass';
 
   // Manager — tab
   static const managerHome = '/r/home';

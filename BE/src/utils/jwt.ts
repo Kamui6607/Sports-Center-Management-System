@@ -39,7 +39,10 @@ export function signRefreshToken(payload: JwtPayload): string {
 }
 
 export function verifyAccessToken(token: string): JwtPayload {
-  return jwt.verify(token, env.JWT_ACCESS_SECRET) as JwtPayload;
+  const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as Partial<JwtPayload>;
+  // JWT_ACCESS_SECRET còn ký QR điểm danh và thẻ Coach — chỉ token có đủ id + role mới là access token.
+  if (typeof payload.id !== "string" || typeof payload.role !== "string") throw new Error("Invalid access token payload");
+  return payload as JwtPayload;
 }
 
 export function verifyRefreshToken(token: string): JwtPayload {

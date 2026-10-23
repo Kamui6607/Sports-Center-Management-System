@@ -12,6 +12,9 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../auth/presentation/providers/session_provider.dart';
 import '../../../schedule/presentation/widgets/next_session_card.dart';
 import '../../../schedule/presentation/widgets/session_tile.dart';
+import '../../../term/domain/entities/coach_term.dart';
+import '../../../term/presentation/providers/term_providers.dart';
+import '../../../term/presentation/term_labels.dart';
 import '../../domain/entities/coach_dashboard.dart';
 import '../providers/coach_providers.dart';
 
@@ -48,6 +51,7 @@ class CoachHomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             _NextTeaching(dashboard: d),
+            const _TermCard(),
             const SizedBox(height: AppSpacing.md),
             KpiGrid(
               children: [
@@ -107,6 +111,67 @@ class CoachHomeScreen extends ConsumerWidget {
                   ),
                 ),
             const SizedBox(height: AppSpacing.xl),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tóm tắt kỳ học hiện tại (đạt / chờ / chưa đạt) — bấm để xem chi tiết, thẻ ra vào, nghỉ phép.
+/// Lỗi tải hoặc hồ sơ chưa duyệt ⇒ ẩn (không làm hỏng màn tổng quan).
+class _TermCard extends ConsumerWidget {
+  const _TermCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(coachTermStatusProvider).value;
+    final ev = status?.evaluation;
+    if (status == null || !status.eligible || ev == null) return const SizedBox.shrink();
+    final label = termStateLabel(ev.state);
+    final c = context.colors;
+    final needsCourse = !ev.registration.ok && ev.state != CoachTermState.exempt;
+    final String hint;
+    if (needsCourse) {
+      hint = ev.state == CoachTermState.nonCompliant
+          ? 'Chưa có khóa học hợp lệ — thẻ ra vào có thể bị từ chối.'
+          : 'Cần tạo khóa học hợp lệ trước ${VnTime.date(ev.lastDay)}.';
+    } else if (ev.warnings.isNotEmpty) {
+      hint = ev.warnings.first;
+    } else {
+      hint = ev.reasons.isEmpty ? '' : ev.reasons.first;
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: AppCard(
+        onTap: () => context.push(AppRoutes.coachTerm),
+        semanticLabel: 'Kỳ học và quyền lợi HLV',
+        child: Row(
+          children: [
+            const IconTile(AppIcons.membership),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(child: Text(status.term.name, style: context.text.bodyStrong)),
+                      const SizedBox(width: AppSpacing.xs),
+                      label.tag(dense: true),
+                    ],
+                  ),
+                  if (hint.isNotEmpty)
+                    Text(
+                      hint,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.caption.copyWith(color: c.textMuted),
+                    ),
+                ],
+              ),
+            ),
+            Icon(AppIcons.chevronRight, color: c.textMuted),
           ],
         ),
       ),

@@ -73,6 +73,10 @@ type BaseEntityModels = {
   MembershipPlan: Models.MembershipPlan;
   Membership: Models.Membership;
   CenterSetting: Models.CenterSetting;
+  AcademicTerm: Models.AcademicTerm;
+  CoachTermStatus: Models.CoachTermStatus;
+  CoachLeave: Models.CoachLeave;
+  CoachPassScan: Models.CoachPassScan;
 };
 
 // ── Kiểm tra lúc biên dịch (không sinh code chạy) ────────────────────────────

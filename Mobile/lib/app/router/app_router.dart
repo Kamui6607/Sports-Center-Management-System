@@ -58,6 +58,9 @@ import '../../features/shop/presentation/screens/manager_order_screens.dart';
 import '../../features/shop/presentation/screens/order_detail_screen.dart';
 import '../../features/shop/presentation/screens/orders_screen.dart';
 import '../../features/shop/presentation/screens/pickup_scan_screen.dart';
+import '../../features/term/presentation/screens/coach_leave_form_screen.dart';
+import '../../features/term/presentation/screens/coach_pass_screen.dart';
+import '../../features/term/presentation/screens/coach_term_screen.dart';
 import '../../features/training/presentation/training_screens.dart';
 import '../shell/role_shell.dart';
 import 'app_routes.dart';
@@ -185,6 +188,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       page('/coach/training/:id', (s) => TrainingPlanScreen(planId: s.pathParameters['id']!, coachMode: true)),
       page(AppRoutes.withdraw, (_) => const WithdrawScreen()),
       page(AppRoutes.coachFeedback, (_) => const CoachFeedbackScreen()),
+      page(AppRoutes.coachTerm, (_) => const CoachTermScreen()),
+      page(AppRoutes.coachLeaveForm, (_) => const CoachLeaveFormScreen()),
+      page(AppRoutes.coachPass, (_) => const CoachPassScreen()),
 
       // ── Manager (bản rút gọn) ────────────────────────────────────────
       StatefulShellRoute.indexedStack(

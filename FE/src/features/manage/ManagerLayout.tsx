@@ -55,6 +55,7 @@ const RefundsPage = lazy(() => import("./pages/RefundsPage"));
 const WithdrawalsPage = lazy(() => import("./pages/WithdrawalsPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
 const CenterSettingsPage = lazy(() => import("./pages/CenterSettingsPage"));
+const TermsPage = lazy(() => import("./pages/TermsPage"));
 
 type NavItem = [path: string, label: string, icon: LucideIcon];
 type NavGroup = { title: string; icon: LucideIcon; items: NavItem[] };
@@ -66,6 +67,7 @@ const NAV: NavGroup[] = [
     items: [
       ["users", "Người dùng", Users],
       ["coaches", "Huấn luyện viên", Dumbbell],
+      ["terms", "Kỳ học & quyền lợi HLV", CalendarClock],
     ],
   },
   {
@@ -429,6 +431,7 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
               <Route path="/manager/users/:id" element={<UserDetail selfId={user.id} />} />
               <Route path="/manager/coaches" element={<CoachesPage />} />
               <Route path="/manager/coaches/:id" element={<CoachDetail />} />
+              <Route path="/manager/terms" element={<TermsPage />} />
               <Route path="/manager/rooms" element={<RoomsPage />} />
               <Route path="/manager/rooms/:id" element={<RoomDetail />} />
               <Route path="/manager/classes" element={<ClassesPage />} />
