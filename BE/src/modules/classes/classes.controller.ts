@@ -1,0 +1,98 @@
+import { Request, Response, NextFunction } from "express";
+import * as classesService from "./classes.service.js";
+import { sendSuccess, sendCreated } from "../../utils/response.js";
+import { resubmitActivityPlan } from "../class-schedules/class-schedules.service.js";
+import { getClassStudents } from "./class-summary.service.js";
+
+export async function listClasses(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.user ? { id: req.user.id, role: req.user.role } : undefined;
+    const { classes, pagination } = await classesService.listClasses(req.query, actor);
+    sendSuccess(res, classes, "Classes retrieved successfully", 200, pagination);
+  } catch (err) { next(err); }
+}
+export async function createClass(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = { id: req.user!.id, role: req.user!.role };
+    const cls = await classesService.createClass(req.body, actor);
+    sendCreated(res, cls, "Class created successfully");
+  } catch (err) { next(err); }
+}
+export async function reviewClass(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { action, reason } = req.body;
+    const cls = await classesService.reviewClass(req.params.id as string, action, reason);
+    const msg = action === "APPROVE" ? "Class approved successfully" : "Class rejected";
+    sendSuccess(res, cls, msg);
+  } catch (err) { next(err); }
+}
+export async function getClassById(req: Request, res: Response, next: NextFunction) {
+  try {
+    const cls = await classesService.getClassById(req.params.id as string, req.user);
+    sendSuccess(res, cls, "Class retrieved successfully");
+  } catch (err) { next(err); }
+}
+export async function getClassCoursePlan(req: Request, res: Response, next: NextFunction) {
+  try {
+    const plan = await classesService.getClassCoursePlan(req.params.id as string, req.user);
+    sendSuccess(res, plan, "Class course plan retrieved successfully");
+  } catch (err) { next(err); }
+}
+export async function updateClass(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = { id: req.user!.id, role: req.user!.role };
+    const cls = await classesService.updateClass(req.params.id as string, req.body, actor);
+    sendSuccess(res, cls, "Class updated successfully");
+  } catch (err) { next(err); }
+}
+export async function deleteClass(req: Request, res: Response, next: NextFunction) {
+  try {
+    const cls = await classesService.deleteClass(req.params.id as string);
+    sendSuccess(res, cls, "Class deactivated successfully");
+  } catch (err) { next(err); }
+}
+export async function listFitness(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const fitness = await classesService.listFitness();
+    sendSuccess(res, fitness, "Fitness list retrieved successfully");
+  } catch (err) { next(err); }
+}
+export async function resubmitClass(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = { id: req.user!.id, role: req.user!.role };
+    const result = await resubmitActivityPlan(req.params.id as string, req.body, actor);
+    sendSuccess(res, result, "Class resubmitted for review");
+  } catch (err) { next(err); }
+}
+export async function listClassStudents(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await getClassStudents(req.params.id as string, req.user!);
+    sendSuccess(res, result, "Class students retrieved successfully");
+  } catch (err) { next(err); }
+}
+
+export async function listGoalOptions(_req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, classesService.listGoalOptions(), "Danh mục mục tiêu tập luyện");
+  } catch (err) { next(err); }
+}
+export async function createDraft(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendCreated(res, await classesService.createDraft(req.body, req.user!), "Đã lưu bản nháp");
+  } catch (err) { next(err); }
+}
+export async function updateDraft(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await classesService.updateDraft(req.params.id as string, req.body, req.user!), "Đã lưu bản nháp");
+  } catch (err) { next(err); }
+}
+export async function deleteDraft(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await classesService.deleteDraft(req.params.id as string, req.user!), "Đã xóa bản nháp");
+  } catch (err) { next(err); }
+}
+export async function submitDraft(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await classesService.submitDraft(req.params.id as string, req.body, req.user!), "Đã gửi khóa học chờ duyệt");
+  } catch (err) { next(err); }
+}

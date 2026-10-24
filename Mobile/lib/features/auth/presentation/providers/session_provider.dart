@@ -1,0 +1,92 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/config/env.dart';
+import '../../../../core/data/data_revision.dart';
+import '../../../../core/error/app_failure.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/realtime_client.dart';
+import '../../data/auth_repository_provider.dart';
+import '../../domain/entities/app_user.dart';
+import '../../domain/entities/auth_models.dart';
+
+/// Phiên đăng nhập hiện tại (null = Guest). Router lắng nghe provider này để
+/// điều hướng theo vai trò / trạng thái duyệt CV.
+final sessionProvider = AsyncNotifierProvider<SessionNotifier, AuthSession?>(SessionNotifier.new);
+
+class SessionNotifier extends AsyncNotifier<AuthSession?> {
+  @override
+  Future<AuthSession?> build() {
+    // Refresh token thất bại / tài khoản bị khóa ⇒ xóa phiên, router đưa về Đăng nhập.
+    ref.listen(sessionExpiredProvider, (_, _) {
+      if (state.value != null) {
+        state = const AsyncData(null);
+        ref.read(dataRevisionProvider.notifier).bump();
+      }
+    });
+    return _restore();
+  }
+
+  /// App Mobile dành cho Member & Coach; Manager quản lý trên Web (Doc/GYM_SCOPE_CHANGES.md).
+  /// Chế độ mock vẫn cho vào màn Manager rút gọn để demo/test giao diện.
+  static bool _blockedOnMobile(AuthSession s) => s.user.role == UserRole.manager && !Env.useMock;
+
+  static const managerUseWebMessage =
+      'Tài khoản Quản lý vui lòng đăng nhập trang Web quản trị. Ứng dụng di động dành cho Học viên và Huấn luyện viên.';
+
+  Future<AuthSession?> _restore() async {
+    final session = await ref.read(authRepositoryProvider).restoreSession();
+    if (session != null && _blockedOnMobile(session)) {
+      await ref.read(authRepositoryProvider).logout().catchError((_) {});
+      return null;
+    }
+    return session;
+  }
+
+  Future<AuthSession> login(String email, String password) async {
+    final session = await ref.read(authRepositoryProvider).login(email, password);
+    if (_blockedOnMobile(session)) {
+      await ref.read(authRepositoryProvider).logout().catchError((_) {});
+      throw const AppFailure.forbidden(managerUseWebMessage);
+    }
+    state = AsyncData(session);
+    ref.read(dataRevisionProvider.notifier).bump();
+    return session;
+  }
+
+  /// Member ⇒ trả null (đăng nhập lại); Coach ⇒ phiên tạm để nộp CV.
+  Future<AuthSession?> register(RegisterInput input) async {
+    final session = await ref.read(authRepositoryProvider).register(input);
+    if (session != null) state = AsyncData(session);
+    return session;
+  }
+
+  Future<void> logout() async {
+    try {
+      await ref.read(authRepositoryProvider).logout();
+    } finally {
+      // Đóng kết nối realtime của phiên cũ (không còn token).
+      ref.read(realtimeClientProvider).disconnect();
+      state = const AsyncData(null);
+      ref.read(dataRevisionProvider.notifier).bump();
+    }
+  }
+
+  /// Tải lại hồ sơ (sau khi nộp CV, được duyệt...).
+  Future<void> refresh() async {
+    final session = await ref.read(authRepositoryProvider).refreshMe();
+    state = AsyncData(session);
+  }
+
+  void updateUser(AppUser user) {
+    final current = state.value;
+    if (current != null) state = AsyncData(current.copyWith(user: user));
+  }
+
+  void updateCertification(Certification certification) {
+    final current = state.value;
+    if (current != null) state = AsyncData(current.copyWith(certification: certification));
+  }
+}
+
+/// Người dùng hiện tại (null = Guest / đang tải).
+final currentUserProvider = Provider<AppUser?>((ref) => ref.watch(sessionProvider).value?.user);

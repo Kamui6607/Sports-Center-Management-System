@@ -1,0 +1,315 @@
+import '../../../core/error/app_failure.dart';
+import '../../../core/utils/money.dart';
+import '../../../mock/mock_server.dart';
+import '../../../mock/mock_tables.dart';
+import '../../auth/domain/entities/app_user.dart';
+import '../../coach/domain/entities/wallet.dart';
+import '../../notifications/domain/entities/app_notification.dart';
+import '../../payments/domain/entities/payment.dart';
+import '../../schedule/domain/entities/session.dart';
+import '../domain/entities/refund.dart';
+import '../domain/repositories/refund_repository.dart';
+
+/// Mock theo `BE/src/modules/refunds`.
+class RefundMockRepository implements RefundRepository {
+  RefundMockRepository(this._server);
+
+  final MockServer _server;
+
+  /// Hạn hủy khóa được hoàn 100%: ≥ 3 ngày trước buổi khai giảng (mock không hỗ trợ hoàn ngoại lệ).
+  static const cancelWindow = Duration(days: 3);
+
+  Refund _toRefund(MockDatabase db, RefundRow r) {
+    final orderId = r.orderId;
+    if (orderId != null) {
+      final o = db.shopOrders.firstWhere((x) => x.id == orderId);
+      return Refund(
+        id: r.id,
+        classId: '',
+        className: 'Đơn hàng ${o.code}',
+        reason: r.reason,
+        amount: r.amount,
+        coachDebitAmount: 0,
+        status: r.status,
+        createdAt: r.createdAt,
+        memberName: db.user(o.userId).fullName,
+        coachName: '',
+        note: r.note,
+        processedAt: r.processedAt,
+        processedNote: r.processedNote,
+        rejectReason: r.rejectReason,
+        paidAmount: db.payments.firstWhere((p) => p.id == r.paymentId).amount,
+        orderId: o.id,
+        orderCode: o.code,
+        bankInfo: null,
+      );
+    }
+    final c = db.classRow(r.classId!);
+    return Refund(
+      id: r.id,
+      classId: c.id,
+      className: c.name,
+      reason: r.reason,
+      amount: r.amount,
+      coachDebitAmount: r.coachDebitAmount,
+      status: r.status,
+      createdAt: r.createdAt,
+      memberName: db.userOfMember(r.memberProfileId!).fullName,
+      coachName: db.userOfCoach(c.coachProfileId).fullName,
+      sessionStart: r.scheduleId == null ? null : db.session(r.scheduleId!).start,
+      note: r.note,
+      processedAt: r.processedAt,
+      processedNote: r.processedNote,
+      rejectReason: r.rejectReason,
+      paidAmount: db.payments.firstWhere((p) => p.id == r.paymentId).amount,
+      bankInfo: null,
+    );
+  }
+
+  CancellationEligibility _eligibility(MockDatabase db, String memberId, String classId) {
+    final payment = db.coursePayment(memberId, classId);
+    if (payment == null) {
+      return const CancellationEligibility(
+        allowed: false,
+        paidAmount: 0,
+        estimatedRefund: 0,
+        blockReason: 'Bạn chưa mua khóa học này.',
+      );
+    }
+    final remaining = payment.amount - db.refundedOf(payment.id);
+    final first = db.mainSessionsOf(classId).where((s) => s.status != ScheduleStatus.cancelled).firstOrNull;
+    final deadline = first?.start.subtract(cancelWindow);
+    String? block;
+    if (db.refunds.any(
+      (r) =>
+          r.paymentId == payment.id && r.reason == RefundReason.memberCancelCourse && r.status == RefundStatus.pending,
+    )) {
+      block = 'Bạn đã gửi yêu cầu hủy khóa, đang chờ Quản lý duyệt.';
+    } else if (deadline == null || !db.now().isBefore(deadline)) {
+      block = 'Đã quá hạn hủy khóa được hoàn tiền (phải trước buổi khai giảng ít nhất 3 ngày).';
+    } else if (remaining <= 0) {
+      block = 'Giao dịch đã được hoàn hết.';
+    }
+    return CancellationEligibility(
+      allowed: block == null,
+      paidAmount: payment.amount,
+      estimatedRefund: remaining.clamp(0, payment.amount),
+      deadline: deadline,
+      blockReason: block,
+    );
+  }
+
+  @override
+  Future<CancellationEligibility> eligibility(String classId) =>
+      _server.run(() => _eligibility(_server.db, _server.requireMember().id, classId));
+
+  @override
+  Future<CancellationResult> requestCancellation(
+    String classId, {
+    String? note,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+    bool lateRefund = false,
+  }) => _server.run(() {
+    final db = _server.db;
+    final member = _server.requireMember();
+    final e = _eligibility(db, member.id, classId);
+    if (!e.allowed) throw AppFailure.business(e.blockReason!, code: 'CANCELLATION_NOT_ALLOWED');
+    final payment = db.coursePayment(member.id, classId)!;
+    final cls = db.classRow(classId);
+    final row = RefundRow(
+      id: db.nextId('rf'),
+      paymentId: payment.id,
+      memberProfileId: member.id,
+      classId: classId,
+      reason: RefundReason.memberCancelCourse,
+      amount: e.estimatedRefund,
+      coachDebitAmount: (e.estimatedRefund * MockDatabase.coachShare).round(),
+      walletId: db.walletOf(cls.coachProfileId).id,
+      createdAt: db.now(),
+      note: note?.trim().isEmpty ?? true ? null : note!.trim(),
+    );
+    db.refunds.add(row);
+    final memberName = db.userOfMember(member.id).fullName;
+    db.notify(
+      db.userOfCoach(cls.coachProfileId).id,
+      NotificationType.paymentRefunded,
+      'Yêu cầu hoàn tiền mới',
+      '$memberName yêu cầu hủy khóa "${cls.name}". Tiền đang được tạm giữ.',
+      metadata: {'classId': classId},
+    );
+    db.notifyManagers(
+      'Yêu cầu hoàn tiền mới',
+      '$memberName yêu cầu hủy khóa "${cls.name}".',
+      metadata: {'refundId': row.id},
+    );
+    return CancellationResult(mode: CancellationMode.refundRequested, refund: _toRefund(db, row));
+  });
+
+  @override
+  Future<List<Refund>> myRefunds() => _server.run(() {
+    final db = _server.db;
+    final u = _server.requireUser();
+    final member = db.memberOfUser(u.id);
+    return db.refunds
+        .where((r) => r.buyerUserId == u.id || (member != null && r.memberProfileId == member.id))
+        .map((r) => _toRefund(db, r))
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  });
+
+  @override
+  Future<Refund> refund(String id) => _server.run(() {
+    final db = _server.db;
+    final u = _server.requireUser();
+    final r = db.refunds.where((x) => x.id == id).firstOrNull;
+    if (r == null) throw const AppFailure.notFound('Không tìm thấy yêu cầu hoàn tiền.');
+    final owner =
+        r.buyerUserId == u.id || (r.memberProfileId != null && db.memberOfUser(u.id)?.id == r.memberProfileId);
+    if (u.role != UserRole.manager && !owner) {
+      throw const AppFailure.forbidden();
+    }
+    return _toRefund(db, r);
+  });
+
+  @override
+  Future<void> cancelRequest(String refundId) => _server.run(() {
+    final db = _server.db;
+    final u = _server.requireUser();
+    final r = db.refunds.where((x) => x.id == refundId).firstOrNull;
+    if (r == null) throw const AppFailure.notFound('Không tìm thấy yêu cầu hoàn tiền.');
+    final member = db.memberOfUser(u.id);
+    final isOwner = r.buyerUserId == u.id || (member != null && r.memberProfileId == member.id);
+    if (!isOwner) throw const AppFailure.forbidden();
+    if (r.status != RefundStatus.pending) {
+      throw const AppFailure.business('Chỉ có thể hủy yêu cầu đang chờ duyệt.');
+    }
+    r.status = RefundStatus.cancelled;
+  });
+
+  @override
+  Future<List<Refund>> all({RefundStatus? status}) => _server.run(() {
+    final db = _server.db;
+    _server.requireRole(UserRole.manager);
+    return db.refunds.where((r) => status == null || r.status == status).map((r) => _toRefund(db, r)).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  });
+
+  RefundRow _pending(String id) {
+    _server.requireRole(UserRole.manager);
+    final r = _server.db.refunds.where((x) => x.id == id).firstOrNull;
+    if (r == null) throw const AppFailure.notFound('Không tìm thấy yêu cầu hoàn tiền.');
+    if (r.status != RefundStatus.pending) throw const AppFailure.business('Yêu cầu đã được xử lý.');
+    return r;
+  }
+
+  @override
+  Future<void> approve(String id, {String? transactionRef}) => _server.run(() {
+    final db = _server.db;
+    final r = _pending(id);
+    final now = db.now();
+    r
+      ..status = RefundStatus.completed
+      ..processedAt = now
+      ..processedNote = transactionRef?.trim().isEmpty ?? true ? null : transactionRef!.trim();
+    if (r.orderId != null) {
+      // Hoàn tiền đơn hàng: không trừ ví HLV; đơn → REFUNDED (+ trả hàng về kho nếu chưa giao).
+      db.onOrderRefundApproved(r);
+      db.notify(
+        r.buyerUserId!,
+        NotificationType.paymentRefunded,
+        'Đã hoàn tiền',
+        'Đơn hàng đã được hoàn ${Money.format(r.amount)}.',
+        metadata: {'refundId': r.id, 'orderId': r.orderId!},
+      );
+      return;
+    }
+    // Trừ ví HLV đúng tỷ lệ đã nhận.
+    final wallet = db.wallets.firstWhere((w) => w.id == r.walletId);
+    final classId = r.classId!;
+    final memberProfileId = r.memberProfileId!;
+    wallet.balance -= r.coachDebitAmount;
+    db.walletTxs.add(
+      WalletTxRow(
+        id: db.nextId('wtx'),
+        walletId: wallet.id,
+        amount: r.coachDebitAmount,
+        type: WalletTxType.refundDebit,
+        status: WalletTxStatus.completed,
+        createdAt: now,
+        classId: classId,
+        paymentId: r.paymentId,
+        note: 'Hoàn tiền — ${db.userOfMember(memberProfileId).fullName}',
+      ),
+    );
+    final cls = db.classRow(classId);
+    if (r.reason == RefundReason.memberCancelCourse) {
+      // Hủy khóa: giao dịch REFUNDED, hóa đơn hủy, giải phóng chỗ.
+      db.payments.firstWhere((p) => p.id == r.paymentId).status = PaymentStatus.refunded;
+      for (final i in db.invoices.where((i) => i.paymentId == r.paymentId)) {
+        i.status = InvoiceStatus.cancelled;
+      }
+      for (final e in db.enrollments.where(
+        (e) =>
+            e.memberProfileId == memberProfileId &&
+            e.status == EnrollmentStatus.booked &&
+            db.session(e.sessionId).classId == classId,
+      )) {
+        e
+          ..status = EnrollmentStatus.cancelled
+          ..cancelledAt = now;
+      }
+    }
+    db.notify(
+      db.userOfMember(memberProfileId).id,
+      NotificationType.paymentRefunded,
+      'Đã hoàn tiền',
+      'Yêu cầu hoàn tiền khóa "${cls.name}" đã được duyệt: ${Money.format(r.amount)}.',
+      metadata: {'refundId': r.id},
+    );
+    db.notify(
+      db.userOfCoach(cls.coachProfileId).id,
+      NotificationType.paymentRefunded,
+      'Ví bị trừ do hoàn tiền',
+      'Ví của bạn bị trừ ${Money.format(r.coachDebitAmount)} cho yêu cầu hoàn tiền khóa "${cls.name}".',
+      metadata: {'classId': cls.id},
+    );
+  });
+
+  @override
+  Future<void> reject(String id, String reason) => _server.run(() {
+    final db = _server.db;
+    final r = _pending(id);
+    if (reason.trim().length < 3) {
+      throw const AppFailure.validation(
+        'Lý do từ chối tối thiểu 3 ký tự.',
+        fieldErrors: {'reason': 'Tối thiểu 3 ký tự'},
+      );
+    }
+    r
+      ..status = RefundStatus.rejected
+      ..processedAt = db.now()
+      ..rejectReason = reason.trim();
+    if (r.orderId != null) {
+      db.onOrderRefundRejected(r, reason.trim());
+      db.notify(
+        r.buyerUserId!,
+        NotificationType.paymentRefunded,
+        'Yêu cầu hoàn tiền bị từ chối',
+        'Yêu cầu hoàn tiền đơn hàng bị từ chối.',
+        metadata: {'refundId': r.id, 'orderId': r.orderId!},
+        reason: reason.trim(),
+      );
+      return;
+    }
+    db.notify(
+      db.userOfMember(r.memberProfileId!).id,
+      NotificationType.paymentRefunded,
+      'Yêu cầu hoàn tiền bị từ chối',
+      'Yêu cầu hoàn tiền khóa "${db.classRow(r.classId!).name}" bị từ chối.',
+      metadata: {'refundId': r.id},
+      reason: reason.trim(),
+    );
+  });
+}

@@ -1,0 +1,188 @@
+/* Shared across manager, reception, coach and member portals. */
+dialog {
+  border-color: #e1e8e3;
+  border-radius: 24px;
+  box-shadow: 0 28px 90px #152b3040;
+  scrollbar-gutter: stable;
+}
+dialog::backdrop {
+  background: #132c286b;
+  backdrop-filter: blur(6px);
+}
+.modal-head {
+  padding: 22px 24px;
+  background: #fff;
+}
+.modal-head small {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+.modal-head h2 {
+  letter-spacing: -0.025em;
+  line-height: 1.35;
+}
+.modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  z-index: 2;
+}
+.detail-content {
+  min-width: 0;
+}
+.button.danger-text { color: #963d3d; }
+.detail-content > .details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 24px;
+  margin: 0;
+  padding: 12px 24px;
+}
+.detail-content > .details > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 0;
+  min-width: 0;
+}
+.detail-content .details dt {
+  font-size: 12px;
+  color: #53675a;
+}
+.detail-content .details dd {
+  font-size: 14px;
+  color: #203d31;
+  line-height: 1.55;
+}
+.detail-content .details > div:has(.detail-content),
+.detail-content .details > div:has(.detail-list) {
+  grid-column: 1/-1;
+}
+.detail-content .details .details {
+  padding: 0;
+}
+.detail-disclosure {
+  margin: 0 24px 12px;
+  border: 1px solid #e3ebe5;
+  border-radius: 12px;
+  background: #fafcfb;
+  overflow: hidden;
+}
+.detail-disclosure > summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #304e3d;
+}
+.detail-disclosure > summary span {
+  float: right;
+  font-size: 12px;
+  font-weight: 400;
+  color: #53675a;
+}
+.detail-disclosure[open] > summary {
+  border-bottom: 1px solid #e3ebe5;
+}
+.detail-disclosure .detail-disclosure {
+  margin: 10px;
+}
+.detail-meta {
+  background: transparent;
+}
+.detail-meta dd {
+  font-family: ui-monospace, monospace;
+  font-size: 12px !important;
+}
+.detail-list > .detail-content {
+  border-bottom: 1px solid #e3ebe5;
+  margin: 0;
+}
+.detail-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 24px;
+  border-bottom: 1px solid #e3ebe5;
+  overflow-x: auto;
+}
+.detail-tabs button {
+  white-space: nowrap;
+}
+.detail-tabs button[aria-pressed="true"] {
+  background: #203d31;
+  color: white;
+}
+.qr-panel {
+  padding: 22px;
+  border: 1px solid #dce7df;
+  border-radius: 18px;
+  background: #f7faf8;
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+}
+.qr-code {
+  padding: 18px;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #e1e8e3;
+}
+.qr-panel video {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 16px;
+  background: #14251c;
+}
+.qr-panel textarea {
+  width: 100%;
+}
+.qr-panel label {
+  width: 100%;
+}
+.feedback-card {
+  padding: 18px;
+  border: 1px solid #e1e8e3;
+  border-radius: 14px;
+  background: #fff;
+  display: grid;
+  gap: 10px;
+}
+.feedback-card p {
+  overflow-wrap: anywhere;
+}
+.workflow-page .panel {
+  border-radius: 18px;
+}
+@media (max-width: 600px) {
+  dialog {
+    border-radius: 18px;
+    max-height: 92dvh;
+  }
+  .modal-head {
+    padding: 18px;
+  }
+  .detail-content > .details {
+    padding: 10px 18px;
+    grid-template-columns: 1fr;
+  }
+  .detail-disclosure {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+  .detail-tabs {
+    padding: 10px 18px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  dialog[open] {
+    animation: detail-enter 0.18s ease-out;
+  }
+  @keyframes detail-enter {
+    from {
+      transform: translateY(8px);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+}
