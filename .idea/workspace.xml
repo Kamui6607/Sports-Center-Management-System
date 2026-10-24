@@ -4,46 +4,10 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="update">
-      <change beforePath="$PROJECT_DIR$/.claude/launch.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/launch.json" afterDir="false" />
+    <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="feat(shop): pickup date &amp; pay-at-counter, no-show handling, in-order refunds on web; collapsible manager sidebar 20/10&#10;&#10;- Ship fee 30.000 -&gt; 15.000. PICKUP: choose pickup date (today..+7), pick up early once ready,&#10;  hold until end of (pickup date + 3), reschedule once (max +3 days), reminder 24h before deadline&#10;- Pay at counter (CASH, PICKUP only): new status CONFIRMED (stock reserved, no Payment);&#10;  manager confirms code + phone + cash collected =&gt; CASH payment + COMPLETED; limits 2.000.000đ / 1 open order&#10;- Overdue pickup (no-show, counted over 90 days): unpaid =&gt; cancel + release stock, no refund;&#10;  paid =&gt; return stock + 100% refund (10% holding fee from 3rd no-show);&#10;  2nd no-show =&gt; pay-at-counter locked 30 days; pending refund &gt; 30 days flagged as stale&#10;- Refunds: payoutMethod BANK_TRANSFER | CASH, bank transfer requires customer bank info,&#10;  customer updates bank info in app, manager can remind (1/hour), cancel &amp; refund requires a reason&#10;- Web manager: order dialog shows payment + refund blocks with approve/reject/remind in place,&#10;  cash collection on pickup, queues (pickup today / refund pending / stale refund), no-show badge&#10;- Web manager sidebar: toggle button on the divider, collapsible parent groups,&#10;  groups also collapse when sidebar is collapsed&#10;- Mobile: pickup date chips + payment method on checkout, reschedule + bank form on order detail, mock + tests&#10;- Migration 20261020000000_shop_pickup_cash, e2e shop tests, OpenAPI/FE client regenerated, Doc/SHOP_FLOW_DESIGN.md §10">
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/59c47d38-fbd5-4eb0-868e-ad01a71189bb.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/59c47d38-fbd5-4eb0-868e-ad01a71189bb.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/BE/prisma/schema.prisma" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/config/shop.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/config/shop.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/products/products.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/products/products.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/refunds/refunds.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/refunds/refunds.controller.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/refunds/refunds.routes.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/refunds/refunds.routes.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/refunds/refunds.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/refunds/refunds.schema.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/refunds/refunds.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/refunds/refunds.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/checkout.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/checkout.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/order-state.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/order-state.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/order-view.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/order-view.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/orders.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/orders.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.controller.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.routes.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.routes.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.schema.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/tests/shop.e2e.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/tests/shop.e2e.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Doc/SHOP_FLOW_DESIGN.md" beforeDir="false" afterPath="$PROJECT_DIR$/Doc/SHOP_FLOW_DESIGN.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/docs/API_INVENTORY.md" beforeDir="false" afterPath="$PROJECT_DIR$/FE/docs/API_INVENTORY.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/docs/openapi.json" beforeDir="false" afterPath="$PROJECT_DIR$/FE/docs/openapi.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/ManagerLayout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/ManagerLayout.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/admin.css" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/admin.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/OrdersPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/OrdersPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/shared/generated.ts" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/shared/generated.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/shared/operations.json" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/shared/operations.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/api/shop_json.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/api/shop_json.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/widgets/choice_card.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/widgets/choice_card.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_api_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_mock_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/entities/shop.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/entities/shop.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/repositories/shop_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/repositories/shop_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/checkout_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/checkout_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/order_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/order_detail_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/shop_labels.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/shop_labels.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/widgets/order_sections.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/widgets/order_sections.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/mock/mock_database.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/mock/mock_database.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/mock/shop_operations.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/mock/shop_operations.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/mock/tables/commerce_tables.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/mock/tables/commerce_tables.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/test/mock/mock_flows_test.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/test/mock/mock_flows_test.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/skills-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/skills-lock.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -96,10 +60,10 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "com.google.cloudcode.ide_session_index": "20261020_0002",
+    "com.google.cloudcode.ide_session_index": "20261024_0006",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "develop",
+    "git-widget-placeholder": "#1 on develop",
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "D:/FA26/PRM/Sports-Center-Management-System",
@@ -128,17 +92,6 @@
     </key>
   </component>
   <component name="RunManager">
-    <configuration default="true" type="JetRunConfigurationType">
-      <module name="Sports-Center-Management-System" />
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
-    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
-      <module name="Sports-Center-Management-System" />
-      <option name="filePath" />
-      <method v="2" />
-    </configuration>
     <configuration default="true" type="JetRunConfigurationType">
       <module name="Sports-Center-Management-System" />
       <method v="2">
@@ -186,7 +139,12 @@
       <workItem from="1792423385236" duration="712000" />
       <workItem from="1792428118227" duration="2638000" />
       <workItem from="1792458042593" duration="1223000" />
-      <workItem from="1792460158742" duration="435000" />
+      <workItem from="1792460158742" duration="1578000" />
+      <workItem from="1792463670435" duration="1298000" />
+      <workItem from="1792477027944" duration="15000" />
+      <workItem from="1792846768904" duration="89000" />
+      <workItem from="1792846938771" duration="499000" />
+      <workItem from="1792855247623" duration="823000" />
     </task>
     <task id="LOCAL-00001" summary="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10">
       <option name="closed" value="true" />
@@ -220,7 +178,15 @@
       <option name="project" value="LOCAL" />
       <updated>1792113203015</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="feat(shop): pickup date &amp; pay-at-counter, no-show handling, in-order refunds on web; collapsible manager sidebar 20/10&#10;&#10;- Ship fee 30.000 -&gt; 15.000. PICKUP: choose pickup date (today..+7), pick up early once ready,&#10;  hold until end of (pickup date + 3), reschedule once (max +3 days), reminder 24h before deadline&#10;- Pay at counter (CASH, PICKUP only): new status CONFIRMED (stock reserved, no Payment);&#10;  manager confirms code + phone + cash collected =&gt; CASH payment + COMPLETED; limits 2.000.000đ / 1 open order&#10;- Overdue pickup (no-show, counted over 90 days): unpaid =&gt; cancel + release stock, no refund;&#10;  paid =&gt; return stock + 100% refund (10% holding fee from 3rd no-show);&#10;  2nd no-show =&gt; pay-at-counter locked 30 days; pending refund &gt; 30 days flagged as stale&#10;- Refunds: payoutMethod BANK_TRANSFER | CASH, bank transfer requires customer bank info,&#10;  customer updates bank info in app, manager can remind (1/hour), cancel &amp; refund requires a reason&#10;- Web manager: order dialog shows payment + refund blocks with approve/reject/remind in place,&#10;  cash collection on pickup, queues (pickup today / refund pending / stale refund), no-show badge&#10;- Web manager sidebar: toggle button on the divider, collapsible parent groups,&#10;  groups also collapse when sidebar is collapsed&#10;- Mobile: pickup date chips + payment method on checkout, reschedule + bank form on order detail, mock + tests&#10;- Migration 20261020000000_shop_pickup_cash, e2e shop tests, OpenAPI/FE client regenerated, Doc/SHOP_FLOW_DESIGN.md §10">
+      <option name="closed" value="true" />
+      <created>1792460733492</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1792460733492</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -254,6 +220,7 @@
     <MESSAGE value="feat(Mobile): build mock-data UI for Member, Coach and Manager flows 8/10" />
     <MESSAGE value="feat: connect mobile to real API and implement shop flow 10/10&#10;&#10;- BE: mobile API gaps, auth security fixes (OTP reset, login order),&#10;  shop module (cart, addresses, checkout, order state machine,&#10;  inventory ledger, pickup code, manager tools, anti-abuse limits),&#10;  SePay/refund integration, migrations 20261010000000_mobile_api_gaps&#10;  and 20261011000000_shop_flow, local e2e/smoke tests&#10;- Mobile: network layer + realtime, real API by default, shop screens&#10;  (cart, checkout, orders, addresses) and manager screens (orders,&#10;  pickup scan, inventory), mocks and tests&#10;- Docs: shop flow design, BE API changes, mobile integration notes" />
     <MESSAGE value="update" />
-    <option name="LAST_COMMIT_MESSAGE" value="update" />
+    <MESSAGE value="feat(shop): pickup date &amp; pay-at-counter, no-show handling, in-order refunds on web; collapsible manager sidebar 20/10&#10;&#10;- Ship fee 30.000 -&gt; 15.000. PICKUP: choose pickup date (today..+7), pick up early once ready,&#10;  hold until end of (pickup date + 3), reschedule once (max +3 days), reminder 24h before deadline&#10;- Pay at counter (CASH, PICKUP only): new status CONFIRMED (stock reserved, no Payment);&#10;  manager confirms code + phone + cash collected =&gt; CASH payment + COMPLETED; limits 2.000.000đ / 1 open order&#10;- Overdue pickup (no-show, counted over 90 days): unpaid =&gt; cancel + release stock, no refund;&#10;  paid =&gt; return stock + 100% refund (10% holding fee from 3rd no-show);&#10;  2nd no-show =&gt; pay-at-counter locked 30 days; pending refund &gt; 30 days flagged as stale&#10;- Refunds: payoutMethod BANK_TRANSFER | CASH, bank transfer requires customer bank info,&#10;  customer updates bank info in app, manager can remind (1/hour), cancel &amp; refund requires a reason&#10;- Web manager: order dialog shows payment + refund blocks with approve/reject/remind in place,&#10;  cash collection on pickup, queues (pickup today / refund pending / stale refund), no-show badge&#10;- Web manager sidebar: toggle button on the divider, collapsible parent groups,&#10;  groups also collapse when sidebar is collapsed&#10;- Mobile: pickup date chips + payment method on checkout, reschedule + bank form on order detail, mock + tests&#10;- Migration 20261020000000_shop_pickup_cash, e2e shop tests, OpenAPI/FE client regenerated, Doc/SHOP_FLOW_DESIGN.md §10" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat(shop): pickup date &amp; pay-at-counter, no-show handling, in-order refunds on web; collapsible manager sidebar 20/10&#10;&#10;- Ship fee 30.000 -&gt; 15.000. PICKUP: choose pickup date (today..+7), pick up early once ready,&#10;  hold until end of (pickup date + 3), reschedule once (max +3 days), reminder 24h before deadline&#10;- Pay at counter (CASH, PICKUP only): new status CONFIRMED (stock reserved, no Payment);&#10;  manager confirms code + phone + cash collected =&gt; CASH payment + COMPLETED; limits 2.000.000đ / 1 open order&#10;- Overdue pickup (no-show, counted over 90 days): unpaid =&gt; cancel + release stock, no refund;&#10;  paid =&gt; return stock + 100% refund (10% holding fee from 3rd no-show);&#10;  2nd no-show =&gt; pay-at-counter locked 30 days; pending refund &gt; 30 days flagged as stale&#10;- Refunds: payoutMethod BANK_TRANSFER | CASH, bank transfer requires customer bank info,&#10;  customer updates bank info in app, manager can remind (1/hour), cancel &amp; refund requires a reason&#10;- Web manager: order dialog shows payment + refund blocks with approve/reject/remind in place,&#10;  cash collection on pickup, queues (pickup today / refund pending / stale refund), no-show badge&#10;- Web manager sidebar: toggle button on the divider, collapsible parent groups,&#10;  groups also collapse when sidebar is collapsed&#10;- Mobile: pickup date chips + payment method on checkout, reschedule + bank form on order detail, mock + tests&#10;- Migration 20261020000000_shop_pickup_cash, e2e shop tests, OpenAPI/FE client regenerated, Doc/SHOP_FLOW_DESIGN.md §10" />
   </component>
 </project>
