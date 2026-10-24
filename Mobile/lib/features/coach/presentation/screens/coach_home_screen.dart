@@ -35,6 +35,11 @@ class CoachHomeScreen extends ConsumerWidget {
           icon: const Icon(AppIcons.scan),
           onPressed: () => context.push(AppRoutes.membershipScanner),
         ),
+        IconButton(
+          tooltip: 'Check-in phòng gym',
+          icon: const Icon(AppIcons.building),
+          onPressed: () => context.push(AppRoutes.coachCheckin),
+        ),
         const HeaderActions(),
       ],
       body: AsyncValueView(

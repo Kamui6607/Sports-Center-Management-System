@@ -7,6 +7,7 @@ extension WalletTxTypeLabel on WalletTxType {
     WalletTxType.deposit => 'Doanh thu khóa học',
     WalletTxType.withdrawal => 'Rút tiền',
     WalletTxType.refundDebit => 'Trừ hoàn tiền',
+    WalletTxType.checkinFee => 'Phí check-in phòng gym',
   };
 }
 

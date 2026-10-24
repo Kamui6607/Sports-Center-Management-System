@@ -408,7 +408,7 @@ export function passVerdict(current: TermEvaluation | null, previous: TermEvalua
 }
 
 /** Đánh giá Coach ở kỳ hiện tại và kỳ liền trước (để áp chính sách "kỳ trước chưa đạt"). */
-async function evaluateCurrentAndPrevious(coachId: string, now: Date) {
+export async function evaluateCurrentAndPrevious(coachId: string, now: Date) {
   const current = await getCurrentTermRow(now);
   const prevKey = previousTermKey(current.year, current.seq);
   const previous = await prisma.academicTerm.findUnique({ where: { year_seq: { year: prevKey.year, seq: prevKey.seq } } });

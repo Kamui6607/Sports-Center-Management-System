@@ -3,7 +3,7 @@
 const kCoachRevenueShare = 0.85;
 
 /// Loại giao dịch ví (`TransactionType`).
-enum WalletTxType { deposit, withdrawal, refundDebit }
+enum WalletTxType { deposit, withdrawal, refundDebit, checkinFee }
 
 /// Trạng thái giao dịch ví (`TransactionStatus`).
 enum WalletTxStatus { pending, completed, rejected, failed }

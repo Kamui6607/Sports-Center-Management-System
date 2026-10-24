@@ -1106,6 +1106,120 @@
       "403"
     ]
   },
+  "POST /terms/check-in/qr": {
+    "path": "/terms/check-in/qr",
+    "method": "POST",
+    "summary": "MANAGER — tạo mã QR check-in phòng gym cho HLV (sống ~60 giây, trang Web tự đổi mã)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403"
+    ]
+  },
+  "POST /terms/check-in": {
+    "path": "/terms/check-in",
+    "method": "POST",
+    "summary": "COACH — quét QR check-in ⇒ ghi MỘT ngày dùng phòng (giờ VN)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "token"
+      ],
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "201",
+      "400",
+      "403"
+    ]
+  },
+  "GET /terms/me/check-ins": {
+    "path": "/terms/me/check-ins",
+    "method": "GET",
+    "summary": "COACH — mức dùng phòng tháng này + các ngày gần đây",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403"
+    ]
+  },
+  "GET /terms/check-ins": {
+    "path": "/terms/check-ins",
+    "method": "GET",
+    "summary": "MANAGER — nhật ký check-in phòng gym của HLV (+ tổng hợp phí)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "dayKey",
+        "schema": {
+          "type": "string",
+          "example": "2026-10-24"
+        }
+      },
+      {
+        "in": "query",
+        "name": "monthKey",
+        "schema": {
+          "type": "string",
+          "example": "2026-10"
+        }
+      },
+      {
+        "in": "query",
+        "name": "coachId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403"
+    ]
+  },
   "PATCH /terms/{id}": {
     "path": "/terms/{id}",
     "method": "PATCH",
@@ -5709,7 +5823,8 @@
           "enum": [
             "WITHDRAWAL",
             "DEPOSIT",
-            "REFUND_DEBIT"
+            "REFUND_DEBIT",
+            "CHECKIN_FEE"
           ],
           "default": "WITHDRAWAL"
         }

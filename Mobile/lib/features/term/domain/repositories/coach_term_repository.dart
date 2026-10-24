@@ -21,4 +21,11 @@ abstract interface class CoachTermRepository {
 
   /// `DELETE /terms/me/leaves/:id` — hủy đơn đang chờ duyệt (hoặc đã duyệt nhưng chưa bắt đầu).
   Future<CoachLeave> cancelLeave(String id);
+
+  /// `POST /terms/check-in { token }` — quét QR check-in do Quản lý tạo ⇒ ghi MỘT ngày dùng phòng.
+  /// Quét lại trong ngày ⇒ `alreadyCheckedIn`, không tính thêm.
+  Future<CheckInResult> checkIn(String token);
+
+  /// `GET /terms/me/check-ins` — mức dùng tháng này + các ngày gần đây.
+  Future<MyCheckIns> myCheckIns();
 }

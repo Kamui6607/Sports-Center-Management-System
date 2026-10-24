@@ -84,6 +84,8 @@ abstract final class AppRoutes {
   static const coachTerm = '/coach/term';
   static const coachLeaveForm = '/coach/term/leave';
   static const coachPass = '/coach/pass';
+  static const coachCheckin = '/coach/checkin';
+  static const coachCheckinScan = '/coach/checkin/scan';
 
   // Manager — tab
   static const managerHome = '/r/home';

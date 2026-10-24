@@ -8,6 +8,7 @@ export type PatchTrainingPlansResultsIdRequest = { "date"?: string; "coachNote"?
 export type PostTermsMeLeavesRequest = { "startDate": string; "endDate": string; "kind"?: "SICK" | "PERSONAL" | "OTHER"; "reason": string };
 export type PatchTermsLeavesIdReviewRequest = { "action": "APPROVE" | "REJECT"; "note"?: string };
 export type PostTermsPassVerifyRequest = { "token": string };
+export type PostTermsCheckInRequest = { "token": string };
 export type PatchTermsIdRequest = { "graceDays": number };
 export type PutTermsIdCoachesCoachIdExemptRequest = { "reason": string };
 export type PostShopCartItemsRequest = { "productId": string; "quantity"?: number };

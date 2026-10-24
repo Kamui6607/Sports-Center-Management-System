@@ -77,6 +77,7 @@ type BaseEntityModels = {
   CoachTermStatus: Models.CoachTermStatus;
   CoachLeave: Models.CoachLeave;
   CoachPassScan: Models.CoachPassScan;
+  CoachCheckIn: Models.CoachCheckIn;
 };
 
 // ── Kiểm tra lúc biên dịch (không sinh code chạy) ────────────────────────────

@@ -191,6 +191,7 @@ class WalletTxTile extends StatelessWidget {
       WalletTxType.deposit => AppIcons.trend,
       WalletTxType.withdrawal => AppIcons.bank,
       WalletTxType.refundDebit => AppIcons.refund,
+      WalletTxType.checkinFee => AppIcons.building,
     };
     return InkWell(
       onTap: onTap,

@@ -93,6 +93,7 @@ void main() {
       '/coach/term',
       '/coach/term/leave',
       '/coach/pass',
+      '/coach/checkin',
       '/shop',
       '/orders',
       '/orders/o-5',

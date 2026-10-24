@@ -261,6 +261,8 @@ model CoachProfile {
   termStatuses  CoachTermStatus[]
   leaves        CoachLeave[]
   passScans     CoachPassScan[]
+  /// Nhật ký dùng phòng gym theo ngày (check-in) và phí phát sinh.
+  checkIns      CoachCheckIn[]
 }
 
 /// Hồ sơ chứng nhận HLV (CV) để Manager xét duyệt — 1–1 với CoachProfile.
@@ -858,6 +860,8 @@ model CoachWallet {
   coachId   String       @unique
   coach     CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
   balance   Decimal      @default(0) @db.Decimal(12, 2)
+  /// Phí check-in còn nợ (ví không đủ tiền ròng của khóa để trừ) — trừ dần khi có tiền, và trừ vào số dư khả dụng khi rút.
+  feeDebt   Decimal      @default(0) @db.Decimal(12, 2)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @default(now()) @updatedAt
 
@@ -870,6 +874,8 @@ enum TransactionType {
   WITHDRAWAL
   /// Trừ ví HLV khi hoàn tiền cho hội viên (hủy khóa / hủy buổi không dạy bù).
   REFUND_DEBIT
+  /// Phí check-in phòng gym của HLV — trừ vào tiền ròng của khóa CŨ NHẤT còn dư (khớp cách tính rút tiền theo từng khóa).
+  CHECKIN_FEE
 }
 
 enum TransactionStatus {
@@ -1438,4 +1444,34 @@ model CoachPassScan {
 
   @@index([coachId, createdAt])
   @@index([createdAt])
+}
+
+/// Một ngày HLV dùng phòng gym (quét QR check-in do Manager tạo). Mỗi HLV tối đa 1 dòng / ngày VN.
+/// Trong số ngày miễn phí của tháng (và HLV đạt kỳ) ⇒ `free`; ngược lại phát sinh `feeAssessed`,
+/// phần trừ được từ ví là `feeCharged`, phần chưa trừ được ghi nợ `feeDebt`.
+model CoachCheckIn {
+  id          String          @id @default(uuid())
+  coachId     String
+  coach       CoachProfile    @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  /// Ngày dùng phòng YYYY-MM-DD (giờ VN) và tháng YYYY-MM để đếm hạn mức.
+  dayKey      String
+  monthKey    String
+  checkedInAt DateTime        @default(now())
+  /// Thứ tự ngày dùng trong tháng (1, 2, ...).
+  dayIndex    Int
+  free        Boolean
+  feeAssessed Decimal         @default(0) @db.Decimal(12, 2)
+  feeCharged  Decimal         @default(0) @db.Decimal(12, 2)
+  feeDebt     Decimal         @default(0) @db.Decimal(12, 2)
+  /// Trạng thái kỳ của HLV lúc check-in (để đối chiếu vì sao miễn phí / bị tính phí).
+  termState   CoachTermState?
+  /// Manager phát hành mã QR đã được quét.
+  qrIssuedBy  String?
+  note        String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @default(now()) @updatedAt
+
+  @@unique([coachId, dayKey])
+  @@index([coachId, monthKey])
+  @@index([dayKey])
 }

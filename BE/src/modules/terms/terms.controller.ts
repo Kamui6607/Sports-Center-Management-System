@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import * as service from "./terms.service.js";
 import { runTermMaintenance } from "./term-notifications.js";
+import * as checkIn from "./checkin.service.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
-import type { LeaveListQuery, PassScanQuery, TermRosterQuery } from "./terms.schema.js";
+import type { CheckInListQuery, LeaveListQuery, PassScanQuery, TermRosterQuery } from "./terms.schema.js";
 
 type Handler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 
@@ -91,4 +92,23 @@ export const verifyPass = wrap(async (req, res) => {
 export const listPassScans = wrap(async (req, res) => {
   const { scans, pagination } = await service.listPassScans(req.query as unknown as PassScanQuery);
   sendSuccess(res, scans, "Pass scans retrieved successfully", 200, pagination);
+});
+
+// ── Check-in phòng gym ──
+export const createCheckInQr = wrap(async (req, res) => {
+  sendSuccess(res, checkIn.issueCheckInQr(req.user!.id), "Check-in QR issued");
+});
+
+export const scanCheckIn = wrap(async (req, res) => {
+  const result = await checkIn.coachCheckIn(req.user!.id, req.body.token);
+  sendSuccess(res, result, result.alreadyCheckedIn ? "Already checked in today" : "Checked in", result.alreadyCheckedIn ? 200 : 201);
+});
+
+export const getMyCheckIns = wrap(async (req, res) => {
+  sendSuccess(res, await checkIn.getMyCheckIns(req.user!.id), "My check-ins retrieved successfully");
+});
+
+export const listCheckIns = wrap(async (req, res) => {
+  const { items, summary, policy, pagination } = await checkIn.listCheckIns(req.query as unknown as CheckInListQuery);
+  sendSuccess(res, { items, summary, policy }, "Check-ins retrieved successfully", 200, pagination);
 });

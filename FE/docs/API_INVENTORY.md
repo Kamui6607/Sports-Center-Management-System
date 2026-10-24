@@ -2,7 +2,7 @@
 
 Source: docs/openapi.json — exported from the checked-out backend with `cd BE && npm run openapi:export` (`--live` downloads https://sports-center-management-system.onrender.com/api/v1/docs/swagger-ui-init.js instead; do not use it for an unreleased local backend).
 
-Snapshot: 2026-10-23. Production base: https://sports-center-management-system.onrender.com/api/v1
+Snapshot: 2026-10-24. Production base: https://sports-center-management-system.onrender.com/api/v1
 
 Response examples are documentation only, never application data. The client sends the documented HTTP Bearer token.
 
@@ -2594,6 +2594,193 @@ Responses/status codes:
 {
   "200": {
     "description": "OK"
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## POST /terms/check-in/qr
+MANAGER — tạo mã QR check-in phòng gym cho HLV (sống ~60 giây, trang Web tự đổi mã)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ token, expiresIn, issuedAt } — token đưa vào QR"
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## POST /terms/check-in
+COACH — quét QR check-in ⇒ ghi MỘT ngày dùng phòng (giờ VN)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "token"
+  ],
+  "properties": {
+    "token": {
+      "type": "string"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Đã check-in hôm nay"
+  },
+  "201": {
+    "description": "Created — ngày dùng đầu tiên trong ngày"
+  },
+  "400": {
+    "description": "CHECKIN_QR_EXPIRED | CHECKIN_QR_INVALID"
+  },
+  "403": {
+    "description": "CHECKIN_NOT_ELIGIBLE — hồ sơ chưa duyệt / tài khoản khóa"
+  }
+}
+```
+
+## GET /terms/me/check-ins
+COACH — mức dùng phòng tháng này + các ngày gần đây
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /terms/check-ins
+MANAGER — nhật ký check-in phòng gym của HLV (+ tổng hợp phí)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "query",
+    "name": "dayKey",
+    "schema": {
+      "type": "string",
+      "example": "2026-10-24"
+    }
+  },
+  {
+    "in": "query",
+    "name": "monthKey",
+    "schema": {
+      "type": "string",
+      "example": "2026-10"
+    }
+  },
+  {
+    "in": "query",
+    "name": "coachId",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "in": "query",
+    "name": "page",
+    "schema": {
+      "type": "integer"
+    }
+  },
+  {
+    "in": "query",
+    "name": "limit",
+    "schema": {
+      "type": "integer"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ items, summary: { total, free, paid, feeAssessed, feeCharged, feeDebt } } + pagination"
   },
   "403": {
     "description": "Insufficient role permissions",
@@ -12789,7 +12976,8 @@ Parameters:
       "enum": [
         "WITHDRAWAL",
         "DEPOSIT",
-        "REFUND_DEBIT"
+        "REFUND_DEBIT",
+        "CHECKIN_FEE"
       ],
       "default": "WITHDRAWAL"
     }

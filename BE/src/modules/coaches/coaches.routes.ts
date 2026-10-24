@@ -191,7 +191,7 @@ router.post(
  *     tags: [Coaches]
  *     security: [{ BearerAuth: [] }]
  *     parameters:
- *       - { in: query, name: type, schema: { type: string, enum: [WITHDRAWAL, DEPOSIT, REFUND_DEBIT], default: WITHDRAWAL } }
+ *       - { in: query, name: type, schema: { type: string, enum: [WITHDRAWAL, DEPOSIT, REFUND_DEBIT, CHECKIN_FEE], default: WITHDRAWAL } }
  *       - { in: query, name: status, schema: { type: string, enum: [PENDING, COMPLETED, REJECTED, FAILED] } }
  *       - { in: query, name: coachId, schema: { type: string } }
  *       - { in: query, name: page, schema: { type: integer } }
@@ -204,7 +204,7 @@ router.get(
   authenticate,
   authorize("MANAGER"),
   validate(z.object({
-    type: z.enum(["WITHDRAWAL", "DEPOSIT", "REFUND_DEBIT"]).optional(),
+    type: z.enum(["WITHDRAWAL", "DEPOSIT", "REFUND_DEBIT", "CHECKIN_FEE"]).optional(),
     status: z.enum(["PENDING", "COMPLETED", "REJECTED", "FAILED"]).optional(),
     coachId: z.string().optional(),
     page: z.string().optional(),

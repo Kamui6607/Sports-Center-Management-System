@@ -59,3 +59,19 @@ export const PassScanQuerySchema = z.object({
 export type TermRosterQuery = z.infer<typeof TermRosterQuerySchema>;
 export type LeaveListQuery = z.infer<typeof LeaveListQuerySchema>;
 export type PassScanQuery = z.infer<typeof PassScanQuerySchema>;
+
+/** COACH: `POST /terms/check-in` — token đọc từ QR do Manager tạo. */
+export const ScanCheckInSchema = z.object({
+  token: z.string().trim().min(10).max(2000),
+});
+
+/** MANAGER: `GET /terms/check-ins`. */
+export const CheckInListQuerySchema = z.object({
+  dayKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày phải có dạng YYYY-MM-DD").optional(),
+  monthKey: z.string().regex(/^\d{4}-\d{2}$/, "Tháng phải có dạng YYYY-MM").optional(),
+  coachId: z.string().min(1).optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+export type CheckInListQuery = z.infer<typeof CheckInListQuerySchema>;

@@ -48,6 +48,20 @@ export const COACH_TERM = {
 } as const;
 
 /**
+ * Check-in phòng gym của HLV (Doc/COACH_TERMS.md §10): Manager tạo QR, HLV quét ⇒ ghi 1 ngày dùng phòng.
+ * HLV đạt/được miễn kỳ (thẻ hợp lệ) có số ngày miễn phí mỗi tháng; quá hạn mức — hoặc thẻ không hợp lệ — thì mỗi ngày
+ * dùng bị trừ phí từ tiền ròng của khóa CŨ NHẤT còn dư. Ví chưa đủ tiền ⇒ ghi nợ, trừ dần khi có tiền.
+ */
+export const COACH_CHECKIN = {
+  /** Số ngày dùng phòng miễn phí mỗi tháng (giờ VN) cho HLV có thẻ hợp lệ. */
+  FREE_DAYS_PER_MONTH: 20,
+  /** Phí mỗi ngày dùng quá hạn mức (VND). */
+  FEE_PER_DAY: 20_000,
+  /** Mã QR check-in do Manager tạo sống ngắn (giây); trang Web tự đổi mã. */
+  QR_TTL_SECONDS: 60,
+} as const;
+
+/**
  * Các bậc thông báo cho Coach (số tăng dần theo thời gian). Mỗi Coach × kỳ chỉ nhận bậc MỚI NHẤT đã đến hạn
  * và chưa gửi — bỏ lỡ nhiều bậc (VD server ngủ) thì không dồn thông báo.
  */

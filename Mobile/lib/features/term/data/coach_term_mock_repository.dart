@@ -3,6 +3,7 @@ import '../../../core/utils/vn_time.dart';
 import '../../../mock/mock_server.dart';
 import '../../../mock/mock_tables.dart';
 import '../../classes/domain/entities/course.dart';
+import '../../coach/domain/entities/wallet.dart';
 import '../../schedule/domain/entities/session.dart';
 import '../domain/entities/coach_term.dart';
 import '../domain/repositories/coach_term_repository.dart';
@@ -311,5 +312,127 @@ class CoachTermMockRepository implements CoachTermRepository {
     }
     row.status = LeaveStatus.cancelled;
     return _leave(row);
+  });
+
+  // ── Check-in phòng gym (khớp `BE/src/modules/terms/checkin.service.ts`) ──
+  static const freeDaysPerMonth = 20;
+  static const feePerDay = 20000;
+  static const qrPrefix = 'mock-checkin.';
+
+  static String _dayKey(DateTime now) {
+    final w = VnTime.wall(now);
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${w.year}-${two(w.month)}-${two(w.day)}';
+  }
+
+  CoachCheckIn _checkInView(CoachCheckInRow r) => CoachCheckIn(
+    dayKey: r.dayKey,
+    checkedInAt: r.checkedInAt,
+    dayIndex: r.dayIndex,
+    free: r.free,
+    feeAssessed: r.feeAssessed,
+    feeCharged: r.feeCharged,
+    feeDebt: r.feeDebt,
+  );
+
+  CheckInUsage _usage(MockDatabase db, String coachId, bool entitled, DateTime now) {
+    final monthKey = _dayKey(now).substring(0, 7);
+    final rows = db.coachCheckIns.where((r) => r.coachProfileId == coachId && r.monthKey == monthKey).toList();
+    final freeUsed = rows.where((r) => r.free).length;
+    return CheckInUsage(
+      monthKey: monthKey,
+      daysUsed: rows.length,
+      freeDaysUsed: freeUsed,
+      freeDaysPerMonth: freeDaysPerMonth,
+      freeDaysLeft: entitled ? (freeDaysPerMonth - freeUsed).clamp(0, freeDaysPerMonth) : 0,
+      feePerDay: feePerDay,
+      entitled: entitled,
+      feeAssessedThisMonth: rows.fold(0, (s, r) => s + r.feeAssessed),
+      feeChargedThisMonth: rows.fold(0, (s, r) => s + r.feeCharged),
+      feeDebt: db.checkinDebts[coachId] ?? 0,
+      checkedInToday: rows.any((r) => r.dayKey == _dayKey(now)),
+    );
+  }
+
+  @override
+  Future<CheckInResult> checkIn(String token) => _server.run(() {
+    final db = _server.db;
+    final coach = _server.requireCoach();
+    if (!token.trim().startsWith(qrPrefix)) {
+      throw const AppFailure.business('Mã QR check-in không hợp lệ.', code: 'CHECKIN_QR_INVALID');
+    }
+    final now = db.now();
+    final dayKey = _dayKey(now);
+    final monthKey = dayKey.substring(0, 7);
+    final ev = _evaluate(db, coach, termOf(now), now);
+    final verdict = _verdict(ev);
+    final entitled = verdict.valid;
+
+    final existing = db.coachCheckIns.where((r) => r.coachProfileId == coach.id && r.dayKey == dayKey).firstOrNull;
+    if (existing != null) {
+      return CheckInResult(
+        alreadyCheckedIn: true,
+        checkIn: _checkInView(existing),
+        usage: _usage(db, coach.id, entitled, now),
+        pass: verdict,
+      );
+    }
+    final monthRows = db.coachCheckIns.where((r) => r.coachProfileId == coach.id && r.monthKey == monthKey).toList();
+    final free = entitled && monthRows.where((r) => r.free).length < freeDaysPerMonth;
+    final fee = free ? 0 : feePerDay;
+    var charged = 0;
+    if (fee > 0) {
+      final wallet = db.walletOf(coach.id);
+      charged = fee < wallet.balance ? fee : (wallet.balance < 0 ? 0 : wallet.balance);
+      if (charged > 0) {
+        wallet.balance -= charged;
+        db.walletTxs.add(
+          WalletTxRow(
+            id: db.nextId('wtx-fee'),
+            walletId: wallet.id,
+            amount: charged,
+            type: WalletTxType.checkinFee,
+            status: WalletTxStatus.completed,
+            createdAt: now,
+            note: 'Phí check-in phòng gym $dayKey',
+          ),
+        );
+      }
+      if (fee > charged) db.checkinDebts[coach.id] = (db.checkinDebts[coach.id] ?? 0) + (fee - charged);
+    }
+    final row = CoachCheckInRow(
+      id: db.nextId('ci'),
+      coachProfileId: coach.id,
+      dayKey: dayKey,
+      monthKey: monthKey,
+      checkedInAt: now,
+      dayIndex: monthRows.length + 1,
+      free: free,
+      feeAssessed: fee,
+      feeCharged: charged,
+      feeDebt: fee - charged,
+    );
+    db.coachCheckIns.add(row);
+    return CheckInResult(
+      alreadyCheckedIn: false,
+      checkIn: _checkInView(row),
+      usage: _usage(db, coach.id, entitled, now),
+      pass: verdict,
+    );
+  });
+
+  @override
+  Future<MyCheckIns> myCheckIns() => _server.run(() {
+    final db = _server.db;
+    final coach = _server.requireCoach();
+    final now = db.now();
+    final entitled = _verdict(_evaluate(db, coach, termOf(now), now)).valid;
+    final items = db.coachCheckIns.where((r) => r.coachProfileId == coach.id).toList()
+      ..sort((a, b) => b.dayKey.compareTo(a.dayKey));
+    return MyCheckIns(
+      eligible: true,
+      usage: _usage(db, coach.id, entitled, now),
+      items: items.take(40).map(_checkInView).toList(),
+    );
   });
 }

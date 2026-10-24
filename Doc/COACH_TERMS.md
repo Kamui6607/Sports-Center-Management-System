@@ -79,7 +79,7 @@ Migration `20261023000000_coach_terms` (idempotent, chỉ **thêm**: không DROP
 ## 7. Áp lên DB dùng chung (Render)
 
 1. Báo nhóm + `pg_dump`.
-2. `cd BE && npx prisma migrate deploy` (migration idempotent, chạy lại an toàn).
+2. `cd BE && npx prisma migrate deploy` — áp 2 migration idempotent: `20261023000000_coach_terms` và `20261024000000_coach_checkin` (chạy lại an toàn).
 3. `npx prisma generate`, restart BE.
 4. Kỳ được tạo tự động ở lần gọi đầu; không cần seed.
 
@@ -93,3 +93,27 @@ Migration `20261023000000_coach_terms` (idempotent, chỉ **thêm**: không DROP
 - **Không tự khóa** tài khoản hay chặn cổng (phương án B): cần dữ liệu thật của một kỳ để kiểm chứng tiêu chí trước. Nhật ký quét thẻ + bảng kết quả là nền để bật sau.
 - Chưa có thiết bị quét trên Mobile cho Manager (Manager dùng Web).
 - Chưa có cron ngoài; xem lưu ý hạ tầng ở mục 3.
+
+## 10. Check-in phòng gym & phí (theo yêu cầu của leader)
+
+**Luồng:** Manager hiển thị mã QR check-in ở quầy (Web, đổi mỗi ~45 giây) ⇒ HLV quét bằng app ⇒ hệ thống ghi **MỘT ngày dùng phòng** (ngày giờ VN). Quét lại trong ngày không tính thêm. (Thẻ ra vào ở §2 — HLV đưa QR cho Manager quét — vẫn còn để kiểm tra nhanh tình trạng; check-in là nguồn tính ngày dùng và phí.)
+
+**Phí (mặc định, chỉnh ở `COACH_CHECKIN` trong `BE/src/config/coach-term.ts`):**
+
+| Tình huống | Kết quả |
+|---|---|
+| Thẻ hợp lệ (đạt / miễn / đang ân hạn, kỳ trước không rớt) **và** còn trong **20 ngày miễn phí/tháng** | Miễn phí |
+| Quá 20 ngày trong tháng | **20.000đ/ngày** |
+| Thẻ không hợp lệ (chưa đạt kỳ, hoặc kỳ trước rớt mà kỳ này chưa đạt) | Tính phí **ngay từ ngày đầu** |
+
+**Trừ tiền — khóa cũ nhất trước (FIFO):** phí được trừ từ **tiền ròng của khóa tạo sớm nhất còn dư** (tiền ròng = `DEPOSIT − REFUND_DEBIT − CHECKIN_FEE`), rồi sang khóa kế tiếp nếu chưa đủ. Mỗi khoản trừ là một `WalletTransaction` loại **`CHECKIN_FEE`** gắn `classId` — nhờ vậy cách tính **rút tiền theo từng khóa** vẫn khớp. Không trừ vào phần đang tạm giữ cho hoàn tiền / lệnh rút chờ duyệt, và không làm số dư âm.
+
+**Ví chưa đủ tiền:** vẫn cho check-in, phần chưa trừ được ghi vào `CoachWallet.feeDebt`. Nợ được trừ dần (ưu tiên trước phí mới) mỗi khi HLV check-in, xem ví hoặc yêu cầu rút; **số dư khả dụng để rút đã trừ nợ**.
+
+**API:** `POST /terms/check-in/qr` (MANAGER) · `POST /terms/check-in` (COACH, `{ token }`) · `GET /terms/me/check-ins` (COACH) · `GET /terms/check-ins` (MANAGER, lọc `dayKey`/`monthKey`/`coachId`, kèm tổng hợp phí). Lỗi thường gặp: `CHECKIN_QR_EXPIRED`, `CHECKIN_QR_INVALID`, `CHECKIN_NOT_ELIGIBLE`.
+
+**Giao diện:** Web Manager — tab *Check-in phòng gym* (QR + nhật ký + tổng hợp). Mobile Coach — *Check-in phòng gym* (nút trên thanh tiêu đề Tổng quan và trong màn Kỳ học): hạn mức tháng, phí, nợ, quét QR (có nhập mã thủ công); giao dịch ví hiện loại "Phí check-in phòng gym".
+
+**Dữ liệu:** migration `20261024000000_coach_checkin` (idempotent, chỉ thêm): giá trị enum `TransactionType.CHECKIN_FEE`, cột `CoachWallet.feeDebt`, bảng `CoachCheckIn` (`@@unique([coachId, dayKey])` chống tính trùng ngày).
+
+**Các điểm đã giả định (chưa được leader xác nhận):** 20 ngày/tháng và 20.000đ/ngày; "ví cũ nhất" hiểu là khóa tạo sớm nhất còn tiền ròng; ví thiếu tiền thì cho check-in và ghi nợ; không giới hạn khung giờ mở cửa (giờ mở cửa trong `CenterSetting` là chữ tự do). Manager chưa có thao tác miễn/hoàn phí cho từng lượt.

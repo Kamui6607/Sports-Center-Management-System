@@ -26,3 +26,29 @@ class CoachLeaveRow {
   LeaveStatus status;
   String? reviewNote;
 }
+
+class CoachCheckInRow {
+  CoachCheckInRow({
+    required this.id,
+    required this.coachProfileId,
+    required this.dayKey,
+    required this.monthKey,
+    required this.checkedInAt,
+    required this.dayIndex,
+    required this.free,
+    required this.feeAssessed,
+    required this.feeCharged,
+    required this.feeDebt,
+  });
+
+  final String id;
+  final String coachProfileId;
+  final String dayKey;
+  final String monthKey;
+  final DateTime checkedInAt;
+  final int dayIndex;
+  final bool free;
+  final int feeAssessed;
+  final int feeCharged;
+  final int feeDebt;
+}

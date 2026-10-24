@@ -189,3 +189,81 @@ class CoachLeave {
   /// Hủy được khi đang chờ duyệt, hoặc đã duyệt nhưng chưa bắt đầu.
   bool canCancel(DateTime now) => isPending || (status == LeaveStatus.approved && startDate.isAfter(now));
 }
+
+/// Mức dùng phòng gym trong tháng của HLV (`GET /terms/me/check-ins`).
+class CheckInUsage {
+  const CheckInUsage({
+    required this.monthKey,
+    required this.daysUsed,
+    required this.freeDaysUsed,
+    required this.freeDaysPerMonth,
+    required this.freeDaysLeft,
+    required this.feePerDay,
+    required this.entitled,
+    required this.feeAssessedThisMonth,
+    required this.feeChargedThisMonth,
+    required this.feeDebt,
+    required this.checkedInToday,
+  });
+
+  final String monthKey;
+  final int daysUsed;
+  final int freeDaysUsed;
+  final int freeDaysPerMonth;
+
+  /// Thẻ không hợp lệ ⇒ 0 (mọi ngày đều tính phí).
+  final int freeDaysLeft;
+  final int feePerDay;
+
+  /// Thẻ hợp lệ ⇒ được hưởng hạn mức miễn phí.
+  final bool entitled;
+  final int feeAssessedThisMonth;
+  final int feeChargedThisMonth;
+
+  /// Phí còn nợ (ví chưa đủ tiền ròng của khóa để trừ).
+  final int feeDebt;
+  final bool checkedInToday;
+}
+
+/// Một ngày dùng phòng.
+class CoachCheckIn {
+  const CoachCheckIn({
+    required this.dayKey,
+    required this.checkedInAt,
+    required this.dayIndex,
+    required this.free,
+    required this.feeAssessed,
+    required this.feeCharged,
+    required this.feeDebt,
+  });
+
+  /// YYYY-MM-DD theo giờ VN.
+  final String dayKey;
+  final DateTime checkedInAt;
+  final int dayIndex;
+  final bool free;
+  final int feeAssessed;
+  final int feeCharged;
+  final int feeDebt;
+}
+
+/// Kết quả quét QR check-in.
+class CheckInResult {
+  const CheckInResult({required this.alreadyCheckedIn, required this.checkIn, required this.usage, required this.pass});
+
+  /// Đã check-in hôm nay trước đó — không tính thêm.
+  final bool alreadyCheckedIn;
+  final CoachCheckIn checkIn;
+  final CheckInUsage usage;
+  final PassVerdict pass;
+}
+
+/// Tổng quan check-in của tôi.
+class MyCheckIns {
+  const MyCheckIns({required this.eligible, required this.usage, required this.items});
+
+  /// `false` ⇒ hồ sơ HLV chưa được duyệt (chưa check-in được).
+  final bool eligible;
+  final CheckInUsage usage;
+  final List<CoachCheckIn> items;
+}

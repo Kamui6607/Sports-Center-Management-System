@@ -5,6 +5,7 @@ import { buildPaginationMeta } from "../../utils/pagination.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { lockCoachWallet } from "../../utils/dbLocks.js";
 import { computeWithdrawEligibility } from "./wallet-eligibility.service.js";
+import { settleCheckinDebt } from "../terms/checkin-fee.service.js";
 
 /** Số ngày tối đa từ khi class COMPLETED mà coach được phép rút tiền. 0 = không giới hạn. */
 const WITHDRAWAL_ALLOWED_AFTER_CLASS_COMPLETED = true;
@@ -23,8 +24,12 @@ export async function getMyWallet(coachUserId: string) {
   });
   if (!coachProfile) throw new AppError("Coach profile not found", 404);
 
-  const wallet =
+  let wallet =
     coachProfile.wallet ?? (await prisma.coachWallet.create({ data: { coachId: coachProfile.id, balance: 0 } }));
+  // Phí check-in còn nợ: trừ dần khi ví đã có tiền ròng (best-effort — lỗi không chặn việc xem ví).
+  if (Number(wallet.feeDebt) > 0) {
+    wallet = (await settleCheckinDebt(wallet.id).catch(() => null)) ?? wallet;
+  }
   // BE-5 / L4: tiền tạm giữ, số dư khả dụng và điều kiện rút theo từng khóa.
   const eligibility = await computeWithdrawEligibility(prisma, wallet);
 
@@ -33,6 +38,7 @@ export async function getMyWallet(coachUserId: string) {
     coach: { fullName: coachProfile.user.fullName, email: coachProfile.user.email },
     pendingRefundDebit: eligibility.pendingRefundDebit,
     pendingWithdrawal: eligibility.pendingWithdrawal,
+    checkinDebt: eligibility.checkinDebt,
     available: eligibility.available,
     withdrawEligibility: {
       eligible: eligibility.eligible,
@@ -112,7 +118,9 @@ export async function requestWithdrawal(coachUserId: string, data: {
 
   if (!coachProfile.wallet) throw new AppError("Coach wallet not found. Please create a class first.", 404);
 
-  const wallet = coachProfile.wallet;
+  let wallet = coachProfile.wallet;
+  // Trừ nợ phí check-in (nếu có) trước khi tính số dư khả dụng để rút.
+  if (Number(wallet.feeDebt) > 0) wallet = (await settleCheckinDebt(wallet.id).catch(() => null)) ?? wallet;
 
   if (data.amount <= 0) throw new AppError("Amount must be positive", 400);
   if (Number(wallet.balance) < data.amount) {

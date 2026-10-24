@@ -3,12 +3,14 @@ import { authenticate } from "../../middlewares/authenticate.js";
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
 import {
+  CheckInListQuerySchema,
   CreateLeaveSchema,
   ExemptSchema,
   LeaveIdParamSchema,
   LeaveListQuerySchema,
   PassScanQuerySchema,
   ReviewLeaveSchema,
+  ScanCheckInSchema,
   TermCoachParamSchema,
   TermIdParamSchema,
   TermRosterQuerySchema,
@@ -235,6 +237,76 @@ router.get("/pass/scans", authorize("MANAGER"), validate(PassScanQuerySchema, "q
  *       403: { $ref: "#/components/responses/Forbidden" }
  */
 router.post("/maintenance", authorize("MANAGER"), controller.runMaintenance);
+
+/**
+ * @swagger
+ * /terms/check-in/qr:
+ *   post:
+ *     summary: MANAGER — tạo mã QR check-in phòng gym cho HLV (sống ~60 giây, trang Web tự đổi mã)
+ *     tags: [Terms]
+ *     responses:
+ *       200: { description: "{ token, expiresIn, issuedAt } — token đưa vào QR" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ */
+router.post("/check-in/qr", authorize("MANAGER"), controller.createCheckInQr);
+
+/**
+ * @swagger
+ * /terms/check-in:
+ *   post:
+ *     summary: COACH — quét QR check-in ⇒ ghi MỘT ngày dùng phòng (giờ VN)
+ *     description: |
+ *       Còn hạn mức miễn phí tháng và thẻ hợp lệ ⇒ miễn phí; ngược lại trừ phí/ngày từ tiền ròng của khóa cũ nhất còn dư
+ *       (ví thiếu ⇒ ghi nợ, trừ dần). Quét lại trong ngày ⇒ 200 `alreadyCheckedIn=true`, không tính thêm.
+ *       `{ alreadyCheckedIn, checkIn: { dayKey, free, feeAssessed, feeCharged, feeDebt, dayIndex }, pass, usage }`.
+ *     tags: [Terms]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token: { type: string }
+ *     responses:
+ *       201: { description: Created — ngày dùng đầu tiên trong ngày }
+ *       200: { description: Đã check-in hôm nay }
+ *       400: { description: "CHECKIN_QR_EXPIRED | CHECKIN_QR_INVALID" }
+ *       403: { description: "CHECKIN_NOT_ELIGIBLE — hồ sơ chưa duyệt / tài khoản khóa" }
+ */
+router.post("/check-in", authorize("COACH"), validate(ScanCheckInSchema), controller.scanCheckIn);
+
+/**
+ * @swagger
+ * /terms/me/check-ins:
+ *   get:
+ *     summary: COACH — mức dùng phòng tháng này + các ngày gần đây
+ *     description: "`{ eligible, pass, usage: { daysUsed, freeDaysUsed, freeDaysPerMonth, freeDaysLeft, feePerDay, feeAssessedThisMonth, feeChargedThisMonth, feeDebt, checkedInToday }, items }`"
+ *     tags: [Terms]
+ *     responses:
+ *       200: { description: OK }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ */
+router.get("/me/check-ins", authorize("COACH"), controller.getMyCheckIns);
+
+/**
+ * @swagger
+ * /terms/check-ins:
+ *   get:
+ *     summary: MANAGER — nhật ký check-in phòng gym của HLV (+ tổng hợp phí)
+ *     tags: [Terms]
+ *     parameters:
+ *       - { in: query, name: dayKey, schema: { type: string, example: "2026-10-24" } }
+ *       - { in: query, name: monthKey, schema: { type: string, example: "2026-10" } }
+ *       - { in: query, name: coachId, schema: { type: string } }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
+ *     responses:
+ *       200: { description: "{ items, summary: { total, free, paid, feeAssessed, feeCharged, feeDebt } } + pagination" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ */
+router.get("/check-ins", authorize("MANAGER"), validate(CheckInListQuerySchema, "query"), controller.listCheckIns);
 
 /**
  * @swagger

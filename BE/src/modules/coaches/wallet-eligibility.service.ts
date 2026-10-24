@@ -16,7 +16,7 @@ export interface WithdrawClassState {
   classId: string;
   className: string;
   classStatus: string;
-  /** Doanh thu ròng của khóa trong ví: DEPOSIT − REFUND_DEBIT (đã hoàn tất). */
+  /** Doanh thu ròng của khóa trong ví: DEPOSIT − REFUND_DEBIT − CHECKIN_FEE (đã hoàn tất). */
   netEarned: number;
   pendingRefundDebit: number;
   /** Số buổi còn SCHEDULED (> 0 ⇒ khóa chưa kết thúc). */
@@ -31,6 +31,8 @@ export interface WithdrawEligibility {
   balance: number;
   pendingRefundDebit: number;
   pendingWithdrawal: number;
+  /** Phí check-in còn nợ (ví chưa đủ tiền ròng để trừ) — đã trừ khỏi `available`. */
+  checkinDebt: number;
   available: number;
   eligible: boolean;
   blockers: { code: string; message: string }[];
@@ -41,7 +43,7 @@ const vnd = (n: number) => `${Math.round(n).toLocaleString("vi-VN")}đ`;
 
 export async function computeWithdrawEligibility(
   db: DbClient,
-  wallet: { id: string; coachId: string; balance: Prisma.Decimal | number }
+  wallet: { id: string; coachId: string; balance: Prisma.Decimal | number; feeDebt?: Prisma.Decimal | number | null }
 ): Promise<WithdrawEligibility> {
   const [classes, byType, holds, withdrawals] = await Promise.all([
     db.class.findMany({
@@ -51,7 +53,7 @@ export async function computeWithdrawEligibility(
     }),
     db.walletTransaction.groupBy({
       by: ["classId", "type"],
-      where: { walletId: wallet.id, status: "COMPLETED", type: { in: ["DEPOSIT", "REFUND_DEBIT"] } },
+      where: { walletId: wallet.id, status: "COMPLETED", type: { in: ["DEPOSIT", "REFUND_DEBIT", "CHECKIN_FEE"] } },
       _sum: { amount: true },
     }),
     db.refund.groupBy({
@@ -109,9 +111,11 @@ export async function computeWithdrawEligibility(
 
   const balance = Number(wallet.balance);
   const eligibleEarned = states.filter((s) => s.withdrawable).reduce((sum, s) => sum + s.netEarned, 0);
+  const checkinDebt = Number(wallet.feeDebt ?? 0);
   const available = Math.max(
     0,
-    Math.min(balance - pendingRefundDebit - pendingWithdrawal, eligibleEarned - completedWithdrawal - pendingWithdrawal)
+    Math.min(balance - pendingRefundDebit - pendingWithdrawal, eligibleEarned - completedWithdrawal - pendingWithdrawal) -
+      checkinDebt
   );
 
   const blockers: { code: string; message: string }[] = [];
@@ -148,6 +152,7 @@ export async function computeWithdrawEligibility(
     balance,
     pendingRefundDebit,
     pendingWithdrawal,
+    checkinDebt,
     available,
     eligible: blockers.length === 0 && available > 0,
     blockers,

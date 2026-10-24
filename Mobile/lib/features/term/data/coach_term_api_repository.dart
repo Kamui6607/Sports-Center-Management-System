@@ -122,6 +122,51 @@ class CoachTermApiRepository implements CoachTermRepository {
     return leave(res.json);
   }
 
+  static CheckInUsage usage(Json u) => CheckInUsage(
+    monthKey: u.str('monthKey'),
+    daysUsed: u.integer('daysUsed'),
+    freeDaysUsed: u.integer('freeDaysUsed'),
+    freeDaysPerMonth: u.integer('freeDaysPerMonth'),
+    freeDaysLeft: u.integer('freeDaysLeft'),
+    feePerDay: u.integer('feePerDay'),
+    entitled: u.boolean('entitled'),
+    feeAssessedThisMonth: u.money('feeAssessedThisMonth'),
+    feeChargedThisMonth: u.money('feeChargedThisMonth'),
+    feeDebt: u.money('feeDebt'),
+    checkedInToday: u.boolean('checkedInToday'),
+  );
+
+  static CoachCheckIn checkInRow(Json c) => CoachCheckIn(
+    dayKey: c.str('dayKey'),
+    checkedInAt: c.date('checkedInAt'),
+    dayIndex: c.integer('dayIndex'),
+    free: c.boolean('free'),
+    feeAssessed: c.money('feeAssessed'),
+    feeCharged: c.money('feeCharged'),
+    feeDebt: c.money('feeDebt'),
+  );
+
+  @override
+  Future<CheckInResult> checkIn(String token) async {
+    final j = (await _api.post('/terms/check-in', body: {'token': token.trim()})).json;
+    return CheckInResult(
+      alreadyCheckedIn: j.boolean('alreadyCheckedIn'),
+      checkIn: checkInRow(j.obj('checkIn')),
+      usage: usage(j.obj('usage')),
+      pass: verdict(j.obj('pass')),
+    );
+  }
+
+  @override
+  Future<MyCheckIns> myCheckIns() async {
+    final j = (await _api.get('/terms/me/check-ins')).json;
+    return MyCheckIns(
+      eligible: j.boolean('eligible'),
+      usage: usage(j.obj('usage')),
+      items: j.objList('items').map(checkInRow).toList(),
+    );
+  }
+
   @override
   Future<CoachLeave> cancelLeave(String id) async =>
       leave((await _api.delete('/terms/me/leaves/${Uri.encodeComponent(id)}')).json);

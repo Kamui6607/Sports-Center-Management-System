@@ -40,6 +40,13 @@ class CoachTermScreen extends ConsumerWidget {
             ],
             const SizedBox(height: AppSpacing.md),
             _PassBanner(status: status),
+            const SizedBox(height: AppSpacing.sm),
+            AppButton.outline(
+              label: 'Check-in phòng gym',
+              icon: AppIcons.building,
+              expand: true,
+              onPressed: () => context.push(AppRoutes.coachCheckin),
+            ),
             const SizedBox(height: AppSpacing.lg),
             const _LeaveSection(),
             const SizedBox(height: AppSpacing.xl),
