@@ -160,3 +160,51 @@ Mỗi học viên mua khóa đã được ghi danh vào **mọi buổi** của k
 - **BE:** `src/config/fitness-goals.ts`, `src/utils/i18n.ts`, `src/modules/center/*`, `src/modules/payments/purchase-snapshot.ts`, `tests/gym-scope.local.ts`; sửa `classes`, `class-schedules`, `enrollments`, `refunds`, `feedbacks`, `coaches`, `reports`, `rooms`, `auth`, `members`, `shop`, `payments`, `memberships`, `prisma/schema.prisma`, `prisma/seed.ts`.
 - **Mobile:** `features/catalog/presentation/{location_card,goal_chips_field,center_info_screen}.dart`, `classes/presentation/widgets/coach_profile_sheet.dart`, `schedule/presentation/screens/reschedule_session_screen.dart`, `core/widgets/search_select_field.dart`, `core/utils/vn_text.dart`; viết lại wizard tạo khóa, Khóa học của tôi (lịch sử), form địa chỉ, hủy khóa, chi tiết buổi; thêm `url_launcher`.
 - **FE:** `features/manage/pages/{RefundsPage,WithdrawalsPage,OrdersPage,CenterSettingsPage}.tsx`, `shared/InvoiceDialog.tsx`; xóa `features/reception/*` + các trang chỉ phục vụ Lễ tân; sửa Phòng tập, Khóa học, Doanh thu, menu Manager.
+
+
+---
+
+# 🛡️ Đợt 24–25/10/2026 — Siết chặt nghiệp vụ & luồng gói thành viên
+
+> Chi tiết: `Doc/BUSINESS_HARDENING_PLAN.md` (rà soát + kết quả) và `Doc/MEMBERSHIP_FLOW.md` (gói thành viên).
+
+## 20. Khóa học: mở bán, đăng ký muộn, hóa đơn
+
+### 20.1. Trạng thái mở bán (`summary.saleState`, BE tính)
+`ON_SALE` Đang mở bán · `FULL` Hết chỗ (tính cả chỗ đang giữ cho người chờ chuyển khoản) · `SALE_CLOSED` Ngừng nhận học viên mới · `ENDED` Đã kết thúc · `NOT_OPEN` Chưa duyệt.
+Member/Guest chỉ thấy `ON_SALE` + `FULL` ở `GET /classes` (BE tự lọc). Coach/Manager thấy mọi khóa kèm nhãn.
+
+### 20.2. Hạn mở bán
+Ngừng nhận học viên mới khi đã diễn ra **≥ 50%** số buổi **hoặc** còn **< 3 buổi** (khóa ngắn hơn 3 buổi: so với tổng số buổi). Cấu hình `COURSE_SALE_MAX_PROGRESS_PERCENT`, `COURSE_SALE_MIN_REMAINING_SESSIONS`.
+
+### 20.3. Đăng ký muộn — trả tiền theo buổi còn lại
+- N = số buổi chính; đơn giá = giá trọn khóa ÷ N; k = số buổi bắt đầu **sau lúc mã QR hết hạn**.
+- Thành tiền = giá trọn khóa nếu k ≥ N, ngược lại `min(giá trọn khóa, làm tròn lên 1.000đ (giá × k ÷ N))`.
+- Bảng tính lưu ở `purchaseSnapshot.pricing`; **mọi khoản hoàn sau đó tính theo thành tiền ÷ k** (hủy buổi 80%, buổi bị hủy/dời 100%, hoàn ngoại lệ theo số buổi chưa học của chính hội viên).
+- Mốc hủy khóa "≥ 3 ngày ⇒ hoàn 100%" tính theo **buổi đầu tiên của hội viên**.
+
+### 20.4. Mua khóa chắc chắn
+- Tạo QR: BE kiểm tra lại toàn bộ (còn mở bán, chưa mua, còn chỗ, không trùng giờ, không bị phạt) trong transaction có lock ⇒ giao dịch PENDING **giữ 1 chỗ** tới hết hạn QR.
+- Mua rồi ⇒ 409 `COURSE_ALREADY_PURCHASED` (đã hủy khóa ⇒ mua lại được).
+- Tiền về: ghi danh có kiểm sức chứa + kích hoạt lại chỗ đã hủy; thiếu buổi so với đã tính tiền ⇒ tự tạo yêu cầu hoàn phần thiếu `COURSE_NOT_FULFILLED` (0 buổi ⇒ hoàn toàn bộ, giao dịch `REQUIRES_REVIEW`).
+- Ghi danh trọn khóa `POST /enrollments/bulk` với khóa có phí ⇒ phải đã mua (403 `CLASS_NOT_PURCHASED`).
+
+### 20.5. Job bảo trì khóa học (5 phút, `POST /classes/maintenance` chạy tay)
+PENDING quá giờ khai giảng ⇒ tự từ chối + nhả phòng · khóa chưa có học viên ⇒ báo HLV lúc 24h trước khai giảng và khi khai giảng · qua hạn mở bán mà 0 học viên ⇒ tự đóng (hủy buổi mã `NO_ENROLLMENT`, **không tính lỗi HLV**) · hết buổi ⇒ `COMPLETED`. Manager không duyệt được khóa đã quá giờ khai giảng (409 `CLASS_REVIEW_TOO_LATE`).
+
+### 20.6. Hóa đơn & doanh thu
+- `GET /payments/my/:id/invoice` (chủ giao dịch) · `GET /payments/:id/invoice` (Manager): người bán, người mua (ảnh chụp lúc mua), dòng hàng (SL × đơn giá = thành tiền), tạm tính, giảm, phí giao hàng, tổng, các khoản hoàn, thực trả sau hoàn.
+- Mobile: hộp xác nhận mua khóa có bảng tính; màn **thanh toán thành công** hiện hóa đơn rút gọn; màn **Hóa đơn** mới. Web: hóa đơn in được từ trang Doanh thu.
+- Doanh thu: **gộp** = SUCCESS + REFUNDED theo `paidAt`; **đã hoàn** = Σ khoản hoàn đã chuyển (theo `processedAt`); **thực nhận** = gộp − đã hoàn (sửa lỗi trừ hai lần).
+- Lịch sử thanh toán đọc tên sản phẩm/gói **lúc mua**; cấp gói thành viên theo **số ngày lúc mua**.
+- **Trình bày chi phí thống nhất** (Mobile widget `CostLineItem` + `CostSummary`): mỗi dòng ghi *Đơn giá × SL* và *Thành tiền*; khối tổng ghi *Tạm tính → Giảm giá (nếu có) → Phí giao hàng (đơn sản phẩm: số tiền / Miễn phí / Nhận tại quầy) → Tổng thanh toán*. Áp dụng ở: màn đặt hàng, màn QR đang chờ thanh toán (khối "Chi tiết đơn"), màn thanh toán thành công, Hóa đơn, chi tiết đơn hàng. Thẻ trong *Lịch sử thanh toán* và *Đơn mua* có dòng tóm tắt cách ra tổng (tạm tính · giảm · ship). `GET /payments/my` trả thêm `subtotal`, `discount`, `shippingFee`, `total`, `fulfillmentType`.
+- **Gói thành viên:** hội viên mở *Chi tiết thanh toán* của gói từ thẻ thành viên (gói hiện tại), gói xếp hàng, lịch sử mua gói và *Lịch sử thanh toán*. Web: nút *Xem hóa đơn* ở chi tiết đơn hàng.
+
+## 21. Gói thành viên (hội viên chỉ tập gym tự do)
+Xem `Doc/MEMBERSHIP_FLOW.md`: CRUD gói trên Web, thẻ thành viên Mobile thiết kế lại với **mã QR động 60 giây**, quét thẻ + nhật ký vào cửa, gói xếp hàng (tối đa 3), nhắc gia hạn 7 ngày / 1 ngày, Manager hủy gói + hoàn phần còn lại.
+
+## 22. Migration & áp lên DB Render
+- `20261025000000_business_hardening` — cột `Class.alertStage/closedReason/closedAt`, `ClassSchedule.cancelCode`, enum `COURSE_NOT_FULFILLED`, backfill ảnh chụp người bán/người mua.
+- `20261025010000_membership_flow` — cột gói/membership, bảng `MemberPassScan`, enum `MEMBERSHIP_CANCELLED`.
+- Cả hai idempotent, chỉ THÊM. **Đã áp DB local, chưa áp Render.** Khi áp: `pg_dump "$RENDER_DATABASE_URL" -Fc -f backup_$(date +%Y%m%d).dump` rồi `cd BE && npx prisma migrate deploy`.
+- Biến môi trường mới (tùy chọn): `COURSE_SALE_MAX_PROGRESS_PERCENT` (50), `COURSE_SALE_MIN_REMAINING_SESSIONS` (3).
