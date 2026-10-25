@@ -42,6 +42,8 @@ const app = express();
 app.set("etag", false);
 
 // Global middlewares
+// Chạy sau 1 proxy (Render): lấy IP thật từ X-Forwarded-For cho rate limit.
+app.set("trust proxy", 1);
 app.use(helmet());
 app.use(cors());
 app.use(morgan("dev"));

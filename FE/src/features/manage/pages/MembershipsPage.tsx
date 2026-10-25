@@ -3,7 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { Link } from "react-router-dom";
 import { ScanLine } from "lucide-react";
 import { api } from "../../../shared/api";
-import { DataTable, Dialog, ErrorBox, Field, PageHead, Pager, Panel, Pill, QueryView, SearchBox, Select, dateOnly, dateTime, get, num, str, useUrlState, vnd } from "../kit";
+import { EmptyState, DataTable, Dialog, ErrorBox, Field, PageHead, Pager, Panel, Pill, QueryView, SearchBox, Select, dateOnly, dateTime, get, num, str, useUrlState, vnd } from "../kit";
 import type { Row } from "../kit";
 
 const STATUS: Record<string, [string, "ok" | "warn" | "bad" | "info" | "plain"]> = {
@@ -58,7 +58,7 @@ export default function MembershipsPage() {
             <>
               <DataTable
                 rows={res.data}
-                empty={<p className="cr-muted" style={{ margin: 0 }}>Chưa có gói nào khớp bộ lọc.</p>}
+                empty={<EmptyState title="Chưa có gói nào" text="Gói hội viên mua trên ứng dụng sẽ hiện tại đây." />}
                 columns={[
                   {
                     key: "m",
@@ -195,7 +195,7 @@ function ScanLog() {
         {(res) => (
           <DataTable
             rows={res.data}
-            empty={<p className="cr-muted" style={{ margin: 0 }}>Chưa có lượt quét.</p>}
+            empty={<EmptyState title="Chưa có lượt quét" text="Mỗi lần quét thẻ ở cửa sẽ được ghi lại tại đây." />}
             columns={[
               { key: "t", title: "Thời điểm", render: (x) => <span className="cr-mono">{dateTime(x.createdAt)}</span> },
               { key: "m", title: "Hội viên", render: (x) => str(get(x, "member.user.fullName")) },

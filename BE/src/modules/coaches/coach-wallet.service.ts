@@ -336,6 +336,13 @@ export async function listWalletTransactionsForManager(query: any) {
   const where: Prisma.WalletTransactionWhereInput = { type: query.type ?? "WITHDRAWAL" };
   if (query.status) where.status = query.status;
   if (query.coachId) where.wallet = { coachId: query.coachId };
+  if (query.startDate || query.endDate) {
+    where.createdAt = { ...(query.startDate ? { gte: new Date(query.startDate) } : {}), ...(query.endDate ? { lte: new Date(query.endDate) } : {}) };
+  }
+  if (query.search) {
+    const userMatch = { OR: [{ fullName: { contains: query.search, mode: "insensitive" as const } }, { email: { contains: query.search, mode: "insensitive" as const } }] };
+    where.wallet = { ...(query.coachId ? { coachId: query.coachId } : {}), coach: { user: userMatch } };
+  }
 
   const [total, rows] = await Promise.all([
     prisma.walletTransaction.count({ where }),

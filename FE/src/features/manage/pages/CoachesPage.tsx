@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { UserPlus } from "lucide-react";
 import { api } from "../../../shared/api";
-import { ActivePill, ApprovalPill, DataTable, PageHead, Pager, Panel, QueryView, SearchBox, Select, dateTime, get, str, useUrlState } from "../kit";
+import { EmptyState, ActivePill, ApprovalPill, DataTable, PageHead, Pager, Panel, QueryView, SearchBox, Select, dateTime, get, str, useUrlState } from "../kit";
 import type { Row } from "../kit";
 import { CreateUserDialog } from "./UsersPage";
 
@@ -137,7 +137,7 @@ function CvQueue() {
           <>
             <DataTable
               rows={res.data}
-              empty={<div className="cr-state"><h3>Không có hồ sơ</h3><p>Không có hồ sơ CV nào ở trạng thái này.</p></div>}
+              empty={<EmptyState title="Không có hồ sơ" text="Không có hồ sơ CV nào ở trạng thái này." />}
               columns={[
                 {
                   key: "name",

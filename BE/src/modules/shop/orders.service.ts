@@ -484,6 +484,8 @@ export async function listOrdersForManager(query: {
   fulfillmentType?: "PICKUP" | "DELIVERY";
   search?: string;
   queue?: string;
+  startDate?: string;
+  endDate?: string;
 }) {
   const { page: p, limit, skip } = page(query);
   const search = query.search?.trim();
@@ -493,6 +495,9 @@ export async function listOrdersForManager(query: {
     ...statusFilter(query.status),
     ...queueFilter(query.queue, now),
     ...(query.fulfillmentType ? { fulfillmentType: query.fulfillmentType } : {}),
+    ...(query.startDate || query.endDate
+      ? { createdAt: { ...(query.startDate ? { gte: new Date(query.startDate) } : {}), ...(query.endDate ? { lte: new Date(query.endDate) } : {}) } }
+      : {}),
     ...(search
       ? {
           OR: [

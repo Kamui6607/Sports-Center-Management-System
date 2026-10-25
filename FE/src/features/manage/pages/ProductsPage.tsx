@@ -265,8 +265,11 @@ export function ProductDialog({ product, onClose }: { product: Row | null; onClo
         <Field label="Ảnh chính sản phẩm" wide error={show("imageUrl", true)} hint="Chọn tệp ảnh (JPEG, PNG, WEBP, GIF) hoặc dán đường dẫn ảnh">
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <ProductThumb url={imagePreview || (urlOk(f.imageUrl) ? f.imageUrl : null)} size={44} />
-            <input type="file" accept="image/*" onChange={onFileChange} style={{ maxWidth: 220 }} />
-            <span style={{ fontSize: "12px", color: "#888" }}>hoặc dán URL:</span>
+            <label className="cr-btn sm">
+              Chọn ảnh…
+              <input type="file" accept="image/*" onChange={onFileChange} className="sr-only" />
+            </label>
+            <span className="cr-subtle" style={{ fontSize: 12.5 }}>hoặc dán URL</span>
             <input
               value={f.imageUrl}
               onChange={(e) => {

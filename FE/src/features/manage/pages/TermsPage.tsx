@@ -129,7 +129,7 @@ function RosterTab() {
           </p>
         )}
         {sum && (
-          <div className="cr-kpis" style={{ marginBottom: 16 }}>
+          <div className="cr-kpis cols-3" style={{ marginBottom: 16 }}>
             {(
               [
                 ["Tổng HLV", sum.total, ""],
@@ -425,7 +425,7 @@ type CheckInList = {
 function CheckInTab() {
   const s = useUrlState();
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const issue = useMutation({ mutationFn: () => api<CheckInQr>("POST /terms/check-in/qr") });
+  const issue = useMutation({ mutationFn: () => api<CheckInQr>("POST /terms/check-in/qr", { silent: true }) });
   const issueRef = useRef(issue.mutate);
   issueRef.current = issue.mutate;
 
@@ -486,7 +486,7 @@ function CheckInTab() {
         <QueryView q={list}>
           {(res) => (
             <>
-              <div className="cr-kpis" style={{ marginBottom: 16 }}>
+              <div className="cr-kpis cols-3" style={{ marginBottom: 16 }}>
                 {(
                   [
                     ["Lượt check-in", num(res.data.summary.total), ""],

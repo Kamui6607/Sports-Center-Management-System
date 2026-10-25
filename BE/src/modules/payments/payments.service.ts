@@ -31,6 +31,10 @@ export async function creditCoachWallet(
 
   const coachAmount = Math.floor(paymentAmount * COACH_REVENUE_SHARE);
 
+  // C3: chống cộng ví trùng cho cùng một giao dịch (gọi lặp / đồng thời).
+  const credited = await tx.walletTransaction.findFirst({ where: { paymentId, type: "DEPOSIT" }, select: { id: true } });
+  if (credited) return;
+
   // Upsert wallet rồi lấy ID
   const wallet = await tx.coachWallet.upsert({
     where: { coachId: cls.coachId },
@@ -144,6 +148,7 @@ export async function listPayments(query: any) {
   if (query.memberId) where.memberId = query.memberId;
   if (query.status) where.status = query.status;
   if (query.method) where.method = query.method;
+  if (query.activationStatus) where.activationStatus = query.activationStatus;
   if (query.startDate || query.endDate) {
     where.createdAt = {};
     if (query.startDate) where.createdAt.gte = new Date(query.startDate);
@@ -188,39 +193,41 @@ export async function getPaymentById(id: string, currentUser: any) {
 }
 
 export async function updatePaymentStatus(id: string, status: string) {
-  const payment = await prisma.payment.findUnique({ where: { id } });
-  if (!payment) throw new AppError("Payment not found", 404);
-
-  // Giao dịch online (SePay): trạng thái CHỈ được chốt bởi webhook/đối soát (settlement).
-  if (payment.gateway) {
-    throw new AppError(
-      "Không thể đổi trạng thái thanh toán online thủ công. Giao dịch SePay được chốt qua webhook/đối soát.",
-      400
-    );
-  }
-
-  // BR-14: Strict state machine
-  if (payment.status === status) return payment;
-
-  if (payment.status === "SUCCESS" && status !== "REFUNDED") {
-    throw new AppError("A successful payment can only be refunded", 400);
-  }
-  if (payment.status === "FAILED" || payment.status === "REFUNDED") {
-    throw new AppError(`Cannot update payment from ${payment.status} to ${status}`, 400);
-  }
-
-  const updateData: any = { status };
-  if (status === "SUCCESS") updateData.paidAt = new Date();
-
   await prisma.$transaction(async (tx) => {
-    await tx.payment.update({ where: { id }, data: updateData });
+    const payment = await tx.payment.findUnique({ where: { id } });
+    if (!payment) throw new AppError("Payment not found", 404);
 
-    if (status === "SUCCESS") {
+    // Giao dịch online (SePay): trạng thái CHỈ được chốt bởi webhook/đối soát (settlement).
+    if (payment.gateway) {
+      throw new AppError(
+        "Không thể đổi trạng thái thanh toán online thủ công. Giao dịch SePay được chốt qua webhook/đối soát.",
+        400
+      );
+    }
+
+    // BR-14: Strict state machine
+    if (payment.status === status) return;
+    if (payment.status === "SUCCESS" && status !== "REFUNDED") {
+      throw new AppError("A successful payment can only be refunded", 400);
+    }
+    if (payment.status === "FAILED" || payment.status === "REFUNDED") {
+      throw new AppError(`Cannot update payment from ${payment.status} to ${status}`, 400);
+    }
+
+    // C3: CAS theo trạng thái đã đọc — request đồng thời thứ hai nhận 409, không fulfill/cộng ví lần nữa.
+    const data: Prisma.PaymentUpdateManyMutationInput = { status: status as Prisma.PaymentUpdateManyMutationInput["status"] };
+    if (status === "SUCCESS") data.paidAt = new Date();
+    const { count } = await tx.payment.updateMany({ where: { id, status: payment.status }, data });
+    if (count === 0) {
+      throw new AppError("Giao dịch vừa được cập nhật bởi thao tác khác. Tải lại để xem trạng thái mới.", 409, {
+        code: "PAYMENT_STATUS_CHANGED",
+      });
+    }
+
+    if (status === "SUCCESS" && payment.classId && payment.memberId) {
       // Auto-enroll + credit wallet nếu là payment cho class (payment lớp học luôn có memberId)
-      if (payment.classId && payment.memberId) {
-        const member = await tx.memberProfile.findUniqueOrThrow({ where: { id: payment.memberId }, select: { userId: true } });
-        await fulfillCoursePaymentTx(tx, payment, member.userId);
-      }
+      const member = await tx.memberProfile.findUniqueOrThrow({ where: { id: payment.memberId }, select: { userId: true } });
+      await fulfillCoursePaymentTx(tx, payment, member.userId);
     }
   });
 

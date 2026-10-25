@@ -62,6 +62,8 @@ export const PaymentQuerySchema = z.object({
   memberId: z.string().optional(),
   status: z.enum(["PENDING", "SUCCESS", "FAILED", "REFUNDED"]).optional(),
   method: z.enum(["CASH", "BANK_TRANSFER", "SEPAY"]).optional(),
+  /** C4: lọc giao dịch đã thu nhưng chưa kích hoạt được (REQUIRES_REVIEW). */
+  activationStatus: z.enum(["ACTIVATED", "REQUIRES_REVIEW"]).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 });

@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
+import { rateLimit } from "../../middlewares/rateLimit.js";
 import { authenticateRestricted } from "../../middlewares/authenticateRestricted.js";
 import { validate } from "../../middlewares/validate.js";
 import { avatarUpload } from "../../middlewares/upload.js";
@@ -12,6 +13,14 @@ import {
   ResetPasswordSchema,
 } from "./auth.schema.js";
 import * as authController from "./auth.controller.js";
+
+// C1: chống dò mật khẩu / OTP — theo IP + email (và trần theo IP). Cần `trust proxy` (app.ts) để req.ip là IP thật sau proxy.
+const byIpAndEmail = (req: Request) => `${req.ip}|${String(req.body?.email ?? "").trim().toLowerCase()}`;
+const byIp = (req: Request) => req.ip ?? "anonymous";
+const loginLimit = rateLimit({ name: "login", windowMs: 15 * 60_000, max: 10, key: byIpAndEmail });
+const loginIpLimit = rateLimit({ name: "login-ip", windowMs: 15 * 60_000, max: 50, key: byIp });
+const otpLimit = rateLimit({ name: "otp", windowMs: 15 * 60_000, max: 5, key: byIpAndEmail });
+const refreshLimit = rateLimit({ name: "refresh", windowMs: 60_000, max: 30, key: byIp });
 
 const router = Router();
 
@@ -72,7 +81,7 @@ router.post("/register", validate(RegisterSchema), authController.register);
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.post("/login", validate(LoginSchema), authController.login);
+router.post("/login", loginIpLimit, loginLimit, validate(LoginSchema), authController.login);
 
 /**
  * @swagger
@@ -120,7 +129,7 @@ router.post("/logout", authenticateRestricted, authController.logout);
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.post("/refresh-token", validate(RefreshTokenSchema), authController.refreshToken);
+router.post("/refresh-token", refreshLimit, validate(RefreshTokenSchema), authController.refreshToken);
 
 /**
  * @swagger
@@ -140,7 +149,7 @@ router.post("/refresh-token", validate(RefreshTokenSchema), authController.refre
  *     responses:
  *       200: { $ref: "#/components/responses/MessageOk" }
  */
-router.post("/forgot-password", validate(ForgotPasswordSchema), authController.forgotPassword);
+router.post("/forgot-password", otpLimit, validate(ForgotPasswordSchema), authController.forgotPassword);
 
 /**
  * @swagger
@@ -166,7 +175,7 @@ router.post("/forgot-password", validate(ForgotPasswordSchema), authController.f
  *       200: { $ref: "#/components/responses/MessageOk" }
  *       400: { $ref: "#/components/responses/BadRequest" }
  */
-router.patch("/reset-password", validate(ResetPasswordSchema), authController.resetPassword);
+router.patch("/reset-password", otpLimit, validate(ResetPasswordSchema), authController.resetPassword);
 
 /**
  * @swagger

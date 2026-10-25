@@ -60,7 +60,8 @@ router.get(
  */
 router.get(
   "/:id",
-  authenticate, authorize("MANAGER", "COACH"),
+  // C2: HLV xem học viên của mình qua GET /coaches/me/students/:memberId (đã giới hạn phạm vi).
+  authenticate, authorize("MANAGER"),
   membersController.getMemberById
 );
 

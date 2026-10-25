@@ -94,9 +94,9 @@ export function WeekCalendar({ week, rows, onSelect, showRoom = true }: { week: 
 export function ScheduleLegend() {
   return (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      <Pill tone="ok">Đã lên lịch</Pill>
+      <Pill tone="info">Đã lên lịch</Pill>
       <Pill tone="warn">Buổi dạy bù</Pill>
-      <Pill tone="info">Hoàn thành</Pill>
+      <Pill tone="plain">Hoàn thành</Pill>
       <Pill tone="bad">Đã hủy</Pill>
     </div>
   );

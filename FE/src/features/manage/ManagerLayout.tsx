@@ -27,12 +27,13 @@ import {
   Users,
   UsersRound,
   WalletCards,
+  ClipboardCheck,
 } from "lucide-react";
 import { IdCard, ScanLine } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ProfileOk } from "../../shared/generated";
 import { NotificationBell } from "../../shared/Communication";
-import { Skeleton, num } from "./kit";
+import { Skeleton, num, PageErrorBoundary } from "./kit";
 import { ThemeToggle, useThemePref } from "./theme";
 import { GlobalSearch } from "./GlobalSearch";
 import { fillRate, usePendingClasses, usePendingCv, useTodaySessions } from "./opsQueries";
@@ -59,6 +60,7 @@ const CenterSettingsPage = lazy(() => import("./pages/CenterSettingsPage"));
 const TermsPage = lazy(() => import("./pages/TermsPage"));
 const MembershipPlansPage = lazy(() => import("./pages/MembershipPlansPage"));
 const MembershipsPage = lazy(() => import("./pages/MembershipsPage"));
+const AttendancePenaltiesPage = lazy(() => import("./pages/AttendancePenaltiesPage"));
 
 type NavItem = [path: string, label: string, icon: LucideIcon];
 type NavGroup = { title: string; icon: LucideIcon; items: NavItem[] };
@@ -80,6 +82,7 @@ const NAV: NavGroup[] = [
       ["classes", "Khóa học & lớp", GraduationCap],
       ["schedules", "Lịch học", CalendarDays],
       ["rooms", "Phòng tập", DoorOpen],
+      ["attendance", "Chuyên cần & khiếu nại", ClipboardCheck],
     ],
   },
   {
@@ -304,7 +307,7 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
   const [openGroups, setOpenGroups] = useState<string[]>(readOpenGroups);
   // Mặc định mở nhóm chứa trang đang xem (cả khi điều hướng sang nhóm khác).
   useEffect(() => {
-    if (activeGroup) setOpenGroups((g) => (g.includes(activeGroup.title) ? g : [...g, activeGroup.title]));
+    if (activeGroup) setOpenGroups((g) => (g.length === 1 && g[0] === activeGroup.title ? g : [activeGroup.title]));
   }, [activeGroup]);
   useEffect(() => {
     try {
@@ -314,7 +317,7 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
     }
   }, [openGroups]);
   const toggleGroup = (title: string) =>
-    setOpenGroups((g) => (g.includes(title) ? g.filter((t) => t !== title) : [...g, title]));
+    setOpenGroups((g) => (g.includes(title) ? [] : [title]));
   // Thanh bên thu gọn (rail): mọi nhóm thu lại; bấm icon cha chỉ bung nhóm đó (không đổi trạng thái của chế độ mở rộng).
   const [railGroup, setRailGroup] = useState<string | null>(null);
   useEffect(() => setRailGroup(null), [rail]);
@@ -429,6 +432,7 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
           </div>
         </header>
         <main id="cr-main" className="cr-content" tabIndex={-1}>
+          <PageErrorBoundary resetKey={pathname}>
           <Suspense fallback={<Skeleton rows={8} />}>
             <Routes>
               <Route path="/manager/dashboard" element={<Dashboard user={user} />} />
@@ -451,6 +455,7 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
               <Route path="/manager/center" element={<CenterSettingsPage />} />
               <Route path="/manager/membership-plans" element={<MembershipPlansPage />} />
               <Route path="/manager/memberships" element={<MembershipsPage />} />
+              <Route path="/manager/attendance" element={<AttendancePenaltiesPage />} />
               <Route path="/manager/reports" element={<Navigate replace to="/manager/revenue" />} />
               <Route path="/manager/profile" element={<ProfilePage user={user} />} />
               <Route path="/manager" element={<Navigate replace to="/manager/dashboard" />} />
@@ -469,6 +474,7 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
               />
             </Routes>
           </Suspense>
+          </PageErrorBoundary>
         </main>
       </div>
     </div>

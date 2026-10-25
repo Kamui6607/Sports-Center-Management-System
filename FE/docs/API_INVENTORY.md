@@ -2,7 +2,7 @@
 
 Source: docs/openapi.json — exported from the checked-out backend with `cd BE && npm run openapi:export` (`--live` downloads https://sports-center-management-system.onrender.com/api/v1/docs/swagger-ui-init.js instead; do not use it for an unreleased local backend).
 
-Snapshot: 2026-10-24. Production base: https://sports-center-management-system.onrender.com/api/v1
+Snapshot: 2026-10-25. Production base: https://sports-center-management-system.onrender.com/api/v1
 
 Response examples are documentation only, never application data. The client sends the documented HTTP Bearer token.
 
@@ -4069,6 +4069,22 @@ Parameters:
   },
   {
     "in": "query",
+    "name": "startDate",
+    "schema": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  {
+    "in": "query",
+    "name": "endDate",
+    "schema": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  {
+    "in": "query",
     "name": "page",
     "schema": {
       "type": "integer"
@@ -6608,6 +6624,29 @@ Parameters:
   },
   {
     "in": "query",
+    "name": "startDate",
+    "schema": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  {
+    "in": "query",
+    "name": "endDate",
+    "schema": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  {
+    "in": "query",
+    "name": "search",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "in": "query",
     "name": "page",
     "schema": {
       "type": "integer"
@@ -7917,6 +7956,17 @@ Parameters:
         "CASH",
         "BANK_TRANSFER",
         "SEPAY"
+      ]
+    }
+  },
+  {
+    "in": "query",
+    "name": "activationStatus",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "ACTIVATED",
+        "REQUIRES_REVIEW"
       ]
     }
   },
@@ -13496,6 +13546,29 @@ Parameters:
   {
     "in": "query",
     "name": "coachId",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "in": "query",
+    "name": "startDate",
+    "schema": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  {
+    "in": "query",
+    "name": "endDate",
+    "schema": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  {
+    "in": "query",
+    "name": "search",
     "schema": {
       "type": "string"
     }

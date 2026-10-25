@@ -449,6 +449,8 @@ router.get("/manage/summary", ...manager, c.managerSummary);
  *       - { in: query, name: fulfillmentType, schema: { type: string, enum: [PICKUP, DELIVERY] } }
  *       - { in: query, name: search, schema: { type: string } }
  *       - { in: query, name: queue, schema: { type: string, enum: [PICKUP_TODAY, REFUND_PENDING, STALE_REFUND] } }
+ *       - { in: query, name: startDate, schema: { type: string, format: date-time } }
+ *       - { in: query, name: endDate, schema: { type: string, format: date-time } }
  *       - { in: query, name: page, schema: { type: integer } }
  *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:

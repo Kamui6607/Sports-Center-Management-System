@@ -2197,6 +2197,22 @@
       },
       {
         "in": "query",
+        "name": "startDate",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      {
+        "in": "query",
+        "name": "endDate",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      {
+        "in": "query",
         "name": "page",
         "schema": {
           "type": "integer"
@@ -3385,6 +3401,29 @@
       },
       {
         "in": "query",
+        "name": "startDate",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      {
+        "in": "query",
+        "name": "endDate",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
         "name": "page",
         "schema": {
           "type": "integer"
@@ -4080,6 +4119,17 @@
             "CASH",
             "BANK_TRANSFER",
             "SEPAY"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "activationStatus",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "ACTIVATED",
+            "REQUIRES_REVIEW"
           ]
         }
       },
@@ -6178,6 +6228,29 @@
       {
         "in": "query",
         "name": "coachId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "startDate",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      {
+        "in": "query",
+        "name": "endDate",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      {
+        "in": "query",
+        "name": "search",
         "schema": {
           "type": "string"
         }

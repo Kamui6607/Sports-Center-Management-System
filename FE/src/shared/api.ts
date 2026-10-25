@@ -163,6 +163,8 @@ async function apiRequest<T = RecordData>(
     query?: Record<string, string>;
     body?: unknown;
     signal?: AbortSignal;
+    /** Không bật toast (thao tác nền, VD tự đổi mã QR). */
+    silent?: boolean;
   } = {},
 ): Promise<Envelope<T>> {
   const op = contract[key];
@@ -241,6 +243,7 @@ export async function api<T = RecordData>(
   try {
     const result = await apiRequest<T>(key, options);
     if (
+      !options.silent &&
       !key.startsWith("GET ") &&
       !/\/auth\/refresh-token|\/notifications\/.*read|\/chat\//.test(key)
     ) {
@@ -258,6 +261,8 @@ export async function api<T = RecordData>(
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError")
       throw error;
+    // Query (GET) hiển thị lỗi tại chỗ bằng ErrorBox/QueryView — không toast trùng; thao tác nền cũng im lặng.
+    if (key.startsWith("GET ") || options.silent) throw error;
     const code =
       error instanceof ApiError
         ? (error.details as { code?: string } | undefined)?.code
@@ -283,6 +288,29 @@ export async function api<T = RecordData>(
     }
     throw error;
   }
+}
+/** GET trả Blob (VD CV PDF) có xác thực — 401 thì refresh token một lần như api(). */
+export async function apiBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  const run = () =>
+    fetch(BASE_URL + path, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal,
+    });
+  let res = await run();
+  if (res.status === 401 && refreshToken) {
+    await refresh();
+    res = await run();
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(
+      res.status === 401
+        ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+        : body.message || "Không tải được tệp.",
+      res.status,
+    );
+  }
+  return res.blob();
 }
 export const authService = {
   async login(body: PostAuthLoginRequest) {

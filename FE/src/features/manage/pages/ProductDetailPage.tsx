@@ -3,7 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, PackagePlus, Pencil, Power, Trash2 } from "lucide-react";
 import { api } from "../../../shared/api";
-import { ActivePill, ConfirmDialog, DataTable, Dialog, Dl, ErrorBox, Field, PageHead, Pager, Panel, Pill, QueryView, dateTime, num, str, vnd } from "../kit";
+import { EmptyState, ActivePill, ConfirmDialog, DataTable, Dialog, Dl, ErrorBox, Field, PageHead, Pager, Panel, Pill, QueryView, dateTime, num, str, vnd } from "../kit";
 import type { Row } from "../kit";
 import { ProductDialog, ProductThumb, StockPill } from "./ProductsPage";
 
@@ -291,7 +291,7 @@ function Reviews({ id, onChanged }: { id: string; onChanged: () => void }) {
           <>
             <DataTable
               rows={res.data}
-              empty={<p className="cr-muted" style={{ margin: 0 }}>Chưa có đánh giá.</p>}
+              empty={<EmptyState title="Chưa có đánh giá" text="Đánh giá của khách sau khi nhận hàng sẽ hiện tại đây." />}
               columns={[
                 {
                   key: "u",

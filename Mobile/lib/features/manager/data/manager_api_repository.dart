@@ -31,13 +31,14 @@ class ManagerApiRepository implements ManagerRepository {
       _total('/coaches/wallet/transactions', {'type': 'WITHDRAWAL', 'status': 'PENDING'}),
       _api.get('/refunds/summary'),
     ]);
-    final summary = (results[3] as ApiResponse).json;
+    // BE `GET /refunds/summary` trả `pending: { count, amount }`.
+    final pending = (results[3] as ApiResponse).json.obj('pending');
     return ApprovalCounts(
       cvs: results[0] as int,
       classes: results[1] as int,
       withdrawals: results[2] as int,
-      refunds: summary.integer('pending'),
-      refundPendingAmount: summary.money('totalPendingAmount'),
+      refunds: pending.integer('count'),
+      refundPendingAmount: pending.money('amount'),
     );
   }
 

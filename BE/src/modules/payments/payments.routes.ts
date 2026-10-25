@@ -78,6 +78,9 @@ router.post(
  *         name: method
  *         schema: { type: string, enum: [CASH, BANK_TRANSFER, SEPAY] }
  *       - in: query
+ *         name: activationStatus
+ *         schema: { type: string, enum: [ACTIVATED, REQUIRES_REVIEW] }
+ *       - in: query
  *         name: startDate
  *         schema: { type: string }
  *       - in: query

@@ -194,6 +194,9 @@ router.post(
  *       - { in: query, name: type, schema: { type: string, enum: [WITHDRAWAL, DEPOSIT, REFUND_DEBIT, CHECKIN_FEE], default: WITHDRAWAL } }
  *       - { in: query, name: status, schema: { type: string, enum: [PENDING, COMPLETED, REJECTED, FAILED] } }
  *       - { in: query, name: coachId, schema: { type: string } }
+ *       - { in: query, name: startDate, schema: { type: string, format: date-time } }
+ *       - { in: query, name: endDate, schema: { type: string, format: date-time } }
+ *       - { in: query, name: search, schema: { type: string } }
  *       - { in: query, name: page, schema: { type: integer } }
  *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
@@ -209,6 +212,9 @@ router.get(
     coachId: z.string().optional(),
     page: z.string().optional(),
     limit: z.string().optional(),
+    startDate: z.string().datetime({ offset: true }).optional(),
+    endDate: z.string().datetime({ offset: true }).optional(),
+    search: z.string().trim().max(100).optional(),
   }), "query"),
   walletController.listWalletTransactions
 );

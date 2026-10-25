@@ -10,12 +10,12 @@ import { sendError } from "../utils/response.js";
  *
  * 429 `{ code: "RATE_LIMITED", retryAfterSeconds }`.
  */
-export function rateLimit(opts: { name: string; windowMs: number; max: number }) {
+export function rateLimit(opts: { name: string; windowMs: number; max: number; key?: (req: Request) => string }) {
   const hits = new Map<string, number[]>();
   return (req: Request, res: Response, next: NextFunction): void => {
     // Chạy e2e hàng loạt trong cùng tiến trình: tắt khi có biến môi trường này.
     if (process.env.RATE_LIMIT_DISABLED === "true") return next();
-    const key = req.user?.id ?? req.ip ?? "anonymous";
+    const key = opts.key?.(req) ?? req.user?.id ?? req.ip ?? "anonymous";
     const now = Date.now();
     const recent = (hits.get(key) ?? []).filter((t) => now - t < opts.windowMs);
     if (recent.length >= opts.max) {

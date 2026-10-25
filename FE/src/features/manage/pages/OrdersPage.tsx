@@ -3,6 +3,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { api } from "../../../shared/api";
 import { InvoiceDialog } from "../../../shared/InvoiceDialog";
 import {
+  periodQuery,
+  PERIOD_OPTIONS,
   ConfirmDialog,
   DataTable,
   Dialog,
@@ -96,6 +98,7 @@ export default function OrdersPage() {
     status: s.value("status"),
     fulfillmentType: s.value("fulfillmentType"),
     queue: s.value("queue"),
+    ...periodQuery(s.value("period")),
     page: String(s.page),
     limit: "15",
   };
@@ -116,6 +119,7 @@ export default function OrdersPage() {
           <SearchBox value={s.value("search")} onChange={(v) => s.set({ search: v })} placeholder="Mã đơn, tên, SĐT" />
           <Select label="Cần xử lý" value={s.value("queue")} onChange={(v) => s.set({ queue: v })} options={Object.entries(QUEUE_LABEL)} />
           <Select label="Trạng thái" value={s.value("status")} onChange={(v) => s.set({ status: v })} options={Object.entries(STATUS_LABEL)} />
+          <Select label="Ngày đặt" all="Mọi thời gian" value={s.value("period")} onChange={(v) => s.set({ period: v })} options={PERIOD_OPTIONS} />
           <Select
             label="Hình thức"
             value={s.value("fulfillmentType")}

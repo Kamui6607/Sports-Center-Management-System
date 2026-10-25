@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Check, FileText, X } from "lucide-react";
-import { api, ApiError, BASE_URL, getAccessToken } from "../../../shared/api";
+import { api, apiBlob } from "../../../shared/api";
 import {
+  EmptyState,
+  SalePill,
   ActivePill,
   ApprovalPill,
   ConfirmDialog,
@@ -71,7 +73,8 @@ function CoachDetail({ coach }: { coach: Row }) {
           <UpcomingSessions userId={userId} />
         </div>
         <div style={{ display: "grid", gap: 20 }} id="cv">
-          <CvPanel profileId={profileId} cert={cert} status={status} name={str(coach.fullName)} userId={userId} />
+          <CvPanel profileId={profileId} cert={cert} status={status} name={str(coach.fullName)} />
+          <CoachFeedbackPanel profileId={profileId} />
         </div>
       </div>
     </>
@@ -142,14 +145,7 @@ function useCvBlob(profileId: string, enabled: boolean) {
     let objectUrl = "";
     setLoading(true);
     setError(undefined);
-    fetch(`${BASE_URL}/coaches/${encodeURIComponent(profileId)}/cv/file`, { headers: { Authorization: `Bearer ${getAccessToken()}` } })
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new ApiError(res.status === 401 ? "Phiên đăng nhập đã hết hạn — tải lại trang để tiếp tục." : body.message || "Không tải được CV.", res.status);
-        }
-        return res.blob();
-      })
+    apiBlob(`/coaches/${encodeURIComponent(profileId)}/cv/file`)
       .then((blob) => {
         if (revoked) return;
         objectUrl = URL.createObjectURL(blob);
@@ -165,7 +161,7 @@ function useCvBlob(profileId: string, enabled: boolean) {
   return { url, error, loading };
 }
 
-function CvPanel({ profileId, cert, status, name, userId }: { profileId: string; cert: Row | null; status: string; name: string; userId: string }) {
+function CvPanel({ profileId, cert, status, name }: { profileId: string; cert: Row | null; status: string; name: string }) {
   const hasFile = Boolean(cert?.fileUrl);
   const [show, setShow] = useState(false);
   const cv = useCvBlob(profileId, show && hasFile);
@@ -273,7 +269,7 @@ function CoachClasses({ profileId }: { profileId: string }) {
               { key: "s", title: "Duyệt", render: (c) => <ApprovalPill status={c.status} /> },
               { key: "p", title: "Giá", className: "num", render: (c) => vnd(c.price) },
               { key: "b", title: "Số buổi", className: "num", render: (c) => num(get(c, "_count.schedules")) },
-              { key: "a", title: "Mở bán", render: (c) => <ActivePill active={c.isActive} on="Đang mở" off="Ngừng" /> },
+              { key: "a", title: "Mở bán", render: (c) => <SalePill row={c} /> },
             ]}
           />
         )}
@@ -308,6 +304,75 @@ function UpcomingSessions({ userId }: { userId: string }) {
           </>
         )}
       </QueryView>
+    </Panel>
+  );
+}
+
+/** M2: đánh giá của hội viên về HLV — Quản lý gỡ đánh giá vi phạm. */
+function CoachFeedbackPanel({ profileId }: { profileId: string }) {
+  const cache = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [removing, setRemoving] = useState<Row | null>(null);
+  const q = useQuery({
+    queryKey: ["admin", "coach-feedbacks", profileId, page],
+    queryFn: ({ signal }) => api<Row>("GET /feedbacks", { query: { coachId: profileId, page: String(page), limit: "5" }, signal }),
+    placeholderData: keepPreviousData,
+    enabled: Boolean(profileId),
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => api("DELETE /feedbacks/{id}/manager", { params: { id } }),
+    onSuccess: () => {
+      setRemoving(null);
+      void cache.invalidateQueries({ queryKey: ["admin", "coach-feedbacks", profileId] });
+    },
+  });
+  const avg = get(q.data, "data.summary.averageRating");
+  return (
+    <Panel title="Đánh giá từ hội viên" desc={q.data ? `${avg != null ? `${str(avg)} ★ trung bình · ` : ""}${num(get(q.data, "data.summary.totalFeedbacks"))} đánh giá` : undefined}>
+      <QueryView q={q} rows={3}>
+        {(res) => {
+          const rows = (get(res, "data.feedbacks") as Row[]) ?? [];
+          return rows.length ? (
+            <>
+              <ul className="cr-list">
+                {rows.map((f) => (
+                  <li key={str(f.id)} style={{ alignItems: "flex-start" }}>
+                    <div className="cr-cell-main" style={{ minWidth: 0 }}>
+                      <strong>
+                        <span style={{ color: "var(--warning)" }} aria-label={`${str(f.rating)} sao`}>
+                          {"★".repeat(Number(f.rating) || 0)}
+                        </span>{" "}
+                        {f.isAnonymous ? "Ẩn danh" : str(get(f, "member.user.fullName")) || "Hội viên"}
+                      </strong>
+                      {str(f.comment) ? <span style={{ overflowWrap: "anywhere" }}>{str(f.comment)}</span> : null}
+                      <small>{dateTime(f.createdAt)}</small>
+                    </div>
+                    <button className="cr-btn sm danger" onClick={() => setRemoving(f)}>
+                      Gỡ
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <Pager meta={res.pagination} onPage={setPage} />
+            </>
+          ) : (
+            <EmptyState title="Chưa có đánh giá" text="Đánh giá hội viên gửi từ ứng dụng sẽ hiện tại đây." />
+          );
+        }}
+      </QueryView>
+      {removing && (
+        <ConfirmDialog
+          title="Gỡ đánh giá"
+          target={str(removing.comment) || `${str(removing.rating)} sao`}
+          consequence="Đánh giá bị xóa khỏi hồ sơ HLV trên ứng dụng và không khôi phục được."
+          confirmLabel="Gỡ đánh giá"
+          danger
+          busy={del.isPending}
+          error={del.error}
+          onConfirm={() => del.mutate(str(removing.id))}
+          onClose={() => setRemoving(null)}
+        />
+      )}
     </Panel>
   );
 }

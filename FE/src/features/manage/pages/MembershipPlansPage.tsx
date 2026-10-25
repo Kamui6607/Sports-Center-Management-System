@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Plus, Star } from "lucide-react";
+import { Plus, Star, Pencil, Power, Trash2 } from "lucide-react";
 import { api } from "../../../shared/api";
-import { ActivePill, ConfirmDialog, DataTable, Dialog, ErrorBox, Field, fieldErrors, PageHead, Panel, Pill, QueryView, get, num, str, vnd } from "../kit";
+import { EmptyState, RowAction, ActivePill, ConfirmDialog, DataTable, Dialog, ErrorBox, Field, fieldErrors, PageHead, Panel, Pill, QueryView, get, num, str, vnd } from "../kit";
 import type { Row } from "../kit";
 
 /**
@@ -52,7 +52,7 @@ export default function MembershipPlansPage() {
           {(res) => (
             <DataTable
               rows={res.data}
-              empty={<p className="cr-muted" style={{ margin: 0 }}>Chưa có gói nào — bấm “Thêm gói” để mở bán.</p>}
+              empty={<EmptyState title="Chưa có gói thành viên" text="Bấm “Thêm gói” để mở bán gói tập đầu tiên." />}
               columns={[
                 {
                   key: "n",
@@ -85,7 +85,7 @@ export default function MembershipPlansPage() {
                   title: "Thực thu",
                   className: "num",
                   render: (p) => (
-                    <div className="cr-cell-main">
+                    <div className="cr-cell-main" style={{ minWidth: 0, justifyItems: "end" }}>
                       <strong>{vnd(get(p, "stats.netRevenue"))}</strong>
                       {Number(get(p, "stats.refunded")) ? <small>đã hoàn {vnd(get(p, "stats.refunded"))}</small> : null}
                     </div>
@@ -98,21 +98,18 @@ export default function MembershipPlansPage() {
                   title: "",
                   className: "actions",
                   render: (p) => (
-                    <span style={{ display: "inline-flex", gap: 6 }}>
-                      <button className="cr-btn sm" onClick={() => setEditing(p)}>
-                        Sửa
-                      </button>
-                      <button className="cr-btn sm" onClick={() => setConfirm({ kind: "toggle", plan: p })}>
-                        {p.isActive ? "Tắt bán" : "Mở bán"}
-                      </button>
-                      <button
-                        className="cr-btn sm danger"
-                        disabled={Number(get(p, "stats.soldCount")) > 0}
-                        title={Number(get(p, "stats.soldCount")) > 0 ? "Gói đã có người mua — chỉ tắt bán được" : undefined}
-                        onClick={() => setConfirm({ kind: "delete", plan: p })}
-                      >
-                        Xóa
-                      </button>
+                    <span className="cr-row-actions">
+                      <RowAction label={`Sửa ${str(p.name)}`} onClick={() => setEditing(p)}>
+                        <Pencil size={16} />
+                      </RowAction>
+                      <RowAction label={p.isActive ? `Tắt bán ${str(p.name)}` : `Mở bán ${str(p.name)}`} onClick={() => setConfirm({ kind: "toggle", plan: p })}>
+                        <Power size={16} />
+                      </RowAction>
+                      {Number(get(p, "stats.soldCount")) > 0 ? null : (
+                        <RowAction label={`Xóa ${str(p.name)}`} onClick={() => setConfirm({ kind: "delete", plan: p })}>
+                          <Trash2 size={16} />
+                        </RowAction>
+                      )}
                     </span>
                   ),
                 },

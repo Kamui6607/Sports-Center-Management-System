@@ -5,7 +5,7 @@ import { ArrowLeft, Check, Power, X } from "lucide-react";
 import { api } from "../../../shared/api";
 import { allPages } from "../../../shared/pagedApi";
 import {
-  ActivePill,
+  SalePill,
   ApprovalPill,
   AREA_LABEL,
   CLASS_TYPE_LABEL,
@@ -83,7 +83,7 @@ function ClassDetail({ cls }: { cls: Row }) {
         desc={
           <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
             <ApprovalPill status={cls.status} />
-            <ActivePill active={cls.isActive} on="Đang mở bán" off="Ngừng mở bán" />
+            {cls.status === "APPROVED" || get(cls, "summary.saleState") ? <SalePill row={cls} /> : null}
           </span>
         }
         actions={
@@ -128,7 +128,7 @@ function ClassDetail({ cls }: { cls: Row }) {
           <div className="cr-kpi-value">{sessions.isPending ? "…" : num(sessions.data?.data.length)}</div>
           <div className="cr-kpi-note">{num(upcoming)} buổi sắp diễn ra</div>
         </div>
-        <div className="cr-kpi amber">
+        <div className="cr-kpi">
           <div className="cr-kpi-label">Đã thu</div>
           <div className="cr-kpi-value">{students.isPending ? "…" : vnd(get(students.data, "data.grossRevenue"))}</div>
           <div className="cr-kpi-note">đã hoàn {vnd(get(students.data, "data.refundedAmount"))}</div>

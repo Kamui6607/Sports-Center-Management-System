@@ -89,6 +89,9 @@ export const OrderQuerySchema = z.object({
   search: z.string().trim().max(100).optional(),
   /** Manager: hàng đợi xử lý — PICKUP_TODAY (khách hẹn lấy hôm nay), REFUND_PENDING (đang chờ hoàn), STALE_REFUND (chờ hoàn quá hạn). */
   queue: z.enum(["PICKUP_TODAY", "REFUND_PENDING", "STALE_REFUND"]).optional(),
+  /** U4 (Manager): khoảng ngày tạo đơn, ISO có múi giờ. */
+  startDate: z.string().datetime({ offset: true }).optional(),
+  endDate: z.string().datetime({ offset: true }).optional(),
 });
 
 export const CancelOrderSchema = z.object({ reason: z.string().trim().max(500).optional() });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import { api } from "../../../shared/api";
 import { allPages } from "../../../shared/pagedApi";
@@ -169,7 +169,7 @@ function RevenueBody({ r, enrollments, membershipRevenue }: { r: Row; enrollment
           <div className="cr-kpi-value">{vnd(r.netRevenue)}</div>
           <div className="cr-kpi-note">doanh thu gộp − đã hoàn</div>
         </div>
-        <div className="cr-kpi amber">
+        <div className="cr-kpi">
           <div className="cr-kpi-label">Giao dịch tạo trong kỳ</div>
           <div className="cr-kpi-value">{num(r.totalPayments)}</div>
           <div className="cr-kpi-note">
@@ -222,20 +222,6 @@ function RevenueBody({ r, enrollments, membershipRevenue }: { r: Row; enrollment
           ]}
         />
       </Panel>
-      <Panel title="10 giao dịch gần nhất của kỳ">
-        <DataTable
-          rows={(r.recentPayments as Row[]) ?? []}
-          empty={<p className="cr-muted" style={{ margin: 0 }}>Không có giao dịch thu/hoàn trong kỳ.</p>}
-          columns={[
-            { key: "t", title: "Thanh toán lúc", render: (p) => <span className="cr-mono">{dateTime(p.paidAt)}</span> },
-            { key: "m", title: "Người mua", render: (p) => str(get(p, "member.user.fullName")) || "—" },
-            { key: "k", title: "Loại", render: (p) => paymentType(p) },
-            { key: "i", title: "Mặt hàng (lúc mua)", render: (p) => str(p.itemName) || "—" },
-            { key: "s", title: "Trạng thái", render: (p) => <PayPill status={p.status} /> },
-            { key: "a", title: "Số tiền", className: "num", render: (p) => vnd(p.amount) },
-          ]}
-        />
-      </Panel>
     </>
   );
 }
@@ -255,7 +241,14 @@ function PaymentsTable({ start, end }: { start: string; end: string }) {
     endDate: new Date(`${end}T23:59:59.999+07:00`).toISOString(),
     status: s.value("status"),
     method: s.value("method"),
+    activationStatus: s.value("activation"),
   };
+  const cache = useQueryClient();
+  // C4: giao dịch đã thu tiền nhưng chưa ghi danh được ⇒ Quản lý kích hoạt bù (BE dùng đúng snapshot đơn).
+  const retry = useMutation({
+    mutationFn: (id: string) => api("POST /payments/{id}/retry-activation", { params: { id } }),
+    onSuccess: () => void cache.invalidateQueries({ queryKey: ["admin", "revenue"] }),
+  });
   const query = { ...filters, page: String(s.page), limit: "15" };
   const q = useQuery({
     queryKey: ["admin", "revenue", "payments", query],
@@ -309,6 +302,15 @@ function PaymentsTable({ start, end }: { start: string; end: string }) {
       <div className="cr-filters" style={{ marginBottom: 14 }}>
         <Select label="Trạng thái" value={s.value("status")} onChange={(v) => s.set({ status: v })} options={Object.entries(PAY_STATUS).map(([k, [l]]) => [k, l])} />
         <Select label="Phương thức" value={s.value("method")} onChange={(v) => s.set({ method: v })} options={Object.entries(METHOD)} />
+        <Select
+          label="Kích hoạt"
+          value={s.value("activation")}
+          onChange={(v) => s.set({ activation: v })}
+          options={[
+            ["REQUIRES_REVIEW", "Đã thu – chưa kích hoạt"],
+            ["ACTIVATED", "Đã kích hoạt"],
+          ]}
+        />
       </div>
       {exportError ? <ErrorBox error={exportError} /> : null}
       <QueryView q={q}>
@@ -317,7 +319,7 @@ function PaymentsTable({ start, end }: { start: string; end: string }) {
             <DataTable
               rows={res.data}
               columns={[
-                { key: "c", title: "Tạo lúc", render: (p) => <span className="cr-mono">{dateTime(p.createdAt)}</span> },
+                { key: "c", title: "Tạo lúc", className: "nowrap", render: (p) => <span className="cr-mono">{dateTime(p.createdAt)}</span> },
                 {
                   key: "m",
                   title: "Người mua",
@@ -339,18 +341,32 @@ function PaymentsTable({ start, end }: { start: string; end: string }) {
                   ),
                 },
                 { key: "me", title: "Phương thức", render: (p) => METHOD[str(p.method)] ?? str(p.method) },
-                { key: "s", title: "Trạng thái", render: (p) => <PayPill status={p.status} /> },
-                { key: "p", title: "Thanh toán lúc", render: (p) => <span className="cr-mono">{dateTime(p.paidAt)}</span> },
+                { key: "s", title: "Trạng thái", render: (p) => (p.activationStatus === "REQUIRES_REVIEW" ? <span style={{ display: "inline-grid", gap: 4 }}><PayPill status={p.status} /><Pill tone="warn">Chưa kích hoạt</Pill></span> : <PayPill status={p.status} />) },
+                { key: "p", title: "Thanh toán lúc", className: "nowrap", render: (p) => <span className="cr-mono">{dateTime(p.paidAt)}</span> },
                 { key: "a", title: "Số tiền", className: "num", render: (p) => vnd(p.amount) },
                 {
                   key: "i",
                   title: "",
-                  render: (p) =>
-                    ["SUCCESS", "REFUNDED"].includes(str(p.status)) ? (
-                      <button className="cr-btn" onClick={() => setInvoiceId(str(p.id))}>
-                        Hóa đơn
-                      </button>
-                    ) : null,
+                  className: "actions",
+                  render: (p) => (
+                    <span className="cr-row-actions" style={{ gap: 6 }}>
+                      {p.activationStatus === "REQUIRES_REVIEW" ? (
+                        <button
+                          className="cr-btn sm primary"
+                          disabled={retry.isPending}
+                          title={str(p.reviewReason) || "Tiền đã về nhưng hội viên chưa được ghi danh"}
+                          onClick={() => retry.mutate(str(p.id))}
+                        >
+                          {retry.isPending && retry.variables === str(p.id) ? "Đang kích hoạt…" : "Kích hoạt lại"}
+                        </button>
+                      ) : null}
+                      {["SUCCESS", "REFUNDED"].includes(str(p.status)) ? (
+                        <button className="cr-btn sm" onClick={() => setInvoiceId(str(p.id))}>
+                          Hóa đơn
+                        </button>
+                      ) : null}
+                    </span>
+                  ),
                 },
               ]}
             />

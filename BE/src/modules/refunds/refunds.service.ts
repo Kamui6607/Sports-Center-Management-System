@@ -912,6 +912,12 @@ function buildRefundWhere(query: RefundQueryInput): Prisma.RefundWhereInput {
   if (query.memberId) where.memberId = query.memberId;
   if (query.classId) where.classId = query.classId;
   if (query.orderId) where.orderId = query.orderId;
+  if (query.startDate || query.endDate) {
+    where.createdAt = { ...(query.startDate ? { gte: new Date(query.startDate) } : {}), ...(query.endDate ? { lte: new Date(query.endDate) } : {}) };
+  }
+  if (query.search) {
+    where.member = { user: { OR: [{ fullName: { contains: query.search, mode: "insensitive" } }, { email: { contains: query.search, mode: "insensitive" } }] } };
+  }
   return where;
 }
 

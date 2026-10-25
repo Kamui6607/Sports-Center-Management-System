@@ -102,6 +102,9 @@ router.get(
  *       - { in: query, name: memberId, schema: { type: string } }
  *       - { in: query, name: classId, schema: { type: string } }
  *       - { in: query, name: orderId, schema: { type: string } }
+ *       - { in: query, name: startDate, schema: { type: string, format: date-time } }
+ *       - { in: query, name: endDate, schema: { type: string, format: date-time } }
+ *       - { in: query, name: search, schema: { type: string } }
  *       - { in: query, name: page, schema: { type: integer } }
  *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:

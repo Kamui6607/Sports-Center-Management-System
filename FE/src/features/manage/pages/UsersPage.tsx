@@ -143,7 +143,7 @@ export function CreateUserDialog({ onClose, role }: { onClose: () => void; role?
   });
   const errs = fieldErrors(m.error);
   const invalid =
-    f.fullName.trim().length < 2 || !/^S+@S+.S+$/.test(f.email) || f.password.length < 6 || !(CREATABLE_ROLES as readonly string[]).includes(f.role);
+    f.fullName.trim().length < 2 || !/^\S+@\S+\.\S+$/.test(f.email) || f.password.length < 6 || !(CREATABLE_ROLES as readonly string[]).includes(f.role);
   return (
     <Dialog
       title={role === "COACH" ? "Tạo tài khoản huấn luyện viên" : "Tạo tài khoản"}

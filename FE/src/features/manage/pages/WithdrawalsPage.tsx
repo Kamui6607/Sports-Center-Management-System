@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../shared/api";
-import { ConfirmDialog, DataTable, Dl, PageHead, Pager, Panel, Pill, QueryView, Select, dateTime, get, str, useUrlState, vnd } from "../kit";
+import { SearchBox, periodQuery, PERIOD_OPTIONS, ConfirmDialog, DataTable, Dl, PageHead, Pager, Panel, Pill, QueryView, Select, dateTime, get, str, useUrlState, vnd } from "../kit";
 import type { Row } from "../kit";
 
 const STATUS: Record<string, [string, "ok" | "warn" | "bad" | "info"]> = {
@@ -16,7 +16,7 @@ export default function WithdrawalsPage() {
   const s = useUrlState();
   const [action, setAction] = useState<{ row: Row; kind: "APPROVE" | "REJECT" } | null>(null);
   const cache = useQueryClient();
-  const query = { type: "WITHDRAWAL", status: s.value("status"), page: String(s.page), limit: "15" };
+  const query = { type: "WITHDRAWAL", status: s.value("status"), search: s.value("search"), ...periodQuery(s.value("period")), page: String(s.page), limit: "15" };
   const q = useQuery({
     queryKey: ["admin", "withdrawals", query],
     queryFn: ({ signal }) => api<Row[]>("GET /coaches/wallet/transactions", { query, signal }),
@@ -35,7 +35,9 @@ export default function WithdrawalsPage() {
       <PageHead eyebrow="Kinh doanh · Tài chính" title="Rút tiền HLV" desc="HLV chỉ rút được tiền của khóa đã kết thúc; số dư khả dụng đã trừ khoản hoàn tiền đang chờ." />
       <Panel>
         <div className="cr-filters" style={{ marginBottom: 14 }}>
+          <SearchBox value={s.value("search")} onChange={(v) => s.set({ search: v })} placeholder="Tên hoặc email HLV" />
           <Select label="Trạng thái" value={s.value("status")} onChange={(v) => s.set({ status: v })} options={Object.entries(STATUS).map(([k, [l]]) => [k, l])} />
+          <Select label="Ngày yêu cầu" all="Mọi thời gian" value={s.value("period")} onChange={(v) => s.set({ period: v })} options={PERIOD_OPTIONS} />
         </div>
         <QueryView q={q}>
           {(res) => (

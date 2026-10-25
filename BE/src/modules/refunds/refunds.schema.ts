@@ -52,6 +52,10 @@ export const RefundQuerySchema = z.object({
   /** Lọc hoàn tiền của một đơn hàng. */
   orderId: z.string().min(1).optional(),
   classId: z.string().min(1).optional(),
+  /** U4: khoảng ngày yêu cầu (ISO có múi giờ) + tìm theo tên/email hội viên. */
+  startDate: z.string().datetime({ offset: true }).optional(),
+  endDate: z.string().datetime({ offset: true }).optional(),
+  search: z.string().trim().max(100).optional(),
 });
 
 export type RequestCourseRefundInput = z.infer<typeof RequestCourseRefundSchema>;

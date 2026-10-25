@@ -55,9 +55,11 @@ export default function RoomsPage() {
                       </div>
                     ),
                   },
-                  { key: "a", title: "Chỉ dẫn", render: (r) => str(r.directions) || "—" },
                   { key: "c", title: "Sức chứa", className: "num", render: (r) => `${num(r.capacity)} người` },
-                  { key: "s", title: "Trạng thái", render: (r) => <ActivePill active={r.isActive} on="Đang sử dụng" off="Ngừng sử dụng" /> },
+                  ...(res.data.some((r) => str(r.directions))
+                    ? [{ key: "a", title: "Chỉ dẫn", render: (r: Row) => str(r.directions) || <span className="cr-subtle">—</span> }]
+                    : []),
+                  { key: "s", title: "Trạng thái", render: (r) => (r.isActive ? <span className="cr-muted">Đang sử dụng</span> : <ActivePill active={false} off="Ngừng sử dụng" />) },
                   {
                     key: "x",
                     title: "",

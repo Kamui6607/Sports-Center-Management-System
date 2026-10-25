@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../shared/api";
-import { ConfirmDialog, DataTable, Dialog, Dl, ErrorBox, Field, PageHead, Pager, Panel, Pill, QueryView, Select, dateTime, get, num, str, useUrlState, vnd } from "../kit";
+import { SearchBox, periodQuery, PERIOD_OPTIONS, ConfirmDialog, DataTable, Dialog, Dl, ErrorBox, Field, PageHead, Pager, Panel, Pill, QueryView, Select, dateTime, get, num, str, useUrlState, vnd } from "../kit";
 import type { Row } from "../kit";
 
 /** Lý do hoàn tiền (BE `RefundReason`) — xem Doc/GYM_SCOPE_CHANGES.md §11. */
@@ -33,7 +33,7 @@ function StatusPill({ status }: { status: unknown }) {
 export default function RefundsPage() {
   const s = useUrlState();
   const [open, setOpen] = useState<Row | null>(null);
-  const query = { status: s.value("status"), reason: s.value("reason"), page: String(s.page), limit: "15" };
+  const query = { status: s.value("status"), reason: s.value("reason"), search: s.value("search"), ...periodQuery(s.value("period")), page: String(s.page), limit: "15" };
   const q = useQuery({
     queryKey: ["admin", "refunds", query],
     queryFn: ({ signal }) => api<Row[]>("GET /refunds", { query, signal }),
@@ -57,7 +57,9 @@ export default function RefundsPage() {
       />
       <Panel>
         <div className="cr-filters" style={{ marginBottom: 14 }}>
+          <SearchBox value={s.value("search")} onChange={(v) => s.set({ search: v })} placeholder="Tên hoặc email hội viên" />
           <Select label="Trạng thái" value={s.value("status")} onChange={(v) => s.set({ status: v })} options={Object.entries(STATUS).map(([k, [l]]) => [k, l])} />
+          <Select label="Ngày yêu cầu" all="Mọi thời gian" value={s.value("period")} onChange={(v) => s.set({ period: v })} options={PERIOD_OPTIONS} />
           <Select label="Lý do" value={s.value("reason")} onChange={(v) => s.set({ reason: v })} options={Object.entries(REFUND_REASON)} />
         </div>
         <QueryView q={q}>

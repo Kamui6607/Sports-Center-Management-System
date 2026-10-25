@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { Component, useEffect, useId, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AlertTriangle, ChevronLeft, ChevronRight, Inbox, Search, X } from "lucide-react";
@@ -228,8 +228,9 @@ export function Ring({ value, total, label }: { value: number; total: number; la
   return (
     <span className={"cr-ring" + (value >= total ? " full" : "")} title={label ?? `${value}/${total}`}>
       <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
-        <circle className="track" cx="11" cy="11" r={r} fill="none" strokeWidth="2.5" />
-        <circle className="val" cx="11" cy="11" r={r} fill="none" strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${p * c} ${c}`} />
+        <circle className="cr-ring-track" cx="11" cy="11" r={r} fill="none" strokeWidth="2.5" />
+        {/* 0%: không vẽ cung (cung dài 0 + đầu bo tròn hiện thành một chấm lệch) */}
+        {p > 0 && <circle className="cr-ring-val" cx="11" cy="11" r={r} fill="none" strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${p * c} ${c}`} />}
       </svg>
       <span>
         {Math.round(p * 100)}%<span className="sr-only"> ({label ?? `${value}/${total}`})</span>
@@ -306,7 +307,7 @@ export function QueryView<T>({
 export type Column<T> = { key: string; title: string; render: (row: T) => ReactNode; className?: string };
 
 export function DataTable<T extends Row>({ rows, columns, empty, label = "Bảng dữ liệu" }: { rows: T[]; columns: Column<T>[]; empty?: ReactNode; label?: string }) {
-  if (!rows.length) return <>{empty ?? <EmptyState title="Không có kết quả" text="Không có bản ghi nào khớp bộ lọc hiện tại." />}</>;
+  if (!rows.length) return <>{empty ?? <EmptyState title="Không có dữ liệu" text="Chưa có bản ghi nào để hiển thị. Nếu đang lọc, hãy thử bỏ bớt điều kiện." />}</>;
   return (
     <div className="cr-table-wrap" tabIndex={0} role="region" aria-label={label}>
       <table className="cr-table">
@@ -540,4 +541,76 @@ export function Dl({ items }: { items: [string, ReactNode][] }) {
       ))}
     </dl>
   );
+}
+
+// ── Trạng thái mở bán khóa học (BE tính `summary.saleState`) ───────────────
+const SALE: Record<string, [string, "ok" | "warn" | "info" | "plain"]> = {
+  ON_SALE: ["Đang mở bán", "ok"],
+  FULL: ["Đã đủ chỗ", "info"],
+  SALE_CLOSED: ["Ngừng nhận học viên", "warn"],
+  ENDED: ["Đã kết thúc", "plain"],
+  NOT_OPEN: ["Chưa mở bán", "plain"],
+};
+/** Ưu tiên `summary.saleState`; không có thì chỉ hiện bật/tắt bán khi khóa đã duyệt (tránh "Đã kết thúc" + "Đang mở"). */
+export function SalePill({ row }: { row: Row }) {
+  const st = str(get(row, "summary.saleState"));
+  if (st) return <Pill tone={SALE[st]?.[1] ?? "plain"}>{str(get(row, "summary.saleStateLabel")) || SALE[st]?.[0] || st}</Pill>;
+  if (row.status !== "APPROVED") return <span className="cr-muted">—</span>;
+  return row.isActive ? <Pill tone="ok">Đang mở bán</Pill> : <Pill>Ngừng mở bán</Pill>;
+}
+
+// ── Kỳ lọc nhanh cho danh sách (gửi ISO theo giờ Việt Nam) ─────────────────
+export const PERIOD_OPTIONS: [string, string][] = [
+  ["7d", "7 ngày qua"],
+  ["30d", "30 ngày qua"],
+  ["month", "Tháng này"],
+  ["last-month", "Tháng trước"],
+];
+export function periodQuery(preset: string): Record<string, string> {
+  if (!preset) return {};
+  const today = vnDateKey(new Date());
+  const shift = (k: string, n: number) => {
+    const d = new Date(`${k}T12:00:00+07:00`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return vnDateKey(d);
+  };
+  let start = today;
+  let end = today;
+  if (preset === "7d") start = shift(today, -6);
+  else if (preset === "30d") start = shift(today, -29);
+  else if (preset === "month") start = `${today.slice(0, 8)}01`;
+  else if (preset === "last-month") {
+    const [y, m] = today.split("-").map(Number);
+    const yy = m === 1 ? y - 1 : y;
+    const mm = m === 1 ? 12 : m - 1;
+    start = `${yy}-${String(mm).padStart(2, "0")}-01`;
+    end = new Date(Date.UTC(yy, mm, 0)).toISOString().slice(0, 10);
+  }
+  return { startDate: vnStartOf(start).toISOString(), endDate: new Date(`${end}T23:59:59.999+07:00`).toISOString() };
+}
+
+// ── Lỗi hiển thị theo trang: giữ sidebar/topbar, tự reset khi đổi route ────
+export class PageErrorBoundary extends Component<{ resetKey: string; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidUpdate(prev: { resetKey: string }) {
+    if (prev.resetKey !== this.props.resetKey && this.state.failed) this.setState({ failed: false });
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="cr-state" role="alert">
+        <span className="cr-state-icon" aria-hidden="true">
+          <AlertTriangle size={20} strokeWidth={1.7} />
+        </span>
+        <h3>Trang này gặp lỗi hiển thị</h3>
+        <p>Dữ liệu đã lưu không bị ảnh hưởng. Thử tải lại phần này hoặc chuyển sang trang khác.</p>
+        <button className="cr-btn primary" onClick={() => this.setState({ failed: false })}>
+          Thử lại
+        </button>
+      </div>
+    );
+  }
 }
