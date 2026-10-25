@@ -128,3 +128,54 @@ class CheckInResult {
   final String roomName;
   final AttendanceStatus status;
 }
+
+/// Trạng thái một buổi trong bảng chuyên cần RIÊNG của một khóa.
+enum CourseSessionMark { present, late, absent, excused, notMarked, upcoming, cancelled }
+
+/// Một buổi của khóa (đã qua hoặc sắp tới) kèm kết quả điểm danh của học viên.
+class CourseAttendanceSession {
+  const CourseAttendanceSession({
+    required this.scheduleId,
+    required this.startTime,
+    required this.endTime,
+    required this.mark,
+    this.roomName,
+    this.isMakeup = false,
+    this.note,
+  });
+
+  final String scheduleId;
+  final DateTime startTime;
+  final DateTime endTime;
+  final CourseSessionMark mark;
+  final String? roomName;
+  final bool isMakeup;
+  final String? note;
+}
+
+/// Chuyên cần của học viên trong MỘT khóa: có mặt / đi trễ / vắng / có phép / chưa điểm danh / sắp tới.
+class CourseAttendance {
+  const CourseAttendance(this.sessions);
+
+  static const empty = CourseAttendance([]);
+
+  /// Sắp theo thời gian tăng dần.
+  final List<CourseAttendanceSession> sessions;
+
+  int _count(CourseSessionMark m) => sessions.where((s) => s.mark == m).length;
+
+  int get present => _count(CourseSessionMark.present);
+  int get late => _count(CourseSessionMark.late);
+  int get absent => _count(CourseSessionMark.absent);
+  int get excused => _count(CourseSessionMark.excused);
+  int get notMarked => _count(CourseSessionMark.notMarked);
+  int get upcoming => _count(CourseSessionMark.upcoming);
+
+  /// Có mặt + đi trễ được tính là tham gia.
+  int get attended => present + late;
+
+  /// Buổi đã qua được tính tỷ lệ (vắng có phép không tính — giống BE).
+  int get counted => present + late + absent + notMarked;
+
+  double get rate => counted == 0 ? 1 : attended / counted;
+}

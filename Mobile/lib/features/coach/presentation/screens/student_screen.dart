@@ -9,6 +9,7 @@ import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../attendance/presentation/widgets/course_attendance_view.dart';
 import '../../../auth/presentation/auth_labels.dart';
 import '../../../catalog/domain/entities/catalog.dart';
 import '../../../training/data/training_repository_provider.dart';
@@ -16,24 +17,40 @@ import '../../../training/domain/entities/training.dart';
 import '../../../training/presentation/training_screens.dart';
 import '../providers/coach_providers.dart';
 
-/// H10 + H11 — Hồ sơ học viên (góc nhìn HLV) + lộ trình tập do HLV lập.
-class StudentScreen extends ConsumerWidget {
+/// H10 + H11 — Hồ sơ học viên (góc nhìn HLV) + chuyên cần & lộ trình RIÊNG từng khóa của HLV mà học viên học.
+class StudentScreen extends ConsumerStatefulWidget {
   const StudentScreen({super.key, required this.memberProfileId});
 
   final String memberProfileId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StudentScreen> createState() => _StudentScreenState();
+}
+
+class _StudentScreenState extends ConsumerState<StudentScreen> {
+  String? _classId;
+
+  @override
+  Widget build(BuildContext context) {
+    final memberProfileId = widget.memberProfileId;
     final value = ref.watch(studentProfileProvider(memberProfileId));
+    final profile = value.value;
+    final selected = profile == null || profile.classes.isEmpty
+        ? null
+        : profile.classes.where((c) => c.classId == _classId).firstOrNull ?? profile.classes.first;
     return AppScaffold(
       title: 'Hồ sơ học viên',
-      floatingActionButton: value.value == null
+      floatingActionButton: profile == null
           ? null
           : FloatingActionButton.extended(
               onPressed: () => showAppBottomSheet<void>(
                 context: context,
-                title: 'Lập lộ trình cho ${value.value!.student.fullName}',
-                builder: (_) => _PlanForm(memberProfileId: memberProfileId),
+                title: 'Lập lộ trình cho ${profile.student.fullName}',
+                builder: (_) => _PlanForm(
+                  memberProfileId: memberProfileId,
+                  classId: selected?.classId,
+                  className: selected?.className,
+                ),
               ),
               backgroundColor: context.colors.primary,
               foregroundColor: context.colors.accent,
@@ -47,6 +64,11 @@ class StudentScreen extends ConsumerWidget {
         data: (p) {
           final s = p.student;
           final c = context.colors;
+          final st = selected;
+          // Lộ trình của khóa đang chọn + lộ trình chung (dữ liệu cũ chưa gắn khóa).
+          final plans = p.plans
+              .where((plan) => st == null || plan.classId == st.classId || plan.classId == null)
+              .toList();
           return RefreshableScroll(
             onRefresh: () => ref.refresh(studentProfileProvider(memberProfileId).future),
             children: [
@@ -75,45 +97,43 @@ class StudentScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              const SectionHeader(title: 'Chuyên cần trong khóa của bạn'),
-              for (final st in p.classes)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: AppCard(
-                    child: Row(
-                      children: [
-                        ProgressRing(ratio: st.pastSessions == 0 ? 1 : st.attended / st.pastSessions),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(st.className, style: context.text.bodyStrong),
-                              Text(
-                                'Tham gia ${st.attended}/${st.pastSessions} buổi đã qua',
-                                style: context.text.caption.copyWith(color: c.textMuted),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+              if (st != null) ...[
+                SectionHeader(title: p.classes.length > 1 ? 'Chọn khóa học (${p.classes.length})' : 'Khóa học'),
+                if (p.classes.length > 1) ...[
+                  SegmentedTabs<String>(
+                    padding: EdgeInsets.zero,
+                    selected: st.classId,
+                    onChanged: (id) => setState(() => _classId = id),
+                    options: [for (final k in p.classes) SegmentOption(k.classId, k.className)],
                   ),
-                ),
-              const SizedBox(height: AppSpacing.md),
-              SectionHeader(title: 'Lộ trình bạn đã lập (${p.plans.length})'),
-              if (p.plans.isEmpty)
+                  const SizedBox(height: AppSpacing.md),
+                ] else
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Text(st.className, style: context.text.titleSmall),
+                  ),
+                SectionHeader(title: 'Chuyên cần khóa ${st.className}'),
+                CourseAttendanceView(key: ValueKey(st.classId), attendance: st.attendance),
+                const SizedBox(height: AppSpacing.lg),
+              ],
+              SectionHeader(
+                title: st == null
+                    ? 'Lộ trình bạn đã lập (${plans.length})'
+                    : 'Lộ trình khóa ${st.className} (${plans.length})',
+              ),
+              if (plans.isEmpty)
                 Text(
-                  'Chưa có lộ trình. Lập lộ trình để ghi nhận kết quả và nhận xét cho học viên.',
+                  'Chưa có lộ trình cho khóa này. Bấm "Lập lộ trình" để ghi nhận kết quả và nhận xét cho học viên.',
                   style: context.text.small.copyWith(color: c.textMuted),
                 )
               else
-                for (final plan in p.plans)
+                for (final plan in plans)
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: PlanCard(
                       plan: plan,
                       showMember: true,
+                      showCourse: plan.classId == null,
                       onTap: () => context.push(AppRoutes.coachPlan(plan.id)),
                     ),
                   ),
@@ -127,9 +147,13 @@ class StudentScreen extends ConsumerWidget {
 }
 
 class _PlanForm extends ConsumerStatefulWidget {
-  const _PlanForm({required this.memberProfileId});
+  const _PlanForm({required this.memberProfileId, this.classId, this.className});
 
   final String memberProfileId;
+
+  /// Khóa của lộ trình (khóa đang chọn trên màn hồ sơ).
+  final String? classId;
+  final String? className;
 
   @override
   ConsumerState<_PlanForm> createState() => _PlanFormState();
@@ -157,6 +181,7 @@ class _PlanFormState extends ConsumerState<_PlanForm> with SubmittingState {
           .createPlan(
             PlanDraft(
               memberProfileId: widget.memberProfileId,
+              classId: widget.classId,
               name: _name.text,
               description: _desc.text,
               startDate: _start,
@@ -176,6 +201,10 @@ class _PlanFormState extends ConsumerState<_PlanForm> with SubmittingState {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (widget.className != null) ...[
+          InfoRow(icon: AppIcons.course, text: 'Thuộc khóa: ${widget.className}'),
+          const SizedBox(height: AppSpacing.sm),
+        ],
         AppTextField(
           label: 'Tên lộ trình',
           requiredField: true,

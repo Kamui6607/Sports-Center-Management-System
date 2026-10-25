@@ -48,6 +48,8 @@ class TrainingPlan {
     required this.memberName,
     this.description,
     this.results = const [],
+    this.classId,
+    this.className,
   });
 
   final String id;
@@ -61,6 +63,10 @@ class TrainingPlan {
   final String memberName;
   final List<TrainingResult> results;
 
+  /// Khóa học của lộ trình (null = lộ trình chung với HLV, dữ liệu cũ).
+  final String? classId;
+  final String? className;
+
   bool isActive(DateTime now) => !now.isBefore(startDate) && now.isBefore(endDate);
 
   bool hasEnded(DateTime now) => !now.isBefore(endDate);
@@ -73,9 +79,13 @@ class PlanDraft {
     required this.startDate,
     required this.endDate,
     this.description,
+    this.classId,
   });
 
   final String memberProfileId;
+
+  /// Khóa học mà lộ trình phục vụ.
+  final String? classId;
   final String name;
   final String? description;
   final DateTime startDate;

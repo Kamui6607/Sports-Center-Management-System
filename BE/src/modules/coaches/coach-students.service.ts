@@ -26,37 +26,95 @@ export async function getMyStudent(coachUserId: string, memberId: string, now = 
     where: { memberId: member.id, status: { in: ["BOOKED", "COMPLETED"] }, schedule: { class: { coachId: coach.id } } },
     select: {
       scheduleId: true,
-      schedule: { select: { classId: true, endTime: true, status: true, class: { select: { id: true, name: true } } } },
+      schedule: {
+        select: {
+          classId: true,
+          startTime: true,
+          endTime: true,
+          status: true,
+          makeupForId: true,
+          room: { select: { name: true } },
+          class: { select: { id: true, name: true } },
+        },
+      },
     },
+    orderBy: { schedule: { startTime: "asc" } },
   });
   if (enrollments.length === 0) throw new AppError("Học viên không thuộc khóa học của bạn.", 403);
 
   const attendance = await prisma.attendance.findMany({
     where: { memberId: member.id, scheduleId: { in: enrollments.map((e) => e.scheduleId) } },
-    select: { scheduleId: true, status: true },
+    select: { scheduleId: true, status: true, note: true },
   });
-  const statusBySchedule = new Map(attendance.map((a) => [a.scheduleId, a.status]));
+  const recordBySchedule = new Map(attendance.map((a) => [a.scheduleId, a]));
 
-  const byClass = new Map<string, { classId: string; className: string; attended: number; excused: number; pastSessions: number }>();
+  /** Chuyên cần RIÊNG từng khóa: số buổi có mặt / trễ / vắng / có phép / chưa điểm danh / sắp tới + từng buổi. */
+  type ClassStat = {
+    classId: string;
+    className: string;
+    attended: number;
+    present: number;
+    late: number;
+    absent: number;
+    excused: number;
+    notMarked: number;
+    upcoming: number;
+    pastSessions: number;
+    sessions: {
+      scheduleId: string;
+      startTime: Date;
+      endTime: Date;
+      roomName: string;
+      isMakeup: boolean;
+      /** PRESENT | LATE | ABSENT | EXCUSED | NOT_MARKED (đã qua chưa điểm danh) | UPCOMING | CANCELLED */
+      status: string;
+      note: string | null;
+    }[];
+  };
+  const byClass = new Map<string, ClassStat>();
   for (const e of enrollments) {
     const cls = e.schedule.class;
-    const stat = byClass.get(cls.id) ?? { classId: cls.id, className: cls.name, attended: 0, excused: 0, pastSessions: 0 };
-    const past = e.schedule.status !== "CANCELLED" && e.schedule.endTime <= now;
-    if (past) {
-      const st = statusBySchedule.get(e.scheduleId);
+    const stat =
+      byClass.get(cls.id) ??
+      { classId: cls.id, className: cls.name, attended: 0, present: 0, late: 0, absent: 0, excused: 0, notMarked: 0, upcoming: 0, pastSessions: 0, sessions: [] };
+    const rec = recordBySchedule.get(e.scheduleId);
+    let status: string;
+    if (e.schedule.status === "CANCELLED") status = "CANCELLED";
+    else if (e.schedule.endTime > now) {
+      status = "UPCOMING";
+      stat.upcoming++;
+    } else {
+      status = rec?.status ?? "NOT_MARKED";
       // L5: buổi "vắng có phép" không tính vào tỷ lệ chuyên cần.
-      if (st === "EXCUSED") stat.excused++;
+      if (status === "EXCUSED") stat.excused++;
       else {
         stat.pastSessions++;
-        if (st === "PRESENT" || st === "LATE") stat.attended++;
+        if (status === "PRESENT") stat.present++;
+        else if (status === "LATE") stat.late++;
+        else if (status === "ABSENT") stat.absent++;
+        else stat.notMarked++;
+        if (status === "PRESENT" || status === "LATE") stat.attended++;
       }
     }
+    stat.sessions.push({
+      scheduleId: e.scheduleId,
+      startTime: e.schedule.startTime,
+      endTime: e.schedule.endTime,
+      roomName: e.schedule.room.name,
+      isMakeup: e.schedule.makeupForId !== null,
+      status,
+      note: rec?.note ?? null,
+    });
     byClass.set(cls.id, stat);
   }
 
   const plans = await prisma.trainingPlan.findMany({
     where: { memberId: member.id, coachId: coach.id },
-    include: { coach: { include: { user: { select: { id: true, fullName: true } } } }, results: { orderBy: { date: "asc" } } },
+    include: {
+      coach: { include: { user: { select: { id: true, fullName: true } } } },
+      class: { select: { id: true, name: true } },
+      results: { orderBy: { date: "asc" } },
+    },
     orderBy: { startDate: "desc" },
   });
 

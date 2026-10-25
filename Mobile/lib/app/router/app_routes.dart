@@ -50,6 +50,10 @@ abstract final class AppRoutes {
   static const myCourses = '/member/courses';
   static const courseHistory = '/member/courses/history';
   static String myCourse(String classId) => '/member/courses/$classId';
+
+  /// Chuyên cần / lộ trình RIÊNG của một khóa đã mua.
+  static String myCourseAttendance(String classId) => '/member/courses/$classId/attendance';
+  static String myCourseTraining(String classId) => '/member/courses/$classId/training';
   static String cancelCourse(String classId) => '/member/courses/$classId/cancel';
   static const refunds = '/member/refunds';
   static String mySession(String sessionId) => '/member/sessions/$sessionId';

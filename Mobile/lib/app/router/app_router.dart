@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/attendance/presentation/screens/attendance_screen.dart';
+import '../../features/attendance/presentation/screens/course_attendance_screen.dart';
 import '../../features/attendance/presentation/screens/scan_screen.dart';
 import '../../features/attendance/presentation/screens/session_qr_screen.dart';
 import '../../features/auth/presentation/providers/session_provider.dart';
@@ -158,6 +159,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       page(AppRoutes.courseHistory, (_) => const MyCoursesScreen(initialTab: CourseHistoryTab.completed)),
       page('/member/courses/:id', (s) => MyCourseDetailScreen(classId: s.pathParameters['id']!)),
       page('/member/courses/:id/cancel', (s) => CancelCourseScreen(classId: s.pathParameters['id']!)),
+      page('/member/courses/:id/attendance', (s) => CourseAttendanceScreen(classId: s.pathParameters['id']!)),
+      page(
+        '/member/courses/:id/training',
+        (s) => TrainingPlansScreen(
+          classId: s.pathParameters['id'],
+          coachProfileId: s.uri.queryParameters['coach'],
+          courseName: s.uri.queryParameters['name'],
+        ),
+      ),
       page(AppRoutes.refunds, (_) => const RefundsScreen()),
       page('/member/sessions/:id', (s) => MySessionScreen(sessionId: s.pathParameters['id']!)),
       page(AppRoutes.scan, (_) => const ScanScreen()),

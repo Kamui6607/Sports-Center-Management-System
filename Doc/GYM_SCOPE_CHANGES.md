@@ -206,5 +206,14 @@ Xem `Doc/MEMBERSHIP_FLOW.md`: CRUD gói trên Web, thẻ thành viên Mobile thi
 ## 22. Migration & áp lên DB Render
 - `20261025000000_business_hardening` — cột `Class.alertStage/closedReason/closedAt`, `ClassSchedule.cancelCode`, enum `COURSE_NOT_FULFILLED`, backfill ảnh chụp người bán/người mua.
 - `20261025010000_membership_flow` — cột gói/membership, bảng `MemberPassScan`, enum `MEMBERSHIP_CANCELLED`.
+- `20261025020000_training_plan_class` — cột `TrainingPlan.classId` (+ backfill: HLV chỉ dạy hội viên đúng 1 khóa ⇒ gắn lộ trình cũ vào khóa đó).
 - Cả hai idempotent, chỉ THÊM. **Đã áp DB local, chưa áp Render.** Khi áp: `pg_dump "$RENDER_DATABASE_URL" -Fc -f backup_$(date +%Y%m%d).dump` rồi `cd BE && npx prisma migrate deploy`.
 - Biến môi trường mới (tùy chọn): `COURSE_SALE_MAX_PROGRESS_PERCENT` (50), `COURSE_SALE_MIN_REMAINING_SESSIONS` (3).
+
+
+## 23. Chuyên cần & lộ trình RIÊNG từng khóa
+
+- **Member — Khóa học của tôi › Chuyên cần**: mở màn chuyên cần của **chính khóa đó** (`/member/courses/:id/attendance`), không lẫn khóa khác: tỷ lệ tham gia, số buổi **Có mặt · Đi trễ · Vắng · Có phép · Sắp tới**, bộ lọc *Tất cả / Có mặt / Vắng / Sắp tới* và danh sách từng buổi (phòng, buổi dạy bù, ghi chú). Buổi đã qua chưa điểm danh hiện "Chưa điểm danh" và tính là vắng; vắng có phép không tính vào tỷ lệ (giống BE). Kèm cảnh báo khi đang bị phạt chuyên cần ở khóa đó.
+- **Member — Khóa học của tôi › Lộ trình tập**: chỉ lộ trình của khóa đó (`/member/courses/:id/training`) + lộ trình cũ chưa gắn khóa của cùng HLV (ghi "Lộ trình chung"). Màn lộ trình tổng ghi rõ mỗi lộ trình thuộc khóa nào.
+- **HLV — Hồ sơ học viên**: chọn khóa (tab theo các khóa của HLV mà học viên học) ⇒ chuyên cần và lộ trình **riêng khóa đã chọn**; "Lập lộ trình" gắn vào khóa đang chọn.
+- **BE**: `TrainingPlan.classId` (lộ trình thuộc một khóa; HLV phải phụ trách khóa và hội viên phải học khóa đó, sai ⇒ 400 `PLAN_CLASS_INVALID`; không gửi mà hội viên chỉ học 1 khóa của HLV ⇒ tự gắn). `GET /training-plans?classId=` lọc theo khóa, kèm `class { id, name }`. `GET /coaches/me/students/:memberId` trả cho mỗi khóa `present, late, absent, excused, notMarked, upcoming` + `sessions[]` (từng buổi: giờ, phòng, dạy bù, trạng thái `PRESENT|LATE|ABSENT|EXCUSED|NOT_MARKED|UPCOMING|CANCELLED`).

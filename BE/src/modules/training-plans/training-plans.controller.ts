@@ -12,7 +12,7 @@ export const createPlan = async (req: Request, res: Response, next: NextFunction
 
 export const getPlans = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const plans = await service.getPlans(req.query.memberId as string, req.user!);
+    const plans = await service.getPlans(req.query.memberId as string, req.user!, req.query.classId as string | undefined);
     res.json({ success: true, data: plans });
   } catch (error) { next(error); }
 };

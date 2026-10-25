@@ -29,6 +29,25 @@ export const createPlan = async (data: Prisma.TrainingPlanUncheckedCreateInput, 
     throw new AppError("Cannot assign training plan: user is not an active MEMBER", 400);
   }
 
+  // Lộ trình thuộc MỘT khóa: HLV phụ trách khóa + hội viên đang/đã học khóa đó. Không gửi classId mà hội viên chỉ
+  // học đúng một khóa của HLV ⇒ tự gắn vào khóa đó.
+  const sharedClasses = await prisma.class.findMany({
+    where: {
+      coachId: data.coachId,
+      schedules: { some: { enrollments: { some: { memberId: data.memberId, status: { in: ["BOOKED", "COMPLETED"] } } } } },
+    },
+    select: { id: true },
+  });
+  if (data.classId) {
+    if (!sharedClasses.some((c) => c.id === data.classId)) {
+      throw new AppError("Học viên không học khóa này của bạn — không thể gắn lộ trình vào khóa.", 400, {
+        code: "PLAN_CLASS_INVALID",
+      });
+    }
+  } else if (sharedClasses.length === 1) {
+    data.classId = sharedClasses[0].id;
+  }
+
   const plan = await prisma.trainingPlan.create({
 
     data,
@@ -44,7 +63,7 @@ export const createPlan = async (data: Prisma.TrainingPlanUncheckedCreateInput, 
     "TRAINING_PLAN_ASSIGNED",
     `HLV đã giao kế hoạch tập luyện mới`,
     `HLV ${plan.coach.user.fullName} đã tạo kế hoạch tập "${plan.name}" cho bạn từ ngày ${new Date(plan.startDate).toLocaleDateString("vi-VN")} đến ${new Date(plan.endDate).toLocaleDateString("vi-VN")}.`,
-    { metadata: { planId: plan.id, coachId: plan.coachId } }
+    { metadata: { planId: plan.id, coachId: plan.coachId, classId: plan.classId } }
   ).catch(() => {});
 
   return plan;
@@ -56,6 +75,8 @@ const planInclude = {
   coach: { include: { user: { select: { id: true, fullName: true } } } },
   // BE-17: kèm tên học viên để client không phải tra thêm.
   member: { include: { user: { select: { id: true, fullName: true, avatarUrl: true } } } },
+  // Khóa của lộ trình (null = lộ trình chung với HLV).
+  class: { select: { id: true, name: true } },
   results: { orderBy: { date: "asc" } },
   attachments: {
     orderBy: { createdAt: "desc" },
@@ -71,11 +92,14 @@ const planInclude = {
  */
 export const getPlans = async (
   memberId: string | undefined,
-  actor: { id: string; role: string }
+  actor: { id: string; role: string },
+  classId?: string
 ) => {
+  // Lọc theo khóa: lộ trình của khóa đó (classId null = lộ trình chung, không thuộc khóa nào).
+  const byClass: Prisma.TrainingPlanWhereInput = classId ? { classId } : {};
   if (actor.role === "MANAGER") {
     return prisma.trainingPlan.findMany({
-      where: memberId ? { memberId } : undefined,
+      where: { ...(memberId ? { memberId } : {}), ...byClass },
       include: planInclude,
     });
   }
@@ -84,7 +108,7 @@ export const getPlans = async (
     const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: actor.id } });
     if (!coachProfile) throw new AppError("Coach profile not found", 404);
     return prisma.trainingPlan.findMany({
-      where: { coachId: coachProfile.id, ...(memberId ? { memberId } : {}) },
+      where: { coachId: coachProfile.id, ...(memberId ? { memberId } : {}), ...byClass },
       include: planInclude,
     });
   }
@@ -96,7 +120,7 @@ export const getPlans = async (
       throw new AppError("Forbidden: You can only view your own training plans", 403);
     }
     return prisma.trainingPlan.findMany({
-      where: { memberId: memberProfile.id },
+      where: { memberId: memberProfile.id, ...byClass },
       include: planInclude,
     });
   }

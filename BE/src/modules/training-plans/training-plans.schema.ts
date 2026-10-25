@@ -3,6 +3,8 @@ import { z } from "zod";
 export const CreateTrainingPlanSchema = z.object({
   memberId: z.string().uuid(),
   coachId: z.string().uuid(),
+  /** Khóa học của lộ trình (khuyến nghị) — HLV phải phụ trách khóa và hội viên phải học khóa đó. */
+  classId: z.string().trim().min(1).max(64).optional(),
   name: z.string().min(1),
   description: z.string().optional(),
   startDate: z.string().datetime(),

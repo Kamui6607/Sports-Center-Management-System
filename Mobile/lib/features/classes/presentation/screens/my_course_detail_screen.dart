@@ -98,7 +98,12 @@ class _Content extends ConsumerWidget {
                       label: 'Lộ trình tập',
                       icon: AppIcons.training,
                       size: AppButtonSize.small,
-                      onPressed: () => context.push(AppRoutes.training),
+                      onPressed: () => context.push(
+                        Uri(
+                          path: AppRoutes.myCourseTraining(course.id),
+                          queryParameters: {'coach': course.coach.coachProfileId, 'name': course.name},
+                        ).toString(),
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.xs),
@@ -107,7 +112,7 @@ class _Content extends ConsumerWidget {
                       label: 'Chuyên cần',
                       icon: AppIcons.attendance,
                       size: AppButtonSize.small,
-                      onPressed: () => context.push(AppRoutes.attendance),
+                      onPressed: () => context.push(AppRoutes.myCourseAttendance(course.id)),
                     ),
                   ),
                 ],

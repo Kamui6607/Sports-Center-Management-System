@@ -15,6 +15,8 @@ abstract final class TrainingJson {
     // BE-17: danh sách & chi tiết đều kèm `member.user`.
     memberName: p.obj('member').obj('user').str('fullName', memberName ?? ''),
     results: [for (final r in p.objList('results')) result(r)]..sort((a, b) => b.date.compareTo(a.date)),
+    classId: p.strOrNull('classId'),
+    className: p.objOrNull('class')?.strOrNull('name'),
   );
 
   /// `metrics` của BE: `[{ name, value:number, unit?, note?, lowerIsBetter? }]` (L9).

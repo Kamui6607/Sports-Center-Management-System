@@ -5,8 +5,26 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="feat: harden course sales, payments, invoices and revenue reporting (late-join pricing, sale cutoff, seat holds, class maintenance job, snapshot-based invoices with full cost breakdown) and complete the membership flow (plan CRUD, rotating QR pass with entry log, queued plans, renewal reminders, manager cancellation with refunds) across BE, Mobile and Web 25/10">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/BE/prisma/schema.prisma" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/coaches/coach-students.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/coaches/coach-students.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/training-plans/training-plans.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/training-plans/training-plans.controller.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/training-plans/training-plans.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/training-plans/training-plans.schema.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/training-plans/training-plans.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/training-plans/training-plans.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/tests/business-hardening.local.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/tests/business-hardening.local.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Doc/GYM_SCOPE_CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/Doc/GYM_SCOPE_CHANGES.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/admin.css" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/admin.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/api/training_json.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/api/training_json.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/app/router/app_router.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/app/router/app_router.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/app/router/app_routes.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/app/router/app_routes.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/domain/entities/attendance.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/domain/entities/attendance.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/classes/presentation/screens/my_course_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/classes/presentation/screens/my_course_detail_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/coach/data/coach_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/coach/data/coach_api_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/coach/data/coach_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/coach/data/coach_mock_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/coach/domain/entities/coach_dashboard.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/coach/domain/entities/coach_dashboard.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/coach/presentation/screens/student_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/coach/presentation/screens/student_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/data/training_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/data/training_api_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/domain/entities/training.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/domain/entities/training.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/presentation/training_screens.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/presentation/training_screens.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -59,7 +77,7 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "com.google.cloudcode.ide_session_index": "20261025_0001",
+    "com.google.cloudcode.ide_session_index": "20261025_0005",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "dart.analysis.tool.window.visible": "false",
     "git-widget-placeholder": "#1 on develop",
@@ -145,6 +163,8 @@
       <workItem from="1792846938771" duration="499000" />
       <workItem from="1792855247623" duration="823000" />
       <workItem from="1792914375075" duration="1598000" />
+      <workItem from="1792930699433" duration="262000" />
+      <workItem from="1792933225717" duration="1007000" />
     </task>
     <task id="LOCAL-00001" summary="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10">
       <option name="closed" value="true" />

@@ -370,6 +370,7 @@ model Class {
   walletTransactions WalletTransaction[]
   payments           Payment[]
   refunds            Refund[]
+  trainingPlans      TrainingPlan[]
 
   @@index([coachId])
 }
@@ -726,6 +727,9 @@ model TrainingPlan {
   member      MemberProfile @relation(fields: [memberId], references: [id], onDelete: Cascade)
   coachId     String
   coach       CoachProfile  @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  /// Khóa học mà lộ trình này phục vụ (null = lộ trình chung với HLV, dữ liệu cũ) — để xem lộ trình riêng từng khóa.
+  classId     String?
+  class       Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
   name        String
   description String?
   startDate   DateTime
@@ -739,6 +743,7 @@ model TrainingPlan {
   attachments TrainingPlanAttachment[]
 
   @@index([memberId])
+  @@index([classId])
   @@index([coachId])
 }
 

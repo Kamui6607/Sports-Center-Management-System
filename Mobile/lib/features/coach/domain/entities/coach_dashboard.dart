@@ -1,3 +1,4 @@
+import '../../../attendance/domain/entities/attendance.dart';
 import '../../../classes/domain/entities/coach_class.dart';
 import '../../../schedule/domain/entities/session.dart';
 import '../../../training/domain/entities/training.dart';
@@ -58,10 +59,14 @@ class StudentClassStat {
     required this.className,
     required this.attended,
     required this.pastSessions,
+    this.attendance = CourseAttendance.empty,
   });
 
   final String classId;
   final String className;
   final int attended;
   final int pastSessions;
+
+  /// Từng buổi của học viên trong khóa (có mặt / vắng / sắp tới).
+  final CourseAttendance attendance;
 }

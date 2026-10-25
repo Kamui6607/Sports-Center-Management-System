@@ -34,6 +34,7 @@ class TrainingApiRepository implements TrainingRepository {
       body: {
         'memberId': d.memberProfileId,
         'coachId': coachId,
+        if (d.classId != null) 'classId': d.classId,
         'name': d.name.trim(),
         if (d.description?.trim().isNotEmpty ?? false) 'description': d.description!.trim(),
         'startDate': d.startDate.toUtc().toIso8601String(),

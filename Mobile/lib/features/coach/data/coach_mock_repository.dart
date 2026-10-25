@@ -229,7 +229,48 @@ class CoachMockRepository implements CoachRepository {
           .length;
       attendedTotal += attended;
       pastTotal += enrolled;
-      stats.add(StudentClassStat(classId: c.id, className: c.name, attended: attended, pastSessions: enrolled));
+      // Từng buổi của học viên trong khóa (có mặt / vắng / sắp tới) — như BE `GET /coaches/me/students/:id`.
+      final mine =
+          db
+              .sessionsOf(c.id)
+              .where(
+                (s) => db.enrollments.any(
+                  (e) => e.memberProfileId == mp.id && e.sessionId == s.id && e.status != EnrollmentStatus.cancelled,
+                ),
+              )
+              .toList()
+            ..sort((a, b) => a.start.compareTo(b.start));
+      final attendance = CourseAttendance([
+        for (final s in mine)
+          CourseAttendanceSession(
+            scheduleId: s.id,
+            startTime: s.start,
+            endTime: s.end,
+            mark: s.status == ScheduleStatus.cancelled
+                ? CourseSessionMark.cancelled
+                : s.end.isAfter(now)
+                ? CourseSessionMark.upcoming
+                : switch (db.attendance
+                      .where((a) => a.memberProfileId == mp.id && a.sessionId == s.id)
+                      .firstOrNull
+                      ?.status) {
+                    AttendanceStatus.present => CourseSessionMark.present,
+                    AttendanceStatus.late => CourseSessionMark.late,
+                    AttendanceStatus.absent => CourseSessionMark.absent,
+                    AttendanceStatus.excused => CourseSessionMark.excused,
+                    null => CourseSessionMark.notMarked,
+                  },
+          ),
+      ]);
+      stats.add(
+        StudentClassStat(
+          classId: c.id,
+          className: c.name,
+          attended: attended,
+          pastSessions: enrolled,
+          attendance: attendance,
+        ),
+      );
     }
     final u = db.user(mp.userId);
     final plans = db.trainingPlans

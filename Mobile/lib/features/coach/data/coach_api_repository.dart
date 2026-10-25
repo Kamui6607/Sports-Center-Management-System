@@ -5,6 +5,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/json.dart';
 import '../../../core/utils/money.dart';
 import '../../../core/utils/vn_time.dart';
+import '../../attendance/domain/entities/attendance.dart';
 import '../../schedule/domain/entities/session.dart';
 import '../domain/entities/coach_dashboard.dart';
 import '../domain/entities/wallet.dart';
@@ -219,6 +220,26 @@ class CoachApiRepository implements CoachRepository {
             className: c.str('className'),
             attended: c.integer('attended'),
             pastSessions: c.integer('pastSessions'),
+            attendance: CourseAttendance([
+              for (final s in c.objList('sessions'))
+                CourseAttendanceSession(
+                  scheduleId: s.str('scheduleId'),
+                  startTime: s.date('startTime'),
+                  endTime: s.date('endTime'),
+                  roomName: s.strOrNull('roomName'),
+                  isMakeup: s.boolean('isMakeup'),
+                  note: s.strOrNull('note'),
+                  mark: switch (s.str('status')) {
+                    'PRESENT' => CourseSessionMark.present,
+                    'LATE' => CourseSessionMark.late,
+                    'ABSENT' => CourseSessionMark.absent,
+                    'EXCUSED' => CourseSessionMark.excused,
+                    'UPCOMING' => CourseSessionMark.upcoming,
+                    'CANCELLED' => CourseSessionMark.cancelled,
+                    _ => CourseSessionMark.notMarked,
+                  },
+                ),
+            ]),
           ),
       ],
       plans: [

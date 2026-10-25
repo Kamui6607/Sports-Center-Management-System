@@ -66,14 +66,20 @@ async function main() {
     const d = await call("POST", "/classes/drafts", coach, { name });
     const id = d.body.data.id as string;
     created.push(id);
-    const r = await call("POST", `/classes/drafts/${id}/submit`, coach, {
-      class: { name, capacity, price, classType: "REGULAR", goalTags: ["STRENGTH"] },
-      roomId: room.id,
-      schedules: Array.from({ length: n }, (_, k) => {
-        const st = new Date(base.getTime() + (k * 2 + dayShift) * DAY);
-        return { startTime: iso(st), endTime: iso(new Date(st.getTime() + 3_600_000)) };
-      }),
-    });
+    // Trùng lịch có sẵn của HLV/phòng (dữ liệu seed, phụ thuộc giờ chạy) ⇒ dời 2 giờ rồi thử lại.
+    let r: Awaited<ReturnType<typeof call>> = { status: 0, body: {} };
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const shift = attempt * 2 * 3_600_000;
+      r = await call("POST", `/classes/drafts/${id}/submit`, coach, {
+        class: { name, capacity, price, classType: "REGULAR", goalTags: ["STRENGTH"] },
+        roomId: room.id,
+        schedules: Array.from({ length: n }, (_, k) => {
+          const st = new Date(base.getTime() + shift + (k * 2 + dayShift) * DAY);
+          return { startTime: iso(st), endTime: iso(new Date(st.getTime() + 3_600_000)) };
+        }),
+      });
+      if (!["COACH_CONFLICT", "ROOM_CONFLICT"].includes(r.body?.errors?.code)) break;
+    }
     if (r.status !== 200) throw new Error(`submit ${name}: ${JSON.stringify(r.body)}`);
     if (opts.approve !== false) {
       const a = await call("PATCH", `/classes/${id}/review`, manager, { action: "APPROVE" });

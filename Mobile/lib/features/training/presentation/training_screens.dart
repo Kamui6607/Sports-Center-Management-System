@@ -23,28 +23,48 @@ final planProvider = FutureProvider.autoDispose.family<TrainingPlan, String>((re
 });
 
 /// M13 — Lộ trình tập luyện của Member (chỉ xem).
+/// [classId] ⇒ chỉ lộ trình của khóa đó, kèm lộ trình chung (chưa gắn khóa) với HLV [coachProfileId] của khóa.
 class TrainingPlansScreen extends ConsumerWidget {
-  const TrainingPlansScreen({super.key});
+  const TrainingPlansScreen({super.key, this.classId, this.coachProfileId, this.courseName});
+
+  final String? classId;
+  final String? coachProfileId;
+  final String? courseName;
+
+  bool _belongs(TrainingPlan p) =>
+      classId == null || p.classId == classId || (p.classId == null && p.coachProfileId == coachProfileId);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final value = ref.watch(myPlansProvider);
     return AppScaffold(
-      title: 'Lộ trình tập luyện',
+      title: classId == null ? 'Lộ trình tập luyện' : 'Lộ trình của khóa',
       body: AsyncValueView(
-        value: value,
+        value: value.whenData((all) => all.where(_belongs).toList()),
         onRetry: () => ref.invalidate(myPlansProvider),
         isEmpty: (l) => l.isEmpty,
-        empty: const EmptyState(
+        empty: EmptyState(
           icon: AppIcons.training,
           title: 'Chưa có lộ trình',
-          message: 'HLV sẽ lập lộ trình riêng cho bạn sau khi bạn tham gia khóa học.',
+          message: classId == null
+              ? 'HLV sẽ lập lộ trình riêng cho bạn sau khi bạn tham gia khóa học.'
+              : 'HLV chưa lập lộ trình cho khóa ${courseName ?? 'này'}.',
         ),
         data: (plans) => RefreshableList(
           onRefresh: () => ref.refresh(myPlansProvider.future),
+          header: courseName == null
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Text(courseName!, style: context.text.titleSmall),
+                ),
           itemCount: plans.length,
-          itemBuilder: (context, i) =>
-              PlanCard(plan: plans[i], onTap: () => context.push(AppRoutes.trainingPlan(plans[i].id))),
+          itemBuilder: (context, i) => PlanCard(
+            plan: plans[i],
+            // Màn tổng (không lọc) ghi rõ lộ trình thuộc khóa nào.
+            showCourse: classId == null || plans[i].classId == null,
+            onTap: () => context.push(AppRoutes.trainingPlan(plans[i].id)),
+          ),
         ),
       ),
     );
@@ -53,11 +73,14 @@ class TrainingPlansScreen extends ConsumerWidget {
 
 /// Thẻ lộ trình.
 class PlanCard extends StatelessWidget {
-  const PlanCard({super.key, required this.plan, required this.onTap, this.showMember = false});
+  const PlanCard({super.key, required this.plan, required this.onTap, this.showMember = false, this.showCourse = true});
 
   final TrainingPlan plan;
   final VoidCallback onTap;
   final bool showMember;
+
+  /// Ghi tên khóa của lộ trình (hoặc "Lộ trình chung" nếu chưa gắn khóa).
+  final bool showCourse;
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +107,11 @@ class PlanCard extends StatelessWidget {
             '${showMember ? plan.memberName : 'HLV ${plan.coachName}'} · ${VnTime.date(plan.startDate)} – ${VnTime.date(plan.endDate)}',
             style: context.text.caption.copyWith(color: c.textMuted),
           ),
+          if (showCourse)
+            InfoRow(
+              icon: AppIcons.course,
+              text: plan.className != null ? 'Khóa: ${plan.className}' : 'Lộ trình chung (không gắn khóa)',
+            ),
           if (latestNote != null) ...[
             const SizedBox(height: AppSpacing.xs),
             InfoRow(icon: AppIcons.chat, text: '“${latestNote.coachNote}”'),
