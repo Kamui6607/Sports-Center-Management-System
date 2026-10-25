@@ -11,6 +11,7 @@ import {
 } from "./enrollment-quota.service.js";
 import { findSessionsBlockedByRefund, throwSessionRefundedError } from "../refunds/refunds.service.js";
 import { ROLE_NAME_SELECT } from "../../utils/roles.js";
+import { findUsableCoursePayment } from "../payments/course-purchase.service.js";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
@@ -360,10 +361,18 @@ export async function enrollWholeCourse(classId: string, memberProfileId: string
 
   const cls = await prisma.class.findUnique({
     where: { id: classId },
-    select: { id: true, name: true, classType: true, capacity: true, isActive: true },
+    select: { id: true, name: true, classType: true, capacity: true, isActive: true, price: true, status: true },
   });
   if (!cls) throw new AppError("Class not found", 404);
   if (!cls.isActive) throw new AppError("Class is inactive", 400);
+  if (cls.status !== "APPROVED") throw new AppError("Class is not yet approved", 400);
+  // Khóa có phí: chỉ người ĐÃ MUA (giao dịch còn quyền học) mới ghi danh lại trọn khóa — mua mới đi qua thanh toán.
+  if (Number(cls.price) > 0 && !(await findUsableCoursePayment(prisma, memberProfileId, classId))) {
+    throw new AppError("Bạn chưa mua khóa học này. Vui lòng thanh toán để đăng ký.", 403, {
+      code: "CLASS_NOT_PURCHASED",
+      classId,
+    });
+  }
 
   const sessions = await prisma.classSchedule.findMany({
     where: { classId, status: "SCHEDULED", startTime: { gt: new Date() } },

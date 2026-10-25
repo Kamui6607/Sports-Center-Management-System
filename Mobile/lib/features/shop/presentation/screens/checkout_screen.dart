@@ -243,7 +243,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 children: [
                   for (final (i, l) in p.lines.indexed) ...[
                     if (i > 0) const Divider(height: AppSpacing.md),
-                    KeyValueRow(label: '${l.productName} × ${l.quantity}', value: Money.format(l.lineTotal)),
+                    CostLineItem(
+                      name: l.productName,
+                      unitPrice: l.unitPrice,
+                      quantity: l.quantity,
+                      unit: 'cái',
+                      total: l.lineTotal,
+                    ),
                     for (final w in l.warnings)
                       Align(
                         alignment: Alignment.centerLeft,
@@ -342,16 +348,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             AppCard(
               child: Column(
                 children: [
-                  KeyValueRow(label: 'Tạm tính', value: Money.format(p.subtotal)),
-                  KeyValueRow(
-                    label: 'Phí giao hàng',
-                    value: p.shippingFee == 0 ? (delivery ? 'Miễn phí' : '0đ') : Money.format(p.shippingFee),
-                  ),
-                  const Divider(),
-                  KeyValueRow(
-                    label: cash ? 'Trả tại quầy khi nhận' : 'Tổng thanh toán',
-                    value: Money.format(p.total),
-                    emphasize: true,
+                  CostSummary(
+                    subtotal: p.subtotal,
+                    shippingFeeLabel: CostSummary.shippingLabel(isPickup: !delivery, fee: p.shippingFee),
+                    totalLabel: cash ? 'Trả tại quầy khi nhận' : 'Tổng thanh toán',
+                    total: p.total,
                   ),
                 ],
               ),

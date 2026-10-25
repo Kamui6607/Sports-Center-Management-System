@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../shared/api";
+import { InvoiceDialog } from "../../../shared/InvoiceDialog";
 import {
   ConfirmDialog,
   DataTable,
@@ -65,6 +66,7 @@ const REFUND_REASON: Record<string, string> = {
   ORDER_CANCELLED: "Hủy đơn đã thanh toán",
   ORDER_NOT_PICKED_UP: "Không đến lấy hàng",
   ORDER_LATE_PAYMENT: "Tiền về sau khi đơn đóng",
+  COURSE_NOT_FULFILLED: "Không ghi danh đủ buổi",
 };
 const REFUND_STATUS: Record<string, [string, "ok" | "warn" | "bad" | "info"]> = {
   PENDING: ["Chờ hoàn", "warn"],
@@ -202,6 +204,7 @@ function OrderDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const [carrier, setCarrier] = useState("");
   const [reason, setReason] = useState("");
   const [code, setCode] = useState("");
+  const [invoiceId, setInvoiceId] = useState("");
   const [last4, setLast4] = useState("");
   const [cashCollected, setCashCollected] = useState(false);
   const refresh = () => {
@@ -294,6 +297,12 @@ function OrderDialog({ id, onClose }: { id: string; onClose: () => void }) {
                 ["Mã giao dịch", str(get(o, "payment.transactionCode"))],
               ].filter(([, v]) => v !== "") as [string, ReactNode][]}
             />
+            {get(o, "payment.id") && ["SUCCESS", "REFUNDED"].includes(str(get(o, "payment.status"))) ? (
+              <button className="cr-btn sm" style={{ marginTop: 8 }} onClick={() => setInvoiceId(str(get(o, "payment.id")))}>
+                Xem hóa đơn (đơn giá, phí giao, tổng)
+              </button>
+            ) : null}
+            {invoiceId ? <InvoiceDialog id={invoiceId} onClose={() => setInvoiceId("")} /> : null}
             {get(o, "payment.requiresReview") ? (
               <p className="cr-muted" style={{ marginTop: 8 }}>
                 Giao dịch cần đối soát: {str(get(o, "payment.reviewReason"))}

@@ -13,10 +13,7 @@ class BankAppPickerSheet extends StatefulWidget {
 
   final Checkout checkout;
 
-  static Future<void> show({
-    required BuildContext context,
-    required Checkout checkout,
-  }) {
+  static Future<void> show({required BuildContext context, required Checkout checkout}) {
     return showAppBottomSheet(
       context: context,
       title: 'Chọn ứng dụng ngân hàng',
@@ -61,11 +58,7 @@ class _BankAppPickerSheetState extends State<BankAppPickerSheet> {
 
   void _onSelectApp(BankingApp app) {
     Navigator.of(context).pop();
-    BankLauncherService.launchApp(
-      context: context,
-      app: app,
-      checkout: widget.checkout,
-    );
+    BankLauncherService.launchApp(context: context, app: app, checkout: widget.checkout);
   }
 
   @override
@@ -82,10 +75,7 @@ class _BankAppPickerSheetState extends State<BankAppPickerSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SearchField(
-          hint: 'Tìm theo tên (MB, VCB, Techcombank...)',
-          onChanged: (val) => setState(() => _query = val),
-        ),
+        SearchField(hint: 'Tìm theo tên (MB, VCB, Techcombank...)', onChanged: (val) => setState(() => _query = val)),
         const SizedBox(height: AppSpacing.md),
 
         // Nút sao chép toàn bộ thông tin nhanh
@@ -105,10 +95,7 @@ class _BankAppPickerSheetState extends State<BankAppPickerSheet> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
             child: Center(
-              child: Text(
-                'Không tìm thấy ngân hàng phù hợp.',
-                style: context.text.body.copyWith(color: c.textMuted),
-              ),
+              child: Text('Không tìm thấy ngân hàng phù hợp.', style: context.text.body.copyWith(color: c.textMuted)),
             ),
           )
         else ...[
@@ -116,36 +103,22 @@ class _BankAppPickerSheetState extends State<BankAppPickerSheet> {
           if (!isSearching && installedList.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-              child: Text(
-                'Ứng dụng trên máy của bạn',
-                style: context.text.label.copyWith(color: c.primary),
-              ),
+              child: Text('Ứng dụng trên máy của bạn', style: context.text.label.copyWith(color: c.primary)),
             ),
             for (final app in installedList) ...[
-              _BankAppTile(
-                app: app,
-                isInstalled: true,
-                onTap: () => _onSelectApp(app),
-              ),
+              _BankAppTile(app: app, isInstalled: true, onTap: () => _onSelectApp(app)),
               const SizedBox(height: AppSpacing.xs),
             ],
             const SizedBox(height: AppSpacing.sm),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-              child: Text(
-                'Tất cả ngân hàng hỗ trợ',
-                style: context.text.label.copyWith(color: c.textMuted),
-              ),
+              child: Text('Tất cả ngân hàng hỗ trợ', style: context.text.label.copyWith(color: c.textMuted)),
             ),
           ],
 
           // Nhóm ngân hàng khác
           for (final app in (isSearching ? apps : otherList)) ...[
-            _BankAppTile(
-              app: app,
-              isInstalled: installedIds.contains(app.appId),
-              onTap: () => _onSelectApp(app),
-            ),
+            _BankAppTile(app: app, isInstalled: installedIds.contains(app.appId), onTap: () => _onSelectApp(app)),
             const SizedBox(height: AppSpacing.xs),
           ],
         ],
@@ -155,11 +128,7 @@ class _BankAppPickerSheetState extends State<BankAppPickerSheet> {
 }
 
 class _BankAppTile extends StatelessWidget {
-  const _BankAppTile({
-    required this.app,
-    required this.isInstalled,
-    required this.onTap,
-  });
+  const _BankAppTile({required this.app, required this.isInstalled, required this.onTap});
 
   final BankingApp app;
   final bool isInstalled;
@@ -174,14 +143,9 @@ class _BankAppTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppRadius.cardAll,
         child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
           decoration: BoxDecoration(
-            border: Border.all(
-              color: isInstalled ? c.primary.withValues(alpha: 0.3) : c.border,
-            ),
+            border: Border.all(color: isInstalled ? c.primary.withValues(alpha: 0.3) : c.border),
             borderRadius: AppRadius.cardAll,
             color: isInstalled ? c.primary.withValues(alpha: 0.04) : null,
           ),
@@ -247,13 +211,7 @@ class _BankAppTile extends StatelessWidget {
                     borderRadius: AppRadius.pillAll,
                     border: Border.all(color: c.border),
                   ),
-                  child: Text(
-                    'Tự điền',
-                    style: context.text.caption.copyWith(
-                      color: c.textMuted,
-                      fontSize: 10,
-                    ),
-                  ),
+                  child: Text('Tự điền', style: context.text.caption.copyWith(color: c.textMuted, fontSize: 10)),
                 ),
               const SizedBox(width: AppSpacing.xs),
               Icon(AppIcons.chevronRight, size: AppSizes.iconSm, color: c.textMuted),

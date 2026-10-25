@@ -11,6 +11,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../domain/entities/payment.dart';
 import '../payment_labels.dart';
 import '../providers/payment_providers.dart';
+import '../widgets/invoice_breakdown.dart';
 
 /// I01 — Lịch sử thanh toán (L6: BE đã bỏ hóa đơn — dựng từ `GET /payments/my`).
 class InvoicesScreen extends ConsumerWidget {
@@ -40,6 +41,43 @@ class InvoicesScreen extends ConsumerWidget {
   }
 }
 
+class _Party extends StatelessWidget {
+  const _Party({required this.title, required this.party});
+
+  final String title;
+  final InvoiceParty party;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = context.text.caption.copyWith(color: context.colors.textMuted);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: muted.copyWith(letterSpacing: 1.5)),
+        Text(party.name, style: context.text.bodyStrong),
+        if (party.address != null && party.address!.isNotEmpty) Text(party.address!, style: muted),
+        if ([party.phone, party.email].any((v) => v != null && v.isNotEmpty))
+          Text([party.phone, party.email].where((v) => v != null && v.isNotEmpty).join(' · '), style: muted),
+      ],
+    );
+  }
+}
+
+/// "Tạm tính 300.000 ₫ + ship 30.000 ₫" / "Giá 600.000 ₫ − giảm 200.000 ₫" — cách ra tổng tiền ngay trên thẻ.
+String _costLine(Invoice i) {
+  final parts = <String>[
+    if (i.lines.length > 1) '${i.lines.length} sản phẩm',
+    if (i.lines.length == 1 && i.purpose == CheckoutPurpose.product)
+      'Đơn giá ${Money.format(i.lines.first.unitPrice)} × ${i.lines.first.quantity}',
+    'Tạm tính ${Money.format(i.subtotal)}',
+    if (i.discount > 0) 'giảm ${Money.format(i.discount)}',
+    if (i.purpose == CheckoutPurpose.product)
+      i.isPickup ? 'nhận tại quầy' : (i.shippingFee == 0 ? 'miễn phí ship' : 'ship ${Money.format(i.shippingFee)}'),
+    if (i.refundedAmount > 0) 'đã hoàn ${Money.format(i.refundedAmount)}',
+  ];
+  return parts.join(' · ');
+}
+
 class _InvoiceCard extends StatelessWidget {
   const _InvoiceCard({required this.invoice});
 
@@ -60,6 +98,10 @@ class _InvoiceCard extends StatelessWidget {
               Text(
                 '${invoice.invoiceNumber} · ${VnTime.date(invoice.issuedAt)}',
                 style: context.text.caption.copyWith(color: context.colors.textMuted),
+              ),
+              Text(
+                _costLine(invoice),
+                style: context.text.caption.copyWith(color: context.colors.textMuted, fontFeatures: kTabularFigures),
               ),
             ],
           ),
@@ -87,7 +129,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final value = ref.watch(invoiceProvider(invoiceId));
     return AppScaffold(
-      title: 'Chi tiết thanh toán',
+      title: 'Hóa đơn',
       body: AsyncValueView(
         value: value,
         loading: const SkeletonDetail(),
@@ -108,36 +150,46 @@ class InvoiceDetailScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text('HÓA ĐƠN BÁN HÀNG', style: context.text.titleSmall),
                   const Divider(height: AppSpacing.xl),
                   Text(
-                    'MÃ THANH TOÁN',
+                    'SỐ HÓA ĐƠN',
                     style: context.text.caption.copyWith(color: context.colors.textMuted, letterSpacing: 1.5),
                   ),
                   Text(inv.invoiceNumber, style: context.text.title),
                   const SizedBox(height: AppSpacing.md),
                   KeyValueRow(label: 'Ngày thanh toán', value: VnTime.dateTime(inv.issuedAt)),
-                  if (inv.memberName != null) KeyValueRow(label: 'Khách hàng', value: inv.memberName!),
                   KeyValueRow(label: 'Phương thức', value: inv.paymentMethod.label),
                   if (inv.transactionCode != null) KeyValueRow(label: 'Mã giao dịch', value: inv.transactionCode!),
-                  const Divider(height: AppSpacing.xl),
-                  Text(inv.purpose.label, style: context.text.caption.copyWith(color: context.colors.textMuted)),
-                  if (inv.lines.length > 1)
-                    // L7: đơn nhiều sản phẩm ⇒ hiển thị từng dòng.
-                    for (final line in inv.lines)
-                      KeyValueRow(label: '${line.name} × ${line.quantity}', value: Money.format(line.total))
-                  else
-                    Text(
-                      inv.quantity != null ? '${inv.itemName} × ${inv.quantity}' : inv.itemName,
-                      style: context.text.bodyStrong,
+                  if (inv.periodLabel != null)
+                    KeyValueRow(
+                      label: inv.purpose == CheckoutPurpose.membership ? 'Hiệu lực' : 'Thời gian khóa',
+                      value: inv.periodLabel!,
                     ),
-                  const SizedBox(height: AppSpacing.md),
-                  KeyValueRow(label: 'Tạm tính', value: Money.format(inv.subtotal)),
-                  KeyValueRow(label: 'Giảm giá', value: Money.format(inv.discount)),
-                  const Divider(),
-                  KeyValueRow(label: 'Tổng cộng', value: Money.format(inv.total), emphasize: true),
-                  if (inv.refundedAmount > 0) KeyValueRow(label: 'Đã hoàn', value: Money.format(inv.refundedAmount)),
+                  if (inv.seller != null || inv.buyer != null) ...[
+                    const Divider(height: AppSpacing.xl),
+                    if (inv.seller != null) _Party(title: 'BÊN BÁN', party: inv.seller!),
+                    if (inv.buyer != null) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      _Party(title: 'KHÁCH HÀNG', party: inv.buyer!),
+                    ],
+                  ] else if (inv.memberName != null)
+                    KeyValueRow(label: 'Khách hàng', value: inv.memberName!),
+                  const Divider(height: AppSpacing.xl),
+                  Text(
+                    inv.purpose.label.toUpperCase(),
+                    style: context.text.caption.copyWith(color: context.colors.textMuted, letterSpacing: 1.5),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  InvoiceBreakdown(invoice: inv),
                 ],
               ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Giá, tên mặt hàng và thông tin trên hóa đơn được chốt tại thời điểm mua — thay đổi sau này không ảnh hưởng.',
+              style: context.text.caption.copyWith(color: context.colors.textMuted),
             ),
             if (inv.status == InvoiceStatus.cancelled) ...[
               const SizedBox(height: AppSpacing.md),

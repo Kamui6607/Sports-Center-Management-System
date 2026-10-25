@@ -576,7 +576,15 @@ export async function resubmitActivityPlan(
     const updated = await tx.class.update({
       where: { id: classId },
       // Gửi duyệt ⇒ bỏ dữ liệu nháp của wizard.
-      data: { ...planClassData(data), status: "PENDING", rejectReason: null, draftData: Prisma.DbNull },
+      data: {
+        ...planClassData(data),
+        status: "PENDING",
+        rejectReason: null,
+        draftData: Prisma.DbNull,
+        alertStage: 0,
+        closedReason: null,
+        closedAt: null,
+      },
     });
     const planned = await persistPlanSchedules(tx, classId, cls.coachId, data);
     return { class: updated, schedulesCreated: planned.count, startDate: planned.startDate, endDate: planned.endDate, totalSessions: planned.totalSessions, status: "PENDING" as const };

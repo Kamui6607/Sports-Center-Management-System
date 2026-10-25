@@ -63,9 +63,7 @@ class PaymentApiRepository implements PaymentRepository {
   Future<List<Invoice>> myInvoices() => _payments();
 
   @override
-  Future<Invoice> invoice(String invoiceId) async {
-    final found = (await _payments()).where((i) => i.id == invoiceId).firstOrNull;
-    if (found == null) throw const AppFailure.notFound('Không tìm thấy giao dịch.');
-    return found;
-  }
+  Future<Invoice> invoice(String invoiceId) async =>
+      // Hóa đơn chi tiết do BE dựng từ ảnh chụp lúc mua (đơn giá, giảm, phí ship, hoàn tiền…).
+      PaymentJson.invoiceDetail((await _api.get('/payments/my/$invoiceId/invoice')).json);
 }

@@ -60,8 +60,34 @@ abstract final class ClassJson {
       startDate: cls.dateOrNull('startDate') ?? stats?.firstSessionStart,
       endDate: cls.dateOrNull('endDate') ?? stats?.lastSessionEnd,
       goalMatch: goalMatch(cls.objOrNull('goalMatch')),
+      saleState: saleState(cls.objOrNull('summary')?.strOrNull('saleState')) ?? SaleState.onSale,
+      quote: quote(cls.objOrNull('summary')?.objOrNull('quote')),
     );
   }
+
+  /// `saleState` của BE (`ON_SALE`…) ⇒ [SaleState].
+  static SaleState? saleState(String? v) => switch (v) {
+    'ON_SALE' => SaleState.onSale,
+    'FULL' => SaleState.full,
+    'SALE_CLOSED' => SaleState.saleClosed,
+    'ENDED' => SaleState.ended,
+    'NOT_OPEN' => SaleState.notOpen,
+    _ => null,
+  };
+
+  /// Báo giá mua khóa (`summary.quote` / `course-plan.sale.quote`).
+  static CourseQuote? quote(Json? q) => q == null
+      ? null
+      : CourseQuote(
+          listPrice: q.money('listPrice'),
+          totalSessions: q.integer('totalSessions'),
+          unitPrice: q.money('unitPrice'),
+          sessionsPurchased: q.integer('sessionsPurchased'),
+          sessionsMissed: q.integer('sessionsMissed'),
+          discount: q.money('discount'),
+          amount: q.money('amount'),
+          isLate: q.boolean('isLate'),
+        );
 
   /// `goalMatch` của BE (null với Guest/HLV).
   static GoalMatch? goalMatch(Json? g) => g == null

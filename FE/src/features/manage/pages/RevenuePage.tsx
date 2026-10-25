@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import { api } from "../../../shared/api";
 import { allPages } from "../../../shared/pagedApi";
+import { InvoiceDialog } from "../../../shared/InvoiceDialog";
 import { DataTable, ErrorBox, PageHead, Pager, Panel, Pill, QueryView, Select, dateTime, get, num, str, useUrlState, vnDateKey, vnd } from "../kit";
 import type { Row } from "../kit";
 
@@ -152,21 +153,21 @@ function RevenueBody({ r, enrollments, membershipRevenue }: { r: Row; enrollment
     <>
       <div className="cr-kpis">
         <div className="cr-kpi">
-          <div className="cr-kpi-label">Tổng thu</div>
+          <div className="cr-kpi-label">Doanh thu gộp</div>
           <div className="cr-kpi-value">{vnd(r.totalRevenue)}</div>
-          <div className="cr-kpi-note">{num(r.successPayments)} giao dịch thành công</div>
+          <div className="cr-kpi-note">{num(r.successPayments)} giao dịch đã thu (gồm cả giao dịch hoàn sau đó)</div>
         </div>
         <div className={"cr-kpi" + (Number(r.refundedAmount) > 0 ? " alert" : "")}>
           <div className="cr-kpi-label">Đã hoàn</div>
           <div className="cr-kpi-value">{vnd(r.refundedAmount)}</div>
           <div className="cr-kpi-note">
-            {num(r.refundedPayments)} giao dịch hoàn toàn bộ · {num(r.partialRefunds)} khoản hoàn từng phần
+            {num(r.refundCount)} khoản hoàn đã chuyển trả · {num(r.refundedPayments)} giao dịch hoàn toàn bộ
           </div>
         </div>
         <div className="cr-kpi">
           <div className="cr-kpi-label">Thực nhận (ròng)</div>
           <div className="cr-kpi-value">{vnd(r.netRevenue)}</div>
-          <div className="cr-kpi-note">tổng thu − đã hoàn</div>
+          <div className="cr-kpi-note">doanh thu gộp − đã hoàn</div>
         </div>
         <div className="cr-kpi amber">
           <div className="cr-kpi-label">Giao dịch tạo trong kỳ</div>
@@ -216,6 +217,8 @@ function RevenueBody({ r, enrollments, membershipRevenue }: { r: Row; enrollment
             { key: "k", title: "Loại", render: (x) => ({ CLASS: "Khóa học", MEMBERSHIP: "Gói thành viên", ORDER: "Đơn hàng" })[str(x.kind)] ?? "Khác" },
             { key: "c", title: "Giao dịch", className: "num", render: (x) => num(x.count) },
             { key: "v", title: "Đã thu", className: "num", render: (x) => vnd(x.revenue) },
+            { key: "r", title: "Đã hoàn", className: "num", render: (x) => (Number(x.refunded) ? `−${vnd(x.refunded)}` : "—") },
+            { key: "net", title: "Thực nhận", className: "num", render: (x) => vnd(x.net ?? x.revenue) },
           ]}
         />
       </Panel>
@@ -246,6 +249,7 @@ function PaymentsTable({ start, end }: { start: string; end: string }) {
   const s = useUrlState({ preset: "month" });
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<unknown>();
+  const [invoiceId, setInvoiceId] = useState("");
   const filters = {
     startDate: new Date(`${start}T00:00:00+07:00`).toISOString(),
     endDate: new Date(`${end}T23:59:59.999+07:00`).toISOString(),
@@ -338,12 +342,23 @@ function PaymentsTable({ start, end }: { start: string; end: string }) {
                 { key: "s", title: "Trạng thái", render: (p) => <PayPill status={p.status} /> },
                 { key: "p", title: "Thanh toán lúc", render: (p) => <span className="cr-mono">{dateTime(p.paidAt)}</span> },
                 { key: "a", title: "Số tiền", className: "num", render: (p) => vnd(p.amount) },
+                {
+                  key: "i",
+                  title: "",
+                  render: (p) =>
+                    ["SUCCESS", "REFUNDED"].includes(str(p.status)) ? (
+                      <button className="cr-btn" onClick={() => setInvoiceId(str(p.id))}>
+                        Hóa đơn
+                      </button>
+                    ) : null,
+                },
               ]}
             />
             <Pager meta={res.pagination} onPage={s.setPage} />
           </>
         )}
       </QueryView>
+      {invoiceId ? <InvoiceDialog id={invoiceId} onClose={() => setInvoiceId("")} /> : null}
     </Panel>
   );
 }

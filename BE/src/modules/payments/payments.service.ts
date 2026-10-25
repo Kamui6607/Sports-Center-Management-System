@@ -5,6 +5,9 @@ import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { isMembershipPayment, MEMBERSHIP_NOTE_PREFIX } from "../memberships/memberships.service.js";
+import { flushNotificationOutbox } from "../notifications/outbox.service.js";
+import { prepareCourseCheckout } from "./course-purchase.service.js";
+import { fulfillCoursePaymentTx } from "./course-fulfillment.service.js";
 
 /** Tỷ lệ chia doanh thu: Coach nhận 85%, hệ thống giữ 15% */
 const COACH_REVENUE_SHARE = 0.85;
@@ -62,24 +65,6 @@ export async function creditCoachWallet(
   }
 }
 
-/**
- * Auto-enroll member vào các buổi SCHEDULED CHƯA DIỄN RA của class sau khi payment SUCCESS
- * (buổi đã qua giờ bắt đầu thì không ghi danh). Chạy TRONG transaction.
- */
-export async function autoEnrollAfterPayment(tx: any, classId: string, memberProfileId: string) {
-  const schedules: { id: string }[] = await tx.classSchedule.findMany({
-    where: { classId, status: "SCHEDULED", startTime: { gt: new Date() } },
-    select: { id: true },
-  });
-  if (schedules.length === 0) return 0;
-  // 1 query cho mọi buổi; skipDuplicates giữ nguyên enrollment đã có (idempotent như upsert cũ).
-  await tx.enrollment.createMany({
-    data: schedules.map((s) => ({ memberId: memberProfileId, scheduleId: s.id, status: "BOOKED" })),
-    skipDuplicates: true,
-  });
-  return schedules.length;
-}
-
 export async function createPayment(data: any, createdById: string) {
   // Resolve member
   const memberProfile = await prisma.memberProfile.findFirst({
@@ -94,52 +79,61 @@ export async function createPayment(data: any, createdById: string) {
     cls = await prisma.class.findUnique({ where: { id: data.classId } });
     if (!cls) throw new AppError("Class not found", 404);
     if (cls.status !== "APPROVED") throw new AppError("Class is not yet approved", 400);
-    const price = Number(cls.price);
-    if (price <= 0) {
+    if (Number(cls.price) <= 0) {
       throw new AppError("Khóa học miễn phí, không cần ghi nhận thanh toán.", 400);
-    }
-    // Số tiền là căn cứ cho 85% ví HLV và tiền hoàn ⇒ phải đúng giá khóa học.
-    if (Number(data.amount) !== price) {
-      throw new AppError(
-        `Số tiền phải bằng giá khóa học (${price.toLocaleString("vi-VN")}đ).`,
-        400,
-        { code: "AMOUNT_MISMATCH", expectedAmount: price }
-      );
     }
   }
 
-  return prisma.$transaction(async (tx) => {
-    const paymentStatus = data.status ?? "SUCCESS";
-    const purchaseSnapshot = data.classId ? await buildClassSnapshot(tx, data.classId) : null;
-    const payment = await tx.payment.create({
-      data: {
-        memberId: memberProfile.id,
-        classId: data.classId,
-        classNameSnapshot: cls?.name,
-        purchaseSnapshot: purchaseSnapshot ? (purchaseSnapshot as unknown as Prisma.InputJsonValue) : undefined,
-        amount: data.amount,
-        method: data.method,
-        status: paymentStatus,
-        note: data.note,
-        transactionCode: data.transactionCode,
-        paidAt: paymentStatus === "SUCCESS" ? new Date() : undefined,
-        createdById,
-      },
-      include: { member: { include: { user: { select: { fullName: true } } } } },
-    });
-
-    let enrolledCount = 0;
-
-    if (payment.status === "SUCCESS") {
-      // Nếu payment cho 1 class → auto-enroll + credit coach wallet
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const now = new Date();
+      const paymentStatus = data.status ?? "SUCCESS";
+      let purchaseSnapshot: unknown = null;
       if (data.classId && cls) {
-        enrolledCount = await autoEnrollAfterPayment(tx, data.classId, memberProfile.id);
-        await creditCoachWallet(tx, data.classId, payment.id, Number(data.amount));
+        // Cùng bộ luật với mua online: còn mở bán, chưa mua, còn chỗ, không trùng giờ; số tiền = báo giá theo buổi còn lại.
+        const { quote } = await prepareCourseCheckout(tx, memberProfile.id, data.classId, now, now);
+        if (Number(data.amount) !== quote.amount) {
+          throw new AppError(
+            `Số tiền phải bằng thành tiền của khóa học (${quote.amount.toLocaleString("vi-VN")}đ` +
+              (quote.isLate ? ` — ${quote.sessionsPurchased}/${quote.totalSessions} buổi còn lại` : "") +
+              `).`,
+            400,
+            { code: "AMOUNT_MISMATCH", expectedAmount: quote.amount, quote }
+          );
+        }
+        purchaseSnapshot = await buildClassSnapshot(tx, data.classId, { quote, buyerUserId: memberProfile.userId });
       }
-    }
+      const payment = await tx.payment.create({
+        data: {
+          memberId: memberProfile.id,
+          classId: data.classId,
+          classNameSnapshot: cls?.name,
+          purchaseSnapshot: purchaseSnapshot ? (purchaseSnapshot as Prisma.InputJsonValue) : undefined,
+          amount: data.amount,
+          method: data.method,
+          status: paymentStatus,
+          note: data.note,
+          transactionCode: data.transactionCode,
+          paidAt: paymentStatus === "SUCCESS" ? now : undefined,
+          createdById,
+        },
+        include: { member: { include: { user: { select: { fullName: true } } } } },
+      });
 
-    return { ...payment, enrolledCount };
-  });
+      let enrolledCount = 0;
+      let refund: { id: string; amount: number } | null = null;
+      // Nếu payment cho 1 class → ghi danh (có sức chứa) + cộng ví HLV + hoàn phần thiếu nếu có.
+      if (payment.status === "SUCCESS" && data.classId && cls) {
+        const done = await fulfillCoursePaymentTx(tx, payment, memberProfile.userId, now);
+        enrolledCount = done.enrolled;
+        refund = done.refund;
+      }
+      return { ...payment, enrolledCount, refund };
+    },
+    { timeout: 30_000 }
+  );
+  await flushNotificationOutbox().catch(() => {});
+  return result;
 }
 
 export async function listPayments(query: any) {
@@ -224,8 +218,8 @@ export async function updatePaymentStatus(id: string, status: string) {
     if (status === "SUCCESS") {
       // Auto-enroll + credit wallet nếu là payment cho class (payment lớp học luôn có memberId)
       if (payment.classId && payment.memberId) {
-        await autoEnrollAfterPayment(tx, payment.classId, payment.memberId);
-        await creditCoachWallet(tx, payment.classId, payment.id, Number(payment.amount));
+        const member = await tx.memberProfile.findUniqueOrThrow({ where: { id: payment.memberId }, select: { userId: true } });
+        await fulfillCoursePaymentTx(tx, payment, member.userId);
       }
     }
   });
@@ -239,6 +233,27 @@ export async function updatePaymentStatus(id: string, status: string) {
  * - COACH: đơn sản phẩm của mình.
  * `type=CLASS|ORDER` lọc theo loại; mỗi bản ghi kèm tên khóa / dòng sản phẩm và số tiền đã hoàn.
  */
+/** Tạm tính / giảm / phí giao hàng của một giao dịch — đọc đơn hàng (OrderItem snapshot) hoặc bảng tính khóa lúc mua. */
+function costBreakdownOf(p: {
+  amount: Prisma.Decimal;
+  purchaseSnapshot: Prisma.JsonValue | null;
+  order: { subtotal: Prisma.Decimal; shippingFee: Prisma.Decimal; totalPrice: Prisma.Decimal; fulfillmentType: string } | null;
+}) {
+  const total = Math.round(Number(p.amount));
+  if (p.order) {
+    return {
+      subtotal: Math.round(Number(p.order.subtotal)),
+      discount: 0,
+      shippingFee: Math.round(Number(p.order.shippingFee)),
+      fulfillmentType: p.order.fulfillmentType,
+      total,
+    };
+  }
+  const pricing = (p.purchaseSnapshot as { pricing?: { listPrice?: number } } | null)?.pricing;
+  const subtotal = pricing?.listPrice ?? total;
+  return { subtotal, discount: Math.max(0, subtotal - total), shippingFee: 0, fulfillmentType: null, total };
+}
+
 export async function listMyPayments(user: { id: string; role: string }, query: any) {
   const page = Math.max(1, parseInt(query.page ?? "1") || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10") || 10));
@@ -291,15 +306,23 @@ export async function listMyPayments(user: { id: string; role: string }, query: 
     orderId: p.orderId,
     orderStatus: p.order?.status ?? null,
     membershipId: p.membership?.id ?? null,
-    membershipPlanName: p.membership?.plan.name ?? null,
+    membershipPlanName:
+      (p.purchaseSnapshot as { kind?: string; name?: string } | null)?.kind === "MEMBERSHIP"
+        ? ((p.purchaseSnapshot as { name?: string }).name ?? p.membership?.plan.name ?? null)
+        : (p.membership?.plan.name ?? null),
+    /** Bảng tính giá khóa học lúc mua (đăng ký muộn) — null với giao dịch cũ / không phải khóa học. */
+    pricing: (p.purchaseSnapshot as { pricing?: unknown } | null)?.pricing ?? null,
     items:
       p.order?.items.map((i) => ({
         productId: i.productId,
-        productName: i.product.name,
+        // Tên LÚC MUA (OrderItem snapshot) — đổi tên sản phẩm sau này không đổi lịch sử.
+        productName: i.productName ?? i.product.name,
         quantity: i.quantity,
         unitPrice: i.unitPrice,
         totalAmount: i.totalAmount,
       })) ?? [],
+    // Bảng tính (giống hóa đơn): tạm tính − giảm + phí giao hàng = tổng (= amount).
+    ...costBreakdownOf(p),
     refundedAmount: p.refunds.filter((r) => r.status === "COMPLETED").reduce((sum, r) => sum + Number(r.amount), 0),
     pendingRefundAmount: p.refunds.filter((r) => r.status === "PENDING").reduce((sum, r) => sum + Number(r.amount), 0),
   }));

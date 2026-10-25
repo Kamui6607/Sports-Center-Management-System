@@ -6,6 +6,7 @@ import '../../../../app/router/app_routes.dart';
 import '../../../../core/data/data_revision.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
+import '../../../../core/utils/money.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../products/presentation/product_labels.dart';
@@ -136,6 +137,11 @@ class OrderCard extends ConsumerWidget {
                       '${o.itemCount} sản phẩm · ${VnTime.dateTime(o.createdAt)}'
                       '${showBuyer && o.recipientName != null ? ' · ${o.recipientName}' : ''}',
                       style: context.text.caption.copyWith(color: c.textMuted),
+                    ),
+                    Text(
+                      'Tạm tính ${Money.format(o.subtotal)} · '
+                      '${o.isPickup ? 'nhận tại quầy' : (o.shippingFee == 0 ? 'miễn phí ship' : 'ship ${Money.format(o.shippingFee)}')}',
+                      style: context.text.caption.copyWith(color: c.textMuted, fontFeatures: kTabularFigures),
                     ),
                   ],
                 ),

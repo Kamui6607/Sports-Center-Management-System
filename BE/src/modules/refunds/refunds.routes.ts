@@ -98,7 +98,7 @@ router.get(
  *     tags: [Refunds]
  *     parameters:
  *       - { in: query, name: status, schema: { type: string, enum: [PENDING, COMPLETED, REJECTED, CANCELLED] } }
- *       - { in: query, name: reason, schema: { type: string, enum: [MEMBER_CANCEL_COURSE, MEMBER_CANCEL_SESSION, SESSION_CANCELLED, ORDER_CANCELLED, ORDER_NOT_PICKED_UP, ORDER_LATE_PAYMENT] } }
+ *       - { in: query, name: reason, schema: { type: string, enum: [MEMBER_CANCEL_COURSE, MEMBER_CANCEL_SESSION, SESSION_CANCELLED, ORDER_CANCELLED, ORDER_NOT_PICKED_UP, ORDER_LATE_PAYMENT, COURSE_NOT_FULFILLED] } }
  *       - { in: query, name: memberId, schema: { type: string } }
  *       - { in: query, name: classId, schema: { type: string } }
  *       - { in: query, name: orderId, schema: { type: string } }

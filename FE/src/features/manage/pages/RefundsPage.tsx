@@ -14,6 +14,7 @@ export const REFUND_REASON: Record<string, string> = {
   ORDER_CANCELLED: "Hủy đơn hàng đã thanh toán",
   ORDER_NOT_PICKED_UP: "Không đến lấy hàng",
   ORDER_LATE_PAYMENT: "Chuyển khoản sau khi đơn hết hạn",
+  COURSE_NOT_FULFILLED: "Không ghi danh đủ buổi đã thanh toán",
 };
 const STATUS: Record<string, [string, "ok" | "warn" | "bad" | "info"]> = {
   PENDING: ["Chờ duyệt", "warn"],

@@ -1,6 +1,7 @@
 import '../core/config/env.dart';
 import '../core/error/app_failure.dart';
 import '../core/network/json.dart';
+import '../core/utils/vn_time.dart';
 import '../features/payments/domain/entities/payment.dart';
 
 /// Ánh xạ "SePay checkout view" của BE (`POST /payments/sepay/checkout`,
@@ -79,8 +80,11 @@ abstract final class PaymentJson {
           : isMembership
           ? p.str('membershipPlanName', 'Gói thành viên')
           : p.str('className', 'Khóa học'),
-      subtotal: total,
-      discount: 0,
+      // BE trả bảng tính theo ảnh chụp lúc mua: tạm tính − giảm + phí giao hàng = tổng.
+      subtotal: p.intOrNull('subtotal') ?? total,
+      discount: p.money('discount'),
+      shippingFee: p.money('shippingFee'),
+      isPickup: p.str('fulfillmentType') == 'PICKUP',
       total: total,
       paymentMethod: p.enumOr('method', PaymentMethod.values, PaymentMethod.sepay),
       quantity: lines.length == 1 ? lines.first.quantity : null,
@@ -88,6 +92,77 @@ abstract final class PaymentJson {
       paidAt: p.dateOrNull('paidAt'),
       lines: lines,
       refundedAmount: p.money('refundedAmount'),
+    );
+  }
+
+  /// Hóa đơn chi tiết `GET /payments/my/:id/invoice` (BE dựng từ ảnh chụp lúc mua).
+  static Invoice invoiceDetail(Json j) {
+    final kind = j.str('kind');
+    final seller = j.objOrNull('seller');
+    final buyer = j.objOrNull('buyer');
+    final membership = j.objOrNull('membership');
+    final course = j.objOrNull('course');
+    final lines = [
+      for (final l in j.objList('lines'))
+        InvoiceLine(
+          name: l.str('name'),
+          description: l.strOrNull('description'),
+          unit: l.str('unit', 'cái'),
+          quantity: l.integer('quantity', 1),
+          unitPrice: l.money('unitPrice'),
+          total: l.money('amount'),
+        ),
+    ];
+    final from = membership?.dateOrNull('startDate') ?? course?.dateOrNull('startDate');
+    final to = membership?.dateOrNull('endDate') ?? course?.dateOrNull('endDate');
+    return Invoice(
+      id: j.str('id'),
+      invoiceNumber: j.str('invoiceNumber'),
+      status: j.str('status') == 'REFUNDED' ? InvoiceStatus.cancelled : InvoiceStatus.issued,
+      statusLabel: j.strOrNull('statusLabel'),
+      issuedAt: j.dateOrNull('paidAt') ?? j.date('createdAt'),
+      purpose: kind == 'ORDER'
+          ? CheckoutPurpose.product
+          : kind == 'MEMBERSHIP'
+          ? CheckoutPurpose.membership
+          : CheckoutPurpose.course,
+      itemName: lines.isEmpty ? 'Giao dịch' : lines.map((l) => l.name).join(', '),
+      subtotal: j.money('subtotal'),
+      discount: j.money('discount'),
+      discountLabel: j.strOrNull('discountLabel'),
+      shippingFee: j.money('shippingFee'),
+      total: j.money('total'),
+      paymentMethod: j.enumOr('method', PaymentMethod.values, PaymentMethod.sepay),
+      memberName: buyer?.strOrNull('fullName'),
+      transactionCode: j.strOrNull('gatewayTransId') ?? j.strOrNull('transactionCode'),
+      paidAt: j.dateOrNull('paidAt'),
+      lines: lines,
+      refundedAmount: j.money('refundedAmount'),
+      pendingRefundAmount: j.money('pendingRefundAmount'),
+      isPickup: j.objOrNull('order')?.str('fulfillmentType') == 'PICKUP',
+      seller: seller == null
+          ? null
+          : InvoiceParty(
+              name: seller.str('name'),
+              address: seller.strOrNull('address'),
+              phone: seller.strOrNull('hotline'),
+              email: seller.strOrNull('email'),
+            ),
+      buyer: buyer == null
+          ? null
+          : InvoiceParty(name: buyer.str('fullName'), phone: buyer.strOrNull('phone'), email: buyer.strOrNull('email')),
+      periodLabel: from != null && to != null ? '${VnTime.date(from)} – ${VnTime.date(to)}' : null,
+      refunds: [
+        for (final r in j.objList('refunds'))
+          InvoiceRefund(
+            reasonLabel: r.str('reasonLabel'),
+            amount: r.money('amount'),
+            statusLabel: r.str('statusLabel'),
+            completed: r.str('status') == 'COMPLETED',
+            createdAt: r.date('createdAt'),
+            processedAt: r.dateOrNull('processedAt'),
+          ),
+      ],
     );
   }
 

@@ -124,6 +124,24 @@ class CoachClassCard extends StatelessWidget {
             style: context.text.caption.copyWith(color: c.textMuted),
           ),
           const SizedBox(height: AppSpacing.sm),
+          // Trạng thái mở bán (BE tính): HLV biết khóa còn nhận học viên không, có ai đăng ký chưa.
+          if (course.status == ClassStatus.approved || course.status == ClassStatus.completed) ...[
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                StatusLabel(course.saleState.label, switch (course.saleState) {
+                  SaleState.onSale => StatusTone.success,
+                  SaleState.full => StatusTone.info,
+                  SaleState.saleClosed => StatusTone.warning,
+                  _ => StatusTone.neutral,
+                }).tag(dense: true),
+                if (course.studentCount == 0 && course.saleState != SaleState.ended)
+                  const StatusLabel('Chưa có học viên', StatusTone.warning).tag(dense: true),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           if (course.status == ClassStatus.rejected && course.rejectReason != null) ...[
             AlertBanner.error(message: course.rejectReason!),
             const SizedBox(height: AppSpacing.sm),

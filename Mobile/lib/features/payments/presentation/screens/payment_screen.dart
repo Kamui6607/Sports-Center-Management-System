@@ -9,12 +9,14 @@ import '../../../../core/config/env.dart';
 import '../../../../core/data/data_revision.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
+import '../../../../core/utils/money.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../data/payment_repository_provider.dart';
 import '../../domain/entities/payment.dart';
 import '../providers/payment_providers.dart';
 import '../widgets/bank_transfer_card.dart';
+import '../widgets/invoice_breakdown.dart';
 import '../widgets/payment_qr_block.dart';
 import '../widgets/payment_success_view.dart';
 import '../widgets/payment_summary_card.dart';
@@ -165,6 +167,8 @@ class _PendingViewState extends ConsumerState<_PendingView> {
             children: [
               PaymentSummaryCard(checkout: c, now: now, onExpired: () => ref.invalidate(checkoutProvider(c.paymentId))),
               const SizedBox(height: AppSpacing.md),
+              _OrderBreakdownCard(paymentId: c.paymentId),
+              const SizedBox(height: AppSpacing.md),
               if (failed)
                 const AlertBanner.error(
                   title: 'Thanh toán thất bại',
@@ -219,6 +223,37 @@ class _PendingViewState extends ConsumerState<_PendingView> {
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// Chi tiết đơn đang thanh toán (BE dựng từ ảnh chụp lúc tạo đơn): từng dòng đơn giá × SL = thành tiền,
+/// tạm tính, giảm, phí giao hàng và tổng — để hội viên đối chiếu trước khi chuyển khoản.
+class _OrderBreakdownCard extends ConsumerWidget {
+  const _OrderBreakdownCard({required this.paymentId});
+
+  final String paymentId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final invoice = ref.watch(invoiceProvider(paymentId)).value;
+    if (invoice == null) return const SizedBox.shrink();
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: true,
+          tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          childrenPadding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+          title: Text('Chi tiết đơn', style: context.text.titleSmall),
+          subtitle: Text(
+            '${invoice.lines.length} mục · tổng ${Money.format(invoice.total)}',
+            style: context.text.caption.copyWith(color: context.colors.textMuted),
+          ),
+          children: [InvoiceBreakdown(invoice: invoice, showRefunds: false)],
+        ),
+      ),
     );
   }
 }

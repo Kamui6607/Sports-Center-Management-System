@@ -38,10 +38,7 @@ abstract final class BankLauncherService {
     // 1. Luôn tự động sao chép số tài khoản trước (tiện dụng tối đa cho người dùng).
     await Clipboard.setData(ClipboardData(text: checkout.bank.accountNumber));
     if (context.mounted) {
-      AppSnackbar.success(
-        context,
-        'Đã chép STK ${checkout.bank.accountNumber}. Đang mở ${app.shortName}...',
-      );
+      AppSnackbar.success(context, 'Đã chép STK ${checkout.bank.accountNumber}. Đang mở ${app.shortName}...');
     }
 
     // 2. Gọi App-to-App Deeplink chuẩn VietQR:
@@ -73,10 +70,7 @@ abstract final class BankLauncherService {
 
     // 4. Nếu máy chưa cài hoặc không thể mở
     if (context.mounted) {
-      AppSnackbar.info(
-        context,
-        'Không thể mở ${app.name}. Hãy mở app thủ công và dán số tài khoản đã chép.',
-      );
+      AppSnackbar.info(context, 'Không thể mở ${app.name}. Hãy mở app thủ công và dán số tài khoản đã chép.');
     }
     return false;
   }

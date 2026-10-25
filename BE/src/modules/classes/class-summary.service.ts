@@ -1,7 +1,11 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { vnDateKey, vnWeekdayIso } from "../../utils/vnTime.js";
 import { sepayConfig } from "../../config/sepay.js";
 import { AppError } from "../../middlewares/errorHandler.js";
+import { quoteCourse, saleStateOf, SALE_STATE_LABEL, type CourseQuote, type SaleState } from "./course-sale.js";
+
+type DbClient = typeof prisma | Prisma.TransactionClient;
 
 /**
  * BE-12: Tóm tắt lịch + học viên của khóa học, trả kèm `GET /classes` / `GET /classes/:id`
@@ -25,23 +29,66 @@ export interface ClassSummary {
   endDate: string | null;
   /** Các thứ trong tuần có buổi chính (ISO 1=T2..7=CN), tăng dần. */
   weekdays: number[];
+  /** Trạng thái mở bán (Doc/BUSINESS_HARDENING_PLAN.md §1.1) + nhãn tiếng Việt. */
+  saleState: SaleState;
+  saleStateLabel: string;
+  /** Số chỗ đang được giữ cho giao dịch chờ chuyển khoản (tính như đã đặt khi xét sức chứa). */
+  heldSeats: number;
+  /** Báo giá nếu mua NGAY (đăng ký muộn ⇒ giá theo số buổi còn lại). */
+  quote: Omit<CourseQuote, "scheduleIds">;
+  /** = quote.amount — giá phải trả nếu mua bây giờ. */
+  currentPrice: number;
+}
+
+/**
+ * Số chỗ đang GIỮ cho giao dịch SePay mua khóa còn hạn (PENDING) theo từng khóa — mỗi giao dịch giữ 1 chỗ ở mọi buổi
+ * sắp tới. `excludeMemberId`: không tính giao dịch của chính người đang xét.
+ */
+export async function pendingCourseHolds(
+  db: DbClient,
+  classIds: string[],
+  now = new Date(),
+  excludeMemberId?: string
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (classIds.length === 0) return map;
+  const since = new Date(now.getTime() - sepayConfig().ttlMinutes * 60_000);
+  const rows = await db.payment.findMany({
+    where: {
+      classId: { in: classIds },
+      status: "PENDING",
+      gateway: "SEPAY",
+      createdAt: { gt: since },
+      ...(excludeMemberId ? { memberId: { not: excludeMemberId } } : {}),
+    },
+    select: { classId: true, memberId: true },
+    distinct: ["classId", "memberId"],
+  });
+  for (const r of rows) map.set(r.classId!, (map.get(r.classId!) ?? 0) + 1);
+  return map;
+}
+
+/** Thời điểm mã QR tạo lúc `now` hết hạn — mốc tính số buổi được mua. */
+export function quoteMoment(now = new Date()): Date {
+  return new Date(now.getTime() + sepayConfig().ttlMinutes * 60_000);
 }
 
 const ACTIVE_ENROLLMENT = { status: { in: ["BOOKED", "COMPLETED"] as ("BOOKED" | "COMPLETED")[] } };
 
 /** Tính tóm tắt cho nhiều khóa trong 2 truy vấn. */
 export async function buildClassSummaries(
-  classes: { id: string; capacity: number }[],
+  classes: { id: string; capacity: number; status?: string; isActive?: boolean; price?: unknown }[],
   now = new Date()
 ): Promise<Map<string, ClassSummary>> {
   const ids = classes.map((c) => c.id);
   const result = new Map<string, ClassSummary>();
   if (ids.length === 0) return result;
 
-  const [schedules, enrollments] = await Promise.all([
+  const [schedules, enrollments, holds] = await Promise.all([
     prisma.classSchedule.findMany({
       where: { classId: { in: ids } },
       select: {
+        id: true,
         classId: true,
         startTime: true,
         endTime: true,
@@ -55,7 +102,9 @@ export async function buildClassSummaries(
       where: { ...ACTIVE_ENROLLMENT, schedule: { classId: { in: ids } } },
       select: { memberId: true, schedule: { select: { classId: true } } },
     }),
+    pendingCourseHolds(prisma, ids, now),
   ]);
+  const at = quoteMoment(now);
 
   const students = new Map<string, Set<string>>();
   for (const e of enrollments) {
@@ -69,7 +118,17 @@ export async function buildClassSummaries(
     const live = own.filter((s) => s.status !== "CANCELLED");
     const main = live.filter((s) => s.makeupForId === null);
     const upcoming = live.filter((s) => s.status === "SCHEDULED" && s.startTime > now);
-    const remaining = upcoming.map((s) => Math.max(0, cls.capacity - s._count.enrollments));
+    const held = holds.get(cls.id) ?? 0;
+    const remaining = upcoming.map((s) => Math.max(0, cls.capacity - s._count.enrollments - held));
+    const minRemainingSlots = remaining.length ? Math.min(...remaining) : null;
+    const saleState = saleStateOf({
+      status: cls.status ?? "APPROVED",
+      isActive: cls.isActive ?? true,
+      sessions: own,
+      minRemainingSlots,
+      now,
+    });
+    const { scheduleIds: _ids, ...quote } = quoteCourse(Number(cls.price ?? 0), own, at);
     result.set(cls.id, {
       mainSessionCount: own.filter((s) => s.makeupForId === null).length,
       completedSessionCount: live.filter((s) => s.status === "COMPLETED").length,
@@ -77,11 +136,16 @@ export async function buildClassSummaries(
       firstSessionStart: (main[0] ?? live[0])?.startTime ?? null,
       nextSessionStart: upcoming[0]?.startTime ?? null,
       lastSessionEnd: live.length ? live.reduce((m, s) => (s.endTime > m ? s.endTime : m), live[0].endTime) : null,
-      minRemainingSlots: remaining.length ? Math.min(...remaining) : null,
+      minRemainingSlots,
       studentCount: students.get(cls.id)?.size ?? 0,
       startDate: (main[0] ?? live[0]) ? vnDateKey((main[0] ?? live[0]).startTime) : null,
       endDate: live.length ? vnDateKey(live.reduce((m, s) => (s.startTime > m ? s.startTime : m), live[0].startTime)) : null,
       weekdays: [...new Set(main.map((s) => vnWeekdayIso(s.startTime)))].sort((a, b) => a - b),
+      saleState,
+      saleStateLabel: SALE_STATE_LABEL[saleState],
+      heldSeats: held,
+      quote,
+      currentPrice: quote.amount,
     });
   }
   return result;
@@ -108,7 +172,15 @@ export async function buildCoachRatings(coachIds: string[]): Promise<Map<string,
 
 /** Gắn `summary` + điểm HLV vào khóa học (giữ nguyên các field cũ — chỉ THÊM field). */
 export async function withClassSummaries<
-  T extends { id: string; capacity: number; coachId: string; coach?: Record<string, unknown> | null },
+  T extends {
+    id: string;
+    capacity: number;
+    coachId: string;
+    status?: string;
+    isActive?: boolean;
+    price?: unknown;
+    coach?: Record<string, unknown> | null;
+  },
 >(classes: T[], opts: { hideCoachEmail?: boolean } = {}) {
   const [summaries, ratings] = await Promise.all([
     buildClassSummaries(classes),
@@ -132,7 +204,7 @@ export async function withClassSummaries<
  * - NONE: chưa mua (hoặc đã được hoàn tiền toàn bộ).
  */
 export async function getMemberPurchase(memberId: string, classId: string, now = new Date()) {
-  const [paid, pending] = await Promise.all([
+  const [paidRow, pending, futureLive, holding] = await Promise.all([
     prisma.payment.findFirst({
       where: { memberId, classId, status: "SUCCESS" },
       orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
@@ -143,7 +215,14 @@ export async function getMemberPurchase(memberId: string, classId: string, now =
       orderBy: { createdAt: "desc" },
       select: { id: true, createdAt: true },
     }),
+    prisma.classSchedule.count({ where: { classId, status: "SCHEDULED", startTime: { gt: now } } }),
+    prisma.enrollment.count({
+      where: { memberId, status: "BOOKED", schedule: { classId, status: "SCHEDULED", startTime: { gt: now } } },
+    }),
   ]);
+  // Đã hủy khóa (không còn giữ chỗ nào trong khi khóa vẫn còn buổi) ⇒ coi như chưa mua, được mua lại.
+  const cancelledPurchase = paidRow !== null && futureLive > 0 && holding === 0;
+  const paid = cancelledPurchase ? null : paidRow;
   const ttlMs = sepayConfig().ttlMinutes * 60_000;
   const pendingValid = pending && pending.createdAt.getTime() + ttlMs > now.getTime() ? pending : null;
 
@@ -162,6 +241,8 @@ export async function getMemberPurchase(memberId: string, classId: string, now =
     pendingPaymentExpiresAt: pendingValid ? new Date(pendingValid.createdAt.getTime() + ttlMs) : null,
     refundedAmount: refunds.reduce((s, r) => s + Number(r.amount), 0),
     hasPendingRefund: refunds.some((r) => r.status === "PENDING" && r.reason === "MEMBER_CANCEL_COURSE"),
+    /** Từng mua rồi hủy khóa — giao dịch cũ (để client hiện "Mua lại"). */
+    previousPaymentId: cancelledPurchase ? paidRow!.id : null,
   };
 }
 

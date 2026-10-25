@@ -21,17 +21,19 @@ export async function getRevenueReport(startDate: string, endDate: string) {
   const cashFilter = { paidAt: { gte: start, lte: end } };
   const orderFilter = { createdAt: { gte: start, lte: end } };
 
-  const [collectedAgg, refundedAgg, pendingCount, failedCount, ordersCreated, byMethod, recentPayments, partialRefundAgg] =
+  // Doanh thu GỘP = mọi giao dịch đã thu trong kỳ (SUCCESS + REFUNDED — giao dịch bị hoàn sau vẫn là tiền đã thu).
+  // ĐÃ HOÀN = tổng khoản hoàn THỰC TRẢ (Refund COMPLETED, theo processedAt) — đúng cả hoàn có phí chiết khấu.
+  // (Trước đây gộp chỉ lấy SUCCESS nhưng lại trừ tiền của giao dịch REFUNDED ⇒ bị trừ hai lần.)
+  const collectedStatuses = { in: ["SUCCESS", "REFUNDED"] as ("SUCCESS" | "REFUNDED")[] };
+  const [collectedAgg, refundedPaymentsAgg, pendingCount, failedCount, ordersCreated, byMethod, recentPayments, refundRows] =
     await Promise.all([
       prisma.payment.aggregate({
-        where: { ...cashFilter, status: "SUCCESS" },
+        where: { ...cashFilter, status: collectedStatuses },
         _sum: { amount: true },
         _count: true,
       }),
-      // Tiền đã hoàn trong kỳ — payment REFUNDED giữ `paidAt` của lần thu gốc.
       prisma.payment.aggregate({
         where: { ...cashFilter, status: "REFUNDED" },
-        _sum: { amount: true },
         _count: true,
       }),
       prisma.payment.count({ where: { ...orderFilter, status: "PENDING" } }),
@@ -39,68 +41,84 @@ export async function getRevenueReport(startDate: string, endDate: string) {
       prisma.payment.count({ where: orderFilter }),
       prisma.payment.groupBy({
         by: ["method"],
-        where: { ...cashFilter, status: "SUCCESS" },
+        where: { ...cashFilter, status: collectedStatuses },
         _sum: { amount: true },
         _count: true,
       }),
       // Danh sách "dòng tiền" CÙNG cohort cash (SUCCESS/REFUNDED, sắp theo paidAt) — không lẫn đơn PENDING.
       prisma.payment.findMany({
-        where: { ...cashFilter, status: { in: ["SUCCESS", "REFUNDED"] } },
+        where: { ...cashFilter, status: collectedStatuses },
         include: {
           member: { include: { user: { select: { fullName: true } } } },
         },
         orderBy: { paidAt: "desc" },
         take: 10,
       }),
-      // Hoàn tiền TỪNG PHẦN đã duyệt trong kỳ (hủy buổi không dạy bù) — giao dịch gốc vẫn SUCCESS
-      // nên chưa nằm trong refundedAgg. Hoàn cả khóa đã đổi giao dịch sang REFUNDED (tính ở refundedAgg).
-      prisma.refund.aggregate({
-        where: { status: "COMPLETED", processedAt: { gte: start, lte: end }, payment: { status: "SUCCESS" } },
-        _sum: { amount: true },
-        _count: true,
+      prisma.refund.findMany({
+        where: { status: "COMPLETED", processedAt: { gte: start, lte: end } },
+        select: {
+          amount: true,
+          payment: {
+            select: { status: true, classId: true, orderId: true, note: true, purchaseSnapshot: true, classNameSnapshot: true },
+          },
+        },
       }),
     ]);
 
-  // Doanh thu theo mặt hàng (khóa học / gói / đơn hàng) — số tiền thực thu + TÊN LÚC MUA (snapshot).
-  const collected = await prisma.payment.findMany({
-    where: { ...cashFilter, status: "SUCCESS" },
-    select: { amount: true, classId: true, orderId: true, note: true, purchaseSnapshot: true, classNameSnapshot: true },
-  });
-  const byItem = new Map<string, { key: string; kind: string; name: string; revenue: number; count: number }>();
-  for (const p of collected) {
+  const itemKey = (p: { classId: string | null; orderId: string | null; note: string | null; purchaseSnapshot: unknown }) => {
     const snap = p.purchaseSnapshot as { kind?: string; planId?: string } | null;
     const kind = p.classId ? "CLASS" : p.orderId ? "ORDER" : snap?.kind === "MEMBERSHIP" ? "MEMBERSHIP" : "OTHER";
     const key = p.classId ? `CLASS:${p.classId}` : kind === "MEMBERSHIP" ? `MEMBERSHIP:${snap?.planId ?? p.note}` : kind;
-    const row = byItem.get(key) ?? { key, kind, name: purchasedItemName(p), revenue: 0, count: 0 };
+    return { kind, key };
+  };
+
+  // Doanh thu theo mặt hàng (khóa học / gói / đơn hàng) — số tiền thực thu + TÊN LÚC MUA (snapshot) + đã hoàn trong kỳ.
+  const collected = await prisma.payment.findMany({
+    where: { ...cashFilter, status: collectedStatuses },
+    select: { amount: true, classId: true, orderId: true, note: true, purchaseSnapshot: true, classNameSnapshot: true },
+  });
+  const byItem = new Map<string, { key: string; kind: string; name: string; revenue: number; count: number; refunded: number; net: number }>();
+  for (const p of collected) {
+    const { kind, key } = itemKey(p);
+    const row = byItem.get(key) ?? { key, kind, name: purchasedItemName(p), revenue: 0, count: 0, refunded: 0, net: 0 };
     row.revenue += Number(p.amount);
     row.count += 1;
     byItem.set(key, row);
   }
+  for (const r of refundRows) {
+    const { kind, key } = itemKey(r.payment);
+    const row = byItem.get(key) ?? { key, kind, name: purchasedItemName(r.payment), revenue: 0, count: 0, refunded: 0, net: 0 };
+    row.refunded += Number(r.amount);
+    byItem.set(key, row);
+  }
+  for (const row of byItem.values()) row.net = row.revenue - row.refunded;
   const revenueByItem = [...byItem.values()].sort((a, b) => b.revenue - a.revenue);
 
   const methodMap: Record<string, number> = {};
   for (const m of byMethod) methodMap[m.method] = Number(m._sum.amount ?? 0);
 
   const totalRevenue = Number(collectedAgg._sum.amount ?? 0);
-  const partialRefundedAmount = Number(partialRefundAgg._sum.amount ?? 0);
-  const refundedAmount = Number(refundedAgg._sum.amount ?? 0) + partialRefundedAmount;
+  const refundedAmount = refundRows.reduce((sum, r) => sum + Number(r.amount), 0);
+  const partialRows = refundRows.filter((r) => r.payment.status === "SUCCESS");
+  const partialRefundedAmount = partialRows.reduce((sum, r) => sum + Number(r.amount), 0);
 
   return {
-    /** Tiền THỰC THU trong kỳ (tổng payment SUCCESS theo `paidAt`). */
+    /** Doanh thu GỘP: tiền đã thu trong kỳ (SUCCESS + REFUNDED theo `paidAt`). */
     totalRevenue,
-    /** Tiền ĐÃ HOÀN trong kỳ (payment REFUNDED theo `paidAt` + hoàn từng phần đã duyệt theo `processedAt`). */
+    /** Tiền ĐÃ HOÀN trong kỳ: tổng `Refund.amount` COMPLETED theo `processedAt` (số tiền thực trả lại khách). */
     refundedAmount,
-    /** Riêng phần hoàn TỪNG PHẦN (hủy buổi không dạy bù) đã duyệt trong kỳ. */
+    /** Phần hoàn TỪNG PHẦN (giao dịch gốc vẫn SUCCESS — hoàn buổi lẻ, hoàn có phí…). */
     partialRefundedAmount,
-    partialRefunds: partialRefundAgg._count,
-    /** Thực nhận = totalRevenue − refundedAmount (không âm). */
+    partialRefunds: partialRows.length,
+    /** Thực nhận = gộp − đã hoàn (không âm). */
     netRevenue: Math.max(0, totalRevenue - refundedAmount),
     /** Tổng số ĐƠN được tạo trong kỳ (mọi trạng thái, theo `createdAt`). */
     totalPayments: ordersCreated,
     /** Số giao dịch THU ĐƯỢC trong kỳ (cùng cohort paidAt với totalRevenue). */
     successPayments: collectedAgg._count,
-    /** Số giao dịch ĐÃ HOÀN trong kỳ (cùng cohort paidAt với refundedAmount). */
-    refundedPayments: refundedAgg._count,
+    /** Số giao dịch đã bị hoàn toàn bộ (cohort paidAt). */
+    refundedPayments: refundedPaymentsAgg._count,
+    refundCount: refundRows.length,
     /** Đơn tạo trong kỳ còn chờ thanh toán (cohort createdAt). */
     pendingPayments: pendingCount,
     /** Đơn tạo trong kỳ đã đóng/thất bại (cohort createdAt). */
@@ -111,13 +129,12 @@ export async function getRevenueReport(startDate: string, endDate: string) {
       SEPAY: methodMap["SEPAY"] ?? 0,
     },
     recentPayments: recentPayments.map((p) => ({ ...p, itemName: purchasedItemName(p) })),
-    /** Doanh thu thực thu theo mặt hàng, tên theo snapshot lúc mua. */
+    /** Doanh thu theo mặt hàng: thu gộp, đã hoàn (trong kỳ), thực nhận — tên theo snapshot lúc mua. */
     revenueByItem,
     note:
-      "totalRevenue = tiền THỰC THU trong kỳ (SUCCESS theo paidAt); refundedAmount = tiền ĐÃ HOÀN " +
-      "(REFUNDED theo paidAt); netRevenue = thực nhận (gross − refunded). pendingPayments/failedPayments/" +
-      "totalPayments đếm theo ĐƠN tạo trong kỳ (createdAt). refundedAmount gồm cả hoàn TỪNG PHẦN " +
-      "(bảng Refund, hủy buổi không dạy bù) đã duyệt trong kỳ theo processedAt.",
+      "totalRevenue = doanh thu GỘP (SUCCESS + REFUNDED theo paidAt); refundedAmount = tổng khoản hoàn đã " +
+      "chuyển trả trong kỳ (Refund COMPLETED theo processedAt, gồm hoàn có phí); netRevenue = gộp − đã hoàn. " +
+      "pendingPayments/failedPayments/totalPayments đếm theo ĐƠN tạo trong kỳ (createdAt).",
   };
 }
 
@@ -252,7 +269,7 @@ export async function getMembershipReport(startDate: string, endDate: string) {
     }),
     // BR-20: doanh thu theo paidAt — chỉ tính giao dịch MUA GÓI thành viên.
     prisma.payment.aggregate({
-      where: { paidAt: { gte: start, lte: end }, status: "SUCCESS", membership: { isNot: null } },
+      where: { paidAt: { gte: start, lte: end }, status: { in: ["SUCCESS", "REFUNDED"] }, membership: { isNot: null } },
       _sum: { amount: true },
     }),
   ]);

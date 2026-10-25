@@ -86,6 +86,8 @@ interface SessionRow {
   status: "SCHEDULED" | "CANCELLED" | "COMPLETED";
   isMakeup: boolean;
   replacedByActiveMakeup: boolean;
+  /** Buổi do HỆ THỐNG hủy (khóa tự đóng vì không có học viên) — không phải lỗi HLV. */
+  systemCancelled: boolean;
   students: number;
   hasEvidence: boolean;
 }
@@ -166,6 +168,7 @@ export async function evaluateCoaches(
         endTime: true,
         status: true,
         makeupForId: true,
+        cancelCode: true,
         makeup: { select: { status: true } },
         class: { select: { coachId: true, name: true, status: true, isActive: true } },
         _count: {
@@ -197,6 +200,7 @@ export async function evaluateCoaches(
       isMakeup: s.makeupForId !== null,
       // Buổi chính bị hủy nhưng đã có buổi dạy bù còn hiệu lực ⇒ không tính là hủy (buổi bù tự tính theo trạng thái của nó).
       replacedByActiveMakeup: s.status === "CANCELLED" && s.makeupForId === null && !!s.makeup && s.makeup.status !== "CANCELLED",
+      systemCancelled: s.status === "CANCELLED" && s.cancelCode === "NO_ENROLLMENT",
       students: s._count.enrollments,
       hasEvidence: s._count.attendances > 0 || s._count.manualCodes > 0,
     });
@@ -235,6 +239,16 @@ export async function evaluateCoaches(
     const perClass = new Map<string, { nonCancelled: number; first: number; last: number }>();
 
     for (const s of bucket.rows) {
+      if (s.systemCancelled) {
+        // Khóa tự đóng vì không có học viên (Doc/BUSINESS_HARDENING_PLAN.md §1.2-D): không tính hủy / không tính phải dạy,
+        // nhưng vẫn giữ trong lịch của khóa để điều kiện "đủ buổi" của kỳ không bị mất.
+        const agg = perClass.get(s.classId) ?? { nonCancelled: 0, first: Infinity, last: -Infinity };
+        agg.nonCancelled++;
+        agg.first = Math.min(agg.first, s.startTime.getTime());
+        agg.last = Math.max(agg.last, s.startTime.getTime());
+        perClass.set(s.classId, agg);
+        continue;
+      }
       if (s.status === "CANCELLED") {
         if (s.replacedByActiveMakeup) continue;
         if (leaveKeys.has(vnDateKey(s.startTime))) leaveCancelled++;

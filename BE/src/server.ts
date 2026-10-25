@@ -14,6 +14,9 @@ import {
 import { runShopMaintenance } from "./modules/shop/orders.service.js";
 import { runTermMaintenance } from "./modules/terms/term-notifications.js";
 import { COACH_TERM } from "./config/coach-term.js";
+import { runClassMaintenance } from "./modules/classes/class-maintenance.service.js";
+import { runMembershipMaintenance } from "./modules/memberships/memberships.service.js";
+import { COURSE_SALE } from "./config/course-sale.js";
 
 /** Nhịp job cửa hàng: đơn hết hạn thanh toán, quá hạn nhận tại quầy, tự hoàn tất (ms). */
 const PRODUCT_ORDER_EXPIRY_INTERVAL_MS = 60_000;
@@ -66,6 +69,17 @@ async function main() {
   const termTimer = setInterval(termJob, COACH_TERM.MAINTENANCE_INTERVAL_MS);
   termTimer.unref();
   setTimeout(termJob, 30_000).unref();
+
+  // Khóa học (Doc/BUSINESS_HARDENING_PLAN.md §1.2): quá hạn duyệt, báo HLV khóa chưa có học viên, tự đóng khóa
+  // qua hạn mở bán mà 0 học viên, đánh dấu khóa đã kết thúc. Idempotent (CAS theo status/alertStage).
+  // Gói thành viên (Doc/MEMBERSHIP_FLOW.md §2.5): hết hạn + nhắc gia hạn 7 ngày / 1 ngày — chạy cùng nhịp.
+  const classJob = () => {
+    void runClassMaintenance().catch((err: any) => console.warn("[CLASSES] job khóa học lỗi:", (err as Error).message));
+    void runMembershipMaintenance().catch((err: any) => console.warn("[MEMBERSHIP] job gói thành viên lỗi:", (err as Error).message));
+  };
+  const classTimer = setInterval(classJob, COURSE_SALE.MAINTENANCE_INTERVAL_MS);
+  classTimer.unref();
+  setTimeout(classJob, 20_000).unref();
 
   server.listen(env.PORT, () => {
     console.log(`Server health running at http://localhost:${env.PORT}/api/v1/health`);

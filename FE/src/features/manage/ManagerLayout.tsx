@@ -28,6 +28,7 @@ import {
   UsersRound,
   WalletCards,
 } from "lucide-react";
+import { IdCard, ScanLine } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ProfileOk } from "../../shared/generated";
 import { NotificationBell } from "../../shared/Communication";
@@ -56,6 +57,8 @@ const WithdrawalsPage = lazy(() => import("./pages/WithdrawalsPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
 const CenterSettingsPage = lazy(() => import("./pages/CenterSettingsPage"));
 const TermsPage = lazy(() => import("./pages/TermsPage"));
+const MembershipPlansPage = lazy(() => import("./pages/MembershipPlansPage"));
+const MembershipsPage = lazy(() => import("./pages/MembershipsPage"));
 
 type NavItem = [path: string, label: string, icon: LucideIcon];
 type NavGroup = { title: string; icon: LucideIcon; items: NavItem[] };
@@ -83,6 +86,8 @@ const NAV: NavGroup[] = [
     title: "Kinh doanh",
     icon: Store,
     items: [
+      ["membership-plans", "Gói thành viên", IdCard],
+      ["memberships", "Hội viên & thẻ", ScanLine],
       ["products", "Sản phẩm", Package],
       ["orders", "Đơn hàng", ReceiptText],
       ["revenue", "Doanh thu", WalletCards],
@@ -444,6 +449,8 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
               <Route path="/manager/refunds" element={<RefundsPage />} />
               <Route path="/manager/withdrawals" element={<WithdrawalsPage />} />
               <Route path="/manager/center" element={<CenterSettingsPage />} />
+              <Route path="/manager/membership-plans" element={<MembershipPlansPage />} />
+              <Route path="/manager/memberships" element={<MembershipsPage />} />
               <Route path="/manager/reports" element={<Navigate replace to="/manager/revenue" />} />
               <Route path="/manager/profile" element={<ProfilePage user={user} />} />
               <Route path="/manager" element={<Navigate replace to="/manager/dashboard" />} />

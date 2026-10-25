@@ -140,6 +140,38 @@ router.get(
   paymentsController.listMyPayments
 );
 
+/**
+ * @swagger
+ * /payments/my/{id}/invoice:
+ *   get:
+ *     summary: Hóa đơn chi tiết của giao dịch của tôi (người bán, người mua, dòng hàng, tạm tính, giảm, phí ship, tổng, hoàn tiền)
+ *     description: Đọc ảnh chụp lúc mua — đổi giá/tên/thông tin sau này không ảnh hưởng. MANAGER dùng `/payments/{id}/invoice`.
+ *     tags: [Payments]
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: "{ invoiceNumber, kind, seller, buyer, lines[{no,name,unit,quantity,unitPrice,amount}], subtotal, discount, discountLabel, shippingFee, total, refunds[], refundedAmount, netAmount, course, membership, order }" }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.get("/my/:id/invoice", authenticate, authorize("MEMBER", "COACH"), paymentsController.getInvoice);
+/**
+ * @swagger
+ * /payments/{id}/invoice:
+ *   get:
+ *     summary: MANAGER — hóa đơn chi tiết của một giao dịch (cùng định dạng /payments/my/{id}/invoice)
+ *     tags: [Payments]
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Hóa đơn }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ *       404: { $ref: "#/components/responses/NotFound" }
+ */
+router.get("/:id/invoice", authenticate, authorize("MANAGER"), paymentsController.getInvoice);
+
 router.get(
   "/:id",
   authenticate,

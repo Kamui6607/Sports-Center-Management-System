@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
+import '../../../../core/utils/money.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../domain/entities/course.dart';
@@ -23,7 +24,7 @@ class ClassCard extends StatelessWidget {
     return AppCard(
       onTap: onTap,
       padding: EdgeInsets.zero,
-      semanticLabel: 'Khóa ${course.name}, giá ${course.price} đồng',
+      semanticLabel: 'Khóa ${course.name}, giá ${course.payablePrice} đồng',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -111,7 +112,29 @@ class ClassCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: MoneyText(course.price, style: context.text.titleSmall.copyWith(color: c.primary)),
+                      child: Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.end,
+                        spacing: AppSpacing.xs,
+                        children: [
+                          MoneyText(course.payablePrice, style: context.text.titleSmall.copyWith(color: c.primary)),
+                          // Đăng ký muộn: giá theo số buổi còn lại (BE tính) + giá trọn khóa gạch ngang.
+                          if (course.quote?.hasDiscount == true) ...[
+                            Text(
+                              Money.format(course.price),
+                              style: context.text.caption.copyWith(
+                                color: c.textMuted,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                            Text(
+                              'còn ${course.quote!.sessionsPurchased}/${course.quote!.totalSessions} buổi',
+                              style: context.text.caption.copyWith(color: c.textMuted),
+                            ),
+                          ],
+                          if (course.saleState == SaleState.full)
+                            StatusLabel(SaleState.full.label, StatusTone.danger).tag(dense: true),
+                        ],
+                      ),
                     ),
                     ?trailing,
                   ],

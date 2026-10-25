@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { buildOrderPaymentSnapshot } from "../payments/purchase-snapshot.js";
 import { Prisma, type Product } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { buildSepayPaymentCode, buildVietQrUrl, isSepayConfigured, sepayConfig } from "../../config/sepay.js";
@@ -529,6 +530,8 @@ export async function createOrder(
             transactionCode: transferCode,
             gateway: SEPAY_GATEWAY,
             note: `Thanh toán online đơn hàng ${orderCode}: ${summary} (chuyển khoản VietQR qua SePay)`,
+            // Người bán/người mua lúc mua — hóa đơn không đổi khi thông tin trung tâm/khách bị sửa sau.
+            purchaseSnapshot: await buildOrderPaymentSnapshot(tx, order.id, user.id),
             gatewayPayload: {
               provider: SEPAY_GATEWAY,
               orderCode: transferCode,

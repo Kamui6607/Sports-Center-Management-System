@@ -74,12 +74,52 @@ enum InvoiceStatus { issued, cancelled }
 
 /// Một dòng sản phẩm của đơn (đơn có thể nhiều dòng — L7).
 class InvoiceLine {
-  const InvoiceLine({required this.name, required this.quantity, required this.unitPrice, required this.total});
+  const InvoiceLine({
+    required this.name,
+    required this.quantity,
+    required this.unitPrice,
+    required this.total,
+    this.unit = 'cái',
+    this.description,
+  });
 
   final String name;
   final int quantity;
   final int unitPrice;
   final int total;
+
+  /// Đơn vị tính (khóa / gói / cái).
+  final String unit;
+  final String? description;
+}
+
+/// Bên bán / bên mua in trên hóa đơn (ảnh chụp lúc mua).
+class InvoiceParty {
+  const InvoiceParty({required this.name, this.address, this.phone, this.email});
+
+  final String name;
+  final String? address;
+  final String? phone;
+  final String? email;
+}
+
+/// Một khoản hoàn tiền của giao dịch.
+class InvoiceRefund {
+  const InvoiceRefund({
+    required this.reasonLabel,
+    required this.amount,
+    required this.statusLabel,
+    required this.completed,
+    required this.createdAt,
+    this.processedAt,
+  });
+
+  final String reasonLabel;
+  final int amount;
+  final String statusLabel;
+  final bool completed;
+  final DateTime createdAt;
+  final DateTime? processedAt;
 }
 
 /// Chi tiết thanh toán (L6 — BE đã bỏ bảng Invoice; dựng từ `GET /payments/my`):
@@ -102,6 +142,15 @@ class Invoice {
     this.paidAt,
     this.lines = const [],
     this.refundedAmount = 0,
+    this.seller,
+    this.buyer,
+    this.discountLabel,
+    this.shippingFee = 0,
+    this.refunds = const [],
+    this.pendingRefundAmount = 0,
+    this.periodLabel,
+    this.statusLabel,
+    this.isPickup = false,
   });
 
   final String id;
@@ -124,4 +173,26 @@ class Invoice {
 
   /// Số tiền đã được hoàn (hoàn một phần khi buổi học bị hủy).
   final int refundedAmount;
+
+  /// Hóa đơn chi tiết (`GET /payments/my/:id/invoice`) — null khi chỉ có dữ liệu danh sách.
+  final InvoiceParty? seller;
+  final InvoiceParty? buyer;
+
+  /// Diễn giải dòng giảm giá (VD đăng ký muộn).
+  final String? discountLabel;
+  final int shippingFee;
+  final List<InvoiceRefund> refunds;
+  final int pendingRefundAmount;
+
+  /// Thời hạn của gói / khóa (VD "01/11/2026 – 30/11/2026").
+  final String? periodLabel;
+
+  /// Nhãn trạng thái từ BE (Đã thanh toán / Đã hoàn tiền…).
+  final String? statusLabel;
+
+  /// Đơn sản phẩm nhận tại quầy (không có phí giao hàng).
+  final bool isPickup;
+
+  /// Thực trả sau hoàn.
+  int get netAmount => (total - refundedAmount).clamp(0, total);
 }

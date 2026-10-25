@@ -46,7 +46,7 @@ export const RefundQuerySchema = z.object({
   limit: z.string().optional(),
   status: z.enum(["PENDING", "COMPLETED", "REJECTED", "CANCELLED"]).optional(),
   reason: z
-    .enum(["MEMBER_CANCEL_COURSE", "MEMBER_CANCEL_COURSE_LATE", "MEMBER_CANCEL_SESSION", "SESSION_RESCHEDULED", "SESSION_CANCELLED", "ORDER_CANCELLED", "ORDER_NOT_PICKED_UP", "ORDER_LATE_PAYMENT"])
+    .enum(["MEMBER_CANCEL_COURSE", "MEMBER_CANCEL_COURSE_LATE", "MEMBER_CANCEL_SESSION", "SESSION_RESCHEDULED", "SESSION_CANCELLED", "ORDER_CANCELLED", "ORDER_NOT_PICKED_UP", "ORDER_LATE_PAYMENT", "COURSE_NOT_FULFILLED", "MEMBERSHIP_CANCELLED"])
     .optional(),
   memberId: z.string().min(1).optional(),
   /** Lọc hoàn tiền của một đơn hàng. */

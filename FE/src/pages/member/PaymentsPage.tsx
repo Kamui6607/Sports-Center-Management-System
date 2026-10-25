@@ -68,7 +68,7 @@ export function MemberPaymentsPage() {
         ))
       )}
       {invoiceId && (
-        <InvoiceDialog id={invoiceId} onClose={() => setInvoiceId("")} />
+        <InvoiceDialog mine id={invoiceId} onClose={() => setInvoiceId("")} />
       )}
       {paymentId && (
         <Modal title="Chi tiết thanh toán" onClose={() => setPaymentId("")}>

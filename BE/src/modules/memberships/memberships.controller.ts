@@ -53,3 +53,58 @@ export async function listMemberships(req: Request, res: Response, next: NextFun
     sendSuccess(res, memberships, "Memberships retrieved successfully", 200, pagination);
   } catch (err) { next(err); }
 }
+
+export async function listManagePlans(_req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await membershipsService.listManagePlans(), "Membership plans retrieved successfully");
+  } catch (err) { next(err); }
+}
+
+export async function updatePlan(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await membershipsService.updatePlan(req.params.id as string, req.body), "Membership plan updated");
+  } catch (err) { next(err); }
+}
+
+export async function deletePlan(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await membershipsService.deletePlan(req.params.id as string), "Membership plan deleted");
+  } catch (err) { next(err); }
+}
+
+export async function getMyHistory(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await membershipsService.listMyMembershipHistory(req.user!.id), "Membership history retrieved");
+  } catch (err) { next(err); }
+}
+
+export async function getMyPass(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await membershipsService.issueMemberPass(req.user!.id), "Member pass issued");
+  } catch (err) { next(err); }
+}
+
+export async function verifyPass(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await membershipsService.verifyMemberPass(req.body.token, req.user!.id), "Member pass verified");
+  } catch (err) { next(err); }
+}
+
+export async function listPassScans(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { scans, pagination } = await membershipsService.listMemberPassScans(req.query as Record<string, string>);
+    sendSuccess(res, scans, "Member pass scans retrieved", 200, pagination);
+  } catch (err) { next(err); }
+}
+
+export async function cancelMembership(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await membershipsService.cancelMembership(req.params.id as string, req.user!.id, req.body), "Membership cancelled");
+  } catch (err) { next(err); }
+}
+
+export async function runMaintenance(_req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await membershipsService.runMembershipMaintenance(), "Membership maintenance completed");
+  } catch (err) { next(err); }
+}

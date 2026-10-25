@@ -6580,7 +6580,8 @@ Parameters:
         "SESSION_CANCELLED",
         "ORDER_CANCELLED",
         "ORDER_NOT_PICKED_UP",
-        "ORDER_LATE_PAYMENT"
+        "ORDER_LATE_PAYMENT",
+        "COURSE_NOT_FULFILLED"
       ]
     }
   },
@@ -8253,6 +8254,124 @@ Responses/status codes:
 }
 ```
 
+## GET /payments/my/{id}/invoice
+Hóa đơn chi tiết của giao dịch của tôi (người bán, người mua, dòng hàng, tạm tính, giảm, phí ship, tổng, hoàn tiền)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ invoiceNumber, kind, seller, buyer, lines[{no,name,unit,quantity,unitPrice,amount}], subtotal, discount, discountLabel, shippingFee, total, refunds[], refundedAmount, netAmount, course, membership, order }"
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /payments/{id}/invoice
+MANAGER — hóa đơn chi tiết của một giao dịch (cùng định dạng /payments/my/{id}/invoice)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "Hóa đơn"
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## PATCH /payments/{id}/status
 Update payment status (thanh toán tại quầy)
 
@@ -9477,7 +9596,7 @@ Responses/status codes:
 ```
 
 ## GET /membership-plans
-Danh sách gói thành viên đang bán (giá tăng dần)
+Danh sách gói thành viên đang bán (theo thứ tự Manager đặt, rồi giá tăng dần)
 
 Authentication: [{"BearerAuth":[]}]
 
@@ -9545,6 +9664,22 @@ Request body:
     },
     "description": {
       "type": "string"
+    },
+    "benefits": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "example": [
+        "Tập không giới hạn giờ mở cửa",
+        "Tủ đồ miễn phí"
+      ]
+    },
+    "isFeatured": {
+      "type": "boolean"
+    },
+    "sortOrder": {
+      "type": "integer"
     }
   }
 }
@@ -9602,6 +9737,155 @@ Responses/status codes:
         }
       }
     }
+  }
+}
+```
+
+## GET /membership-plans/manage
+MANAGER — mọi gói (cả gói đã tắt) kèm số liệu (hội viên đang dùng, lượt bán, doanh thu, đã hoàn)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## PATCH /membership-plans/{id}
+MANAGER sửa gói (đổi giá / số ngày chỉ áp dụng cho giao dịch mới)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "durationDays": {
+      "type": "integer"
+    },
+    "price": {
+      "type": "integer"
+    },
+    "description": {
+      "type": "string"
+    },
+    "benefits": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "isFeatured": {
+      "type": "boolean"
+    },
+    "sortOrder": {
+      "type": "integer"
+    },
+    "isActive": {
+      "type": "boolean"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "404": {
+    "description": "Resource not found",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Record not found"
+          }
+        }
+      }
+    }
+  },
+  "409": {
+    "description": "PLAN_NAME_TAKEN"
+  }
+}
+```
+
+## DELETE /membership-plans/{id}
+MANAGER xóa gói chưa từng bán (đã bán ⇒ 409 PLAN_IN_USE, hãy tắt bán)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "409": {
+    "description": "PLAN_IN_USE"
   }
 }
 ```
@@ -9816,8 +10100,208 @@ Responses/status codes:
 }
 ```
 
+## GET /memberships/my/history
+MEMBER — lịch sử mọi gói đã mua (tên/giá theo ảnh chụp lúc mua)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  }
+}
+```
+
+## GET /memberships/my/pass
+MEMBER — mã QR động của thẻ thành viên (JWT sống 60 giây, app tự làm mới)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ token, expiresIn, expiresAt, isActive, validUntil }"
+  }
+}
+```
+
+## POST /memberships/pass/verify
+MANAGER/COACH quét mã QR động của hội viên ⇒ hợp lệ hay không + ghi nhật ký vào cửa
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "token"
+  ],
+  "properties": {
+    "token": {
+      "type": "string"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ valid, reason, member, membership, validUntil, totalDaysLeft, entriesToday }"
+  },
+  "400": {
+    "description": "PASS_EXPIRED / PASS_INVALID"
+  }
+}
+```
+
+## GET /memberships/pass/scans
+MANAGER — nhật ký quét thẻ hội viên
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "query",
+    "name": "valid",
+    "schema": {
+      "type": "string",
+      "enum": [
+        "true",
+        "false"
+      ]
+    }
+  },
+  {
+    "in": "query",
+    "name": "page",
+    "schema": {
+      "type": "integer"
+    }
+  },
+  {
+    "in": "query",
+    "name": "limit",
+    "schema": {
+      "type": "integer"
+    }
+  }
+]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  }
+}
+```
+
+## POST /memberships/maintenance
+MANAGER — chạy ngay job gói thành viên (hết hạn + nhắc gia hạn 7 ngày / 1 ngày; cũng chạy định kỳ)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ remindedDays7, remindedDays1, expired }"
+  }
+}
+```
+
+## POST /memberships/{id}/cancel
+MANAGER hủy gói của hội viên (gói xếp hàng phía sau dời lên; hoàn tiền tùy chọn ≤ giá trị còn lại)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[
+  {
+    "in": "path",
+    "name": "id",
+    "required": true,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+Request body:
+```json
+{
+  "type": "object",
+  "required": [
+    "reason"
+  ],
+  "properties": {
+    "reason": {
+      "type": "string"
+    },
+    "refundAmount": {
+      "type": "integer",
+      "description": "0 = không hoàn"
+    }
+  }
+}
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "{ membershipId, refund, shiftedQueued, maxRefund }"
+  },
+  "400": {
+    "description": "REFUND_EXCEEDS_REMAINING"
+  },
+  "409": {
+    "description": "MEMBERSHIP_NOT_ACTIVE"
+  }
+}
+```
+
 ## GET /memberships/verify/{userId}
-COACH/MANAGER quét QR (userId) của hội viên ⇒ gói còn / hết hạn
+COACH/MANAGER tra cứu gói của hội viên theo userId (KHÔNG dùng vào cửa — vào cửa dùng /memberships/pass/verify)
 
 Authentication: [{"BearerAuth":[]}]
 
@@ -9907,6 +10391,20 @@ Parameters:
         "EXPIRED",
         "CANCELLED"
       ]
+    }
+  },
+  {
+    "in": "query",
+    "name": "planId",
+    "schema": {
+      "type": "string"
+    }
+  },
+  {
+    "in": "query",
+    "name": "search",
+    "schema": {
+      "type": "string"
     }
   },
   {
@@ -14275,6 +14773,42 @@ Responses/status codes:
   },
   "409": {
     "description": "ROOM_CONFLICT / COACH_CONFLICT / CLASS_NOT_DRAFT"
+  }
+}
+```
+
+## POST /classes/maintenance
+MANAGER — chạy ngay job bảo trì khóa học (cũng chạy định kỳ 5 phút ở server)
+
+Authentication: [{"BearerAuth":[]}]
+
+Parameters:
+```json
+[]
+```
+Request body:
+```json
+null
+```
+Responses/status codes:
+```json
+{
+  "200": {
+    "description": "OK"
+  },
+  "403": {
+    "description": "Insufficient role permissions",
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "example": {
+            "success": false,
+            "message": "Forbidden: insufficient permissions"
+          }
+        }
+      }
+    }
   }
 }
 ```

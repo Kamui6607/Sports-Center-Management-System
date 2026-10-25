@@ -190,6 +190,21 @@ router.get("/goal-options", classesController.listGoalOptions);
  *       400: { description: CLASS_GOALS_REQUIRED / validate }
  *       409: { description: ROOM_CONFLICT / COACH_CONFLICT / CLASS_NOT_DRAFT }
  */
+/**
+ * @swagger
+ * /classes/maintenance:
+ *   post:
+ *     summary: MANAGER — chạy ngay job bảo trì khóa học (cũng chạy định kỳ 5 phút ở server)
+ *     description: |
+ *       Idempotent. Khóa PENDING quá hạn duyệt ⇒ tự từ chối; khóa chưa có học viên ⇒ báo HLV (24h trước / khi khai giảng);
+ *       qua hạn mở bán mà 0 học viên ⇒ tự đóng (hủy buổi mã NO_ENROLLMENT); hết buổi ⇒ COMPLETED.
+ *       Trả `{ reviewExpired, alertedPreStart, alertedStarted, closedNoEnrollment, completed }`.
+ *     tags: [Classes]
+ *     responses:
+ *       200: { description: OK }
+ *       403: { $ref: "#/components/responses/Forbidden" }
+ */
+router.post("/maintenance", authenticate, authorize("MANAGER"), classesController.runMaintenance);
 router.post("/drafts", authenticate, authorize("COACH"), validate(ClassDraftSchema), classesController.createDraft);
 router.patch("/drafts/:id", authenticate, authorize("COACH"), validate(ClassDraftSchema), classesController.updateDraft);
 router.delete("/drafts/:id", authenticate, authorize("COACH"), classesController.deleteDraft);

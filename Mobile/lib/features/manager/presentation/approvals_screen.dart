@@ -216,15 +216,8 @@ class _RefundList extends ConsumerWidget {
         children: [
           if (status == RefundStatus.pending && pendingAmount > 0)
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                context.screenPadding,
-                AppSpacing.xs,
-                context.screenPadding,
-                0,
-              ),
-              child: AlertBanner.info(
-                message: 'Tổng tiền chờ hoàn: ${Money.format(pendingAmount)}',
-              ),
+              padding: EdgeInsets.fromLTRB(context.screenPadding, AppSpacing.xs, context.screenPadding, 0),
+              child: AlertBanner.info(message: 'Tổng tiền chờ hoàn: ${Money.format(pendingAmount)}'),
             ),
           Expanded(
             child: RefreshableList(
@@ -242,4 +235,3 @@ class _RefundList extends ConsumerWidget {
     );
   }
 }
-

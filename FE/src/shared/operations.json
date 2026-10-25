@@ -3357,7 +3357,8 @@
             "SESSION_CANCELLED",
             "ORDER_CANCELLED",
             "ORDER_NOT_PICKED_UP",
-            "ORDER_LATE_PAYMENT"
+            "ORDER_LATE_PAYMENT",
+            "COURSE_NOT_FULFILLED"
           ]
         }
       },
@@ -4204,6 +4205,58 @@
       "200"
     ]
   },
+  "GET /payments/my/{id}/invoice": {
+    "path": "/payments/my/{id}/invoice",
+    "method": "GET",
+    "summary": "Hóa đơn chi tiết của giao dịch của tôi (người bán, người mua, dòng hàng, tạm tính, giảm, phí ship, tổng, hoàn tiền)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403",
+      "404"
+    ]
+  },
+  "GET /payments/{id}/invoice": {
+    "path": "/payments/{id}/invoice",
+    "method": "GET",
+    "summary": "MANAGER — hóa đơn chi tiết của một giao dịch (cùng định dạng /payments/my/{id}/invoice)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403",
+      "404"
+    ]
+  },
   "PATCH /payments/{id}/status": {
     "path": "/payments/{id}/status",
     "method": "PATCH",
@@ -4631,7 +4684,7 @@
   "GET /membership-plans": {
     "path": "/membership-plans",
     "method": "GET",
-    "summary": "Danh sách gói thành viên đang bán (giá tăng dần)",
+    "summary": "Danh sách gói thành viên đang bán (theo thứ tự Manager đặt, rồi giá tăng dần)",
     "security": [
       {
         "BearerAuth": []
@@ -4676,6 +4729,22 @@
         },
         "description": {
           "type": "string"
+        },
+        "benefits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "example": [
+            "Tập không giới hạn giờ mở cửa",
+            "Tủ đồ miễn phí"
+          ]
+        },
+        "isFeatured": {
+          "type": "boolean"
+        },
+        "sortOrder": {
+          "type": "integer"
         }
       }
     },
@@ -4684,6 +4753,104 @@
       "400",
       "401",
       "403"
+    ]
+  },
+  "GET /membership-plans/manage": {
+    "path": "/membership-plans/manage",
+    "method": "GET",
+    "summary": "MANAGER — mọi gói (cả gói đã tắt) kèm số liệu (hội viên đang dùng, lượt bán, doanh thu, đã hoàn)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403"
+    ]
+  },
+  "PATCH /membership-plans/{id}": {
+    "path": "/membership-plans/{id}",
+    "method": "PATCH",
+    "summary": "MANAGER sửa gói (đổi giá / số ngày chỉ áp dụng cho giao dịch mới)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "durationDays": {
+          "type": "integer"
+        },
+        "price": {
+          "type": "integer"
+        },
+        "description": {
+          "type": "string"
+        },
+        "benefits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isFeatured": {
+          "type": "boolean"
+        },
+        "sortOrder": {
+          "type": "integer"
+        },
+        "isActive": {
+          "type": "boolean"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "404",
+      "409"
+    ]
+  },
+  "DELETE /membership-plans/{id}": {
+    "path": "/membership-plans/{id}",
+    "method": "DELETE",
+    "summary": "MANAGER xóa gói chưa từng bán (đã bán ⇒ 409 PLAN_IN_USE, hãy tắt bán)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "409"
     ]
   },
   "PATCH /membership-plans/{id}/toggle": {
@@ -4767,10 +4934,162 @@
       "403"
     ]
   },
+  "GET /memberships/my/history": {
+    "path": "/memberships/my/history",
+    "method": "GET",
+    "summary": "MEMBER — lịch sử mọi gói đã mua (tên/giá theo ảnh chụp lúc mua)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "GET /memberships/my/pass": {
+    "path": "/memberships/my/pass",
+    "method": "GET",
+    "summary": "MEMBER — mã QR động của thẻ thành viên (JWT sống 60 giây, app tự làm mới)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /memberships/pass/verify": {
+    "path": "/memberships/pass/verify",
+    "method": "POST",
+    "summary": "MANAGER/COACH quét mã QR động của hội viên ⇒ hợp lệ hay không + ghi nhật ký vào cửa",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": {
+      "type": "object",
+      "required": [
+        "token"
+      ],
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400"
+    ]
+  },
+  "GET /memberships/pass/scans": {
+    "path": "/memberships/pass/scans",
+    "method": "GET",
+    "summary": "MANAGER — nhật ký quét thẻ hội viên",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "valid",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false"
+          ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /memberships/maintenance": {
+    "path": "/memberships/maintenance",
+    "method": "POST",
+    "summary": "MANAGER — chạy ngay job gói thành viên (hết hạn + nhắc gia hạn 7 ngày / 1 ngày; cũng chạy định kỳ)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200"
+    ]
+  },
+  "POST /memberships/{id}/cancel": {
+    "path": "/memberships/{id}/cancel",
+    "method": "POST",
+    "summary": "MANAGER hủy gói của hội viên (gói xếp hàng phía sau dời lên; hoàn tiền tùy chọn ≤ giá trị còn lại)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "body": {
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "refundAmount": {
+          "type": "integer",
+          "description": "0 = không hoàn"
+        }
+      }
+    },
+    "statusCodes": [
+      "200",
+      "400",
+      "409"
+    ]
+  },
   "GET /memberships/verify/{userId}": {
     "path": "/memberships/verify/{userId}",
     "method": "GET",
-    "summary": "COACH/MANAGER quét QR (userId) của hội viên ⇒ gói còn / hết hạn",
+    "summary": "COACH/MANAGER tra cứu gói của hội viên theo userId (KHÔNG dùng vào cửa — vào cửa dùng /memberships/pass/verify)",
     "security": [
       {
         "BearerAuth": []
@@ -4814,6 +5133,20 @@
             "EXPIRED",
             "CANCELLED"
           ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "planId",
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string"
         }
       },
       {
@@ -6538,6 +6871,22 @@
       "200",
       "400",
       "409"
+    ]
+  },
+  "POST /classes/maintenance": {
+    "path": "/classes/maintenance",
+    "method": "POST",
+    "summary": "MANAGER — chạy ngay job bảo trì khóa học (cũng chạy định kỳ 5 phút ở server)",
+    "security": [
+      {
+        "BearerAuth": []
+      }
+    ],
+    "parameters": [],
+    "body": null,
+    "statusCodes": [
+      "200",
+      "403"
     ]
   },
   "GET /classes/{id}": {

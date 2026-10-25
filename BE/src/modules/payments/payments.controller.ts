@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import * as invoiceService from "./invoice.service.js";
 import * as paymentsService from "./payments.service.js";
 import * as sepayPaymentsService from "./sepay-payments.service.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
@@ -115,5 +116,13 @@ export async function retryPaymentActivation(req: Request, res: Response, next: 
       req.params.id as string
     );
     sendSuccess(res, result, "Đã kích hoạt khóa học cho giao dịch đã thu tiền.");
+  } catch (err) { next(err); }
+}
+
+/** GET /payments/my/:id/invoice · GET /payments/:id/invoice — hóa đơn chi tiết (đọc ảnh chụp lúc mua). */
+export async function getInvoice(req: Request, res: Response, next: NextFunction) {
+  try {
+    const invoice = await invoiceService.getInvoice(req.params.id as string, { id: req.user!.id, role: req.user!.role });
+    sendSuccess(res, invoice, "Invoice retrieved successfully");
   } catch (err) { next(err); }
 }

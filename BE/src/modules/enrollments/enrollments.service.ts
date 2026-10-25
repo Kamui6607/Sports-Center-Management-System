@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma.js";
+import { findUsableCoursePayment } from "../payments/course-purchase.service.js";
 import { Prisma } from "@prisma/client";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
@@ -36,13 +37,8 @@ async function assertCanBook(
 ) {
   // Chốt chặn 1: Member phải đã MUA khóa học này (Payment SUCCESS). Đổi buổi sang khóa tương đương ⇒
   // kiểm tra theo khóa ĐÃ TRẢ TIỀN (`paidClassId`).
-  const hasPaid = await tx.payment.findFirst({
-    where: {
-      memberId: memberProfileId,
-      classId: options.paidClassId ?? schedule.class.id,
-      status: "SUCCESS",
-    },
-  });
+  // Giao dịch đã bị hoàn ở cấp khóa (hoàn ngoại lệ / không ghi danh đủ) không còn quyền đặt chỗ ⇒ phải mua lại.
+  const hasPaid = await findUsableCoursePayment(tx, memberProfileId, options.paidClassId ?? schedule.class.id);
 
   if (!hasPaid) {
     throw new AppError(

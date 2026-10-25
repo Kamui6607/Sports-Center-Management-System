@@ -7,6 +7,57 @@ enum ClassStatus { draft, pending, approved, rejected, completed }
 /// Hạng khóa (`ClassType`).
 enum ClassType { regular, premium }
 
+/// Trạng thái mở bán (`summary.saleState` của BE — Doc/BUSINESS_HARDENING_PLAN.md §1.1).
+enum SaleState {
+  onSale('Đang mở bán'),
+  full('Hết chỗ'),
+  saleClosed('Ngừng nhận học viên mới'),
+  ended('Đã kết thúc'),
+  notOpen('Chưa mở bán');
+
+  const SaleState(this.label);
+
+  final String label;
+}
+
+/// Báo giá nếu mua ngay: đăng ký muộn ⇒ chỉ trả tiền các buổi còn lại (BE tính, client chỉ hiển thị).
+class CourseQuote {
+  const CourseQuote({
+    required this.listPrice,
+    required this.totalSessions,
+    required this.unitPrice,
+    required this.sessionsPurchased,
+    required this.sessionsMissed,
+    required this.discount,
+    required this.amount,
+    required this.isLate,
+  });
+
+  /// Giá trọn khóa.
+  final int listPrice;
+
+  /// Số buổi của khóa (buổi chính).
+  final int totalSessions;
+
+  /// Đơn giá 1 buổi = giá trọn khóa ÷ số buổi.
+  final int unitPrice;
+
+  /// Số buổi sẽ được ghi danh.
+  final int sessionsPurchased;
+
+  /// Số buổi đã diễn ra (không tính tiền).
+  final int sessionsMissed;
+
+  /// Giảm so với giá trọn khóa.
+  final int discount;
+
+  /// Thành tiền phải trả.
+  final int amount;
+  final bool isLate;
+
+  bool get hasDiscount => discount > 0;
+}
+
 /// Tóm tắt HLV phụ trách (mỗi khóa đúng 1 HLV).
 class CoachSummary {
   const CoachSummary({
@@ -60,11 +111,22 @@ class CourseClass {
     this.startDate,
     this.endDate,
     this.goalMatch,
+    this.saleState = SaleState.onSale,
+    this.quote,
   });
 
   final String id;
   final String name;
   final String? description;
+
+  /// Trạng thái mở bán (BE tính).
+  final SaleState saleState;
+
+  /// Báo giá nếu mua ngay (null với dữ liệu mock cũ ⇒ giá trọn khóa).
+  final CourseQuote? quote;
+
+  /// Số tiền phải trả nếu mua bây giờ.
+  int get payablePrice => quote?.amount ?? price;
 
   /// Mô tả chi tiết mục tiêu khóa học (HLV ghi).
   final String? goal;
@@ -207,7 +269,7 @@ class PurchaseInfo {
   final String? pendingPaymentId;
   final List<PurchaseBlocker> blockers;
 
-  /// Hạn chót được hủy khóa (khai giảng − 24h).
+  /// Hạn chót hủy khóa được hoàn 100% (buổi đầu của hội viên − 3 ngày).
   final DateTime? cancelDeadline;
   final bool hasPendingRefund;
 
@@ -223,9 +285,19 @@ class CourseDetail {
     required this.purchase,
     this.goalMatch,
     this.pastSessionCount = 0,
+    this.quote,
+    this.saleState,
   });
 
   final CourseClass course;
+
+  /// Báo giá mua ngay (`course-plan.sale.quote`) — ưu tiên hơn báo giá trong danh sách.
+  final CourseQuote? quote;
+  final SaleState? saleState;
+
+  CourseQuote? get effectiveQuote => quote ?? course.quote;
+  SaleState get effectiveSaleState => saleState ?? course.saleState;
+  int get payablePrice => effectiveQuote?.amount ?? course.price;
 
   /// Độ phù hợp với mục tiêu của học viên (null với Guest/HLV).
   final GoalMatch? goalMatch;

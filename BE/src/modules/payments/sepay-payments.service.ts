@@ -21,7 +21,9 @@ import { createLatePaymentRefundTx, settleOrderPaymentTx } from "../shop/orders.
 import { notifyManagersNewRefunds } from "../refunds/refunds.service.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { enqueueNotification, flushNotificationOutbox } from "../notifications/outbox.service.js";
-import { creditCoachWallet, autoEnrollAfterPayment } from "./payments.service.js";
+import { creditCoachWallet } from "./payments.service.js";
+import { prepareCourseCheckout } from "./course-purchase.service.js";
+import { fulfillCoursePaymentTx } from "./course-fulfillment.service.js";
 
 import type { SepayWebhookBody } from "./payments.schema.js";
 import { ROLE_NAME_SELECT } from "../../utils/roles.js";
@@ -227,7 +229,7 @@ export async function createSepayCheckout(userId: string, classId: string) {
   }
 
   const cls = await prisma.class.findUnique({ where: { id: classId } });
-  if (!cls || !cls.isActive) throw new AppError("Class not found or inactive", 404);
+  if (!cls) throw new AppError("Class not found or inactive", 404);
   if (cls.status !== "APPROVED") throw new AppError("Class is not yet approved", 400);
   if (Number(cls.price) <= 0) {
     throw new AppError("Khóa học miễn phí, không cần thanh toán.", 400);
@@ -269,27 +271,29 @@ export async function createSepayCheckout(userId: string, classId: string) {
     });
   }
 
-  const amount = money(cls.price);
-  // Ảnh chụp khóa học tại thời điểm mua — lịch sử/hóa đơn/thống kê không đổi khi khóa bị sửa sau.
-  const purchaseSnapshot = await buildClassSnapshot(prisma, cls.id);
-
-  // Mã thanh toán riêng: UNIQUE transactionCode bảo đảm không trùng; retry khi va chạm cực hiếm.
-  let payment: Payment | null = null;
-  for (let attempt = 0; attempt < 5 && !payment; attempt++) {
-    const orderCode = buildSepayPaymentCode(cfg);
-    const qrUrl = buildVietQrUrl({ amount, content: orderCode });
-    try {
-      payment = await prisma.payment.create({
+  // Kiểm tra đủ điều kiện + báo giá + tạo giao dịch trong CÙNG transaction (giao dịch PENDING = giữ 1 chỗ).
+  const payment = await prisma.$transaction(
+    async (tx) => {
+      const { quote } = await prepareCourseCheckout(tx, memberProfile.id, cls.id, now);
+      const purchaseSnapshot = await buildClassSnapshot(tx, cls.id, { quote, buyerUserId: userId });
+      let orderCode = buildSepayPaymentCode(cfg);
+      for (let attempt = 0; attempt < 5 && (await tx.payment.findUnique({ where: { transactionCode: orderCode } })); attempt++) {
+        orderCode = buildSepayPaymentCode(cfg);
+      }
+      const qrUrl = buildVietQrUrl({ amount: quote.amount, content: orderCode });
+      return tx.payment.create({
         data: {
           memberId: memberProfile.id,
           classId: cls.id,
-          amount,
+          amount: quote.amount,
           method: "SEPAY",
           status: "PENDING",
           transactionCode: orderCode,
           gateway: SEPAY_GATEWAY,
-          note: `Thanh toán online khóa học ${cls.name} (chuyển khoản VietQR qua SePay)`,
-          // A07: chốt offer ngay lúc tạo QR — giá/duration/tier/quota không bị đổi khi plan sửa sau.
+          note:
+            `Thanh toán online khóa học ${cls.name} (chuyển khoản VietQR qua SePay)` +
+            (quote.isLate ? ` — đăng ký muộn: ${quote.sessionsPurchased}/${quote.totalSessions} buổi` : ""),
+          // A07: chốt offer ngay lúc tạo QR — giá/số buổi không bị đổi khi khóa sửa sau.
           classNameSnapshot: cls.name,
           purchaseSnapshot: purchaseSnapshot ? asJson(purchaseSnapshot) : undefined,
           gatewayPayload: asJson({
@@ -302,16 +306,9 @@ export async function createSepayCheckout(userId: string, classId: string) {
           }),
         },
       });
-    } catch (err) {
-      if (!isUniqueViolation(err)) throw err;
-    }
-  }
-  if (!payment) {
-    throw new AppError("Không tạo được mã thanh toán (trùng mã). Vui lòng thử lại.", 500, {
-      code: "SEPAY_CODE_COLLISION",
-      gateway: SEPAY_GATEWAY,
-    });
-  }
+    },
+    { timeout: 30_000 }
+  );
 
   return buildSepayCheckoutView(payment, cls);
 }
@@ -704,8 +701,26 @@ export async function retrySepayActivation(managerUserId: string, paymentId: str
         : null;
       if (!member) throw new AppError("Member not found", 500);
 
-      await autoEnrollAfterPayment(tx, fresh.classId!, member.id);
-      await creditCoachWallet(tx, fresh.classId!, fresh.id, Number(fresh.amount));
+      // Đã có yêu cầu hoàn do không ghi danh đủ ⇒ không kích hoạt lại (tránh vừa hoàn vừa học).
+      const shortfallRefund = await tx.refund.findFirst({
+        where: { paymentId: fresh.id, reason: "COURSE_NOT_FULFILLED", status: { in: ["PENDING", "COMPLETED"] } },
+        select: { id: true },
+      });
+      if (shortfallRefund) {
+        throw new AppError("Giao dịch đã có yêu cầu hoàn tiền do không ghi danh được — hãy xử lý yêu cầu hoàn.", 409, {
+          code: "SEPAY_REFUND_IN_PROGRESS",
+          refundId: shortfallRefund.id,
+        });
+      }
+      const fulfillment = await fulfillCoursePaymentTx(tx, fresh, member.user.id);
+      if (fulfillment.enrolled === 0) {
+        // Giữ REQUIRES_REVIEW (không cấp quyền học) — yêu cầu hoàn toàn bộ vừa tạo được commit để Manager xử lý.
+        const updated = await tx.payment.update({
+          where: { id: fresh.id },
+          data: { reviewReason: "COURSE_NOT_FULFILLED", reviewedAt: new Date(), reviewedById: managerUserId },
+        });
+        return { payment: updated, refund: fulfillment.refund };
+      }
 
       // Chốt ACTIVATED + thông báo; ghi ai/khi nào xử lý + xoá lý do review.
       const now = new Date();
@@ -914,7 +929,7 @@ async function settleSepayTransfer(
       })
     : null;
 
-  const lateRefunds: { id: string; amount: number }[] = [];
+  const lateRefunds: { id: string; amount: number; message?: string }[] = [];
   const settlement = await prisma.$transaction(async (tx): Promise<Settlement> => {
     // (1) Claim sepayId — UNIQUE chống webhook trùng; 0 dòng = đã xử lý trước đó.
     // Chỉ webhook/mock mới có sepayId số; đối soát API dựa vào Payment.status + advisory lock bên dưới.
@@ -1230,11 +1245,10 @@ async function settleSepayTransfer(
       : null;
     if (!member) throw new AppError("Member not found", 500);
 
+    let fulfillment: Awaited<ReturnType<typeof fulfillCoursePaymentTx>>;
     try {
-      // Ghi danh hội viên vào các buổi SCHEDULED sắp tới của lớp
-      await autoEnrollAfterPayment(tx, payment.classId!, member.id);
-      // Cộng 85% doanh thu vào ví HLV chính
-      await creditCoachWallet(tx, payment.classId!, payment.id, Number(payment.amount));
+      // Ghi danh (có sức chứa, kích hoạt lại chỗ đã hủy) + cộng 85% ví HLV + hoàn phần thiếu nếu có.
+      fulfillment = await fulfillCoursePaymentTx(tx, payment, member.user.id, now);
     } catch (err) {
       // VD: gói khác đã được kích hoạt trong lúc chờ chuyển khoản ⇒ hạ hạng. Tiền ĐÃ về:
       // trạng thái TIỀN = SUCCESS, trạng thái CẤP QUYỀN = REQUIRES_REVIEW để quản lý xử lý.
@@ -1261,6 +1275,36 @@ async function settleSepayTransfer(
       throw err;
     }
 
+    if (fulfillment.refund) {
+      lateRefunds.push({
+        ...fulfillment.refund,
+        message:
+          `Khóa "${payment.classNameSnapshot ?? cls.name}" chỉ ghi danh được ${fulfillment.enrolled}/${fulfillment.expected} buổi ` +
+          `khi tiền về (đơn ${payment.transactionCode ?? ""}) — cần hoàn ${fulfillment.refund.amount.toLocaleString("vi-VN")}đ.`,
+      });
+    }
+    // Không ghi danh được buổi nào ⇒ tiền đã thu, quyền học KHÔNG cấp: chờ Manager hoàn tiền.
+    if (fulfillment.enrolled === 0) {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: "SUCCESS",
+          paidAt: payment.paidAt ?? now,
+          activationStatus: "REQUIRES_REVIEW",
+          reviewReason: "COURSE_NOT_FULFILLED",
+          note: `${payment.note ?? ""} | Đã thu tiền nhưng khóa hết chỗ/không còn buổi — đã tạo yêu cầu hoàn tiền (REQUIRES_REVIEW).`,
+        },
+      });
+      return finish({
+        status: "PROCESSED",
+        reason: "ACTIVATION_REJECTED",
+        paymentId: payment.id,
+        memberId: payment.memberId,
+        paymentStatus: "SUCCESS",
+        processed: true,
+      });
+    }
+
     // Lớp học: chốt tiền + thông báo hội viên (trước đây thiếu bước này ⇒ payment kẹt PENDING).
     await finalizeClassPaymentTx(tx, payment, member, payment.classNameSnapshot ?? cls.name, now);
 
@@ -1278,7 +1322,8 @@ async function settleSepayTransfer(
   await flushNotificationOutbox().catch(() => {});
   for (const r of lateRefunds) {
     void notifyManagersNewRefunds(
-      `Tiền về sau khi đơn ${drafted?.transactionCode ?? code ?? ""} đã đóng — cần hoàn ${r.amount.toLocaleString("vi-VN")}đ.`,
+      r.message ??
+        `Tiền về sau khi đơn ${drafted?.transactionCode ?? code ?? ""} đã đóng — cần hoàn ${r.amount.toLocaleString("vi-VN")}đ.`,
       { refundId: r.id, paymentId: settlement.paymentId }
     );
   }

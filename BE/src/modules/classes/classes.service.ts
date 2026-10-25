@@ -3,11 +3,12 @@ import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { broadcastNotification, createNotification } from "../notifications/notifications.service.js";
 import { evaluateCourseEligibility } from "../enrollments/course-enrollment.service.js";
-import { getMemberPurchase, withClassSummaries } from "./class-summary.service.js";
+import { buildClassSummaries, getMemberPurchase, withClassSummaries } from "./class-summary.service.js";
 import { computeGoalMatch, FITNESS_GOALS, GYM_FITNESS, type GoalMatch } from "../../config/fitness-goals.js";
 import { foldVietnamese } from "../../utils/i18n.js";
 import { resubmitActivityPlan } from "../class-schedules/class-schedules.service.js";
 import type { ClassDraftInput } from "./classes.schema.js";
+import { isPastSaleWindow, saleProgressOf } from "./course-sale.js";
 import type { TrainingLevel } from "@prisma/client";
 
 /** Người gọi API (null = Guest — BE-1). */
@@ -93,9 +94,12 @@ export async function listClasses(query: any, actor?: Actor) {
       // Bản nháp chỉ chủ khóa thấy.
       where.coachId = coachProfile?.id ?? "__none__";
     }
-  } else if (actor?.role === "MEMBER" && !query.status) {
-    // Member chỉ thấy class APPROVED
+  } else if (actor?.role === "MEMBER") {
+    // Member chỉ thấy class APPROVED (bỏ qua tham số status/createdByMe).
     where.status = "APPROVED";
+    where.isActive = true;
+    delete where.coachId;
+    if (query.coachId) where.coachId = query.coachId;
   } else if (!actor) {
     // BE-1: Guest chỉ thấy khóa đang mở bán (bỏ qua mọi tham số status/createdByMe/isActive).
     where.status = "APPROVED";
@@ -121,6 +125,20 @@ export async function listClasses(query: any, actor?: Actor) {
         status: "SCHEDULED",
         startTime: { gt: new Date() },
       },
+    };
+  }
+
+  // Member/Guest chỉ thấy khóa ĐANG MỞ BÁN hoặc HẾT CHỖ — khóa đã kết thúc / ngừng nhận học viên mới bị ẩn
+  // (Doc/BUSINESS_HARDENING_PLAN.md §1.1). BE tự lọc, không phụ thuộc tham số của client.
+  if (!actor || actor.role === "MEMBER") {
+    const now = new Date();
+    const candidates = await prisma.class.findMany({
+      where: { ...where, schedules: { some: { status: "SCHEDULED", startTime: { gt: now } } } },
+      select: { id: true, capacity: true, status: true, isActive: true, price: true },
+    });
+    const sums = await buildClassSummaries(candidates, now);
+    where.id = {
+      in: candidates.filter((c) => ["ON_SALE", "FULL"].includes(sums.get(c.id)?.saleState ?? "")).map((c) => c.id),
     };
   }
 
@@ -209,6 +227,22 @@ export async function reviewClass(classId: string, action: "APPROVE" | "REJECT",
   if (!cls) throw new AppError("Class not found", 404);
   if (cls.status !== "PENDING") {
     throw new AppError(`Class is already ${cls.status} — cannot review again`, 400);
+  }
+
+  // Không duyệt khóa đã quá giờ khai giảng / không còn buổi / đã qua hạn mở bán (khóa vừa duyệt đã "chết").
+  if (action === "APPROVE") {
+    const sessions = await prisma.classSchedule.findMany({
+      where: { classId },
+      select: { id: true, startTime: true, status: true, makeupForId: true },
+    });
+    const progress = saleProgressOf(sessions, new Date());
+    if (progress.remainingSessions === 0 || progress.passedSessions > 0 || isPastSaleWindow(progress)) {
+      throw new AppError(
+        "Khóa học đã quá giờ khai giảng hoặc không còn buổi sắp diễn ra — không thể duyệt. Hãy từ chối để HLV chỉnh lịch và gửi lại.",
+        409,
+        { code: "CLASS_REVIEW_TOO_LATE", ...progress }
+      );
+    }
   }
 
   const newStatus = action === "APPROVE" ? "APPROVED" : "REJECTED";
@@ -463,6 +497,7 @@ export async function getClassCoursePlan(
       capacity: true,
       isActive: true,
       status: true,
+      price: true,
       coach: { select: { userId: true } },
     },
   });
@@ -610,6 +645,26 @@ export async function getClassCoursePlan(
   // BE-13: tình trạng mua của Member (đã mua / đang chờ thanh toán / chưa mua).
   const purchase = memberProfile ? await getMemberPurchase(memberProfile.id, cls.id, now) : null;
 
+  // Trạng thái mở bán + báo giá nếu mua ngay (đăng ký muộn ⇒ giá theo số buổi còn lại).
+  const saleSummary = (await buildClassSummaries([cls], now)).get(cls.id)!;
+  const sale = {
+    state: saleSummary.saleState,
+    label: saleSummary.saleStateLabel,
+    heldSeats: saleSummary.heldSeats,
+    quote: saleSummary.quote,
+  };
+  if (eligibility && purchase?.status === "NONE" && sale.state !== "ON_SALE") {
+    eligibility.blockers.unshift({
+      code: sale.state === "FULL" ? "COURSE_FULL" : sale.state === "SALE_CLOSED" ? "COURSE_SALE_CLOSED" : "COURSE_ENDED",
+      message:
+        sale.state === "FULL"
+          ? "Khóa học đã hết chỗ (gồm cả chỗ đang được giữ cho người đang thanh toán)."
+          : sale.state === "SALE_CLOSED"
+            ? "Khóa học đã diễn ra quá nửa chặng hoặc còn quá ít buổi nên ngừng nhận học viên mới."
+            : "Khóa học đã kết thúc hoặc chưa mở bán.",
+    });
+  }
+
   const firstSession = sessions[0];
   const lastSession = sessions[sessions.length - 1];
   const memberGoals = await memberGoalsOf(actor);
@@ -663,6 +718,7 @@ export async function getClassCoursePlan(
             },
           },
     sessions,
+    sale,
     goalMatch: memberGoals ? computeGoalMatch(memberGoals, cls) : null,
     registration: memberProfile
       ? {

@@ -106,6 +106,8 @@ class CourseApiRepository implements CourseRepository {
       purchase: _purchaseInfo(course, plan.objOrNull('registration')),
       goalMatch: ClassJson.goalMatch(plan.objOrNull('goalMatch')) ?? course.goalMatch,
       pastSessionCount: plan.objOrNull('course')?.integer('pastSessionCount') ?? course.completedSessionCount,
+      quote: ClassJson.quote(plan.objOrNull('sale')?.objOrNull('quote')),
+      saleState: ClassJson.saleState(plan.objOrNull('sale')?.strOrNull('state')),
     );
   }
 

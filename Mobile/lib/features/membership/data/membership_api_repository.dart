@@ -17,6 +17,9 @@ class MembershipApiRepository implements MembershipRepository {
     durationDays: p.integer('durationDays'),
     price: p.money('price'),
     description: p.strOrNull('description'),
+    benefits: p.strList('benefits'),
+    isFeatured: p.boolean('isFeatured'),
+    pricePer30Days: p.intOrNull('pricePer30Days'),
   );
 
   static Membership _membership(Json m) => Membership(
@@ -26,6 +29,11 @@ class MembershipApiRepository implements MembershipRepository {
     endDate: m.date('endDate'),
     status: m.enumOr('status', MembershipStatus.values, MembershipStatus.expired),
     daysLeft: m.integer('daysLeft'),
+    isQueued: m.boolean('isQueued'),
+    totalDays: m.intOrNull('totalDays'),
+    paidAmount: m['paidAmount'] == null ? null : m.money('paidAmount'),
+    cancelReason: m.strOrNull('cancelReason'),
+    paymentId: m.strOrNull('paymentId'),
   );
 
   @override
@@ -51,19 +59,51 @@ class MembershipApiRepository implements MembershipRepository {
   }
 
   @override
-  Future<MembershipVerifyResult> verify(String userId) async {
-    final j = (await _api.get('/memberships/verify/${Uri.encodeComponent(userId)}')).json;
-    final user = j.obj('user');
-    final m = j.objOrNull('membership');
-    return MembershipVerifyResult(
-      userId: user.str('id'),
-      fullName: user.str('fullName'),
-      avatarUrl: user.strOrNull('avatarUrl'),
+  Future<MembershipOverview> overview() async {
+    final j = (await _api.get('/memberships/my')).json;
+    final current = j.objOrNull('current');
+    final expired = j.objOrNull('recentExpired');
+    return MembershipOverview(
+      current: current == null ? null : _membership(current),
+      queued: j.objList('queued').map(_membership).toList(),
+      validUntil: j.dateOrNull('validUntil'),
+      totalDaysLeft: j.integer('totalDaysLeft'),
+      recentExpired: expired == null ? null : _membership(expired),
+      canQueueMore: j.boolean('canQueueMore', true),
+    );
+  }
+
+  @override
+  Future<List<Membership>> history() async =>
+      (await _api.get('/memberships/my/history')).list.map(_membership).toList();
+
+  @override
+  Future<MemberPass> pass() async {
+    final j = (await _api.get('/memberships/my/pass')).json;
+    return MemberPass(
+      token: j.str('token'),
+      expiresAt: j.dateOrNull('expiresAt') ?? DateTime.now().add(Duration(seconds: j.integer('expiresIn', 60))),
       isActive: j.boolean('isActive'),
-      status: m?.enumOrNull('status', MembershipStatus.values),
+    );
+  }
+
+  @override
+  Future<MembershipVerifyResult> verifyPass(String token) async {
+    final j = (await _api.post('/memberships/pass/verify', body: {'token': token})).json;
+    final member = j.obj('member');
+    final m = j.objOrNull('membership');
+    final valid = j.boolean('valid');
+    return MembershipVerifyResult(
+      userId: member.str('userId'),
+      fullName: member.str('fullName'),
+      avatarUrl: ApiClient.absoluteUrl(member.strOrNull('avatarUrl')),
+      isActive: valid,
+      status: valid ? MembershipStatus.active : (m == null ? null : MembershipStatus.expired),
       planName: m?.strOrNull('planName'),
-      endDate: m?.dateOrNull('endDate'),
-      daysLeft: m?.integer('daysLeft') ?? 0,
+      endDate: j.dateOrNull('validUntil') ?? m?.dateOrNull('endDate'),
+      daysLeft: j.integer('totalDaysLeft'),
+      reason: j.strOrNull('reason'),
+      entriesToday: j.integer('entriesToday'),
     );
   }
 }

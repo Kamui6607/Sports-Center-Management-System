@@ -27,27 +27,44 @@ class _ClassPurchaseBarState extends ConsumerState<ClassPurchaseBar> {
   bool _busy = false;
 
   Future<void> _buy() async {
-    final course = widget.detail.course;
+    final d = widget.detail;
+    final course = d.course;
+    final q = d.effectiveQuote;
+    final sessions = q?.sessionsPurchased ?? d.sessions.length;
     final confirmed = await showConfirmSheet(
       context: context,
       title: 'Xác nhận mua khóa học',
       message:
           'Bạn sẽ thanh toán bằng chuyển khoản VietQR. Sau khi thanh toán thành công, hệ thống tự ghi danh bạn vào '
-          '${widget.detail.sessions.length} buổi sắp diễn ra.',
-      confirmLabel: 'Thanh toán ${Money.format(course.price)}',
+          '$sessions buổi sắp diễn ra.',
+      confirmLabel: 'Thanh toán ${Money.format(d.payablePrice)}',
       extra: AppCard(
         color: context.colors.surfaceMuted,
         child: Column(
           children: [
             KeyValueRow(label: 'Khóa học', value: course.name),
             KeyValueRow(label: 'HLV', value: course.coach.fullName),
-            KeyValueRow(label: 'Số buổi được ghi danh', value: '${widget.detail.sessions.length}'),
+            if (q != null) ...[
+              KeyValueRow(label: 'Giá trọn khóa', value: Money.format(q.listPrice)),
+              KeyValueRow(label: 'Số buổi của khóa', value: '${q.totalSessions} buổi'),
+              KeyValueRow(label: 'Đơn giá', value: '${Money.format(q.unitPrice)}/buổi'),
+              if (q.sessionsMissed > 0)
+                KeyValueRow(label: 'Buổi đã diễn ra (không tính phí)', value: '${q.sessionsMissed} buổi'),
+              KeyValueRow(label: 'Số buổi được học', value: '${q.sessionsPurchased} buổi'),
+              if (q.hasDiscount)
+                KeyValueRow(
+                  label: q.isLate ? 'Giảm do đăng ký muộn' : 'Giảm',
+                  value: '−${Money.format(q.discount)}',
+                  valueColor: context.colors.successText,
+                ),
+            ] else
+              KeyValueRow(label: 'Số buổi được ghi danh', value: '${d.sessions.length}'),
             const Divider(),
-            KeyValueRow(label: 'Tổng tiền', value: Money.format(course.price), emphasize: true),
+            KeyValueRow(label: 'Thành tiền', value: Money.format(d.payablePrice), emphasize: true),
           ],
         ),
       ),
-      warning: 'Chỉ được hủy khóa và hoàn tiền khi còn ≥ 24 giờ trước buổi khai giảng.',
+      warning: 'Hủy khóa được hoàn 100% khi còn ≥ 3 ngày trước buổi học đầu tiên của bạn; muộn hơn chỉ được xin hoàn ngoại lệ (có phí).',
     );
     if (!confirmed || !mounted) return;
     setState(() => _busy = true);
@@ -67,6 +84,11 @@ class _ClassPurchaseBarState extends ConsumerState<ClassPurchaseBar> {
     final course = d.course;
     if (user != null && user.role != UserRole.member) return const SizedBox.shrink();
     final Widget action = switch (d.purchase.status) {
+      _ when user == null && d.effectiveSaleState != SaleState.onSale => AppButton(
+        expand: true,
+        label: d.effectiveSaleState.label,
+        onPressed: null,
+      ),
       _ when user == null => AppButton(
         expand: true,
         label: 'Đăng nhập để mua',
@@ -84,6 +106,12 @@ class _ClassPurchaseBarState extends ConsumerState<ClassPurchaseBar> {
         label: 'Tiếp tục thanh toán',
         onPressed: () => context.push(AppRoutes.payment(d.purchase.pendingPaymentId!)),
       ),
+      // Khóa hết chỗ / ngừng nhận học viên mới / đã kết thúc ⇒ nói rõ lý do thay vì nút mua.
+      PurchaseStatus.none when d.effectiveSaleState != SaleState.onSale => AppButton(
+        expand: true,
+        label: d.effectiveSaleState.label,
+        onPressed: null,
+      ),
       PurchaseStatus.none => AppButton(
         expand: true,
         label: 'Mua khóa học',
@@ -98,8 +126,19 @@ class _ClassPurchaseBarState extends ConsumerState<ClassPurchaseBar> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Trọn khóa', style: context.text.caption.copyWith(color: context.colors.textMuted)),
-              MoneyText(course.price, style: context.text.titleSmall),
+              Text(
+                d.effectiveQuote?.isLate == true ? 'Còn ${d.effectiveQuote!.sessionsPurchased} buổi' : 'Trọn khóa',
+                style: context.text.caption.copyWith(color: context.colors.textMuted),
+              ),
+              if (d.effectiveQuote?.hasDiscount == true)
+                Text(
+                  Money.format(d.effectiveQuote!.listPrice),
+                  style: context.text.caption.copyWith(
+                    color: context.colors.textMuted,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+              MoneyText(d.payablePrice, style: context.text.titleSmall),
             ],
           ),
           const SizedBox(width: AppSpacing.md),

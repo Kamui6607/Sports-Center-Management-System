@@ -67,55 +67,42 @@ class OrderItemsCard extends StatelessWidget {
         children: [
           for (final (i, l) in o.lines.indexed) ...[
             if (i > 0) const Divider(height: AppSpacing.lg),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox.square(
-                  dimension: AppSpacing.xxl,
-                  child: AppNetworkImage(
-                    url: l.imageUrl,
-                    seed: l.productId,
-                    placeholderIcon: productIcon(l.productName),
-                    iconSize: AppSizes.icon,
-                  ),
+            CostLineItem(
+              leading: SizedBox.square(
+                dimension: AppSpacing.xxl,
+                child: AppNetworkImage(
+                  url: l.imageUrl,
+                  seed: l.productId,
+                  placeholderIcon: productIcon(l.productName),
+                  iconSize: AppSizes.icon,
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(l.productName, style: context.text.bodyStrong),
-                      Text(
-                        '${Money.format(l.unitPrice)} × ${l.quantity}',
-                        style: context.text.caption.copyWith(color: context.colors.textMuted),
-                      ),
-                      if (l.review != null) ...[
+              ),
+              name: l.productName,
+              unitPrice: l.unitPrice,
+              quantity: l.quantity,
+              unit: 'cái',
+              total: l.total,
+              footer: l.review == null
+                  ? null
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         const SizedBox(height: AppSpacing.xxs),
                         RatingStars(rating: l.review!.rating.toDouble()),
                         if (l.review!.comment != null) Text(l.review!.comment!, style: context.text.small),
                         if (l.review!.isHidden)
                           const StatusTag(label: 'Đánh giá đã bị ẩn', tone: StatusTone.neutral, dense: true),
                       ],
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    MoneyText(l.total, style: context.text.bodyStrong),
-                    ?lineTrailing?.call(l),
-                  ],
-                ),
-              ],
+                    ),
+              trailing: lineTrailing?.call(l),
             ),
           ],
           const Divider(height: AppSpacing.lg),
-          KeyValueRow(label: 'Tạm tính', value: Money.format(o.subtotal)),
-          KeyValueRow(
-            label: 'Phí giao hàng',
-            value: o.isPickup ? 'Không có' : (o.shippingFee == 0 ? 'Miễn phí' : Money.format(o.shippingFee)),
+          CostSummary(
+            subtotal: o.subtotal,
+            shippingFeeLabel: CostSummary.shippingLabel(isPickup: o.isPickup, fee: o.shippingFee),
+            total: o.total,
           ),
-          KeyValueRow(label: 'Tổng thanh toán', value: Money.format(o.total), emphasize: true),
         ],
       ),
     );

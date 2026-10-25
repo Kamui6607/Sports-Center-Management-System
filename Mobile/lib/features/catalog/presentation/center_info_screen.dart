@@ -39,27 +39,16 @@ class CenterInfoScreen extends ConsumerWidget {
           children: [
             _CenterHeroBanner(center: center),
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                context.screenPadding,
-                AppSpacing.lg,
-                context.screenPadding,
-                0,
-              ),
+              padding: EdgeInsets.fromLTRB(context.screenPadding, AppSpacing.lg, context.screenPadding, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Banner đã có tên, địa chỉ, giờ mở cửa và nút bản đồ ⇒ không lặp lại LocationCard ở đây.
                   // Không có thông tin liên hệ ⇒ không chừa khoảng trống.
-                  if (_hasContact(center)) ...[
-                    _ContactCard(center: center),
-                    const SizedBox(height: AppSpacing.lg),
-                  ],
+                  if (_hasContact(center)) ...[_ContactCard(center: center), const SizedBox(height: AppSpacing.lg)],
                   SectionHeader(title: 'Phòng tập (${rooms.length})'),
                   const SizedBox(height: AppSpacing.xs),
-                  if (rooms.isEmpty)
-                    _EmptyRooms()
-                  else
-                    ...rooms.map((r) => _RoomCard(room: r)),
+                  if (rooms.isEmpty) _EmptyRooms() else ...rooms.map((r) => _RoomCard(room: r)),
                   const SizedBox(height: AppSpacing.xl),
                 ],
               ),
@@ -93,12 +82,7 @@ class _CenterHeroBanner extends StatelessWidget {
         top: false,
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.xl,
-          ),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -106,22 +90,12 @@ class _CenterHeroBanner extends StatelessWidget {
               Container(
                 width: AppSpacing.xxl + AppSpacing.sm,
                 height: AppSpacing.xxl + AppSpacing.sm,
-                decoration: BoxDecoration(
-                  color: c.accent.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  AppIcons.building,
-                  size: AppSizes.iconXl,
-                  color: c.accent,
-                ),
+                decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.15), shape: BoxShape.circle),
+                child: Icon(AppIcons.building, size: AppSizes.iconXl, color: c.accent),
               ),
               const SizedBox(height: AppSpacing.md),
               // Tên trung tâm
-              Text(
-                center.name,
-                style: context.text.title.copyWith(color: c.onPrimary),
-              ),
+              Text(center.name, style: context.text.title.copyWith(color: c.onPrimary)),
               const SizedBox(height: AppSpacing.xs),
               // Địa chỉ
               Row(
@@ -132,9 +106,7 @@ class _CenterHeroBanner extends StatelessWidget {
                   Expanded(
                     child: Text(
                       center.address,
-                      style: context.text.small.copyWith(
-                        color: c.onPrimary.withValues(alpha: 0.8),
-                      ),
+                      style: context.text.small.copyWith(color: c.onPrimary.withValues(alpha: 0.8)),
                     ),
                   ),
                 ],
@@ -147,9 +119,7 @@ class _CenterHeroBanner extends StatelessWidget {
                     const SizedBox(width: AppSpacing.xs),
                     Text(
                       center.openingHours!,
-                      style: context.text.small.copyWith(
-                        color: c.onPrimary.withValues(alpha: 0.8),
-                      ),
+                      style: context.text.small.copyWith(color: c.onPrimary.withValues(alpha: 0.8)),
                     ),
                   ],
                 ),
@@ -163,11 +133,7 @@ class _CenterHeroBanner extends StatelessWidget {
                   _HeroChipButton(
                     icon: AppIcons.map,
                     label: 'Mở bản đồ',
-                    onTap: () => openExternal(
-                      context,
-                      Uri.parse(center.mapLink),
-                      copyText: center.address,
-                    ),
+                    onTap: () => openExternal(context, Uri.parse(center.mapLink), copyText: center.address),
                   ),
                   _HeroChipButton(
                     icon: AppIcons.copy,
@@ -190,11 +156,7 @@ class _CenterHeroBanner extends StatelessWidget {
 }
 
 class _HeroChipButton extends StatelessWidget {
-  const _HeroChipButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+  const _HeroChipButton({required this.icon, required this.label, required this.onTap});
   final IconData icon;
   final String label;
   final VoidCallback onTap;
@@ -209,19 +171,13 @@ class _HeroChipButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs - 2,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs - 2),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: AppSizes.iconSm, color: c.onPrimary),
               const SizedBox(width: AppSpacing.xs - 2),
-              Text(
-                label,
-                style: context.text.label.copyWith(color: c.onPrimary),
-              ),
+              Text(label, style: context.text.label.copyWith(color: c.onPrimary)),
             ],
           ),
         ),
@@ -266,34 +222,24 @@ class _ContactCard extends StatelessWidget {
               label: 'Email',
               value: center.email!,
               actionLabel: 'Gửi',
-              onAction: () => openExternal(
-                context,
-                Uri(scheme: 'mailto', path: center.email),
-              ),
+              onAction: () => openExternal(context, Uri(scheme: 'mailto', path: center.email)),
             ),
           if (center.parkingNote != null) ...[
-            if (center.hotline != null || center.email != null)
-              Divider(height: AppSpacing.md, color: c.border),
+            if (center.hotline != null || center.email != null) Divider(height: AppSpacing.md, color: c.border),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(AppIcons.info, size: AppSizes.iconSm + 2, color: c.textMuted),
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
-                  child: Text(
-                    center.parkingNote!,
-                    style: context.text.small.copyWith(color: c.text),
-                  ),
+                  child: Text(center.parkingNote!, style: context.text.small.copyWith(color: c.text)),
                 ),
               ],
             ),
           ],
           if (center.description != null) ...[
             const SizedBox(height: AppSpacing.xs),
-            Text(
-              center.description!,
-              style: context.text.small.copyWith(color: c.textMuted),
-            ),
+            Text(center.description!, style: context.text.small.copyWith(color: c.textMuted)),
           ],
         ],
       ),
@@ -325,10 +271,7 @@ class _ContactRow extends StatelessWidget {
           Container(
             width: AppSpacing.xl,
             height: AppSpacing.xl,
-            decoration: BoxDecoration(
-              color: c.primary.withValues(alpha: 0.08),
-              borderRadius: AppRadius.controlAll,
-            ),
+            decoration: BoxDecoration(color: c.primary.withValues(alpha: 0.08), borderRadius: AppRadius.controlAll),
             child: Icon(icon, size: AppSizes.iconSm + 2, color: c.primary),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -373,10 +316,7 @@ class _RoomCard extends StatelessWidget {
             Container(
               width: AppSpacing.xxl,
               height: AppSpacing.xxl,
-              decoration: BoxDecoration(
-                color: c.primary.withValues(alpha: 0.07),
-                borderRadius: AppRadius.controlAll,
-              ),
+              decoration: BoxDecoration(color: c.primary.withValues(alpha: 0.07), borderRadius: AppRadius.controlAll),
               child: Icon(AppIcons.building, size: AppSizes.icon, color: c.primary),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -392,10 +332,7 @@ class _RoomCard extends StatelessWidget {
                         Icon(AppIcons.location, size: AppSizes.iconSm, color: c.textMuted),
                         const SizedBox(width: AppSpacing.xxs),
                         Expanded(
-                          child: Text(
-                            room.placeLabel,
-                            style: context.text.small.copyWith(color: c.textMuted),
-                          ),
+                          child: Text(room.placeLabel, style: context.text.small.copyWith(color: c.textMuted)),
                         ),
                       ],
                     ),
@@ -407,10 +344,7 @@ class _RoomCard extends StatelessWidget {
                         Icon(AppIcons.directions, size: AppSizes.iconSm, color: c.textMuted),
                         const SizedBox(width: AppSpacing.xxs),
                         Expanded(
-                          child: Text(
-                            room.directions!,
-                            style: context.text.small.copyWith(color: c.textMuted),
-                          ),
+                          child: Text(room.directions!, style: context.text.small.copyWith(color: c.textMuted)),
                         ),
                       ],
                     ),
@@ -418,10 +352,7 @@ class _RoomCard extends StatelessWidget {
                   const SizedBox(height: AppSpacing.xs),
                   // Capacity chip
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs,
-                      vertical: 2,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 2),
                     decoration: BoxDecoration(
                       color: c.primary.withValues(alpha: 0.08),
                       borderRadius: AppRadius.pillAll,
@@ -431,10 +362,7 @@ class _RoomCard extends StatelessWidget {
                       children: [
                         Icon(AppIcons.users, size: AppSizes.iconSm - 2, color: c.primary),
                         const SizedBox(width: AppSpacing.xxs),
-                        Text(
-                          '${room.capacity} người',
-                          style: context.text.caption.copyWith(color: c.primary),
-                        ),
+                        Text('${room.capacity} người', style: context.text.caption.copyWith(color: c.primary)),
                       ],
                     ),
                   ),
@@ -453,10 +381,7 @@ class _EmptyRooms extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
     child: Center(
-      child: Text(
-        'Chưa có thông tin phòng tập.',
-        style: context.text.small.copyWith(color: context.colors.textMuted),
-      ),
+      child: Text('Chưa có thông tin phòng tập.', style: context.text.small.copyWith(color: context.colors.textMuted)),
     ),
   );
 }

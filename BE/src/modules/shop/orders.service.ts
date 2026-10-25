@@ -1,4 +1,5 @@
 import { Prisma, type OrderStatus } from "@prisma/client";
+import { buildOrderPaymentSnapshot } from "../payments/purchase-snapshot.js";
 import { prisma } from "../../config/prisma.js";
 import { shopConfig } from "../../config/shop.js";
 import { AppError } from "../../middlewares/errorHandler.js";
@@ -879,6 +880,7 @@ export async function confirmPickup(manager: Actor, orderId: string, rawCode: st
         paidAt: now,
         activationStatus: "ACTIVATED",
         createdById: manager.id,
+        purchaseSnapshot: await buildOrderPaymentSnapshot(tx, order.id, order.userId),
         note: `Thu tiền mặt tại quầy cho đơn ${order.code}`,
       },
     });

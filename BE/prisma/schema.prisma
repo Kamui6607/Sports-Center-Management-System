@@ -233,6 +233,7 @@ model MemberProfile {
   manualCodeAttempts AttendanceManualCodeAttempt[]
   refunds            Refund[]
   memberships        Membership[]
+  passScans          MemberPassScan[]
 }
 
 enum CoachApprovalStatus {
@@ -355,6 +356,11 @@ model Class {
   // Khác với classType (REGULAR | PREMIUM là hạng lớp).
   areaType    AreaType
   isActive    Boolean             @default(true)
+  /// Bậc cảnh báo "khóa chưa có học viên" đã gửi cho HLV (0 = chưa gửi, 1 = trước khai giảng 24h, 2 = đã khai giảng) — chống gửi trùng.
+  alertStage  Int                 @default(0)
+  /// Lý do hệ thống tự đóng/từ chối khóa (REVIEW_EXPIRED | NO_ENROLLMENT | ENDED) và thời điểm đóng.
+  closedReason String?
+  closedAt    DateTime?
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @default(now()) @updatedAt
 
@@ -380,6 +386,8 @@ model ClassSchedule {
   /// BE-20: lý do & phương án khi buổi bị hủy (null nếu chưa hủy / hủy khi chưa ai đặt chỗ).
   cancelReason     String?
   cancelResolution ScheduleCancelResolution?
+  /// Mã hủy do HỆ THỐNG (REVIEW_EXPIRED | NO_ENROLLMENT) — null = HLV/Manager hủy. Buổi hệ thống hủy không tính vào tỷ lệ hủy buổi của HLV.
+  cancelCode       String?
   /// Buổi DẠY BÙ: trỏ tới buổi bị hủy mà buổi này thay thế (NULL = buổi chính của lớp).
   /// Tiền 1 buổi khi hoàn = tiền lớp ÷ số buổi CHÍNH (không tính buổi bù).
   makeupForId String?        @unique
@@ -920,6 +928,8 @@ enum RefundReason {
   ORDER_CANCELLED // Đơn hàng đã thanh toán bị hủy (khách yêu cầu / trung tâm hủy) — hoàn toàn bộ
   ORDER_NOT_PICKED_UP // Khách không đến lấy hàng đúng hạn — hoàn theo chính sách (SHOP_NOT_PICKED_UP_REFUND_PERCENT)
   ORDER_LATE_PAYMENT // Tiền về sau khi đơn đã hết hạn/hủy — không khôi phục đơn, hoàn lại tiền
+  MEMBERSHIP_CANCELLED // Manager hủy gói thành viên của hội viên — hoàn phần giá trị còn lại (tùy chọn)
+  COURSE_NOT_FULFILLED // Đã thu tiền khóa nhưng không ghi danh đủ số buổi đã tính tiền (hết chỗ / buổi bị hủy trong lúc chờ CK) — hoàn phần thiếu
 }
 
 enum RefundStatus {
@@ -1282,6 +1292,12 @@ model MembershipPlan {
   description  String?
   /// Manager bật/tắt gói (gói tắt không bán nữa, membership đã mua vẫn giữ).
   isActive     Boolean      @default(true)
+  /// Quyền lợi hiển thị trên thẻ gói (tối đa 8 dòng).
+  benefits     String[]     @default([])
+  /// Gói nổi bật ("Phổ biến") trên màn chọn gói.
+  isFeatured   Boolean      @default(false)
+  /// Thứ tự hiển thị (nhỏ trước), cùng thứ tự thì rẻ trước.
+  sortOrder    Int          @default(0)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @default(now()) @updatedAt
   memberships  Membership[]
@@ -1300,11 +1316,37 @@ model Membership {
   startDate DateTime
   endDate   DateTime
   status    MembershipStatus @default(ACTIVE)
+  /// Bậc nhắc gia hạn đã gửi (0 = chưa, 1 = còn 7 ngày, 2 = còn 1 ngày, 3 = đã hết hạn) — chống gửi trùng.
+  reminderStage Int          @default(0)
+  /// Manager hủy gói: thời điểm, lý do, người hủy.
+  cancelledAt   DateTime?
+  cancelReason  String?
+  cancelledById String?
   createdAt DateTime         @default(now())
   updatedAt DateTime         @default(now()) @updatedAt
 
+  scans     MemberPassScan[]
+
   @@index([memberId])
   @@index([status])
+}
+
+/// Nhật ký quét thẻ thành viên ở cửa (Manager/HLV quét mã QR động của hội viên) — để đối soát, không tự khóa ai.
+model MemberPassScan {
+  id           String         @id @default(uuid())
+  memberId     String
+  member       MemberProfile  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// Gói đang hiệu lực lúc quét (null = không có gói).
+  membershipId String?
+  membership   Membership?    @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  scannedBy    String
+  valid        Boolean
+  reason       String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now()) @updatedAt
+
+  @@index([memberId, createdAt])
+  @@index([createdAt])
 }
 
 enum MembershipStatus {

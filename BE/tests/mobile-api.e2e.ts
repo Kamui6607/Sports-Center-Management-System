@@ -22,7 +22,8 @@ async function main() {
     capacity: 5,
     fitness: `${RUN}-Yoga`,
     roomId: room.id,
-    sessions: [{ startInHours: -24, status: "COMPLETED" }, { startInHours: 72 }, { startInHours: 96 }],
+    // Khóa 4 buổi đã qua 1 buổi (25%) — còn 3 buổi nên vẫn trong hạn mở bán (Doc/BUSINESS_HARDENING_PLAN.md §2.2).
+    sessions: [{ startInHours: -24, status: "COMPLETED" }, { startInHours: 72 }, { startInHours: 96 }, { startInHours: 120 }],
   });
   const hidden = await createClass(coach, { status: "PENDING", roomId: room.id, sessions: [] });
   await purchase(member, open.cls, open.schedules.slice(1).map((s) => s.id));
@@ -36,7 +37,7 @@ async function main() {
   check("Guest truyền status=PENDING vẫn chỉ thấy APPROVED", !(guestStatus.body.data ?? []).some((c: any) => c.id === hidden.cls.id));
   const item = guestList.body.data.find((c: any) => c.id === open.cls.id);
   check("Guest không thấy email HLV", item && item.coach.user && item.coach.user.email === undefined, item?.coach?.user);
-  check("summary: 3 buổi chính, 1 hoàn thành, 2 sắp tới", item?.summary?.mainSessionCount === 3 && item.summary.completedSessionCount === 1 && item.summary.upcomingSessionCount === 2, item?.summary);
+  check("summary: 4 buổi chính, 1 hoàn thành, 3 sắp tới", item?.summary?.mainSessionCount === 4 && item.summary.completedSessionCount === 1 && item.summary.upcomingSessionCount === 3, item?.summary);
   check("summary: 1 học viên, còn 4 chỗ", item?.summary?.studentCount === 1 && item.summary.minRemainingSlots === 4, item?.summary);
   check("coach kèm ratingAverage/ratingCount", item?.coach?.ratingCount === 0 && item.coach.ratingAverage === 0);
   const guestDetail = await http("GET", `/classes/${open.cls.id}`);
@@ -126,7 +127,7 @@ async function main() {
   const mineIds = (mine.body.data ?? []).map((s: any) => s.classId);
   check("class-schedules?mine=true (COACH) chỉ buổi khóa của mình", mine.status === 200 && mineIds.length > 0 && mineIds.every((id: string) => [open.cls.id, newId, clashAfterReject.body.data?.class?.id].includes(id)), mineIds);
   const mineMember = await http("GET", "/class-schedules?mine=true", { token: member.token });
-  check("class-schedules?mine=true (MEMBER) chỉ buổi đang giữ chỗ", (mineMember.body.data ?? []).length === 2, (mineMember.body.data ?? []).length);
+  check("class-schedules?mine=true (MEMBER) chỉ buổi đang giữ chỗ", (mineMember.body.data ?? []).length === 3, (mineMember.body.data ?? []).length);
   const cancelSession = await http("POST", `/class-schedules/${open.schedules[2].id}/cancel`, {
     token: coach.token,
     body: { reason: "HLV ốm", resolution: { mode: "REFUND" } },

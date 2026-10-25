@@ -3,6 +3,7 @@ import * as classesService from "./classes.service.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
 import { resubmitActivityPlan } from "../class-schedules/class-schedules.service.js";
 import { getClassStudents } from "./class-summary.service.js";
+import { runClassMaintenance } from "./class-maintenance.service.js";
 
 export async function listClasses(req: Request, res: Response, next: NextFunction) {
   try {
@@ -94,5 +95,12 @@ export async function deleteDraft(req: Request, res: Response, next: NextFunctio
 export async function submitDraft(req: Request, res: Response, next: NextFunction) {
   try {
     sendSuccess(res, await classesService.submitDraft(req.params.id as string, req.body, req.user!), "Đã gửi khóa học chờ duyệt");
+  } catch (err) { next(err); }
+}
+
+/** POST /classes/maintenance — Manager chạy tay job bảo trì khóa học. */
+export async function runMaintenance(_req: Request, res: Response, next: NextFunction) {
+  try {
+    sendSuccess(res, await runClassMaintenance(), "Class maintenance completed");
   } catch (err) { next(err); }
 }

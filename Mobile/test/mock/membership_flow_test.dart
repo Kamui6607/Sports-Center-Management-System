@@ -61,20 +61,36 @@ void main() {
 
   test('HLV quét QR: còn hạn / hết hạn / chưa có gói', () async {
     await login('coach@demo.vn');
-    final active = await memberships.verify('u-m1');
+    final active = await memberships.verifyPass('u-m1');
     expect(active.isActive, isTrue);
     expect(active.daysLeft, 25);
-    final expired = await memberships.verify('u-m3');
+    final expired = await memberships.verifyPass('u-m3');
     expect(expired.isActive, isFalse);
     expect(expired.status, MembershipStatus.expired);
-    final none = await memberships.verify('u-m2');
+    final none = await memberships.verifyPass('u-m2');
     expect(none.isActive, isFalse);
     expect(none.status, isNull);
-    await expectLater(memberships.verify('khong-ton-tai'), throwsA(isA<AppFailure>()));
+    await expectLater(memberships.verifyPass('khong-ton-tai'), throwsA(isA<AppFailure>()));
+  });
+
+  test('thẻ: QR động quét được, gói mua thêm nằm trong danh sách xếp hàng', () async {
+    await login('member@demo.vn');
+    final paymentId = await memberships.purchase('mbp-1m');
+    await PaymentMockRepository(server).simulatePaid(paymentId);
+    final o = await memberships.overview();
+    expect(o.isActive, isTrue);
+    expect(o.queued, hasLength(1));
+    expect(o.totalDaysLeft, 55);
+    final pass = await memberships.pass();
+    expect(pass.isActive, isTrue);
+    await login('coach@demo.vn');
+    final r = await memberships.verifyPass(pass.token);
+    expect(r.isActive, isTrue);
+    expect(r.userId, 'u-m1');
   });
 
   test('hội viên không được quét thẻ người khác', () async {
     await login('member@demo.vn');
-    await expectLater(memberships.verify('u-m2'), throwsA(isA<AppFailure>()));
+    await expectLater(memberships.verifyPass('u-m2'), throwsA(isA<AppFailure>()));
   });
 }

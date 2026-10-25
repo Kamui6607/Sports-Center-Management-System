@@ -44,11 +44,7 @@ class BrowseNotifier extends AsyncNotifier<BrowseState> {
     ref.watch(dataRevisionProvider);
     final q = ref.watch(classQueryProvider);
     final page = await ref.read(courseRepositoryProvider).browse(q.copyWith(page: 1));
-    return BrowseState(
-      items: page.items.where((c) => c.hasAvailableSessions).toList(),
-      page: 1,
-      hasMore: page.hasMore,
-    );
+    return BrowseState(items: page.items.where((c) => c.hasAvailableSessions).toList(), page: 1, hasMore: page.hasMore);
   }
 
   Future<void> loadMore() async {

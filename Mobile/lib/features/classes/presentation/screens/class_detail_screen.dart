@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
+import '../../../../core/utils/money.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../auth/domain/entities/app_user.dart';
@@ -89,7 +90,14 @@ class _Body extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               Text(course.name, style: context.text.headline),
               const SizedBox(height: AppSpacing.xs),
-              MoneyText(course.price, style: context.text.title.copyWith(color: c.primary)),
+              MoneyText(detail.payablePrice, style: context.text.title.copyWith(color: c.primary)),
+              if (detail.effectiveQuote?.hasDiscount == true)
+                Text(
+                  'Giá trọn khóa ${Money.format(course.price)} · đã diễn ra ${detail.effectiveQuote!.sessionsMissed} buổi — '
+                  'bạn chỉ trả tiền ${detail.effectiveQuote!.sessionsPurchased} buổi còn lại '
+                  '(${Money.format(detail.effectiveQuote!.unitPrice)}/buổi)',
+                  style: context.text.caption.copyWith(color: c.successText),
+                ),
               Text(
                 'Trọn khóa ${course.mainSessionCount} buổi'
                 '${course.startDate != null && course.endDate != null ? ' · ${VnTime.date(course.startDate!)} – ${VnTime.date(course.endDate!)}' : ''}',

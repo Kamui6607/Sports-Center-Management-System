@@ -2735,8 +2735,73 @@ dialog::backdrop {
 .reception-actions .button {
   white-space: normal;
 }
+/* Hóa đơn là "tờ giấy": luôn nền sáng chữ đậm (kể cả khi trang quản trị đang ở chủ đề tối) để in/đọc rõ. */
 .invoice-print {
   padding: var(--space-6);
+  background: #ffffff;
+  color: #1c2622;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.invoice-print h2,
+.invoice-print strong,
+.invoice-print th {
+  color: #1c2622;
+}
+.invoice-print .eyebrow {
+  color: #203d31;
+  font-weight: 700;
+}
+.invoice-print .muted {
+  color: #58695f;
+  font-size: 0.85em;
+  margin: 0;
+}
+.invoice-meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-4) 0;
+}
+.invoice-meta dt {
+  color: #58695f;
+}
+.invoice-meta dd {
+  margin: 0;
+}
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.invoice-table thead th {
+  background: #f3f6f4;
+}
+.invoice-table th,
+.invoice-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid #dbe3de;
+  text-align: left;
+  vertical-align: top;
+}
+.invoice-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+/* Bỏ độ rộng tối thiểu chung của bảng: cột phụ (STT, ĐVT, SL) gọn, tên hàng chiếm phần còn lại. */
+.invoice-table th,
+.invoice-table td {
+  min-width: 0;
+}
+.invoice-table th:nth-child(1),
+.invoice-table th:nth-child(3),
+.invoice-table th:nth-child(4) {
+  width: 1%;
+  white-space: nowrap;
+}
+.invoice-table tfoot th {
+  font-weight: 700;
 }
 @media print {
   body:has(.invoice-print) * {
