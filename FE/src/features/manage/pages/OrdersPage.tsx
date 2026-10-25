@@ -301,10 +301,18 @@ function OrderDialog({ id, onClose }: { id: string; onClose: () => void }) {
                 ["Mã giao dịch", str(get(o, "payment.transactionCode"))],
               ].filter(([, v]) => v !== "") as [string, ReactNode][]}
             />
-            {get(o, "payment.id") && ["SUCCESS", "REFUNDED"].includes(str(get(o, "payment.status"))) ? (
+            {get(o, "payment.id") ? (
               <button className="cr-btn sm" style={{ marginTop: 8 }} onClick={() => setInvoiceId(str(get(o, "payment.id")))}>
-                Xem hóa đơn (đơn giá, phí giao, tổng)
+                Xem hóa đơn {str(o.status) === "REFUNDED" ? "(Đã hoàn tiền)" : str(o.status) === "CANCELLED" ? "(Đã hủy)" : ""}
               </button>
+            ) : null}
+            <a className="cr-btn sm" style={{ marginTop: 8, marginLeft: 8 }} href="/manager/revenue" target="_blank" rel="noreferrer" title="Mở lịch sử thanh toán trong Doanh thu">
+              Lịch sử thanh toán & doanh thu ↗
+            </a>
+            {refunds.length > 0 || str(o.status) === "REFUNDED" || str(o.status) === "REFUND_REQUESTED" ? (
+              <a className="cr-btn sm" style={{ marginTop: 8, marginLeft: 8 }} href="/manager/refunds" target="_blank" rel="noreferrer" title="Mở danh sách hoàn tiền">
+                Lịch sử hoàn tiền ↗
+              </a>
             ) : null}
             {invoiceId ? <InvoiceDialog id={invoiceId} onClose={() => setInvoiceId("")} /> : null}
             {get(o, "payment.requiresReview") ? (

@@ -74,7 +74,7 @@ function UserDetail({ user, selfId }: { user: Row; selfId: string }) {
   });
 
   const lock = useMutation({ mutationFn: () => api("DELETE /users/{id}", { params: { id } }), onSuccess: () => { setAction(null); refresh(); } });
-  const unlock = useMutation({ mutationFn: () => api("PATCH /users/{id}", { params: { id }, body: { isActive: true } }), onSuccess: () => { setAction(null); refresh(); } });
+  const enableUser = useMutation({ mutationFn: () => api("PATCH /users/{id}", { params: { id }, body: { isActive: true } }), onSuccess: () => { setAction(null); refresh(); } });
   const role = useMutation({ mutationFn: () => api("PATCH /users/{id}", { params: { id }, body: { role: newRole } }), onSuccess: () => { setAction(null); refresh(); } });
   const reset = useMutation({
     mutationFn: () => api<Row>("POST /users/{id}/password-reset", { params: { id } }),
@@ -259,9 +259,9 @@ function UserDetail({ user, selfId }: { user: Row; selfId: string }) {
           target={`${str(user.fullName)} · ${str(user.email)}`}
           consequence="Người dùng có thể đăng nhập lại bằng mật khẩu hiện tại."
           confirmLabel="Mở khóa"
-          busy={unlock.isPending}
-          error={unlock.error}
-          onConfirm={() => unlock.mutate()}
+          busy={enableUser.isPending}
+          error={enableUser.error}
+          onConfirm={() => enableUser.mutate()}
           onClose={() => setAction(null)}
         />
       )}

@@ -64,7 +64,7 @@ function AuthFrame({ children }: { children: ReactNode }) {
             </span>
           </div>
           <div>
-            <div className="cr-eyebrow">Không gian quản lý trung tâm</div>
+            <div className="cr-sublabel">Không gian quản lý trung tâm</div>
             <h1>
               Mọi phòng tập, lớp học và <em>nhịp vận hành</em> trên một màn hình.
             </h1>
@@ -112,7 +112,7 @@ export function AdminLogin({ onLogin, busy, error }: { onLogin: (e: string, p: s
   return (
     <AuthFrame>
       <form className="cr-auth-card" onSubmit={submit}>
-        <div className="cr-eyebrow">Đăng nhập quản trị</div>
+        <div className="cr-sublabel">Đăng nhập quản trị</div>
         <h2>Chào mừng trở lại</h2>
         <p>Đăng nhập bằng tài khoản Quản lý trung tâm.</p>
         <Field label="Email" required>
@@ -170,7 +170,7 @@ export function ResetPasswordScreen() {
     <AuthFrame>
       {done ? (
         <div className="cr-auth-card">
-          <div className="cr-eyebrow">Hoàn tất</div>
+          <div className="cr-sublabel">Hoàn tất</div>
           <h2>Đã đặt mật khẩu mới</h2>
           <p>Mọi phiên đăng nhập cũ của tài khoản đã bị đăng xuất. Hãy đăng nhập lại bằng mật khẩu mới (Web cho Quản lý, ứng dụng Pulse cho Hội viên/HLV).</p>
           <Link className="cr-btn primary" to="/login">
@@ -179,7 +179,7 @@ export function ResetPasswordScreen() {
         </div>
       ) : (
         <form className="cr-auth-card" onSubmit={submit} noValidate>
-          <div className="cr-eyebrow">Đặt lại mật khẩu</div>
+          <div className="cr-sublabel">Đặt lại mật khẩu</div>
           <h2>Đặt mật khẩu mới</h2>
           <p>Nhập email và mã 6 số trong email đặt lại mật khẩu. Mã có hiệu lực 15 phút và chỉ dùng một lần.</p>
           <Field label="Email" required error={errs.email}>

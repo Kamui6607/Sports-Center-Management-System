@@ -52,7 +52,7 @@ export function AttendancePenalties() {
     <>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">CHUYÊN CẦN MINH BẠCH</div>
+          <div className="cr-sublabel">CHUYÊN CẦN MINH BẠCH</div>
           <h1>Cảnh báo & quyết định chuyên cần</h1>
           <p>Xem trước trước khi thu hồi chỗ; mỗi quyết định đều có thể được khiếu nại và thu hồi.</p>
         </div>

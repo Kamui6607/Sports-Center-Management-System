@@ -2736,7 +2736,7 @@ dialog::backdrop {
   white-space: normal;
 }
 /* Hóa đơn là "tờ giấy": luôn nền sáng chữ đậm (kể cả khi trang quản trị đang ở chủ đề tối) để in/đọc rõ. */
-.invoice-print {
+.invoice-print { position: relative;
   padding: var(--space-6);
   background: #ffffff;
   color: #1c2622;
@@ -2757,6 +2757,11 @@ dialog::backdrop {
   font-size: 0.85em;
   margin: 0;
 }
+.invoice-stamp { position: absolute; top: 18px; right: 20px; padding: 5px 12px; border: 2px solid currentColor; border-radius: 6px; font-size: 13.5px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; transform: rotate(-5deg); pointer-events: none; opacity: 0.95; }
+.invoice-stamp.cancelled { color: #d92d20; border-color: #d92d20; background: #fef3f2; }
+.invoice-stamp.refunded { color: #b54708; border-color: #b54708; background: #fffaeb; }
+.invoice-stamp.partial { color: #315f87; border-color: #315f87; background: #eef4fa; }
+.invoice-stamp.paid { color: #267346; border-color: #267346; background: #edfcf2; }
 .invoice-meta {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -2829,7 +2834,7 @@ dialog::backdrop {
   body:has(.invoice-print) dialog > :not(.invoice-print) {
     display: none !important;
   }
-  .invoice-print {
+  .invoice-print { position: relative;
     color: #000;
     background: var(--color-surface);
   }

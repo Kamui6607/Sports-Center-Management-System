@@ -38,6 +38,28 @@ class ManagerHomeScreen extends ConsumerWidget {
               style: context.text.small.copyWith(color: context.colors.textMuted),
             ),
             const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton.outline(
+                    label: 'Quét nhận hàng',
+                    icon: AppIcons.scan,
+                    expand: true,
+                    onPressed: () => context.push(AppRoutes.pickupScan),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: AppButton.outline(
+                    label: 'Quét thẻ HV',
+                    icon: AppIcons.membership,
+                    expand: true,
+                    onPressed: () => context.push(AppRoutes.membershipScanner),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
             if (c.total == 0)
               const AlertBanner.success(message: 'Không còn việc nào chờ duyệt.')
             else
@@ -106,7 +128,7 @@ class ManagerHomeScreen extends ConsumerWidget {
   }
 }
 
-/// Cửa hàng: đơn cần xử lý, chờ nhận tại quầy, sắp hết hàng + lối tắt quét mã nhận hàng.
+/// Cửa hàng: đơn cần xử lý, chờ nhận tại quầy, sắp hết hàng.
 class _ShopSection extends ConsumerWidget {
   const _ShopSection();
 
@@ -150,20 +172,6 @@ class _ShopSection extends ConsumerWidget {
               onTap: () => context.push(AppRoutes.inventory),
             ),
           ],
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        AppButton.outline(
-          label: 'Quét mã nhận hàng',
-          icon: AppIcons.scan,
-          expand: true,
-          onPressed: () => context.push(AppRoutes.pickupScan),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        AppButton.outline(
-          label: 'Quét thẻ thành viên',
-          icon: AppIcons.membership,
-          expand: true,
-          onPressed: () => context.push(AppRoutes.membershipScanner),
         ),
       ],
     );

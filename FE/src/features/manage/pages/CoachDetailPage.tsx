@@ -328,7 +328,7 @@ function CoachFeedbackPanel({ profileId }: { profileId: string }) {
   });
   const avg = get(q.data, "data.summary.averageRating");
   return (
-    <Panel title="Đánh giá từ hội viên" desc={q.data ? `${avg != null ? `${str(avg)} ★ trung bình · ` : ""}${num(get(q.data, "data.summary.totalFeedbacks"))} đánh giá` : undefined}>
+    <Panel title="Đánh giá từ hội viên" desc={q.data ? `${avg != null ? `Điểm TB ${str(avg)}/5 · ` : ""}${num(get(q.data, "data.summary.totalFeedbacks"))} đánh giá` : undefined}>
       <QueryView q={q} rows={3}>
         {(res) => {
           const rows = (get(res, "data.feedbacks") as Row[]) ?? [];
@@ -340,7 +340,7 @@ function CoachFeedbackPanel({ profileId }: { profileId: string }) {
                     <div className="cr-cell-main" style={{ minWidth: 0 }}>
                       <strong>
                         <span style={{ color: "var(--warning)" }} aria-label={`${str(f.rating)} sao`}>
-                          {"★".repeat(Number(f.rating) || 0)}
+                          {`${Number(f.rating) || 0}/5 sao ·`}
                         </span>{" "}
                         {f.isAnonymous ? "Ẩn danh" : str(get(f, "member.user.fullName")) || "Hội viên"}
                       </strong>

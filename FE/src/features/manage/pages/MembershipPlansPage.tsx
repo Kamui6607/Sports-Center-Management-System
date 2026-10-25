@@ -233,7 +233,7 @@ function PlanDialog({ plan, onClose }: { plan: Row | null; onClose: () => void }
           label="Quyền lợi (mỗi dòng một ý, tối đa 8)"
           wide
           error={benefitLines.length > 8 ? "Tối đa 8 dòng." : errs.benefits}
-          hint="Hiển thị dạng danh sách có dấu ✓ trên thẻ gói trong ứng dụng."
+          hint="Hiển thị dạng danh sách quyền lợi trên thẻ gói trong ứng dụng."
         >
           <textarea value={f.benefits} onChange={(e) => setF({ ...f, benefits: e.target.value })} rows={4} placeholder={"Tập không giới hạn giờ mở cửa\nTủ đồ & khăn miễn phí"} />
         </Field>

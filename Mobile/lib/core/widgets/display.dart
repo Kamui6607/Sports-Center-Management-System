@@ -101,7 +101,7 @@ class ProgressRing extends StatelessWidget {
   }
 }
 
-/// Ô số liệu tổng quan.
+/// Ô số liệu tổng quan (nhãn + biểu tượng mảnh phía trên, số tabular lớn bên dưới — đồng bộ Web `.cr-kpi`).
 class KpiTile extends StatelessWidget {
   const KpiTile({
     super.key,
@@ -140,18 +140,27 @@ class KpiTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, size: AppSizes.icon, color: highlight ? c.accent : c.accentStrong),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.text.caption.copyWith(color: highlight ? c.accent : c.textMuted),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xxs),
+                    Icon(icon, size: AppSizes.iconSm, color: highlight ? c.accent : c.accentStrong),
+                  ],
+                ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: context.text.title.copyWith(color: fg, fontFeatures: kTabularFigures),
-                ),
-                Text(
-                  label,
-                  maxLines: 2,
-                  style: context.text.caption.copyWith(color: highlight ? c.accent : c.textMuted),
                 ),
               ],
             ),

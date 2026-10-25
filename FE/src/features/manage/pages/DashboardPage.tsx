@@ -104,7 +104,7 @@ export default function DashboardPage({ user }: { user: ProfileOk["data"] }) {
               </button>
             ))}
           </div>
-          <Link className="cr-btn" to={`/manager/revenue?preset=${preset}`}>
+          <Link className="cr-btn soft" to="/manager/memberships"><WalletCards size={16} aria-hidden="true" /> Quét thẻ</Link><Link className="cr-btn" to={`/manager/revenue?preset=${preset}`}>
             <FileBarChart size={16} aria-hidden="true" /> Báo cáo & xuất CSV
           </Link>
         </div>
@@ -587,7 +587,7 @@ function ActionQueue() {
             </div>
             <div className="cr-queue-row">
               <span>
-                Đơn hàng đang xử lý: <b>{shop.data ? num(orders) : "…"}</b>
+                Đơn hàng đang xử lý: <b>{shop.data ? num(orders) : "…"}</b> · <Link to="/manager/orders">Xử lý đơn</Link>
               </span>
             </div>
           </>

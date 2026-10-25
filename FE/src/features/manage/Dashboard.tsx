@@ -143,7 +143,7 @@ export function Dashboard({ reports = false }: { reports?: boolean }) {
     <>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">
+          <div className="cr-sublabel">
             {reports
               ? "HIỂU DỮ LIỆU. DẪN DẮT TĂNG TRƯỞNG."
               : "MỖI NGÀY LÀ MỘT BƯỚC TIẾN"}

@@ -176,6 +176,13 @@ class ManagerOrderDetailScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.md),
             const SectionHeader(title: 'Sản phẩm'),
             OrderItemsCard(order: o),
+            const SizedBox(height: AppSpacing.md),
+            SectionHeader(
+              title: 'Thanh toán & Hóa đơn',
+              actionLabel: 'Hóa đơn',
+              onAction: () => context.push(AppRoutes.invoices),
+            ),
+            OrderPaymentCard(order: o, isManager: true),
             if (o.refunds.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.md),
               const SectionHeader(title: 'Hoàn tiền'),

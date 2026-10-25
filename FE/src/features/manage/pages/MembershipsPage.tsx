@@ -156,7 +156,7 @@ function PassScanner() {
       {verify.error ? <ErrorBox error={verify.error} /> : null}
       {r ? (
         <div className={"cr-scan-result " + (r.valid ? "ok" : "bad")} role="status">
-          <strong>{r.valid ? "✓ HỢP LỆ" : "✕ KHÔNG HỢP LỆ"}</strong>
+          <strong>{r.valid ? "THẺ HỢP LỆ" : "THẺ KHÔNG HỢP LỆ"}</strong>
           <span>
             {str(get(r, "member.fullName"))} · {str(get(r, "membership.planName")) || "chưa có gói"}
           </span>

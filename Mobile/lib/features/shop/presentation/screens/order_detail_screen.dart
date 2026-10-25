@@ -162,6 +162,13 @@ class OrderDetailScreen extends ConsumerWidget {
                   : null,
             ),
             const SizedBox(height: AppSpacing.md),
+            SectionHeader(
+              title: 'Thanh toán & Hóa đơn',
+              actionLabel: 'Lịch sử thanh toán',
+              onAction: () => context.push(AppRoutes.invoices),
+            ),
+            OrderPaymentCard(order: o),
+            const SizedBox(height: AppSpacing.md),
             SectionHeader(title: o.isPickup ? 'Người nhận' : 'Giao tới'),
             OrderRecipientCard(order: o),
             if (o.refunds.isNotEmpty) ...[

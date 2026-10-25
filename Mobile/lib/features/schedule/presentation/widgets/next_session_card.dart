@@ -44,23 +44,60 @@ class NextSessionCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Wrap(
+                      spacing: AppSpacing.xxs,
+                      runSpacing: AppSpacing.xxs,
+                      children: [
+                        if (ongoing)
+                          const StatusLabel('Đang diễn ra', StatusTone.success).tag(dense: true)
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: c.onPrimary.withValues(alpha: 0.12),
+                              borderRadius: AppRadius.pillAll,
+                            ),
+                            child: Text(
+                              'Buổi sắp tới',
+                              style: context.text.caption.copyWith(color: c.accent),
+                            ),
+                          ),
+                        if (s.isMakeup) const StatusLabel('Buổi dạy bù', StatusTone.brand).tag(dense: true),
+                      ],
+                    ),
+                  ),
+                  Icon(AppIcons.chevronRight, size: AppSizes.iconSm, color: c.onPrimary.withValues(alpha: 0.65)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
               Text(s.className, style: context.text.title.copyWith(color: c.onPrimary)),
-              if (ongoing || s.isMakeup) ...[
-                const SizedBox(height: AppSpacing.xs),
-                Wrap(
-                  spacing: AppSpacing.xxs,
-                  runSpacing: AppSpacing.xxs,
-                  children: [
-                    if (ongoing) const StatusLabel('Đang diễn ra', StatusTone.success).tag(dense: true),
-                    if (s.isMakeup) const StatusLabel('Buổi dạy bù', StatusTone.brand).tag(dense: true),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-              ],
-              const SizedBox(height: AppSpacing.xxs),
-              Text(details, style: context.text.body.copyWith(color: c.onPrimary)),
-              Text(subtitle, style: context.text.small.copyWith(color: c.onPrimary.withValues(alpha: 0.8))),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.xs),
+              Row(
+                children: [
+                  Icon(AppIcons.calendar, size: AppSizes.iconSm, color: c.accent),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(details, style: context.text.body.copyWith(color: c.onPrimary)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(AppIcons.location, size: AppSizes.iconSm, color: c.onPrimary.withValues(alpha: 0.72)),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      subtitle,
+                      style: context.text.small.copyWith(color: c.onPrimary.withValues(alpha: 0.82)),
+                    ),
+                  ),
+                ],
+              ),
+              Divider(height: AppSpacing.lg, color: c.onPrimary.withValues(alpha: 0.14)),
               action ??
                   NextSessionNote(
                     icon: AppIcons.time,
@@ -119,7 +156,7 @@ class NoUpcomingSessionCard extends StatelessWidget {
   Widget build(BuildContext context) => AppCard(
     child: Row(
       children: [
-        Icon(AppIcons.calendar, color: context.colors.primary),
+        const IconTile(AppIcons.calendar),
         const SizedBox(width: AppSpacing.sm),
         Expanded(child: Text(message, style: context.text.body)),
         TextButton(onPressed: onAction, child: Text(actionLabel)),

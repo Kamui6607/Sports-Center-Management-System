@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../app/router/app_routes.dart';
 
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
@@ -214,4 +217,91 @@ class OrderRefundsCard extends StatelessWidget {
       ],
     ),
   );
+}
+
+
+/// Thẻ thanh toán & hóa đơn gắn với đơn hàng.
+/// Cung cấp lối tắt trực tiếp tới hóa đơn thanh toán tương ứng và lịch sử thanh toán,
+/// đồng thời đánh dấu rõ ràng trạng thái ĐÃ HỦY hoặc ĐÃ HOÀN TIỀN khi đơn bị hủy/hoàn.
+class OrderPaymentCard extends StatelessWidget {
+  const OrderPaymentCard({super.key, required this.order, this.isManager = false});
+
+  final ShopOrder order;
+  final bool isManager;
+
+  @override
+  Widget build(BuildContext context) {
+    final o = order;
+    final isCancelled = o.status == ShopOrderStatus.cancelled || o.status == ShopOrderStatus.expired;
+    final isRefunded = o.status == ShopOrderStatus.refunded;
+    final isPartiallyRefunded = !isRefunded && o.refunds.any((r) => r.status == 'COMPLETED');
+
+    final StatusTag statusTag;
+    if (isCancelled) {
+      statusTag = const StatusTag(label: 'ĐÃ HỦY', tone: StatusTone.danger);
+    } else if (isRefunded) {
+      statusTag = const StatusTag(label: 'ĐÃ HOÀN TIỀN', tone: StatusTone.warning);
+    } else if (isPartiallyRefunded) {
+      statusTag = const StatusTag(label: 'HOÀN 1 PHẦN', tone: StatusTone.info);
+    } else if (o.isPaid || o.status == ShopOrderStatus.paid || o.status == ShopOrderStatus.completed) {
+      statusTag = const StatusTag(label: 'ĐÃ THANH TOÁN', tone: StatusTone.success);
+    } else if (o.paymentMethod == ShopPaymentMethod.cash) {
+      statusTag = const StatusTag(label: 'TRẢ TẠI QUẦY', tone: StatusTone.neutral);
+    } else {
+      statusTag = const StatusTag(label: 'CHỜ THANH TOÁN', tone: StatusTone.warning);
+    }
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('Trạng thái thanh toán', style: context.text.small.copyWith(color: context.colors.textMuted)),
+              ),
+              statusTag,
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          InfoRow(icon: o.paymentMethod.icon, text: 'Hình thức: ${o.paymentMethod.label}'),
+          InfoRow(icon: AppIcons.wallet, text: 'Tổng tiền: ${Money.format(o.total)}'),
+          if (o.amountDueAtCounter > 0)
+            InfoRow(icon: AppIcons.check, text: 'Cần trả tại quầy: ${Money.format(o.amountDueAtCounter)}'),
+          if (isCancelled) ...[
+            const SizedBox(height: AppSpacing.xs),
+            const AlertBanner.error(
+              message: 'Đơn hàng đã bị hủy. Hóa đơn tương ứng được đánh dấu ĐÃ HỦY.',
+            ),
+          ] else if (isRefunded || isPartiallyRefunded) ...[
+            const SizedBox(height: AppSpacing.xs),
+            AlertBanner.warning(
+              message: isRefunded
+                  ? 'Đơn hàng đã được hoàn tiền toàn bộ. Hóa đơn tương ứng được đánh dấu ĐÃ HOÀN TIỀN.'
+                  : 'Đơn hàng có khoản hoàn tiền. Hóa đơn tương ứng được đánh dấu HOÀN 1 PHẦN.',
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          const Divider(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.xs),
+          if (o.paymentId != null) ...[
+            AppButton.outline(
+              label: 'Xem hóa đơn thanh toán',
+              icon: AppIcons.invoice,
+              expand: true,
+              onPressed: () => context.push(AppRoutes.invoice(o.paymentId!)),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
+          AppButton.ghost(
+            label: 'Lịch sử thanh toán',
+            icon: AppIcons.time,
+            size: AppButtonSize.small,
+            expand: true,
+            onPressed: () => context.push(AppRoutes.invoices),
+          ),
+        ],
+      ),
+    );
+  }
 }

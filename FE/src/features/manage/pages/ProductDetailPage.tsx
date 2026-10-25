@@ -84,7 +84,7 @@ function ProductDetail({ p }: { p: Row }) {
           ["Tồn trên kệ", p.stockQuantity, "số lượng thực tế"],
           ["Đang giữ cho đơn", p.reservedStock, "đơn chờ thanh toán"],
           ["Có thể bán", p.availableStock, `cảnh báo khi ≤ ${num(p.lowStockThreshold)}`],
-          ["Đánh giá", p.reviewCount, Number(p.reviewCount) > 0 ? `★ ${Number(p.rating ?? 0).toFixed(1)} trung bình` : "chưa có đánh giá"],
+          ["Đánh giá", p.reviewCount, Number(p.reviewCount) > 0 ? `Điểm TB ${Number(p.rating ?? 0).toFixed(1)}/5` : "chưa có đánh giá"],
         ].map(([l, v, n]) => (
           <div className={"cr-kpi" + (l === "Có thể bán" && Number(v) <= Number(p.lowStockThreshold) ? " alert" : "")} key={str(l)}>
             <div className="cr-kpi-label">{str(l)}</div>
@@ -303,7 +303,7 @@ function Reviews({ id, onChanged }: { id: string; onChanged: () => void }) {
                     </div>
                   ),
                 },
-                { key: "r", title: "Điểm", render: (r) => <span className="cr-mono" style={{ color: "var(--warning)", letterSpacing: 1 }} aria-label={`${Number(r.rating)} sao`}>{"★".repeat(Number(r.rating))}</span> },
+                { key: "r", title: "Điểm", render: (r) => <span className="cr-tag warn" aria-label={`${Number(r.rating)} sao`}>{`${Number(r.rating)}/5`}</span> },
                 { key: "c", title: "Nhận xét", render: (r) => str(r.comment) || <span className="cr-muted">—</span> },
                 { key: "s", title: "Hiển thị", render: (r) => (r.isHidden ? <Pill tone="bad">Đã ẩn</Pill> : <Pill tone="ok">Công khai</Pill>) },
                 {

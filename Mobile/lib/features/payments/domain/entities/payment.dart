@@ -150,6 +150,8 @@ class Invoice {
     this.pendingRefundAmount = 0,
     this.periodLabel,
     this.statusLabel,
+    this.orderStatus,
+    this.orderId,
     this.isPickup = false,
   });
 
@@ -192,6 +194,25 @@ class Invoice {
 
   /// Đơn sản phẩm nhận tại quầy (không có phí giao hàng).
   final bool isPickup;
+  final String? orderStatus;
+  final String? orderId;
+
+  /// Đã hủy giao dịch / đơn hàng.
+  bool get isCancelled =>
+      orderStatus == 'CANCELLED' ||
+      statusLabel == 'Đã hủy' ||
+      statusLabel == 'Đã hủy / hết hạn' ||
+      (status == InvoiceStatus.cancelled && refundedAmount == 0);
+
+  /// Đã hoàn tiền (toàn bộ hoặc đánh dấu hoàn tiền).
+  bool get isRefunded =>
+      orderStatus == 'REFUNDED' ||
+      statusLabel == 'Đã hoàn tiền' ||
+      (total > 0 && refundedAmount >= total) ||
+      (status == InvoiceStatus.cancelled && refundedAmount > 0);
+
+  /// Hoàn tiền một phần (vẫn giữ phần tiền còn lại).
+  bool get isPartiallyRefunded => !isRefunded && refundedAmount > 0;
 
   /// Thực trả sau hoàn.
   int get netAmount => (total - refundedAmount).clamp(0, total);

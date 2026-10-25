@@ -47,6 +47,7 @@ class MemberHomeScreen extends ConsumerWidget {
         onRefresh: () => _refresh(ref),
         children: [
           Text('Xin chào, ${user?.firstName ?? ''}!', style: context.text.headline),
+          const SizedBox(height: 2),
           Text(
             '${VnTime.weekdayOf(now)}, ${VnTime.date(now)}',
             style: context.text.small.copyWith(color: context.colors.textMuted),
@@ -151,6 +152,7 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final items = [
       (AppIcons.scan, 'Quét QR', AppRoutes.scan),
       (AppIcons.course, 'Khóa của tôi', AppRoutes.myCourses),
@@ -165,18 +167,28 @@ class _QuickActions extends StatelessWidget {
         for (final (icon, label, route) in items)
           AppCard(
             onTap: () => context.push(route),
-            padding: const EdgeInsets.all(AppSpacing.xs),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.xs),
             semanticLabel: label,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: context.colors.primary),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: c.surfaceMuted,
+                    borderRadius: AppRadius.controlAll,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(icon, size: AppSizes.icon, color: c.primary),
+                ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   label,
                   textAlign: TextAlign.center,
-                  maxLines: 2,
-                  style: context.text.caption.copyWith(color: context.colors.text),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.caption.copyWith(color: c.text),
                 ),
               ],
             ),

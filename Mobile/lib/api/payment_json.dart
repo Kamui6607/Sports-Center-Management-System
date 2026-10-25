@@ -140,6 +140,8 @@ abstract final class PaymentJson {
       refundedAmount: j.money('refundedAmount'),
       pendingRefundAmount: j.money('pendingRefundAmount'),
       isPickup: j.objOrNull('order')?.str('fulfillmentType') == 'PICKUP',
+      orderStatus: j.objOrNull('order')?.strOrNull('status'),
+      orderId: j.objOrNull('order')?.strOrNull('id'),
       seller: seller == null
           ? null
           : InvoiceParty(
