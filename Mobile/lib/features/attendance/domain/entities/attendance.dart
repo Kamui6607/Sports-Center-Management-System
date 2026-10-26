@@ -39,8 +39,14 @@ class ClassAttendanceStat {
     required this.excused,
   });
 
-  /// Ngưỡng cảnh báo chuyên cần (BE: `ATTENDANCE_WARNING` dưới 80%).
+  /// Ngưỡng cảnh báo chuyên cần (BE: `ATTENDANCE.WARN_THRESHOLD` = 80%).
   static const warningThreshold = 0.8;
+
+  /// Mẫu tối thiểu để xét cảnh báo/phạt (BE: `ATTENDANCE.MIN_SAMPLE`); ít hơn thì luôn là bình thường.
+  static const minSample = 5;
+
+  /// BE chỉ xét số buổi đã kết thúc gần nhất này của mỗi khóa (`ATTENDANCE.SAMPLE_WINDOW`).
+  static const sampleWindow = 10;
 
   final String classId;
   final String className;
@@ -49,12 +55,13 @@ class ClassAttendanceStat {
   final int absent;
   final int excused;
 
-  int get total => present + late + absent + excused;
+  /// Số buổi được tính tỷ lệ: vắng có phép KHÔNG tính (giống BE), "không điểm danh" đã gộp vào vắng.
+  int get counted => present + late + absent;
 
   /// Có mặt + đi trễ được tính là tham gia.
-  double get rate => total == 0 ? 1 : (present + late) / total;
+  double get rate => counted == 0 ? 1 : (present + late) / counted;
 
-  bool get isWarning => total > 0 && rate < warningThreshold;
+  bool get isWarning => counted >= minSample && rate < warningThreshold;
 }
 
 /// Phạt chuyên cần (`AttendancePenalty`).
@@ -92,6 +99,9 @@ class AttendancePenalty {
   /// Hạn khiếu nại (BE: 72 giờ).
   final DateTime? appealDeadline;
   final String? revokedReason;
+
+  /// `attendanceRate` là tỷ lệ 0–1 (BE trả phần trăm, repository đã chia 100) ⇒ số phần trăm để hiển thị.
+  int get ratePercent => (attendanceRate * 100).round();
 
   bool canAppeal(DateTime now) =>
       status == PenaltyStatus.applied && appealedAt == null && appealDeadline != null && now.isBefore(appealDeadline!);
@@ -178,4 +188,23 @@ class CourseAttendance {
   int get counted => present + late + absent + notMarked;
 
   double get rate => counted == 0 ? 1 : attended / counted;
+
+  /// Các buổi đã qua (không tính sắp tới / bị hủy), mới nhất trước, tối đa [ClassAttendanceStat.sampleWindow] buổi
+  /// — đúng cửa sổ mà BE dùng để xét cảnh báo và phạt.
+  List<CourseAttendanceSession> get recentPast {
+    final past = [
+      for (final s in sessions)
+        if (s.mark != CourseSessionMark.upcoming && s.mark != CourseSessionMark.cancelled) s,
+    ]..sort((a, b) => b.startTime.compareTo(a.startTime));
+    return past.take(ClassAttendanceStat.sampleWindow).toList();
+  }
+
+  /// Cảnh báo giống BE: tính trên [recentPast] (bỏ vắng có phép), cần từ [ClassAttendanceStat.minSample] buổi
+  /// và tỷ lệ dưới [ClassAttendanceStat.warningThreshold].
+  bool get isWarning {
+    final recent = recentPast.where((s) => s.mark != CourseSessionMark.excused).toList();
+    if (recent.length < ClassAttendanceStat.minSample) return false;
+    final attended = recent.where((s) => s.mark == CourseSessionMark.present || s.mark == CourseSessionMark.late).length;
+    return attended / recent.length < ClassAttendanceStat.warningThreshold;
+  }
 }

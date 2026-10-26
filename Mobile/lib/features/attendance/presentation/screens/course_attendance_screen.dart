@@ -78,7 +78,7 @@ class CourseAttendanceScreen extends ConsumerWidget {
                 AlertBanner.error(
                   title: 'Đang bị tạm khóa đặt chỗ khóa này',
                   message:
-                      'Chuyên cần ${penalty.attendanceRate}%: ${penalty.reason}'
+                      'Chuyên cần ${penalty.ratePercent}%: ${penalty.reason}'
                       '${penalty.blockedUntil != null ? ' Mở lại từ ${VnTime.date(penalty.blockedUntil!)}.' : ''}',
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -97,7 +97,9 @@ class CourseAttendanceScreen extends ConsumerWidget {
                 ),
               const SizedBox(height: AppSpacing.md),
               const AlertBanner.info(
-                message: 'Có mặt hoặc đi trễ được tính là tham gia; vắng có phép không tính vào tỷ lệ. Dưới 80% sẽ bị cảnh báo.',
+                message:
+                    'Có mặt hoặc đi trễ được tính là tham gia; vắng có phép không tính vào tỷ lệ. '
+                    'Cảnh báo xét trên ${ClassAttendanceStat.sampleWindow} buổi đã qua gần nhất, từ ${ClassAttendanceStat.minSample} buổi trở lên: dưới 80% sẽ bị cảnh báo.',
               ),
               const SizedBox(height: AppSpacing.xl),
             ],

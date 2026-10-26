@@ -49,7 +49,7 @@ class _CourseAttendanceViewState extends State<CourseAttendanceView> {
   Widget build(BuildContext context) {
     final a = widget.attendance;
     final c = context.colors;
-    final warn = a.counted > 0 && a.rate < ClassAttendanceStat.warningThreshold;
+    final warn = a.isWarning;
     final ringTone = context.tones.of(warn ? StatusTone.danger : StatusTone.success);
     // Buổi đã qua: mới nhất trước; buổi sắp tới: gần nhất trước.
     final list = a.sessions.where(_match).toList()
@@ -128,7 +128,7 @@ class _CourseAttendanceViewState extends State<CourseAttendanceView> {
           options: [
             SegmentOption(_Filter.all, 'Tất cả', count: a.sessions.length),
             SegmentOption(_Filter.attended, 'Có mặt', count: a.attended),
-            SegmentOption(_Filter.absent, 'Vắng', count: a.absent + a.notMarked + a.excused),
+            SegmentOption(_Filter.absent, 'Nghỉ', count: a.absent + a.notMarked + a.excused),
             SegmentOption(_Filter.upcoming, 'Sắp tới', count: a.upcoming),
           ],
         ),

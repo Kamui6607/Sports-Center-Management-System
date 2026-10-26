@@ -36,7 +36,10 @@ class AttendanceScreen extends ConsumerWidget {
           },
           children: [
             const AlertBanner.info(
-              message: 'Có mặt hoặc đi trễ được tính là tham gia. Dưới 80% sẽ bị cảnh báo; tiếp tục vắng có thể bị thu hồi chỗ và chặn đặt lại.',
+              message:
+                  'Có mặt hoặc đi trễ được tính là tham gia; vắng có phép không tính. '
+                  'Mỗi khóa xét ${ClassAttendanceStat.sampleWindow} buổi đã qua gần nhất, từ ${ClassAttendanceStat.minSample} buổi trở lên: '
+                  'dưới 80% sẽ bị cảnh báo; tiếp tục vắng có thể bị thu hồi chỗ và chặn đặt lại.',
             ),
             const SizedBox(height: AppSpacing.md),
             for (final p in penalties) ...[_PenaltyCard(penalty: p), const SizedBox(height: AppSpacing.sm)],
@@ -125,7 +128,9 @@ class _StatCard extends StatelessWidget {
                   children: [
                     Text(stat.className, style: context.text.bodyStrong),
                     Text(
-                      '${stat.total} buổi đã điểm danh',
+                      stat.counted < ClassAttendanceStat.minSample
+                          ? '${stat.counted} buổi tính chuyên cần · chưa đủ ${ClassAttendanceStat.minSample} buổi để xét cảnh báo'
+                          : '${stat.counted} buổi tính chuyên cần (${ClassAttendanceStat.sampleWindow} buổi gần nhất)',
                       style: context.text.caption.copyWith(color: context.colors.textMuted),
                     ),
                     if (stat.isWarning) ...[
