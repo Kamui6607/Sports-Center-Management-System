@@ -44,6 +44,14 @@ extension ShopOrderStatusLabel on ShopOrderStatus {
       this == ShopOrderStatus.notPickedUp;
 }
 
+/// Nhãn theo hình thức nhận: đơn tại quầy đã giao (đúng hạn hay trễ) đều là MỘT trạng thái "Đã nhận".
+StatusLabel orderStatusLabel(ShopOrderStatus status, {required bool pickup}) =>
+    status == ShopOrderStatus.completed && pickup ? const StatusLabel('Đã nhận', StatusTone.success) : status.status;
+
+extension ShopOrderDisplayStatus on ShopOrder {
+  StatusLabel get statusLabel => orderStatusLabel(status, pickup: isPickup);
+}
+
 extension FulfillmentTypeLabel on FulfillmentType {
   String get label => switch (this) {
     FulfillmentType.pickup => 'Nhận tại trung tâm',

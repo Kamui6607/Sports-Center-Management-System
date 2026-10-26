@@ -108,7 +108,16 @@ export const managerTransition = wrap(async (req, res) =>
 );
 export const verifyPickup = wrap(async (req, res) => sendSuccess(res, await orders.verifyPickupCode(req.body.code), "Pickup code valid"));
 export const confirmPickup = wrap(async (req, res) =>
-  sendSuccess(res, await orders.confirmPickup(req.user!, id(req), req.body.code, req.body.phoneLast4, req.body.cashCollected === true), "Order picked up")
+  sendSuccess(
+    res,
+    await orders.confirmPickup(req.user!, id(req), {
+      code: req.body.code,
+      phoneLast4: req.body.phoneLast4,
+      cashCollected: req.body.cashCollected === true,
+      manualReason: req.body.manualReason,
+    }),
+    "Order picked up"
+  )
 );
 export const remindRefundBank = wrap(async (req, res) =>
   sendSuccess(res, await orders.remindRefundBank(req.user!, id(req)), "Customer reminded")

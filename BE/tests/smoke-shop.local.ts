@@ -7,6 +7,8 @@
  * Luồng 1 PICKUP  : thêm giỏ → xem trước → checkout → mock-confirm → Manager "sẵn sàng" → quét mã + 4 số SĐT → COMPLETED → đánh giá.
  * Luồng 2 DELIVERY: thêm địa chỉ → mua ngay → mock-confirm → PROCESSING → SHIPPING (vận đơn) → DELIVERED → khách xác nhận → đánh giá.
  * Luồng 3 HẾT HẠN : checkout → (đẩy hạn về quá khứ) → chờ job của server (≤ 60s) → EXPIRED + nhả hàng.
+ * Luồng 4 NHẬN TRỄ: sẵn sàng → không đến lấy (hoàn chờ duyệt) → khách đến trễ → "Đã nhận", hủy hoàn, lấy lại hàng từ kệ.
+ * Luồng 5 KHÔNG MÃ: sẵn sàng → giao không mã (bắt buộc lý do) → "Đã nhận".
  *
  * Tạo người mua mới (tiền tố `smoke-shop-<RUN>`) + sản phẩm riêng; Manager dùng tài khoản seed manager@sportscenter.com.
  */
@@ -158,6 +160,34 @@ async function main() {
   step("nhả hàng: reserved 0, tồn 9", after.reservedStock === 0 && after.stockQuantity === 9, after);
   r = await api("GET", "/notifications", { token: member });
   step("có thông báo ORDER_UPDATED", (r.body.data ?? []).some((n: any) => n.type === "ORDER_UPDATED"), r.body.data?.map((n: any) => n.type));
+
+  console.log("\n▶ Luồng 4 — Quá hạn → khách nhận TRỄ (chung trạng thái \"Đã nhận\")");
+  const lateBuy = await checkout(member, { mode: "BUY_NOW", items: [{ productId: pGloves.id, quantity: 1 }], fulfillmentType: "PICKUP", recipientPhone: PHONE });
+  const o4 = lateBuy.res.body.data.order;
+  await api("POST", "/payments/sepay/mock-confirm", { token: member, body: { paymentId: lateBuy.res.body.data.checkout.paymentId } });
+  await api("POST", `/shop/manage/orders/${o4.id}/status`, { token: manager, body: { status: "READY_FOR_PICKUP" } });
+  r = await api("POST", `/shop/manage/orders/${o4.id}/status`, { token: manager, body: { status: "NOT_PICKED_UP" } });
+  step("Manager: không đến lấy ⇒ NOT_PICKED_UP + hoàn chờ duyệt", r.body.data?.status === "NOT_PICKED_UP" && r.body.data.refunds?.[0]?.status === "PENDING", r.body);
+  step("Manager thấy còn nhận trễ được", r.body.data?.pickup?.late === true && !!r.body.data.pickup.latePickupUntil, r.body.data?.pickup);
+  step("tồn găng trả lên kệ = 18", (await prisma.product.findUniqueOrThrow({ where: { id: pGloves.id } })).stockQuantity === 18);
+  const late = (await api("GET", `/shop/orders/${o4.id}`, { token: member })).body.data;
+  step("khách vẫn có mã + hạn nhận trễ", !!late.pickup?.code && !!late.pickup.latePickupUntil, late.pickup);
+  r = await api("GET", "/shop/manage/orders?queue=LATE_PICKUP&limit=50", { token: manager });
+  step("hàng đợi Nhận trễ có đơn", (r.body.data ?? []).some((o: any) => o.id === o4.id), r.body);
+  r = await api("POST", `/shop/manage/orders/${o4.id}/pickup`, { token: manager, body: { code: late.pickup.qrPayload, phoneLast4: PHONE.slice(-4) } });
+  step("giao trễ ⇒ COMPLETED, nhãn \"Đã nhận\"", r.body.data?.status === "COMPLETED" && r.body.data.statusLabel === "Đã nhận", r.body);
+  step("hoàn tiền bị hủy + biên nhận ghi người giao, trễ hạn", r.body.data?.refunds?.[0]?.status === "CANCELLED" && r.body.data.receipt?.late === true && !!r.body.data.receipt.handedOverBy, r.body.data);
+  step("lấy lại hàng từ kệ: tồn 17", (await prisma.product.findUniqueOrThrow({ where: { id: pGloves.id } })).stockQuantity === 17);
+
+  console.log("\n▶ Luồng 5 — Giao không mã (khách quên điện thoại)");
+  const manualBuy = await checkout(member, { mode: "BUY_NOW", items: [{ productId: pGloves.id, quantity: 1 }], fulfillmentType: "PICKUP", recipientPhone: PHONE });
+  const o5 = manualBuy.res.body.data.order;
+  await api("POST", "/payments/sepay/mock-confirm", { token: member, body: { paymentId: manualBuy.res.body.data.checkout.paymentId } });
+  await api("POST", `/shop/manage/orders/${o5.id}/status`, { token: manager, body: { status: "READY_FOR_PICKUP" } });
+  r = await api("POST", `/shop/manage/orders/${o5.id}/pickup`, { token: manager, body: { phoneLast4: PHONE.slice(-4) } });
+  step("không mã, không lý do ⇒ 400", r.status === 400, r.body);
+  r = await api("POST", `/shop/manage/orders/${o5.id}/pickup`, { token: manager, body: { phoneLast4: PHONE.slice(-4), manualReason: "Khách quên điện thoại, đã xem CCCD" } });
+  step("không mã + lý do ⇒ Đã nhận, đúng hạn", r.body.data?.status === "COMPLETED" && r.body.data.receipt?.late === false, r.body);
 }
 
 async function cleanup() {

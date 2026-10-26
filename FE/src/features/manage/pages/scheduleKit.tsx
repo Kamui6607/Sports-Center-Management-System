@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "../../../shared/api";
 import { allPages } from "../../../shared/pagedApi";
-import { DataTable, Dialog, Dl, Pill, QueryView, SchedulePill, clock, dateTime, get, num, str, vnDateKey, vnStartOf } from "../kit";
+import { DataTable, DetailColumns, DetailSection, Dialog, Dl, Pill, QueryView, SchedulePill, clock, dateTime, get, num, str, vnDateKey, vnStartOf } from "../kit";
 import type { Row } from "../kit";
 
 const WEEKDAYS = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "CN"];
@@ -113,70 +113,80 @@ export function ScheduleDetailDialog({ id, onClose }: { id: string; onClose: () 
     queryFn: ({ signal }) => allPages<Row>("GET /enrollments/schedule/{scheduleId}", { params: { scheduleId: id }, signal }),
   });
   return (
-    <Dialog title="Chi tiết buổi học" eyebrow="Lịch học" onClose={onClose} wide>
-      <QueryView q={q} rows={4}>
-        {(res) => {
-          const s = res.data;
-          const makeupFor = s.makeupFor as Row | null;
-          const makeup = s.makeup as Row | null;
-          return (
-            <>
-              <Dl
-                items={[
-                  ["Khóa học", <Link key="c" to={`/manager/classes/${str(get(s, "class.id") ?? s.classId)}`} onClick={onClose}>{str(get(s, "class.name"))}</Link>],
-                  ["HLV", str(get(s, "class.coach.user.fullName"))],
-                  ["Thời gian", `${dateTime(s.startTime)} → ${clock(s.endTime)}`],
-                  ["Phòng", <Link key="r" to={`/manager/rooms/${str(s.roomId)}`} onClick={onClose}>{str(get(s, "room.name"))}</Link>],
-                  ["Trạng thái", <SchedulePill key="s" status={s.status} />],
-                  ["Đã giữ chỗ", `${num(get(s, "_count.enrollments"))} / ${num(get(s, "class.capacity"))}`],
-                  ...(s.status === "CANCELLED"
-                    ? ([
-                        ["Lý do hủy", str(s.cancelReason) || "—"],
-                        ["Phương án", RESOLUTION[str(s.cancelResolution)] ?? "Hủy khi chưa có học viên"],
-                      ] as [string, string][])
-                    : []),
-                  ...(makeupFor ? ([["Dạy bù cho buổi", dateTime(makeupFor.startTime)]] as [string, string][]) : []),
-                  ...(makeup ? ([["Buổi dạy bù", `${dateTime(makeup.startTime)} (${makeup.status === "SCHEDULED" ? "đã lên lịch" : str(makeup.status)})`]] as [string, string][]) : []),
-                ]}
-              />
-              <div className="cr-alert info">
-                <div>Tạo, dời, hủy (dạy bù/hoàn tiền) và hoàn thành buổi do HLV phụ trách thực hiện trên ứng dụng. Quản lý theo dõi tại đây và chuyển phòng hàng loạt ở trang Phòng tập.</div>
-              </div>
-            </>
-          );
-        }}
-      </QueryView>
-      <h3 style={{ margin: "6px 0 0", fontSize: 15, fontWeight: 600 }}>Học viên</h3>
-      <QueryView q={e} rows={3}>
-        {(res) => (
-          <DataTable
-            rows={res.data}
-            empty={<p className="cr-muted" style={{ margin: 0 }}>Chưa có học viên giữ chỗ.</p>}
-            columns={[
-              {
-                key: "n",
-                title: "Học viên",
-                render: (r) => (
-                  <div className="cr-cell-main">
-                    <strong>{str(get(r, "member.user.fullName"))}</strong>
-                    <small>{str(get(r, "member.user.email"))}</small>
+    <Dialog title="Chi tiết buổi học" eyebrow="Lịch học" onClose={onClose} size="detail">
+      <DetailColumns
+        main={
+          <QueryView q={q} rows={4}>
+            {(res) => {
+              const s = res.data;
+              const makeupFor = s.makeupFor as Row | null;
+              const makeup = s.makeup as Row | null;
+              return (
+                <>
+                  <DetailSection title="Thông tin buổi">
+                    <Dl
+                      compact
+                      items={[
+                        ["Khóa học", <Link key="c" to={`/manager/classes/${str(get(s, "class.id") ?? s.classId)}`} onClick={onClose}>{str(get(s, "class.name"))}</Link>],
+                        ["HLV", str(get(s, "class.coach.user.fullName"))],
+                        ["Thời gian", `${dateTime(s.startTime)} → ${clock(s.endTime)}`],
+                        ["Phòng", <Link key="r" to={`/manager/rooms/${str(s.roomId)}`} onClick={onClose}>{str(get(s, "room.name"))}</Link>],
+                        ["Trạng thái", <SchedulePill key="s" status={s.status} />],
+                        ["Đã giữ chỗ", `${num(get(s, "_count.enrollments"))} / ${num(get(s, "class.capacity"))}`],
+                        ...(s.status === "CANCELLED"
+                          ? ([
+                              ["Lý do hủy", str(s.cancelReason) || "—"],
+                              ["Phương án", RESOLUTION[str(s.cancelResolution)] ?? "Hủy khi chưa có học viên"],
+                            ] as [string, string][])
+                          : []),
+                        ...(makeupFor ? ([["Dạy bù cho buổi", dateTime(makeupFor.startTime)]] as [string, string][]) : []),
+                        ...(makeup ? ([["Buổi dạy bù", `${dateTime(makeup.startTime)} (${makeup.status === "SCHEDULED" ? "đã lên lịch" : str(makeup.status)})`]] as [string, string][]) : []),
+                      ]}
+                    />
+                  </DetailSection>
+                  <div className="cr-alert info">
+                    <div>Tạo, dời, hủy (dạy bù/hoàn tiền) và hoàn thành buổi do HLV phụ trách thực hiện trên ứng dụng. Quản lý theo dõi tại đây và chuyển phòng hàng loạt ở trang Phòng tập.</div>
                   </div>
-                ),
-              },
-              { key: "p", title: "Điện thoại", render: (r) => <span className="cr-mono">{str(get(r, "member.user.phone")) || "—"}</span> },
-              {
-                key: "s",
-                title: "Trạng thái",
-                render: (r) => {
-                  const [t, l] = ENROLL[str(r.status)] ?? ["info", str(r.status)];
-                  return <Pill tone={t}>{l}</Pill>;
-                },
-              },
-              { key: "b", title: "Giữ chỗ lúc", render: (r) => dateTime(r.bookedAt) },
-            ]}
-          />
-        )}
-      </QueryView>
+                </>
+              );
+            }}
+          </QueryView>
+        }
+        side={
+          <DetailSection title="Học viên">
+            <QueryView q={e} rows={3}>
+              {(res) => (
+                <DataTable
+                  rows={res.data}
+                  empty={<p className="cr-muted" style={{ margin: 0 }}>Chưa có học viên giữ chỗ.</p>}
+                  columns={[
+                    {
+                      key: "n",
+                      title: "Học viên",
+                      render: (r) => (
+                        <div className="cr-cell-main">
+                          <strong>{str(get(r, "member.user.fullName"))}</strong>
+                          <small>{str(get(r, "member.user.email"))}</small>
+                        </div>
+                      ),
+                    },
+                    { key: "p", title: "Điện thoại", render: (r) => <span className="cr-mono">{str(get(r, "member.user.phone")) || "—"}</span> },
+                    {
+                      key: "s",
+                      title: "Trạng thái",
+                      render: (r) => {
+                        const [t, l] = ENROLL[str(r.status)] ?? ["info", str(r.status)];
+                        return <Pill tone={t}>{l}</Pill>;
+                      },
+                    },
+                    { key: "b", title: "Giữ chỗ lúc", render: (r) => dateTime(r.bookedAt) },
+                  ]}
+                />
+              )}
+            </QueryView>
+          </DetailSection>
+        }
+      />
     </Dialog>
   );
 }

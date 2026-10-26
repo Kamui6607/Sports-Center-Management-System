@@ -7,6 +7,9 @@ import {
   PERIOD_OPTIONS,
   ConfirmDialog,
   DataTable,
+  DetailColumns,
+  DetailSection,
+  DetailTotal,
   Dialog,
   Dl,
   ErrorBox,
@@ -38,10 +41,10 @@ const STATUS_LABEL: Record<string, string> = {
   READY_FOR_PICKUP: "Sẵn sàng nhận",
   SHIPPING: "Đang giao",
   DELIVERED: "Đã giao",
-  COMPLETED: "Hoàn tất",
+  COMPLETED: "Hoàn tất / Đã nhận",
   EXPIRED: "Hết hạn",
   CANCELLED: "Đã hủy",
-  NOT_PICKED_UP: "Không đến lấy",
+  NOT_PICKED_UP: "Quá hạn nhận",
   REFUND_REQUESTED: "Chờ hoàn tiền",
   REFUNDED: "Đã hoàn tiền",
 };
@@ -61,6 +64,8 @@ const TONE: Record<string, "ok" | "warn" | "bad" | "info"> = {
 };
 const QUEUE_LABEL: Record<string, string> = {
   PICKUP_TODAY: "Khách hẹn lấy hôm nay",
+  AWAITING_PICKUP: "Chờ khách nhận tại quầy",
+  LATE_PICKUP: "Quá hạn — còn nhận trễ được",
   REFUND_PENDING: "Đang chờ hoàn tiền",
   STALE_REFUND: "Hoàn tiền tồn đọng",
 };
@@ -76,7 +81,10 @@ const REFUND_STATUS: Record<string, [string, "ok" | "warn" | "bad" | "info"]> = 
   REJECTED: ["Từ chối", "bad"],
   CANCELLED: ["Đã hủy", "info"],
 };
-const statusPill = (s: unknown) => <Pill tone={TONE[str(s)] ?? "info"}>{STATUS_LABEL[str(s)] ?? str(s)}</Pill>;
+/** Đơn tại quầy đã giao (đúng hạn hay trễ) ⇒ một trạng thái "Đã nhận"; đơn giao tận nơi hoàn tất ⇒ "Hoàn tất". */
+const statusText = (s: unknown, fulfillment?: unknown) =>
+  str(s) === "COMPLETED" ? (str(fulfillment) === "PICKUP" ? "Đã nhận" : "Hoàn tất") : (STATUS_LABEL[str(s)] ?? str(s));
+const statusPill = (s: unknown, fulfillment?: unknown) => <Pill tone={TONE[str(s)] ?? "info"}>{statusText(s, fulfillment)}</Pill>;
 const payLabel = (r: Row) =>
   r.paymentMethod === "CASH" ? (r.isPaid ? "Tiền mặt tại quầy · đã thu" : "Trả tại quầy · chưa thu") : r.isPaid ? "Chuyển khoản · đã trả" : "Chuyển khoản";
 
@@ -172,7 +180,7 @@ export default function OrdersPage() {
                       const refund = r.pendingRefund as Row | null | undefined;
                       return (
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {statusPill(r.status)}
+                          {statusPill(r.status, r.fulfillmentType)}
                           {refund?.isStale ? <Tag tone="bad">Tồn đọng</Tag> : null}
                           {refund?.awaitingBankInfo ? <Tag tone="warn">Chờ STK</Tag> : null}
                         </div>
@@ -211,6 +219,8 @@ function OrderDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const [invoiceId, setInvoiceId] = useState("");
   const [last4, setLast4] = useState("");
   const [cashCollected, setCashCollected] = useState(false);
+  const [noCode, setNoCode] = useState(false);
+  const [manualReason, setManualReason] = useState("");
   const refresh = () => {
     void cache.invalidateQueries({ queryKey: ["admin", "orders"] });
     void cache.invalidateQueries({ queryKey: ["admin", "refunds"] });
@@ -231,7 +241,11 @@ function OrderDialog({ id, onClose }: { id: string; onClose: () => void }) {
     mutationFn: () =>
       api("POST /shop/manage/orders/{id}/pickup", {
         params: { id },
-        body: { code: code.trim(), phoneLast4: last4.trim(), ...(cashCollected ? { cashCollected: true } : {}) },
+        body: {
+          phoneLast4: last4.trim(),
+          ...(manual ? { manualReason: manualReason.trim() } : { code: code.trim() }),
+          ...(cashCollected ? { cashCollected: true } : {}),
+        },
       }),
     onSuccess: refresh,
   });
@@ -239,170 +253,295 @@ function OrderDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const allowed = ((o?.allowedTransitions as Row[] | undefined) ?? []).map((t) => [str(t.status), str(t.label), Boolean(t.requiresTrackingCode)] as const);
   const busy = transition.isPending || pickup.isPending;
   const pickupInfo = o?.pickup as Row | null | undefined;
+  const lateInfo = Boolean(pickupInfo?.late);
   const needCash = Boolean(pickupInfo?.requiresCashCollection);
   const amountDue = Number(o?.amountDueAtCounter ?? 0);
   const refunds = (o?.refunds as Row[] | undefined) ?? [];
+  const history = (o?.history as Row[] | undefined) ?? [];
+  const receipt = o?.receipt as Row | null | undefined;
   const noShows = Number(get(o, "buyer.noShowCount") ?? 0);
   const cashLock = get(o, "buyer.cashPickupLockedUntil");
   const reasonOk = reason.trim().length >= 3;
+  const isPickup = o?.fulfillmentType !== "DELIVERY";
+  // Đơn quá hạn cũ đã bị xóa mã ⇒ chỉ giao được theo cách "không mã".
+  const codeGone = pickupInfo?.hasCode === false;
+  const manual = noCode || codeGone;
+  const pickupReady = manual ? manualReason.trim().length >= 5 : code.trim().length >= 6;
+  const pickupLocked = pickupInfo?.lockedUntil ? dateTime(pickupInfo.lockedUntil) : "";
+  const pendingLateRefund = refunds.find((r) => r.status === "PENDING");
+
+  const customer = o ? (
+    <DetailSection title="Khách hàng & nhận hàng">
+      <Dl
+        compact
+        items={[
+          [
+            "Người mua",
+            <span key="buyer">
+              {[get(o, "buyer.fullName"), get(o, "buyer.phone")].filter(Boolean).map(str).join(" · ")}
+              {noShows > 0 || cashLock ? (
+                <span style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                  {noShows > 0 ? <Tag tone={noShows >= 2 ? "bad" : "warn"}>Bùng hàng {noShows} lần / 90 ngày</Tag> : null}
+                  {cashLock ? <Tag tone="bad">Khóa trả tại quầy tới {dateOnly(cashLock)}</Tag> : null}
+                </span>
+              ) : null}
+            </span>,
+          ],
+          ["Người nhận", [o.recipientName, o.recipientPhone].filter(Boolean).map(str).join(" · ")],
+          ["Hình thức", isPickup ? "Nhận tại quầy" : "Giao tận nơi"],
+          ...((isPickup
+            ? [
+                [
+                  "Ngày hẹn lấy",
+                  o.preferredPickupDate
+                    ? `${dateOnly(`${str(o.preferredPickupDate)}T00:00:00+07:00`)}${Number(o.pickupRescheduleCount) > 0 ? " (khách đã đổi ngày)" : ""}`
+                    : "",
+                ],
+                ["Hạn nhận hàng", o.pickupDeadline ? dateTime(o.pickupDeadline) : ""],
+              ]
+            : [
+                ["Địa chỉ giao", str(o.shippingAddress)],
+                ["Mã vận đơn", [o.carrier, o.trackingCode].filter(Boolean).map(str).join(" · ")],
+              ]) as [string, ReactNode][]),
+          ["Đặt lúc", dateTime(o.createdAt)],
+          ...(o.note ? ([["Ghi chú", str(o.note)]] as [string, ReactNode][]) : []),
+        ]}
+      />
+    </DetailSection>
+  ) : null;
+
+  const products = o ? (
+    <DetailSection title={`Sản phẩm (${num(o.itemCount)})`}>
+      <DataTable
+        rows={(o.items as Row[] | undefined) ?? []}
+        label="Dòng hàng"
+        columns={[
+          { key: "n", title: "Sản phẩm", render: (r) => str(r.productName) },
+          { key: "q", title: "SL", className: "num", render: (r) => num(r.quantity) },
+          { key: "p", title: "Đơn giá lúc đặt", className: "num", render: (r) => vnd(r.unitPrice) },
+          { key: "t", title: "Thành tiền", className: "num", render: (r) => vnd(r.totalAmount) },
+        ]}
+      />
+    </DetailSection>
+  ) : null;
+
+  const timeline =
+    o && history.length > 0 ? (
+      <DetailSection>
+        <details>
+          <summary>Lịch sử trạng thái ({history.length})</summary>
+          <ol className="cr-timeline">
+            {history.map((h) => (
+              <li key={str(h.id)}>
+                <time>{dateTime(h.createdAt)}</time>
+                <div>
+                  {str(h.label)}
+                  <small>{[h.bySystem ? "Hệ thống" : h.byCustomer ? "Khách" : "Quản lý", str(h.reason)].filter(Boolean).join(" · ")}</small>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </details>
+      </DetailSection>
+    ) : null;
+
+  const money = o ? (
+    <DetailSection>
+      <DetailTotal
+        label="Tổng tiền"
+        value={vnd(o.totalPrice)}
+        extra={statusPill(o.status, o.fulfillmentType)}
+        rows={[
+          ["Tạm tính", vnd(o.subtotal)],
+          ["Phí giao", vnd(o.shippingFee)],
+        ]}
+      />
+    </DetailSection>
+  ) : null;
+
+  const payment = o ? (
+    <DetailSection title="Thanh toán">
+      <Dl
+        compact
+        items={[
+          ["Phương thức", payLabel(o)],
+          ["Số tiền", o.payment ? vnd(get(o, "payment.amount")) : amountDue > 0 ? `${vnd(amountDue)} — thu khi nhận` : ""],
+          ["Trạng thái", str(get(o, "payment.status")) ? <PaymentPill key="pay" status={get(o, "payment.status")} /> : amountDue > 0 ? <Pill tone="warn">Chưa thu</Pill> : ""],
+          ["Thời điểm trả", get(o, "payment.paidAt") ? dateTime(get(o, "payment.paidAt")) : ""],
+          ["Mã giao dịch", str(get(o, "payment.transactionCode"))],
+        ].filter(([, v]) => v !== "") as [string, ReactNode][]}
+      />
+      {get(o, "payment.requiresReview") ? (
+        <p className="cr-muted" style={{ margin: "8px 0 0" }}>
+          Giao dịch cần đối soát: {str(get(o, "payment.reviewReason"))}
+        </p>
+      ) : null}
+      <div className="cr-btn-row" style={{ marginTop: 10 }}>
+        {get(o, "payment.id") ? (
+          <button className="cr-btn sm" onClick={() => setInvoiceId(str(get(o, "payment.id")))}>
+            Xem hóa đơn {str(o.status) === "REFUNDED" ? "(Đã hoàn tiền)" : str(o.status) === "CANCELLED" ? "(Đã hủy)" : ""}
+          </button>
+        ) : null}
+        <a className="cr-btn sm" href="/manager/revenue" target="_blank" rel="noreferrer" title="Mở lịch sử thanh toán trong Doanh thu">
+          Lịch sử thanh toán ↗
+        </a>
+        {refunds.length > 0 || str(o.status) === "REFUNDED" || str(o.status) === "REFUND_REQUESTED" ? (
+          <a className="cr-btn sm" href="/manager/refunds" target="_blank" rel="noreferrer" title="Mở danh sách hoàn tiền">
+            Lịch sử hoàn tiền ↗
+          </a>
+        ) : null}
+      </div>
+      {invoiceId ? <InvoiceDialog id={invoiceId} onClose={() => setInvoiceId("")} /> : null}
+    </DetailSection>
+  ) : null;
+
+  const receiptBlock = receipt ? (
+    <DetailSection title="Đã nhận tại quầy" tone="accent">
+      <Dl
+        compact
+        items={[
+          ["Nhận lúc", dateTime(receipt.receivedAt)],
+          ["Người giao", str(get(receipt, "handedOverBy.fullName"))],
+          ["Đúng hạn?", receipt.late ? <Tag tone="warn">Nhận trễ hạn</Tag> : <Tag tone="ok">Đúng hạn</Tag>],
+          ["Ghi chú", str(receipt.note)],
+        ]}
+      />
+    </DetailSection>
+  ) : null;
+
+  const pickupBlock =
+    o && pickupInfo ? (
+      <DetailSection title={lateInfo ? "Khách đến nhận trễ" : needCash ? "Thu tiền & đánh dấu Đã nhận" : "Đánh dấu Đã nhận"} tone={lateInfo ? "warn" : "accent"}>
+        {lateInfo ? (
+          <p className="cr-muted" style={{ margin: "0 0 10px" }}>
+            Đơn đã quá hạn nhận nhưng còn giao được tới <b>{dateTime(pickupInfo.latePickupUntil)}</b>. Khi giao, hàng được lấy lại từ kệ
+            {pendingLateRefund ? `, yêu cầu hoàn ${vnd(pendingLateRefund.amount)} đang chờ sẽ bị hủy` : ""}; lần bùng hàng vẫn được tính.
+          </p>
+        ) : (
+          <p className="cr-muted" style={{ margin: "0 0 10px" }}>
+            Hạn nhận {dateTime(pickupInfo.deadline)} · đúng hạn hay trễ đều chuyển sang "Đã nhận".
+          </p>
+        )}
+        <div className="cr-form">
+          {manual ? (
+            <Field label="Lý do giao không mã" required hint="VD: khách quên điện thoại, đã xem CCCD">
+              <input value={manualReason} onChange={(e) => setManualReason(e.target.value)} maxLength={300} />
+            </Field>
+          ) : (
+            <Field label="Mã nhận hàng" required>
+              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Mã/QR khách xuất trình" />
+            </Field>
+          )}
+          <Field label="4 số cuối SĐT người nhận" required>
+            <input value={last4} inputMode="numeric" maxLength={4} onChange={(e) => setLast4(e.target.value.replace(/\D/g, ""))} />
+          </Field>
+          {codeGone ? (
+            <p className="cr-muted wide" style={{ margin: 0 }}>
+              Mã nhận hàng của đơn đã hết hiệu lực — đối chiếu SĐT + giấy tờ và ghi lý do.
+            </p>
+          ) : (
+            <label className="wide" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={noCode} onChange={(e) => setNoCode(e.target.checked)} />
+              Khách không có mã — đối chiếu giấy tờ
+            </label>
+          )}
+          {needCash && (
+            <label className="wide" style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 600 }}>
+              <input type="checkbox" checked={cashCollected} onChange={(e) => setCashCollected(e.target.checked)} />
+              Đã thu đủ {vnd(amountDue)} tiền mặt của khách
+            </label>
+          )}
+        </div>
+        <div className="cr-btn-row" style={{ marginTop: 10 }}>
+          <button className="cr-btn primary" disabled={busy || !pickupReady || last4.length !== 4 || (needCash && !cashCollected)} onClick={() => pickup.mutate()}>
+            {pickup.isPending ? "Đang xác nhận…" : needCash ? `Đã thu ${vnd(amountDue)} — Đã nhận` : "Đánh dấu Đã nhận"}
+          </button>
+          {pickupLocked ? <Tag tone="bad">Tạm khóa tới {pickupLocked}</Tag> : null}
+        </div>
+        {pickup.error ? <ErrorBox error={pickup.error} /> : null}
+      </DetailSection>
+    ) : null;
+
+  const transitions =
+    allowed.length > 0 ? (
+      <DetailSection title="Chuyển trạng thái">
+        <div className="cr-form">
+          {allowed.some(([, , needTrack]) => needTrack) && (
+            <>
+              <Field label="Mã vận đơn" hint="Bắt buộc khi chuyển sang Đang giao">
+                <input value={tracking} onChange={(e) => setTracking(e.target.value)} />
+              </Field>
+              <Field label="Đơn vị vận chuyển">
+                <input value={carrier} onChange={(e) => setCarrier(e.target.value)} placeholder="VD: GHN, GHTK" />
+              </Field>
+            </>
+          )}
+          <Field
+            label="Ghi chú / lý do"
+            wide
+            hint={allowed.some(([st]) => st === "REFUND_REQUESTED") ? "Bắt buộc khi hủy & hoàn tiền — khách nhận được lý do này." : undefined}
+          >
+            <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
+          </Field>
+        </div>
+        <div className="cr-btn-row" style={{ marginTop: 10 }}>
+          {allowed.map(([status, label, needTrack]) => (
+            <button
+              key={status}
+              className={"cr-btn " + (["REFUND_REQUESTED", "NOT_PICKED_UP", "CANCELLED"].includes(status) ? "danger" : "primary")}
+              disabled={busy || (needTrack && tracking.trim().length < 3) || (status === "REFUND_REQUESTED" && !reasonOk)}
+              onClick={() => transition.mutate(status)}
+            >
+              {status === "REFUND_REQUESTED" ? "Hủy & hoàn tiền" : status === "CANCELLED" ? "Hủy đơn" : status === "NOT_PICKED_UP" ? "Khách không đến lấy" : label}
+            </button>
+          ))}
+        </div>
+        {transition.error ? <ErrorBox error={transition.error} /> : null}
+      </DetailSection>
+    ) : null;
+
+  const refundBlock =
+    refunds.length > 0 ? (
+      <DetailSection title="Hoàn tiền">
+        {refunds.map((r) => (
+          <RefundBlock key={str(r.id)} orderId={id} refund={r} onDone={refresh} />
+        ))}
+      </DetailSection>
+    ) : null;
+
   return (
-    <Dialog title={o ? `Đơn ${str(o.code)}` : "Đơn hàng"} eyebrow={o ? STATUS_LABEL[str(o.status)] : undefined} onClose={onClose} busy={busy} wide>
+    <Dialog
+      title={o ? `Đơn ${str(o.code)}` : "Đơn hàng"}
+      eyebrow={o ? `${isPickup ? "Nhận tại quầy" : "Giao tận nơi"} · ${payLabel(o)}` : undefined}
+      badge={o ? statusPill(o.status, o.fulfillmentType) : undefined}
+      onClose={onClose}
+      busy={busy}
+      size="detail"
+    >
       {q.isPending ? (
         <Skeleton rows={6} />
       ) : q.isError ? (
         <ErrorBox error={q.error} retry={() => q.refetch()} />
       ) : o ? (
-        <>
-          <Dl
-            items={[
-              [
-                "Người mua",
-                <span key="buyer">
-                  {[get(o, "buyer.fullName"), get(o, "buyer.phone")].filter(Boolean).map(str).join(" · ")}
-                  {noShows > 0 ? (
-                    <>
-                      {" "}
-                      <Tag tone={noShows >= 2 ? "bad" : "warn"}>Bùng hàng {noShows} lần / 90 ngày</Tag>
-                    </>
-                  ) : null}
-                  {cashLock ? (
-                    <>
-                      {" "}
-                      <Tag tone="bad">Khóa trả tại quầy tới {dateOnly(cashLock)}</Tag>
-                    </>
-                  ) : null}
-                </span>,
-              ],
-              ["Người nhận", [o.recipientName, o.recipientPhone].filter(Boolean).map(str).join(" · ")],
-              ["Hình thức", o.fulfillmentType === "DELIVERY" ? "Giao tận nơi" : "Nhận tại quầy"],
-              ["Địa chỉ giao", str(o.shippingAddress)],
-              [
-                "Ngày hẹn lấy",
-                o.preferredPickupDate
-                  ? `${dateOnly(`${str(o.preferredPickupDate)}T00:00:00+07:00`)}${Number(o.pickupRescheduleCount) > 0 ? " (khách đã đổi ngày)" : ""}`
-                  : "",
-              ],
-              ["Hạn nhận hàng", o.pickupDeadline ? dateTime(o.pickupDeadline) : ""],
-              ["Tạm tính", vnd(o.subtotal)],
-              ["Phí giao", vnd(o.shippingFee)],
-              ["Tổng tiền", vnd(o.totalPrice)],
-              ["Trạng thái", statusPill(o.status)],
-              ["Mã vận đơn", [o.carrier, o.trackingCode].filter(Boolean).map(str).join(" · ")],
-              ["Ghi chú", str(o.note)],
-            ].filter(([, v]) => v !== "") as [string, ReactNode][]}
-          />
-          <Panel title="Thanh toán">
-            <Dl
-              items={[
-                ["Phương thức", payLabel(o)],
-                ["Số tiền", o.payment ? vnd(get(o, "payment.amount")) : amountDue > 0 ? `${vnd(amountDue)} — thu khi khách nhận hàng` : ""],
-                ["Trạng thái", str(get(o, "payment.status")) ? <PaymentPill key="pay" status={get(o, "payment.status")} /> : amountDue > 0 ? <Pill tone="warn">Chưa thu</Pill> : ""],
-                ["Thời điểm trả", get(o, "payment.paidAt") ? dateTime(get(o, "payment.paidAt")) : ""],
-                ["Mã giao dịch", str(get(o, "payment.transactionCode"))],
-              ].filter(([, v]) => v !== "") as [string, ReactNode][]}
-            />
-            {get(o, "payment.id") ? (
-              <button className="cr-btn sm" style={{ marginTop: 8 }} onClick={() => setInvoiceId(str(get(o, "payment.id")))}>
-                Xem hóa đơn {str(o.status) === "REFUNDED" ? "(Đã hoàn tiền)" : str(o.status) === "CANCELLED" ? "(Đã hủy)" : ""}
-              </button>
-            ) : null}
-            <a className="cr-btn sm" style={{ marginTop: 8, marginLeft: 8 }} href="/manager/revenue" target="_blank" rel="noreferrer" title="Mở lịch sử thanh toán trong Doanh thu">
-              Lịch sử thanh toán & doanh thu ↗
-            </a>
-            {refunds.length > 0 || str(o.status) === "REFUNDED" || str(o.status) === "REFUND_REQUESTED" ? (
-              <a className="cr-btn sm" style={{ marginTop: 8, marginLeft: 8 }} href="/manager/refunds" target="_blank" rel="noreferrer" title="Mở danh sách hoàn tiền">
-                Lịch sử hoàn tiền ↗
-              </a>
-            ) : null}
-            {invoiceId ? <InvoiceDialog id={invoiceId} onClose={() => setInvoiceId("")} /> : null}
-            {get(o, "payment.requiresReview") ? (
-              <p className="cr-muted" style={{ marginTop: 8 }}>
-                Giao dịch cần đối soát: {str(get(o, "payment.reviewReason"))}
-              </p>
-            ) : null}
-          </Panel>
-          {refunds.length > 0 && (
-            <Panel title="Hoàn tiền">
-              {refunds.map((r) => (
-                <RefundBlock key={str(r.id)} orderId={id} refund={r} onDone={refresh} />
-              ))}
-            </Panel>
-          )}
-          <Panel title="Sản phẩm">
-            <DataTable
-              rows={(o.items as Row[] | undefined) ?? []}
-              label="Dòng hàng"
-              columns={[
-                { key: "n", title: "Sản phẩm", render: (r) => str(r.productName) },
-                { key: "q", title: "SL", className: "num", render: (r) => num(r.quantity) },
-                { key: "p", title: "Đơn giá lúc đặt", className: "num", render: (r) => vnd(r.unitPrice) },
-                { key: "t", title: "Thành tiền", className: "num", render: (r) => vnd(r.totalAmount) },
-              ]}
-            />
-          </Panel>
-          {o.status === "READY_FOR_PICKUP" && (
-            <Panel title={needCash ? "Thu tiền & giao hàng tại quầy" : "Xác nhận khách nhận hàng tại quầy"}>
-              <div className="cr-form">
-                <Field label="Mã nhận hàng" required>
-                  <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Mã/QR khách xuất trình" />
-                </Field>
-                <Field label="4 số cuối SĐT người nhận" required>
-                  <input value={last4} inputMode="numeric" maxLength={4} onChange={(e) => setLast4(e.target.value.replace(/\D/g, ""))} />
-                </Field>
-                {needCash && (
-                  <label className="wide" style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 600 }}>
-                    <input type="checkbox" checked={cashCollected} onChange={(e) => setCashCollected(e.target.checked)} />
-                    Đã thu đủ {vnd(amountDue)} tiền mặt của khách
-                  </label>
-                )}
-              </div>
-              <button
-                className="cr-btn primary"
-                disabled={busy || code.trim().length < 6 || last4.length !== 4 || (needCash && !cashCollected)}
-                onClick={() => pickup.mutate()}
-              >
-                {needCash ? `Đã thu ${vnd(amountDue)} — Giao hàng` : "Xác nhận đã giao hàng"}
-              </button>
-              {pickup.error ? <ErrorBox error={pickup.error} /> : null}
-            </Panel>
-          )}
-          {allowed.length > 0 && (
-            <Panel title="Chuyển trạng thái">
-              <div className="cr-form">
-                {allowed.some(([, , needTrack]) => needTrack) && (
-                  <>
-                    <Field label="Mã vận đơn" hint="Bắt buộc khi chuyển sang Đang giao">
-                      <input value={tracking} onChange={(e) => setTracking(e.target.value)} />
-                    </Field>
-                    <Field label="Đơn vị vận chuyển">
-                      <input value={carrier} onChange={(e) => setCarrier(e.target.value)} placeholder="VD: GHN, GHTK" />
-                    </Field>
-                  </>
-                )}
-                <Field
-                  label="Ghi chú / lý do"
-                  wide
-                  hint={allowed.some(([st]) => st === "REFUND_REQUESTED") ? "Bắt buộc khi hủy & hoàn tiền — khách nhận được lý do này." : undefined}
-                >
-                  <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
-                </Field>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {allowed.map(([status, label, needTrack]) => (
-                  <button
-                    key={status}
-                    className={"cr-btn " + (["REFUND_REQUESTED", "NOT_PICKED_UP", "CANCELLED"].includes(status) ? "danger" : "primary")}
-                    disabled={busy || (needTrack && tracking.trim().length < 3) || (status === "REFUND_REQUESTED" && !reasonOk)}
-                    onClick={() => transition.mutate(status)}
-                  >
-                    {status === "REFUND_REQUESTED" ? "Hủy & hoàn tiền" : status === "CANCELLED" ? "Hủy đơn" : label}
-                  </button>
-                ))}
-              </div>
-              {transition.error ? <ErrorBox error={transition.error} /> : null}
-            </Panel>
-          )}
-        </>
+        <DetailColumns
+          main={
+            <>
+              {customer}
+              {products}
+              {refundBlock}
+              {timeline}
+            </>
+          }
+          side={
+            <>
+              {money}
+              {receiptBlock}
+              {pickupBlock}
+              {transitions}
+              {payment}
+            </>
+          }
+        />
       ) : null}
     </Dialog>
   );
@@ -451,7 +590,7 @@ function RefundBlock({ orderId, refund: r, onDone }: { orderId: string; refund: 
   const fee = Number(r.feePercent ?? 0);
   const transferBlocked = payout === "BANK_TRANSFER" && !r.hasBankInfo;
   return (
-    <div style={{ borderTop: "1px solid var(--line, rgba(127,127,127,.2))", paddingTop: 12, marginTop: 12 }}>
+    <div className="cr-refund-item">
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
         <strong>{vnd(r.amount)}</strong>
         <Pill tone={statusTone}>{statusLabel}</Pill>
@@ -459,6 +598,7 @@ function RefundBlock({ orderId, refund: r, onDone }: { orderId: string; refund: 
         {r.isStale ? <Tag tone="bad">Tồn đọng {num(r.pendingDays)} ngày</Tag> : pending && r.pendingDays != null ? <Tag>Chờ {num(r.pendingDays)} ngày</Tag> : null}
       </div>
       <Dl
+        compact
         items={[
           ["Giá trị gốc", fee > 0 ? `${vnd(r.grossAmount)} − ${fee}% phí giữ hàng` : ""],
           ["Ghi chú", str(r.note)],

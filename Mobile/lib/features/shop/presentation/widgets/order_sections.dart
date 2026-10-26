@@ -30,7 +30,7 @@ class OrderHeaderCard extends StatelessWidget {
               Expanded(
                 child: Text('Đơn hàng', style: context.text.small.copyWith(color: context.colors.textMuted)),
               ),
-              o.status.status.tag(),
+              o.statusLabel.tag(),
             ],
           ),
           CopyableField(label: 'Mã đơn', value: o.code, emphasize: true),
@@ -156,7 +156,7 @@ class OrderTimeline extends StatelessWidget {
       entries: [
         for (final h in order.history.reversed)
           TimelineEntry(
-            title: h.toStatus.status.label,
+            title: orderStatusLabel(h.toStatus, pickup: order.isPickup).label,
             subtitle: [
               VnTime.dateTime(h.at),
               if (h.bySystem) 'Hệ thống' else if (h.byCustomer) 'Bạn' else 'Trung tâm',
@@ -219,7 +219,6 @@ class OrderRefundsCard extends StatelessWidget {
   );
 }
 
-
 /// Thẻ thanh toán & hóa đơn gắn với đơn hàng.
 /// Cung cấp lối tắt trực tiếp tới hóa đơn thanh toán tương ứng và lịch sử thanh toán,
 /// đồng thời đánh dấu rõ ràng trạng thái ĐÃ HỦY hoặc ĐÃ HOÀN TIỀN khi đơn bị hủy/hoàn.
@@ -258,7 +257,10 @@ class OrderPaymentCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text('Trạng thái thanh toán', style: context.text.small.copyWith(color: context.colors.textMuted)),
+                child: Text(
+                  'Trạng thái thanh toán',
+                  style: context.text.small.copyWith(color: context.colors.textMuted),
+                ),
               ),
               statusTag,
             ],
@@ -270,9 +272,7 @@ class OrderPaymentCard extends StatelessWidget {
             InfoRow(icon: AppIcons.check, text: 'Cần trả tại quầy: ${Money.format(o.amountDueAtCounter)}'),
           if (isCancelled) ...[
             const SizedBox(height: AppSpacing.xs),
-            const AlertBanner.error(
-              message: 'Đơn hàng đã bị hủy. Hóa đơn tương ứng được đánh dấu ĐÃ HỦY.',
-            ),
+            const AlertBanner.error(message: 'Đơn hàng đã bị hủy. Hóa đơn tương ứng được đánh dấu ĐÃ HỦY.'),
           ] else if (isRefunded || isPartiallyRefunded) ...[
             const SizedBox(height: AppSpacing.xs),
             AlertBanner.warning(

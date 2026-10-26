@@ -6,10 +6,11 @@ import { AdminLogin, NotManager, ResetPasswordScreen } from "../manage/AuthScree
 import { ErrorBox, Skeleton } from "../manage/kit";
 
 const ManagerLayout = lazy(() => import("../manage/ManagerLayout").then((m) => ({ default: m.ManagerLayout })));
+const GymLanding = lazy(() => import("../landing/GymLanding"));
 
 /**
  * Web chỉ phục vụ MANAGER (Member/Coach dùng Mobile). Vai trò lấy từ `GET /auth/me` của BE, không tự giải mã JWT.
- * Landing/Member/Coach/Reception giữ source nhưng không còn nằm trong luồng của Web quản trị.
+ * `/` là trang giới thiệu phòng gym (công khai); Member/Coach/Reception cũ giữ source nhưng không còn trong luồng Web.
  */
 export function Session() {
   const { pathname, search } = useLocation();
@@ -64,7 +65,13 @@ export function Session() {
     }
   }
 
-  if (pathname === "/reset-password") return <ResetPasswordScreen />;
+  if (pathname === "/reset-password" || pathname === "/forgot-password") return <ResetPasswordScreen />;
+  if (pathname === "/")
+    return (
+      <Suspense fallback={null}>
+        <GymLanding signedIn={session} />
+      </Suspense>
+    );
   if (!session) {
     if (pathname.startsWith("/manager/") && pathname !== "/login")
       return <Navigate replace to={`/login?from=${encodeURIComponent(pathname + search)}`} />;

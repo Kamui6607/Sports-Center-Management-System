@@ -87,8 +87,8 @@ export const OrderQuerySchema = z.object({
   status: z.string().trim().max(40).optional(),
   fulfillmentType: z.enum(["PICKUP", "DELIVERY"]).optional(),
   search: z.string().trim().max(100).optional(),
-  /** Manager: hàng đợi xử lý — PICKUP_TODAY (khách hẹn lấy hôm nay), REFUND_PENDING (đang chờ hoàn), STALE_REFUND (chờ hoàn quá hạn). */
-  queue: z.enum(["PICKUP_TODAY", "REFUND_PENDING", "STALE_REFUND"]).optional(),
+  /** Manager: hàng đợi xử lý — PICKUP_TODAY (khách hẹn lấy hôm nay), AWAITING_PICKUP (sẵn sàng, chờ khách — hạn gần nhất trước), LATE_PICKUP (quá hạn nhưng còn nhận trễ được), REFUND_PENDING (đang chờ hoàn), STALE_REFUND (chờ hoàn quá hạn). */
+  queue: z.enum(["PICKUP_TODAY", "AWAITING_PICKUP", "LATE_PICKUP", "REFUND_PENDING", "STALE_REFUND"]).optional(),
   /** U4 (Manager): khoảng ngày tạo đơn, ISO có múi giờ. */
   startDate: z.string().datetime({ offset: true }).optional(),
   endDate: z.string().datetime({ offset: true }).optional(),
@@ -134,12 +134,17 @@ export const ManagerStatusSchema = z.object({
 
 export const PickupVerifySchema = z.object({ code: z.string().trim().min(6).max(200) });
 
-export const PickupConfirmSchema = z.object({
-  code: z.string().trim().min(6).max(200),
-  phoneLast4: z.string().trim().regex(/^\d{4}$/, "Nhập đúng 4 số cuối SĐT"),
-  /** Đơn trả tại quầy: Manager xác nhận ĐÃ THU đủ tiền mặt (bắt buộc true với đơn CASH chưa thanh toán). */
-  cashCollected: z.boolean().optional(),
-});
+export const PickupConfirmSchema = z
+  .object({
+    /** Mã nhận hàng / nội dung QR. Bỏ trống ⇒ giao không mã (bắt buộc `manualReason`). */
+    code: z.string().trim().min(6).max(200).optional(),
+    phoneLast4: z.string().trim().regex(/^\d{4}$/, "Nhập đúng 4 số cuối SĐT"),
+    /** Đơn trả tại quầy: Manager xác nhận ĐÃ THU đủ tiền mặt (bắt buộc true với đơn CASH chưa thanh toán). */
+    cashCollected: z.boolean().optional(),
+    /** Khách không có mã: lý do + đã đối chiếu giấy tờ (ghi vào lịch sử đơn). */
+    manualReason: z.string().trim().min(5).max(300).optional(),
+  })
+  .refine((b) => !!b.code || !!b.manualReason, { message: "Nhập mã nhận hàng hoặc lý do giao không mã", path: ["code"] });
 
 export const InventoryQuerySchema = z.object({
   page: z.string().optional(),

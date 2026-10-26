@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 import { io, type Socket } from "socket.io-client";
 import {
   Bell,
@@ -19,17 +20,30 @@ import { display } from "./config";
 import "./workflow.css";
 import "./communication.css";
 
-type Notification = {
+export type Notification = {
   id: string;
+  type?: string;
   title: string;
   body: string;
   reason?: string;
   isRead: boolean;
   createdAt: string;
+  metadata?: Record<string, unknown> | null;
 };
 
-export function NotificationBell() {
+/**
+ * Chuông thông báo trên thanh trên cùng.
+ * `allHref` ⇒ thêm "Xem tất cả thông báo" ở chân popup; `linkFor` ⇒ bấm một thông báo thì mở trang liên quan.
+ */
+export function NotificationBell({
+  allHref,
+  linkFor,
+}: {
+  allHref?: string;
+  linkFor?: (n: Notification) => string | undefined;
+} = {}) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const root = useRef<HTMLDivElement>(null);
   const cache = useQueryClient();
   const count = useQuery({
@@ -129,6 +143,11 @@ export function NotificationBell() {
                   className={`notification-popover-item ${item.isRead ? "" : "unread"}`}
                   onClick={() => {
                     if (!item.isRead) markRead.mutate(item.id);
+                    const to = linkFor?.(item);
+                    if (to) {
+                      setOpen(false);
+                      navigate(to);
+                    }
                   }}
                 >
                   <span className="notification-dot" />
@@ -141,6 +160,13 @@ export function NotificationBell() {
               ))
             )}
           </div>
+          {allHref && (
+            <footer className="notification-popover-foot">
+              <Link to={allHref} onClick={() => setOpen(false)}>
+                Xem tất cả thông báo
+              </Link>
+            </footer>
+          )}
         </section>
       )}
     </div>

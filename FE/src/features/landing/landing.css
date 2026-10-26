@@ -1,0 +1,279 @@
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap");
+
+/*
+ * Landing công khai — hướng "The sentence is the layout": câu "Pulse [phòng tập] Gym" là bố cục màn đầu,
+ * các mục sau lặp lại ngữ pháp "một câu bên trái, bằng chứng bên phải".
+ * Bảng màu Pulse (đồng bộ Mobile app_palette.dart): nền sáng, chữ rêu, lime chỉ dùng cho hành động và một trường màu cuối trang.
+ */
+.gl {
+  --ground: #f6f8f7;
+  --ground-2: #eaf0ec;
+  --ink: #1b2f27;
+  --ink-2: #3d4f46;
+  --forest: #203d31;
+  --forest-deep: #10211a;
+  --lime: #d3f879;
+  --lime-strong: #749b38;
+  --paper: #ffffff;
+  --m: clamp(20px, 2.4vw, 36px);
+  --h2: clamp(44px, 5.4vw, 88px);
+  --display: clamp(76px, 13vw, 210px);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-soft: cubic-bezier(0.33, 1, 0.68, 1);
+  --font: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.55;
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+}
+.gl *, .gl *::before, .gl *::after { box-sizing: border-box; }
+.gl img, .gl video { display: block; max-width: 100%; }
+.gl a { color: inherit; }
+.gl :focus-visible { outline: 3px solid var(--lime-strong); outline-offset: 3px; border-radius: 4px; }
+.gl .gl-skip { position: absolute; left: var(--m); top: -60px; z-index: 50; background: var(--forest); color: var(--paper); padding: 10px 16px; border-radius: 999px; text-decoration: none; }
+.gl-skip:focus { top: 12px; }
+
+/* ── Nút & liên kết dùng chung ─────────────────────── */
+.gl-btn {
+  display: inline-flex; align-items: center; gap: 10px; height: 54px; padding: 0 28px; border-radius: 999px; border: 0;
+  background: var(--lime); color: var(--forest); font: 600 17px/1 var(--font); text-decoration: none; cursor: pointer;
+  transition: transform 140ms var(--ease-out), background-color 180ms ease, color 180ms ease;
+}
+.gl-btn svg { transition: transform 300ms var(--ease-out); }
+.gl-btn.dark { background: var(--forest); color: var(--lime); }
+.gl-btn:active { transform: scale(0.97); }
+.gl-textlink {
+  background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--forest); cursor: pointer;
+  text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.25em; text-decoration-color: var(--lime-strong);
+  transition: text-decoration-color 180ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .gl-btn:hover { background: var(--forest); color: var(--lime); }
+  .gl-btn.dark:hover { background: var(--forest-deep); }
+  .gl-btn:hover svg { transform: translate(2px, -2px); }
+  .gl-textlink:hover { text-decoration-color: currentColor; }
+  .gl-nav-links a:hover { text-decoration-color: currentColor; }
+}
+
+/* ── Màn đầu ───────────────────────────────────────── */
+.gl-hero { min-height: 100vh; min-height: 100svh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; padding: 0 var(--m); }
+.gl-nav { height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.gl-word { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; text-decoration: none; color: var(--forest); }
+.gl-word span { color: var(--lime-strong); }
+.gl-nav-links { display: flex; gap: clamp(16px, 2.4vw, 32px); font-size: 17px; font-weight: 500; }
+.gl-nav-links a {
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 0.3em; text-decoration-thickness: 2px;
+  transition: text-decoration-color 180ms ease;
+}
+.gl-nav-links a:last-child { color: var(--forest); font-weight: 600; }
+
+.gl-sentence {
+  align-self: center; margin: 0; display: flex; align-items: center; gap: 0.16em;
+  font-size: var(--display); font-weight: 800; line-height: 0.9; letter-spacing: -0.05em; text-transform: uppercase; color: var(--forest);
+}
+.gl-mask { display: block; overflow: hidden; padding: 0.04em 0.02em 0.08em; margin: -0.04em -0.02em -0.08em; }
+.gl-mask > span { display: block; }
+.gl-strip { flex: 1 1 0; min-width: 1.1em; height: 0.74em; }
+.gl-strip-in { display: block; width: 100%; height: 100%; overflow: hidden; border-radius: 14px; background: #2a3a32; }
+.gl-strip-in video, .gl-strip-in img { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.85); }
+
+.gl-hero-foot { display: grid; justify-items: center; text-align: center; gap: 16px; padding: 24px 0 48px; }
+.gl-lead { margin: 0; max-width: 44ch; font-size: 22px; line-height: 1.45; color: var(--ink); }
+.gl-status { margin: 0; display: inline-flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 500; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.gl-status i { width: 10px; height: 10px; border-radius: 50%; background: #9aa9a1; flex: none; }
+.gl-status.is-open { color: var(--forest); }
+.gl-status.is-open i { background: var(--lime-strong); }
+.gl-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px 28px; margin-top: 8px; }
+
+/* ── Giới thiệu: tiêu đề băng qua ảnh ──────────────── */
+.gl-intro {
+  --fs: var(--h2);
+  --top: clamp(120px, 14vw, 200px);
+  --pw: 50vw;
+  position: relative; isolation: isolate; padding: var(--top) var(--m) 140px;
+  min-height: calc(var(--top) + var(--fs) * 1.04 + var(--pw) * 4 / 3 + 120px);
+}
+.gl-intro-photo { position: absolute; z-index: 1; right: 0; top: calc(var(--top) + var(--fs) * 1.04); width: var(--pw); aspect-ratio: 3 / 4; overflow: hidden; margin: 0; }
+.gl-shutter-in { width: 100%; height: 100%; overflow: hidden; }
+.gl-intro-photo img { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.85); }
+.gl-intro-h { position: relative; display: grid; margin: 0; font-size: var(--fs); line-height: 1.04; font-weight: 700; letter-spacing: -0.035em; }
+.gl-intro-h > span { grid-area: 1 / 1; position: relative; }
+.gl-ink { z-index: 0; color: var(--forest); }
+/* Bản chữ trắng chỉ hiện trong phần nằm trên ảnh (cắt theo mép trái và mép trên của ảnh). */
+.gl-paper::before { content: attr(data-text); white-space: pre-line; }
+.gl-paper { z-index: 2; color: var(--paper); clip-path: inset(calc(var(--fs) * 1.04) 0 0 calc(100% + var(--m) - var(--pw))); }
+.gl-intro-body { position: relative; z-index: 3; margin-top: 44px; width: min(calc(100% - var(--pw) - 32px), 560px); display: grid; gap: 28px; }
+.gl-intro-body p { margin: 0; font-size: 17px; line-height: 1.5; }
+.gl-facts { margin: 0; display: grid; gap: 14px; }
+.gl-facts div { display: grid; gap: 2px; }
+.gl-facts dt { font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.gl-facts dd { margin: 0; font-size: 17px; }
+.gl-intro-small { position: relative; z-index: 3; margin: 72px 0 0; width: min(360px, 32vw); aspect-ratio: 9 / 10; overflow: hidden; }
+.gl-intro-small img { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.85); }
+
+/* ── Khóa học: bảng đẩy sang phải ──────────────────── */
+.gl-list { padding: 120px var(--m) 180px; }
+.gl-h2 { margin: 0; font-size: var(--h2); line-height: 0.98; font-weight: 700; letter-spacing: -0.035em; color: var(--forest); text-indent: 3vw; }
+.gl-list-grid { margin-top: 96px; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.gl-list-photo { grid-column: 1 / span 4; align-self: end; margin: 0; aspect-ratio: 4 / 5; overflow: hidden; }
+.gl-list-photo img { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.85); }
+.gl-list-name { grid-column: 7; margin: 4px 0 0; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.gl-table { grid-column: 8 / span 5; }
+.gl-table ul { list-style: none; margin: 0; padding: 0; }
+.gl-table li { display: grid; grid-template-columns: 30% minmax(0, 1fr) auto; gap: 16px; align-items: baseline; padding: 13px 0; }
+.gl-table li:nth-child(4n + 1):not(:first-child) { margin-top: 30px; }
+.gl-kind { font-size: 14px; color: var(--ink-2); }
+.gl-what { display: grid; gap: 2px; min-width: 0; }
+.gl-what strong { font-size: 17px; font-weight: 600; color: var(--ink); }
+.gl-what small { font-size: 14px; color: var(--ink-2); }
+.gl-price { font-size: 17px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; color: var(--forest); white-space: nowrap; }
+.gl-note { margin: 24px 0 0; font-size: 14px; color: var(--ink); }
+.gl-table > .gl-note:first-child { margin-top: 13px; font-size: 17px; }
+
+/* ── Cách tập: ba màn, động từ dính giữa màn hình ──── */
+.gl-steps { position: relative; background: var(--forest-deep); }
+.gl-steps-h { position: absolute; z-index: 4; top: 40px; left: var(--m); right: var(--m); margin: 0; font-size: 22px; font-weight: 600; color: var(--paper); }
+.gl-step { position: relative; height: 100vh; height: 100svh; overflow: clip; }
+.gl-step img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(0.7) brightness(0.55); }
+.gl-verb {
+  position: absolute; z-index: 2; left: var(--m); right: var(--m); top: 50%; transform: translateY(-50%); margin: 0; text-align: center; padding: 0.08em 0;
+  font-size: var(--display); line-height: 0.9; font-weight: 800; letter-spacing: -0.05em; color: var(--lime);
+}
+.gl-step-text { position: absolute; z-index: 3; left: var(--m); bottom: 44px; margin: 0; max-width: 40ch; font-size: 17px; line-height: 1.5; color: var(--paper); }
+
+/* ── Liên hệ ───────────────────────────────────────── */
+.gl-contact { min-height: 72vh; min-height: 72svh; display: grid; grid-template-rows: auto 1fr auto; gap: 32px; padding: 56px var(--m) 40px; background: var(--forest); color: var(--paper); }
+.gl-contact h2 { margin: 0; max-width: 30ch; font-size: 22px; line-height: 1.4; font-weight: 500; }
+.gl-display {
+  align-self: end; margin: 0; font-size: clamp(40px, 7.6vw, 132px); line-height: 1; font-weight: 600; letter-spacing: -0.045em;
+  color: var(--paper); text-decoration: none; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; transition: color 200ms ease;
+}
+.gl-display.muted { color: rgba(255, 255, 255, 0.6); }
+.gl-contact-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px 40px; font-size: 14px; color: rgba(255, 255, 255, 0.92); }
+.gl-contact-foot > div { display: grid; gap: 4px; }
+.gl-contact-foot strong { color: var(--paper); font-weight: 600; }
+.gl-contact-foot a { color: var(--lime); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.gl-contact-right { text-align: right; justify-items: end; }
+@media (hover: hover) and (pointer: fine) {
+  a.gl-display:hover { color: var(--lime); }
+  .gl-contact-foot a:hover { text-decoration: underline; text-underline-offset: 0.25em; }
+}
+
+/* ── Kết ───────────────────────────────────────────── */
+.gl-foot { position: relative; overflow: hidden; min-height: 100vh; min-height: min(100svh, 980px); display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto auto; padding: 72px var(--m) 0; background: var(--lime); color: var(--forest); }
+.gl-foot-top { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 24px; }
+.gl-foot-top > div { grid-column: 1 / span 7; display: grid; gap: 32px; justify-items: start; }
+.gl-foot h2 { margin: 0; font-size: var(--h2); line-height: 0.98; font-weight: 800; letter-spacing: -0.045em; }
+.gl-foot-links { grid-column: 10 / span 3; list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; align-content: start; font-size: 17px; font-weight: 600; }
+.gl-foot-links a { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 0.3em; text-decoration-thickness: 2px; transition: text-decoration-color 180ms ease; }
+@media (hover: hover) and (pointer: fine) { .gl-foot-links a:hover { text-decoration-color: currentColor; } }
+.gl-foot-pulse { align-self: end; color: var(--forest); margin-bottom: 24px; }
+.gl-foot-pulse svg { display: block; width: 100%; height: 64px; }
+.gl-legal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 24px; font-size: 14px; font-weight: 500; position: relative; z-index: 1; padding-bottom: 8px; }
+.gl-giant {
+  margin: 0 0 0 -0.04em; font-size: 30vw; line-height: 0.8; font-weight: 800; letter-spacing: -0.07em; white-space: nowrap;
+  color: var(--forest); transform: translateY(24%); user-select: none;
+}
+
+/* ── Chuyển động ───────────────────────────────────── */
+.gl .pulse-line path { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+.gl .pulse-line-base { stroke: currentColor; stroke-width: 1.5; opacity: 0.2; }
+.gl .pulse-line-trace { stroke: currentColor; stroke-width: 3; }
+@media (prefers-reduced-motion: no-preference) {
+  /* Vào trang (xong trong ~1,2 giây): chữ trồi khỏi mặt nạ, dải ảnh mở từ trái, rồi câu dẫn và nút. */
+  .gl-mask > span { transform: translateY(105%); animation: gl-line 900ms var(--ease-expo) forwards; animation-delay: calc(120ms + var(--i, 0) * 110ms); }
+  .gl-strip-in { clip-path: inset(0 100% 0 0 round 14px); animation: gl-open 1100ms var(--ease-in-out) 180ms forwards; }
+  .gl-strip-in > * { transform: scale(1.12); animation: gl-settle 1500ms var(--ease-soft) 120ms forwards; }
+  .gl-load { opacity: 0; transform: translateY(12px); animation: gl-rise 520ms var(--ease-out) forwards; animation-delay: var(--d, 0ms); }
+
+  /* Hiện dần khi cuộn tới — mỗi mục: tiêu đề → chữ → ảnh, so le 80ms, chỉ một lần. */
+  .gl [data-reveal] { opacity: 0; transform: translateY(24px); transition: opacity 700ms var(--ease-out), transform 900ms var(--ease-out); transition-delay: calc(var(--i, 0) * 80ms); }
+  .gl [data-reveal].is-in { opacity: 1; transform: none; }
+  /* Ảnh lớn của phần giới thiệu mở như cửa chớp thay vì trồi lên. */
+  .gl .gl-shutter[data-reveal] { opacity: 1; transform: none; }
+  .gl .gl-shutter-in { clip-path: inset(0 0 100% 0); transition: clip-path 1100ms var(--ease-in-out); }
+  .gl .gl-shutter-in img { transform: scale(1.12); transition: transform 1500ms var(--ease-soft); }
+  .gl .gl-shutter.is-in .gl-shutter-in { clip-path: inset(0); }
+  .gl .gl-shutter.is-in .gl-shutter-in img { transform: none; }
+  .gl .gl-foot-pulse[data-reveal] { opacity: 1; transform: none; }
+  .gl-foot-pulse .pulse-line-trace { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1400ms var(--ease-in-out); }
+  .gl-foot-pulse.is-in .pulse-line-trace { stroke-dashoffset: 0; }
+
+  /* Ảnh nền ba bước thu nhẹ theo thanh cuộn (chỉ trình duyệt hỗ trợ scroll timeline). */
+  @supports (animation-timeline: view()) {
+    .gl-step img { animation: gl-drift linear both; animation-timeline: view(); animation-range: cover 0% cover 100%; }
+    .gl-giant { animation: gl-rise-name linear both; animation-timeline: view(); animation-range: entry 0% entry 100%; }
+  }
+}
+@keyframes gl-line { to { transform: none; } }
+@keyframes gl-open { to { clip-path: inset(0 0 0 0 round 14px); } }
+@keyframes gl-settle { to { transform: none; } }
+@keyframes gl-rise { to { opacity: 1; transform: none; } }
+@keyframes gl-drift { from { transform: scale(1.12); } to { transform: scale(1); } }
+@keyframes gl-rise-name { from { transform: translateY(60%); } to { transform: translateY(24%); } }
+
+/* ── Tablet ───────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .gl-contact { min-height: 0; padding-top: 72px; padding-bottom: 40px; gap: 72px; }
+  .gl-foot { min-height: 0; grid-template-rows: auto auto auto auto; }
+  .gl-foot-pulse { margin-top: 96px; }
+  .gl-list-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .gl-list-photo { grid-column: 1 / span 2; }
+  .gl-list-name { display: none; }
+  .gl-table { grid-column: 3 / span 4; }
+  .gl-foot-top { grid-template-columns: 1fr; gap: 32px; }
+  .gl-foot-top > div, .gl-foot-links { grid-column: 1; }
+  .gl-foot-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+}
+
+/* ── Điện thoại ───────────────────────────────────── */
+@media (max-width: 760px) {
+  .gl { font-size: 17px; }
+  .gl-hide-sm { display: none; }
+  .gl-nav { height: 64px; }
+  .gl-sentence { flex-wrap: wrap; justify-content: flex-start; font-size: 21vw; row-gap: 0.12em; }
+  .gl-strip { order: 1; flex: 1 0 100%; height: auto; aspect-ratio: 2 / 1; }
+  .gl-sentence > .gl-mask:last-child { order: 2; }
+  .gl-hero-foot { justify-items: start; text-align: left; padding-bottom: 32px; }
+  .gl-actions { justify-content: flex-start; }
+  .gl-lead { font-size: 18px; }
+  .gl-status { font-size: 14px; align-items: flex-start; }
+  .gl-status i { margin-top: 6px; }
+
+  .gl-intro { --fs: 8.4vw; --top: 96px; --pw: 75vw; padding-bottom: 96px; min-height: 0; }
+  .gl-intro-body { width: 100%; margin-top: calc(var(--pw) * 4 / 3 - var(--fs) * 1.04 + 32px); }
+  .gl-intro-small { width: 50%; margin-top: 40px; }
+
+  .gl-list { padding: 80px var(--m) 112px; }
+  .gl-h2 { font-size: 8.4vw; text-indent: 0; }
+  .gl-list-grid { display: flex; flex-direction: column; margin-top: 48px; gap: 32px; }
+  .gl-list-photo { order: 2; align-self: flex-end; width: 60%; }
+  .gl-table li { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; }
+  .gl-kind { grid-column: 1; grid-row: 1; }
+  .gl-price { grid-column: 2; grid-row: 1; }
+  .gl-what { grid-column: 1 / -1; }
+
+  .gl-steps-h { top: 28px; }
+  .gl-verb { font-size: 16vw; top: 42%; }
+  .gl-step-text { right: var(--m); bottom: 32px; font-size: 17px; }
+
+  .gl-contact { min-height: 86svh; padding: 40px var(--m) 32px; }
+  .gl-contact h2 { font-size: 17px; }
+  .gl-display { font-size: 11vw; }
+  .gl-contact-foot { flex-direction: column; align-items: flex-start; }
+  .gl-contact-right { text-align: left; justify-items: start; }
+
+  .gl-foot { padding-top: 56px; }
+  .gl-foot-top { display: grid; grid-template-columns: 1fr; gap: 32px; }
+  .gl-foot-top > div, .gl-foot-links { grid-column: 1; }
+  .gl-foot h2 { font-size: 13vw; }
+  .gl-foot-links { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; }
+  .gl-btn { height: 52px; }
+  .gl-foot .gl-btn { width: 100%; justify-content: center; }
+  .gl-giant { font-size: 46vw; }
+}

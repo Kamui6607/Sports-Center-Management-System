@@ -101,7 +101,7 @@ class OrderCard extends ConsumerWidget {
         DateTime.now().isBefore(o.paymentExpiresAt!);
     return AppCard(
       onTap: onTap ?? () => context.push(AppRoutes.order(o.id)),
-      semanticLabel: 'Đơn ${o.code}, ${o.status.status.label}',
+      semanticLabel: 'Đơn ${o.code}, ${o.statusLabel.label}',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -112,7 +112,7 @@ class OrderCard extends ConsumerWidget {
               Expanded(
                 child: Text(o.code, style: context.text.label, overflow: TextOverflow.ellipsis),
               ),
-              o.status.status.tag(dense: true),
+              o.statusLabel.tag(dense: true),
             ],
           ),
           const SizedBox(height: AppSpacing.xs),

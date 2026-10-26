@@ -412,13 +412,23 @@ class OrderHistoryEntry {
 
 /// Mã nhận hàng (chỉ chủ đơn thấy `code`/`qrPayload`).
 class PickupInfo {
-  const PickupInfo({this.code, this.qrPayload, this.deadline, this.failedAttempts = 0, this.lockedUntil});
+  const PickupInfo({
+    this.code,
+    this.qrPayload,
+    this.deadline,
+    this.failedAttempts = 0,
+    this.lockedUntil,
+    this.latePickupUntil,
+  });
 
   final String? code;
   final String? qrPayload;
   final DateTime? deadline;
   final int failedAttempts;
   final DateTime? lockedUntil;
+
+  /// Đơn đã quá hạn nhận nhưng vẫn đến lấy trễ được tới mốc này (khi đó yêu cầu hoàn tiền bị hủy).
+  final DateTime? latePickupUntil;
 }
 
 class OrderRefundInfo {

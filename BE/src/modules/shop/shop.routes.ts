@@ -448,7 +448,7 @@ router.get("/manage/summary", ...manager, c.managerSummary);
  *       - { in: query, name: status, schema: { type: string } }
  *       - { in: query, name: fulfillmentType, schema: { type: string, enum: [PICKUP, DELIVERY] } }
  *       - { in: query, name: search, schema: { type: string } }
- *       - { in: query, name: queue, schema: { type: string, enum: [PICKUP_TODAY, REFUND_PENDING, STALE_REFUND] } }
+ *       - { in: query, name: queue, schema: { type: string, enum: [PICKUP_TODAY, AWAITING_PICKUP, LATE_PICKUP, REFUND_PENDING, STALE_REFUND] } }
  *       - { in: query, name: startDate, schema: { type: string, format: date-time } }
  *       - { in: query, name: endDate, schema: { type: string, format: date-time } }
  *       - { in: query, name: page, schema: { type: integer } }
@@ -517,17 +517,17 @@ router.post("/manage/pickup/verify", ...manager, pickupLimit, validate(PickupVer
  * @swagger
  * /shop/manage/orders/{id}/pickup:
  *   post:
- *     summary: Xác nhận giao tại quầy (mã + 4 số cuối SĐT) ⇒ COMPLETED; mã dùng một lần
+ *     summary: Đánh dấu "Đã nhận" tại quầy (mã + 4 số cuối SĐT, hoặc không mã + lý do) ⇒ COMPLETED — đơn READY_FOR_PICKUP hoặc NOT_PICKED_UP còn hạn nhận trễ; mã dùng một lần
  *     tags: [Shop]
  *     security: [{ BearerAuth: [] }]
  *     parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
  *     requestBody:
  *       required: true
- *       content: { application/json: { schema: { type: object, required: [code, phoneLast4], properties: { code: { type: string }, phoneLast4: { type: string }, cashCollected: { type: boolean, description: "Đơn trả tại quầy: đã thu đủ tiền mặt" } } } } }
+ *       content: { application/json: { schema: { type: object, required: [phoneLast4], properties: { code: { type: string }, phoneLast4: { type: string }, cashCollected: { type: boolean, description: "Đơn trả tại quầy: đã thu đủ tiền mặt" }, manualReason: { type: string, description: "Giao không mã: lý do + đã đối chiếu giấy tờ" } } } } }
  *     responses:
  *       200: { description: Đơn hoàn tất }
- *       400: { description: "PICKUP_CODE_INVALID / PHONE_MISMATCH (kèm remainingAttempts) / CASH_COLLECTION_REQUIRED" }
- *       409: { description: "PICKUP_CODE_USED / ORDER_NOT_READY" }
+ *       400: { description: "PICKUP_CODE_INVALID / PHONE_MISMATCH (kèm remainingAttempts) / CASH_COLLECTION_REQUIRED / PICKUP_REASON_REQUIRED" }
+ *       409: { description: "PICKUP_CODE_USED / ORDER_NOT_READY / LATE_PICKUP_CLOSED / LATE_PICKUP_OUT_OF_STOCK" }
  *       423: { description: "PICKUP_LOCKED (kèm lockedUntil)" }
  */
 router.post("/manage/orders/:id/pickup", ...manager, pickupLimit, validate(PickupConfirmSchema), c.confirmPickup);

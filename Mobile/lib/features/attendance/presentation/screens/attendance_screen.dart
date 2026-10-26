@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/router/app_routes.dart';
 import '../../../../core/data/data_revision.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
-import '../../../schedule/presentation/session_labels.dart';
 import '../../data/attendance_repository_provider.dart';
 import '../../domain/entities/attendance.dart';
 import '../providers/attendance_providers.dart';
@@ -20,7 +21,6 @@ class AttendanceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(myAttendanceSummaryProvider);
     final penalties = ref.watch(myPenaltiesProvider).value ?? const [];
-    final records = ref.watch(myAttendanceRecordsProvider).value ?? const [];
     return AppScaffold(
       title: 'Chuyên cần',
       body: AsyncValueView(
@@ -30,8 +30,7 @@ class AttendanceScreen extends ConsumerWidget {
           onRefresh: () async {
             ref
               ..invalidate(myPenaltiesProvider)
-              ..invalidate(myAttendanceRecordsProvider);
-            ref.invalidate(myAttendanceSummaryProvider);
+              ..invalidate(myAttendanceSummaryProvider);
             await ref.read(myAttendanceSummaryProvider.future);
           },
           children: [
@@ -44,48 +43,15 @@ class AttendanceScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.md),
             for (final p in penalties) ...[_PenaltyCard(penalty: p), const SizedBox(height: AppSpacing.sm)],
             const SectionHeader(title: 'Tỷ lệ chuyên cần theo khóa'),
+            Text(
+              'Nhấn vào từng khóa để xem lịch sử điểm danh chi tiết.',
+              style: context.text.caption.copyWith(color: context.colors.textMuted),
+            ),
+            const SizedBox(height: AppSpacing.sm),
             if (stats.isEmpty)
               const EmptyState(compact: true, icon: AppIcons.attendance, title: 'Chưa có dữ liệu điểm danh')
             else
               for (final s in stats) ...[_StatCard(stat: s), const SizedBox(height: AppSpacing.sm)],
-            const SizedBox(height: AppSpacing.md),
-            SectionHeader(title: 'Lịch sử điểm danh (${records.length})'),
-            if (records.isNotEmpty)
-              AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < records.length; i++) ...[
-                      if (i > 0) const Divider(),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(records[i].className, style: context.text.label),
-                                  Text(
-                                    VnTime.sessionLabel(records[i].startTime, records[i].endTime),
-                                    style: context.text.caption.copyWith(color: context.colors.textMuted),
-                                  ),
-                                  if (records[i].note != null)
-                                    Text(
-                                      records[i].note!,
-                                      style: context.text.caption.copyWith(color: context.colors.textMuted),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            records[i].status.status.tag(dense: true),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
             const SizedBox(height: AppSpacing.xl),
           ],
         ),
@@ -116,6 +82,8 @@ class _StatCard extends StatelessWidget {
     );
     return AppCard(
       borderColor: stat.isWarning ? context.tones.of(StatusTone.danger).border : null,
+      onTap: () => context.push(AppRoutes.myCourseAttendance(stat.classId)),
+      semanticLabel: 'Xem lịch sử điểm danh ${stat.className}',
       child: Column(
         children: [
           Row(
@@ -140,6 +108,7 @@ class _StatCard extends StatelessWidget {
                   ],
                 ),
               ),
+              Icon(AppIcons.chevronRight, color: context.colors.textMuted),
             ],
           ),
           const Divider(height: AppSpacing.lg),

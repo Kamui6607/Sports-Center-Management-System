@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../shared/api";
-import { SearchBox, periodQuery, PERIOD_OPTIONS, ConfirmDialog, DataTable, Dialog, Dl, ErrorBox, Field, PageHead, Pager, Panel, Pill, QueryView, Select, dateTime, get, num, str, useUrlState, vnd } from "../kit";
+import { SearchBox, periodQuery, PERIOD_OPTIONS, ConfirmDialog, DataTable, DetailColumns, DetailSection, DetailTotal, Dialog, Dl, ErrorBox, Field, PageHead, Pager, Panel, Pill, QueryView, Select, dateTime, get, num, str, useUrlState, vnd } from "../kit";
 import type { Row } from "../kit";
 
 /** Lý do hoàn tiền (BE `RefundReason`) — xem Doc/GYM_SCOPE_CHANGES.md §11. */
@@ -165,9 +165,10 @@ function RefundDialog({ refund, onClose }: { refund: Row; onClose: () => void })
     <Dialog
       title="Yêu cầu hoàn tiền"
       eyebrow={REFUND_REASON[str(refund.reason)] ?? str(refund.reason)}
+      badge={<StatusPill status={refund.status} />}
       onClose={onClose}
       busy={approve.isPending}
-      wide
+      size="detail"
       onSubmit={() => pending && !feeInvalid && approve.mutate()}
       footer={
         pending ? (
@@ -186,53 +187,88 @@ function RefundDialog({ refund, onClose }: { refund: Row; onClose: () => void })
         )
       }
     >
-      <Dl
-        items={[
-          ["Người nhận", str(get(refund, "member.user.fullName") || get(refund, "order.user.fullName"))],
-          ["Liên hệ", [get(refund, "member.user.phone") || get(refund, "order.user.phone"), get(refund, "member.user.email") || get(refund, "order.user.email")].filter(Boolean).join(" · ")],
-          ["Khóa học / đơn", str(get(refund, "class.name")) || str(get(refund, "order.code"))],
-          ["HLV", str(get(refund, "class.coach.user.fullName"))],
-          ["Đã thanh toán", vnd(get(refund, "payment.amount"))],
-          ["Trừ ví HLV", vnd(refund.coachDebitAmount)],
-          ["Trạng thái", <StatusPill key="st" status={refund.status} />],
-          ["Ghi chú hội viên", str(refund.memberNote)],
-          ["Ghi chú quản lý", str(refund.managerNote)],
-          ["Lý do từ chối", str(refund.rejectReason)],
-        ]}
+      <DetailColumns
+        main={
+          <>
+            <DetailSection title="Người nhận & giao dịch gốc">
+              <Dl
+                compact
+                items={[
+                  ["Người nhận", str(get(refund, "member.user.fullName") || get(refund, "order.user.fullName"))],
+                  ["Liên hệ", [get(refund, "member.user.phone") || get(refund, "order.user.phone"), get(refund, "member.user.email") || get(refund, "order.user.email")].filter(Boolean).join(" · ")],
+                  ["Khóa học / đơn", str(get(refund, "class.name")) || str(get(refund, "order.code"))],
+                  ["HLV", str(get(refund, "class.coach.user.fullName"))],
+                  ["Gửi lúc", dateTime(refund.createdAt)],
+                  ["Xử lý lúc", refund.processedAt ? dateTime(refund.processedAt) : ""],
+                ]}
+              />
+            </DetailSection>
+            <DetailSection title="Ghi chú">
+              <Dl
+                compact
+                items={[
+                  ["Ghi chú hội viên", str(refund.memberNote)],
+                  ["Ghi chú quản lý", str(refund.managerNote)],
+                  ["Lý do từ chối", str(refund.rejectReason)],
+                ]}
+              />
+            </DetailSection>
+          </>
+        }
+        side={
+          <>
+            <DetailSection>
+              <DetailTotal
+                label="Số tiền hoàn"
+                value={vnd(amount)}
+                extra={<StatusPill status={refund.status} />}
+                rows={[
+                  ["Đã thanh toán", vnd(get(refund, "payment.amount"))],
+                  ["Trừ ví HLV", vnd(refund.coachDebitAmount)],
+                ]}
+              />
+            </DetailSection>
+            {bank && (
+              <DetailSection title="Tài khoản nhận tiền">
+                <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+                  <Dl
+                    compact
+                    items={[
+                      ["Ngân hàng", str(bank.bankName)],
+                      ["Số tài khoản", str(bank.bankAccountNumber)],
+                      ["Chủ tài khoản", str(bank.bankAccountName)],
+                    ]}
+                  />
+                  {bank.vietQrUrl ? <img src={str(bank.vietQrUrl)} alt="Mã VietQR chuyển khoản hoàn tiền" style={{ maxWidth: 160 }} /> : null}
+                </div>
+              </DetailSection>
+            )}
+            {pending && (
+              <DetailSection title="Duyệt hoàn tiền" tone="accent">
+                <div className="cr-form">
+                  {late && (
+                    <>
+                      <p className="cr-muted wide" style={{ margin: 0 }}>
+                        Hoàn ngoại lệ: giá trị buổi chưa học <b>{vnd(gross)}</b>. Số tiền hoàn = giá trị gốc × (100% − phí chiết khấu).
+                      </p>
+                      <Field label="Phí chiết khấu (%)" required error={feeInvalid ? "Nhập số nguyên từ 0 đến 99." : undefined} hint={`Hoàn cho hội viên: ${vnd(amount)}`}>
+                        <input type="number" min={0} max={99} value={fee} onChange={(e) => setFee(e.target.value)} />
+                      </Field>
+                    </>
+                  )}
+                  <Field label="Mã giao dịch chuyển khoản" hint="FT/Ref code để đối soát">
+                    <input value={tx} onChange={(e) => setTx(e.target.value)} maxLength={100} />
+                  </Field>
+                  <Field label="Ghi chú" wide>
+                    <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} rows={2} />
+                  </Field>
+                </div>
+              </DetailSection>
+            )}
+            {approve.error ? <ErrorBox error={approve.error} /> : null}
+          </>
+        }
       />
-      {bank && (
-        <Panel title="Tài khoản nhận tiền">
-          <Dl
-            items={[
-              ["Ngân hàng", str(bank.bankName)],
-              ["Số tài khoản", str(bank.bankAccountNumber)],
-              ["Chủ tài khoản", str(bank.bankAccountName)],
-            ]}
-          />
-          {bank.vietQrUrl ? <img src={str(bank.vietQrUrl)} alt="Mã VietQR chuyển khoản hoàn tiền" style={{ maxWidth: 220, marginTop: 10 }} /> : null}
-        </Panel>
-      )}
-      {pending && (
-        <div className="cr-form" style={{ marginTop: 14 }}>
-          {late && (
-            <>
-              <p className="cr-muted wide" style={{ margin: 0 }}>
-                Hoàn ngoại lệ: giá trị buổi chưa học <b>{vnd(gross)}</b>. Số tiền hoàn = giá trị gốc × (100% − phí chiết khấu).
-              </p>
-              <Field label="Phí chiết khấu (%)" required error={feeInvalid ? "Nhập số nguyên từ 0 đến 99." : undefined} hint={`Hoàn cho hội viên: ${vnd(amount)}`}>
-                <input type="number" min={0} max={99} value={fee} onChange={(e) => setFee(e.target.value)} />
-              </Field>
-            </>
-          )}
-          <Field label="Mã giao dịch chuyển khoản" hint="FT/Ref code để đối soát">
-            <input value={tx} onChange={(e) => setTx(e.target.value)} maxLength={100} />
-          </Field>
-          <Field label="Ghi chú" wide>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
-          </Field>
-        </div>
-      )}
-      {approve.error ? <ErrorBox error={approve.error} /> : null}
     </Dialog>
   );
 }

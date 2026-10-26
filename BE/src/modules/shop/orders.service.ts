@@ -8,12 +8,13 @@ import { buildPaginationMeta } from "../../utils/pagination.js";
 import { enqueueNotification, flushNotificationOutbox } from "../notifications/outbox.service.js";
 import { notifyManagersNewRefunds, type PayoutBankDetails } from "../refunds/refunds.service.js";
 import { applyInventory, availableOf } from "./inventory.js";
-import { isUnpaidCash, managerTransitionsFor, ORDER_STATUS_LABEL, transitionOrderTx } from "./order-state.js";
+import { isUnpaidCash, managerTransitionsFor, ORDER_STATUS_LABEL, orderStatusLabel, transitionOrderTx } from "./order-state.js";
 import {
   money,
   ORDER_DETAIL_INCLUDE,
   ORDER_LIST_INCLUDE,
   ORDER_STATUS_GROUPS,
+  latePickupUntil,
   orderManagerView,
   orderOwnerView,
   orderSummaryView,
@@ -468,6 +469,18 @@ function queueFilter(queue?: string, now = new Date()): Prisma.OrderWhereInput {
         status: { in: ["CONFIRMED", "PAID", "READY_FOR_PICKUP"] },
         preferredPickupDate: { gte: today, lt: addDays(today, 1) },
       };
+    case "AWAITING_PICKUP":
+      return { fulfillmentType: "PICKUP", status: "READY_FOR_PICKUP" };
+    case "LATE_PICKUP": {
+      const days = shopConfig().latePickupDays;
+      if (days <= 0) return { id: { in: [] } };
+      return {
+        fulfillmentType: "PICKUP",
+        status: "NOT_PICKED_UP",
+        notPickedUpAt: { gt: addDays(now, -days) },
+        refunds: { none: { status: "COMPLETED" } },
+      };
+    }
     case "REFUND_PENDING":
       return { refunds: { some: { status: "PENDING" } } };
     case "STALE_REFUND":
@@ -518,7 +531,14 @@ export async function listOrdersForManager(query: {
         user: { select: { id: true, fullName: true } },
         refunds: { where: { status: "PENDING" }, select: { id: true, amount: true, createdAt: true, bankAccountNumber: true } },
       },
-      orderBy: query.queue === "PICKUP_TODAY" ? { preferredPickupDate: "asc" } : { createdAt: "desc" },
+      orderBy:
+        query.queue === "PICKUP_TODAY"
+          ? { preferredPickupDate: "asc" }
+          : query.queue === "AWAITING_PICKUP"
+            ? { pickupDeadline: "asc" }
+            : query.queue === "LATE_PICKUP"
+              ? { notPickedUpAt: "asc" }
+              : { createdAt: "desc" },
       skip,
       take: limit,
     }),
@@ -547,7 +567,14 @@ export async function getOrderForManager(orderId: string) {
     prisma.user.findUnique({ where: { id: order.userId }, select: { cashPickupLockedUntil: true } }),
   ]);
   const lock = buyer?.cashPickupLockedUntil && buyer.cashPickupLockedUntil > new Date() ? buyer.cashPickupLockedUntil : null;
-  return orderManagerView(order, new Date(), { noShowCount, cashPickupLockedUntil: lock });
+  // Đơn tại quầy "Đã nhận": ai giao + lúc nào (mốc COMPLETED cuối trong lịch sử).
+  let receipt = null;
+  if (order.fulfillmentType === "PICKUP" && order.status === "COMPLETED") {
+    const h = [...order.history].reverse().find((x) => x.toStatus === "COMPLETED");
+    const staff = h?.actorId ? await prisma.user.findUnique({ where: { id: h.actorId }, select: { id: true, fullName: true } }) : null;
+    receipt = { receivedAt: h?.createdAt ?? order.completedAt, handedOverBy: staff, note: h?.reason ?? null };
+  }
+  return orderManagerView(order, new Date(), { noShowCount, cashPickupLockedUntil: lock }, receipt);
 }
 
 /** Số lần bùng hàng (đơn chuyển NOT_PICKED_UP) của một người trong `SHOP_NO_SHOW_WINDOW_DAYS` ngày gần nhất. */
@@ -712,15 +739,18 @@ async function markNotPickedUpTx(
   const amount = Math.round((gross * (100 - feePercent)) / 100);
   const feeText = feePercent > 0 ? ` (đã trừ ${feePercent}% phí giữ hàng do không đến lấy ${noShowCount} lần trong ${cfg.noShowWindowDays} ngày)` : "";
 
+  const lateDays = cfg.latePickupDays;
+  const lateText = lateDays > 0 ? ` Nếu vẫn muốn lấy, bạn có thể đến quầy trong ${lateDays} ngày tới (khi tiền chưa được hoàn và còn hàng).` : "";
   await transitionOrderTx(tx, order, "NOT_PICKED_UP", {
     actorId,
     reason,
-    data: { pickupCodeHash: null },
+    // Giữ mã nhận hàng trong thời gian "nhận trễ" (SHOP_LATE_PICKUP_DAYS); tắt nhận trễ ⇒ xóa mã ngay.
+    data: lateDays > 0 ? {} : { pickupCodeHash: null },
     notify: {
       body:
         amount > 0
-          ? `Đơn ${order.code} đã quá hạn nhận tại quầy. Trung tâm sẽ hoàn ${amount.toLocaleString("vi-VN")}đ${feeText} — vui lòng cập nhật số tài khoản nhận hoàn trong chi tiết đơn.`
-          : `Đơn ${order.code} đã quá hạn nhận tại quầy nên đã bị hủy, hàng giữ cho bạn đã được nhả.`,
+          ? `Đơn ${order.code} đã quá hạn nhận tại quầy. Trung tâm sẽ hoàn ${amount.toLocaleString("vi-VN")}đ${feeText} — vui lòng cập nhật số tài khoản nhận hoàn trong chi tiết đơn.${lateText}`
+          : `Đơn ${order.code} đã quá hạn nhận tại quầy nên đã bị hủy, hàng giữ cho bạn đã được nhả.${lateText}`,
     },
   });
   for (const item of [...order.items].sort((a, b) => a.productId.localeCompare(b.productId))) {
@@ -798,53 +828,88 @@ export async function remindRefundBank(manager: Actor, orderId: string) {
 /** Tra mã nhận hàng (QR hoặc nhập tay) ⇒ tóm tắt đơn để đối chiếu (SĐT đã che). Không đổi dữ liệu. */
 export async function verifyPickupCode(raw: string) {
   const { orderCode, code } = parsePickupInput(raw);
-  const order = await prisma.order.findUnique({ where: { pickupCodeHash: hashPickupCode(code) }, include: ORDER_LIST_INCLUDE });
-  if (!order || order.status !== "READY_FOR_PICKUP" || (orderCode && orderCode !== order.code)) {
+  const order = await prisma.order.findUnique({
+    where: { pickupCodeHash: hashPickupCode(code) },
+    include: { ...ORDER_LIST_INCLUDE, refunds: { select: { status: true } } },
+  });
+  const lateUntil = order ? latePickupUntil(order, order.refunds) : null;
+  if (!order || (order.status !== "READY_FOR_PICKUP" && !lateUntil) || (orderCode && orderCode !== order.code)) {
     throw new AppError("Mã nhận hàng không đúng hoặc đơn không ở trạng thái chờ nhận.", 400, { code: "PICKUP_CODE_INVALID" });
   }
   return {
     ...orderSummaryView(order),
     recipientPhoneMasked: maskPhone(order.recipientPhone),
     pickupLockedUntil: order.pickupLockedUntil && order.pickupLockedUntil > new Date() ? order.pickupLockedUntil : null,
+    /** Đơn đã quá hạn nhưng còn nhận trễ được — khi giao, yêu cầu hoàn đang chờ bị hủy. */
+    latePickupUntil: lateUntil,
   };
 }
 
+export interface PickupConfirmInput {
+  /** Mã nhận hàng / nội dung QR. Bỏ trống ⇒ giao không mã, bắt buộc `manualReason`. */
+  code?: string;
+  phoneLast4: string;
+  cashCollected?: boolean;
+  /** Khách không xuất trình được mã (mất máy, hết pin…): Manager đối chiếu giấy tờ + ghi lý do. */
+  manualReason?: string;
+}
+
 /**
- * Xác nhận giao hàng tại quầy: mã đúng (hash) + 4 số cuối SĐT người nhận ⇒ COMPLETED (mã bị xóa ⇒ dùng một lần).
+ * Đánh dấu "Đã nhận" (COMPLETED) cho đơn tại quầy — đúng hạn hay trễ hạn đều chung MỘT trạng thái:
+ * - READY_FOR_PICKUP (kể cả đã qua `pickupDeadline` mà job chưa chạy) ⇒ giao bình thường.
+ * - NOT_PICKED_UP còn trong `SHOP_LATE_PICKUP_DAYS` và chưa hoàn tiền xong ⇒ "nhận trễ": hủy yêu cầu hoàn đang chờ,
+ *   lấy lại hàng từ kệ (SALE từ hàng đang bán — hết hàng ⇒ 409), đơn CASH thu tiền như thường. Lần bùng vẫn được tính.
+ * Đối chiếu: mã đúng (hash) + 4 số cuối SĐT; hoặc không mã + 4 số cuối SĐT + lý do (ghi lịch sử, người giao).
  * Sai mã/SĐT ⇒ tăng `pickupFailedAttempts`; đủ `SHOP_PICKUP_MAX_ATTEMPTS` ⇒ khóa `SHOP_PICKUP_LOCK_MINUTES` (423).
  */
-export async function confirmPickup(manager: Actor, orderId: string, rawCode: string, last4: string, cashCollected = false) {
+export async function confirmPickup(manager: Actor, orderId: string, input: PickupConfirmInput) {
   const cfg = shopConfig();
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { refunds: { select: { status: true } } } });
   if (!order) throw new AppError("Order not found", 404, { code: "ORDER_NOT_FOUND" });
-  if (order.status !== "READY_FOR_PICKUP") {
+  const lateUntil = latePickupUntil(order, order.refunds);
+  if (order.fulfillmentType !== "PICKUP" || (order.status !== "READY_FOR_PICKUP" && !lateUntil)) {
     throw new AppError(
-      order.status === "COMPLETED" ? "Đơn đã được giao — mã nhận hàng đã dùng." : `Đơn đang ở trạng thái "${ORDER_STATUS_LABEL[order.status]}".`,
+      order.status === "COMPLETED"
+        ? "Đơn đã được giao — mã nhận hàng đã dùng."
+        : order.status === "NOT_PICKED_UP"
+          ? "Đơn đã quá thời hạn nhận trễ hoặc tiền đã được hoàn — không thể giao."
+          : `Đơn đang ở trạng thái "${orderStatusLabel(order.status, order.fulfillmentType)}".`,
       409,
-      { code: order.status === "COMPLETED" ? "PICKUP_CODE_USED" : "ORDER_NOT_READY", status: order.status }
+      {
+        code: order.status === "COMPLETED" ? "PICKUP_CODE_USED" : order.status === "NOT_PICKED_UP" ? "LATE_PICKUP_CLOSED" : "ORDER_NOT_READY",
+        status: order.status,
+      }
     );
   }
   if (order.pickupLockedUntil && order.pickupLockedUntil > new Date()) {
     throw new AppError("Nhập sai quá nhiều lần — tạm khóa xác nhận đơn này.", 423, { code: "PICKUP_LOCKED", lockedUntil: order.pickupLockedUntil });
   }
   const collectCash = isUnpaidCash(order);
-  if (collectCash && !cashCollected) {
+  if (collectCash && !input.cashCollected) {
     throw new AppError(`Đơn trả tại quầy — xác nhận đã thu ${money(order.totalPrice).toLocaleString("vi-VN")}đ tiền mặt trước khi giao.`, 400, {
       code: "CASH_COLLECTION_REQUIRED",
       amountDue: money(order.totalPrice),
     });
   }
+  const rawCode = input.code?.trim() ?? "";
+  const manualReason = input.manualReason?.trim() ?? "";
+  if (!rawCode && manualReason.length < 5) {
+    throw new AppError("Nhập mã nhận hàng, hoặc ghi lý do giao không mã (đã đối chiếu giấy tờ).", 400, { code: "PICKUP_REASON_REQUIRED" });
+  }
 
-  const { orderCode, code } = parsePickupInput(rawCode);
-  const codeOk = order.pickupCodeHash !== null && hashPickupCode(code) === order.pickupCodeHash && (!orderCode || orderCode === order.code);
+  let codeOk = true;
+  if (rawCode) {
+    const { orderCode, code } = parsePickupInput(rawCode);
+    codeOk = order.pickupCodeHash !== null && hashPickupCode(code) === order.pickupCodeHash && (!orderCode || orderCode === order.code);
+  }
   // Đơn tạo qua API cũ có thể không có SĐT người nhận ⇒ chỉ đối chiếu mã.
-  const phoneOk = !order.recipientPhone || phoneLast4(order.recipientPhone) === last4;
+  const phoneOk = !order.recipientPhone || phoneLast4(order.recipientPhone) === input.phoneLast4;
   if (!codeOk || !phoneOk) {
     const attempts = order.pickupFailedAttempts + 1;
     const lock = attempts >= cfg.pickupMaxAttempts;
     const lockedUntil = lock ? new Date(Date.now() + cfg.pickupLockMinutes * 60_000) : null;
     await prisma.order.updateMany({
-      where: { id: order.id, status: "READY_FOR_PICKUP" },
+      where: { id: order.id, status: order.status },
       data: lock ? { pickupFailedAttempts: 0, pickupLockedUntil: lockedUntil } : { pickupFailedAttempts: attempts },
     });
     if (lock) {
@@ -857,23 +922,65 @@ export async function confirmPickup(manager: Actor, orderId: string, rawCode: st
     );
   }
 
+  const late = order.status === "NOT_PICKED_UP" || (!!order.pickupDeadline && order.pickupDeadline < new Date());
   await prisma.$transaction(async (tx) => {
     const now = new Date();
     const total = money(order.totalPrice);
-    await transitionOrderTx(tx, order, "COMPLETED", {
+    const payment = await tx.payment.findUnique({ where: { orderId: order.id } });
+    // Khóa theo giao dịch: tuần tự với duyệt hoàn tiền / webhook (không thể vừa hoàn tiền vừa giao hàng).
+    if (payment) await lockPaymentWebhook(tx, payment.id);
+    const fresh = await tx.order.findUniqueOrThrow({ where: { id: order.id }, include: { items: true } });
+    if (fresh.status !== order.status) {
+      throw new AppError("Đơn vừa được cập nhật bởi thao tác khác, vui lòng tải lại.", 409, { code: "ORDER_STATE_CHANGED" });
+    }
+    const wasNotPickedUp = fresh.status === "NOT_PICKED_UP";
+    if (wasNotPickedUp) {
+      if (await tx.refund.count({ where: { orderId: order.id, status: "COMPLETED" } })) {
+        throw new AppError("Tiền của đơn đã được hoàn — không thể giao hàng.", 409, { code: "LATE_PICKUP_CLOSED" });
+      }
+      await tx.refund.updateMany({
+        where: { orderId: order.id, status: "PENDING" },
+        data: { status: "CANCELLED", processedAt: now, managerNote: "Khách đã đến nhận hàng trễ — hủy yêu cầu hoàn" },
+      });
+    }
+
+    const how = rawCode ? "đã đối chiếu mã + SĐT" : `giao không mã, đã đối chiếu SĐT + giấy tờ: ${manualReason}`;
+    const reason = `${late ? "Khách nhận trễ hạn" : "Giao hàng"} tại quầy${collectCash ? ` + thu tiền mặt ${total.toLocaleString("vi-VN")}đ` : ""} (${how})`;
+    await transitionOrderTx(tx, fresh, "COMPLETED", {
       actorId: manager.id,
-      reason: collectCash ? `Giao hàng tại quầy + thu tiền mặt ${total.toLocaleString("vi-VN")}đ (đã đối chiếu mã + SĐT)` : "Giao hàng tại quầy (đã đối chiếu mã + SĐT)",
+      reason,
       // Dùng một lần: xóa hash ⇒ mã cũ không còn tra được.
       data: { pickupCodeHash: null, pickupFailedAttempts: 0, pickupLockedUntil: null, ...(collectCash ? { paidAt: now } : {}) },
-      notify: { body: `Bạn đã nhận đơn ${order.code} tại quầy. Cảm ơn bạn! Hãy đánh giá sản phẩm nhé.` },
+      notify: {
+        title: `Đơn hàng ${order.code}: Đã nhận`,
+        body: `Bạn đã nhận đơn ${order.code} tại quầy${wasNotPickedUp ? " (nhận trễ — yêu cầu hoàn tiền của đơn đã được hủy)" : ""}. Cảm ơn bạn! Hãy đánh giá sản phẩm nhé.`,
+      },
     });
-    if (!collectCash) return;
-    // Thu tiền mặt: ghi giao dịch CASH + trừ hẳn tồn đang giữ (SALE).
-    const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
-    for (const item of [...items].sort((a, b) => a.productId.localeCompare(b.productId))) {
-      const sold = await applyInventory(tx, { productId: item.productId, type: "SALE", quantity: item.quantity, orderId: order.id, actorId: manager.id, note: `Đơn ${order.code} giao tại quầy, thu tiền mặt` });
-      if (!sold) throw new AppError(`Tồn kho không nhất quán khi giao đơn ${order.code}.`, 500, { code: "INVENTORY_INCONSISTENT" });
+
+    // Đơn đã trả + đúng hạn: hàng đã trừ khi thanh toán. Còn lại phải trừ kho:
+    // CASH đúng hạn ⇒ từ hàng đang giữ; nhận trễ (hàng đã trả lên kệ / đã nhả) ⇒ từ hàng đang bán.
+    if (!collectCash && !wasNotPickedUp) return;
+    for (const item of [...fresh.items].sort((x, y) => x.productId.localeCompare(y.productId))) {
+      const sold = await applyInventory(tx, {
+        productId: item.productId,
+        type: "SALE",
+        quantity: item.quantity,
+        fromAvailable: wasNotPickedUp,
+        orderId: order.id,
+        actorId: manager.id,
+        note: wasNotPickedUp ? `Đơn ${order.code} khách nhận trễ — lấy lại hàng từ kệ` : `Đơn ${order.code} giao tại quầy, thu tiền mặt`,
+      });
+      if (!sold) {
+        throw wasNotPickedUp
+          ? new AppError(`Không đủ hàng "${item.productName ?? item.productId}" để giao đơn nhận trễ.`, 409, {
+              code: "LATE_PICKUP_OUT_OF_STOCK",
+              productId: item.productId,
+            })
+          : new AppError(`Tồn kho không nhất quán khi giao đơn ${order.code}.`, 500, { code: "INVENTORY_INCONSISTENT" });
+      }
     }
+    if (!collectCash) return;
+    // Thu tiền mặt: ghi giao dịch CASH.
     const member = await tx.memberProfile.findUnique({ where: { userId: order.userId }, select: { id: true } });
     await tx.payment.create({
       data: {
@@ -1109,7 +1216,8 @@ export async function onOrderRefundApprovedTx(tx: Tx, refund: { orderId: string 
   const order = await tx.order.findUnique({ where: { id: refund.orderId }, include: { items: true } });
   if (!order || (order.status !== "REFUND_REQUESTED" && order.status !== "NOT_PICKED_UP")) return;
   const wasRequested = order.status === "REFUND_REQUESTED";
-  await transitionOrderTx(tx, order, "REFUNDED", { actorId: managerId, reason: "Quản lý đã duyệt hoàn tiền", notify: false });
+  // Đã hoàn tiền ⇒ hết quyền nhận trễ: xóa mã nhận hàng còn giữ.
+  await transitionOrderTx(tx, order, "REFUNDED", { actorId: managerId, reason: "Quản lý đã duyệt hoàn tiền", data: { pickupCodeHash: null }, notify: false });
   if (wasRequested) {
     for (const item of [...order.items].sort((a, b) => a.productId.localeCompare(b.productId))) {
       await applyInventory(tx, { productId: item.productId, type: "RETURN", quantity: item.quantity, orderId: order.id, actorId: managerId, note: `Hoàn tiền đơn ${order.code} — hàng chưa giao, trả về kho` });

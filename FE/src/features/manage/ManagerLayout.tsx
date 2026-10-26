@@ -38,6 +38,10 @@ import { ThemeToggle, useThemePref } from "./theme";
 import { GlobalSearch } from "./GlobalSearch";
 import { fillRate, usePendingClasses, usePendingCv, useTodaySessions } from "./opsQueries";
 import "./admin.css";
+import "./motion.css";
+import "./notifications.css";
+import { managerNotificationLink } from "./notificationLinks";
+import { RouteProgress } from "./RouteProgress";
 
 const Dashboard = lazy(() => import("./pages/DashboardPage"));
 const UsersPage = lazy(() => import("./pages/UsersPage"));
@@ -61,6 +65,7 @@ const TermsPage = lazy(() => import("./pages/TermsPage"));
 const MembershipPlansPage = lazy(() => import("./pages/MembershipPlansPage"));
 const MembershipsPage = lazy(() => import("./pages/MembershipsPage"));
 const AttendancePenaltiesPage = lazy(() => import("./pages/AttendancePenaltiesPage"));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 
 type NavItem = [path: string, label: string, icon: LucideIcon];
 type NavGroup = { title: string; icon: LucideIcon; items: NavItem[] };
@@ -303,7 +308,7 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
   const sideId = useId();
   const activeGroup = NAV.find((g) => g.items.some(([p]) => isOn(pathname, p)));
   const found = [HOME, ...NAV.flatMap((g) => g.items)].find(([p]) => isOn(pathname, p));
-  const section = found?.[1] ?? (pathname.startsWith("/manager/profile") ? "Tài khoản của tôi" : "Quản trị");
+  const section = found?.[1] ?? (pathname.startsWith("/manager/profile") ? "Tài khoản của tôi" : pathname.startsWith("/manager/notifications") ? "Thông báo" : "Quản trị");
   const [openGroups, setOpenGroups] = useState<string[]>(readOpenGroups);
   // Mặc định mở nhóm chứa trang đang xem (cả khi điều hướng sang nhóm khác).
   useEffect(() => {
@@ -426,14 +431,17 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
           <GlobalSearch pages={pages} />
           <div className="cr-top-actions">
             <ThemeToggle />
-            <NotificationBell />
+            <NotificationBell allHref="/manager/notifications" linkFor={managerNotificationLink} />
             <span className="cr-top-sep" aria-hidden="true" />
             <UserMenu user={user} onLogout={onLogout} />
           </div>
         </header>
+        <RouteProgress />
         <main id="cr-main" className="cr-content" tabIndex={-1}>
           <PageErrorBoundary resetKey={pathname}>
           <Suspense fallback={<Skeleton rows={8} />}>
+            {/* key theo đường dẫn ⇒ mỗi trang mới chạy hiệu ứng vào (motion.css `.cr-page`). */}
+            <div className="cr-page" key={pathname}>
             <Routes>
               <Route path="/manager/dashboard" element={<Dashboard user={user} />} />
               <Route path="/manager/users" element={<UsersPage selfId={user.id} />} />
@@ -458,6 +466,7 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
               <Route path="/manager/attendance" element={<AttendancePenaltiesPage />} />
               <Route path="/manager/reports" element={<Navigate replace to="/manager/revenue" />} />
               <Route path="/manager/profile" element={<ProfilePage user={user} />} />
+              <Route path="/manager/notifications" element={<NotificationsPage />} />
               <Route path="/manager" element={<Navigate replace to="/manager/dashboard" />} />
               <Route path="/" element={<Navigate replace to="/manager/dashboard" />} />
               <Route
@@ -473,6 +482,7 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
                 }
               />
             </Routes>
+            </div>
           </Suspense>
           </PageErrorBoundary>
         </main>

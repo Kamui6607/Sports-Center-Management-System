@@ -50,6 +50,8 @@ export function shopConfig() {
     /** Sai mã nhận hàng N lần ⇒ khóa xác nhận đơn đó trong `pickupLockMinutes`. */
     pickupMaxAttempts: int("SHOP_PICKUP_MAX_ATTEMPTS", 5, 1, 50),
     pickupLockMinutes: int("SHOP_PICKUP_LOCK_MINUTES", 15, 1, 24 * 60),
+    /** Đơn đã NOT_PICKED_UP vẫn nhận trễ được trong N ngày (khi tiền chưa hoàn & còn hàng); 0 = tắt. */
+    latePickupDays: int("SHOP_LATE_PICKUP_DAYS", 7, 0, 60),
     /** Số địa chỉ tối đa trong sổ địa chỉ. */
     maxAddresses: 10,
     /** Số dòng tối đa trong giỏ. */
@@ -115,6 +117,7 @@ export function publicShopConfig() {
     noShowFeeThreshold: cfg.noShowFeeThreshold,
     noShowFeePercent: cfg.noShowFeePercent,
     staleRefundDays: cfg.staleRefundDays,
+    latePickupDays: cfg.latePickupDays,
     /** SEPAY: chuyển khoản trước (mọi hình thức). CASH: trả tại quầy (chỉ PICKUP). */
     paymentMethods: ["SEPAY", "CASH"],
     fulfillmentTypes: ["PICKUP", "DELIVERY"],

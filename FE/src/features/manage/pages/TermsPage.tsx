@@ -3,7 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { CalendarClock, Play, RefreshCw, ScanLine } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { api } from "../../../shared/api";
-import { ConfirmDialog, DataTable, Dialog, Dl, ErrorBox, Field, PageHead, Pager, Panel, Pill, QueryView, SearchBox, Select, dateOnly, dateTime, fieldErrors, get, num, str, useUrlState, vnDateKey, vnd } from "../kit";
+import { ConfirmDialog, DataTable, DetailColumns, DetailSection, Dialog, Dl, ErrorBox, Field, PageHead, Pager, Panel, Pill, QueryView, SearchBox, Select, dateOnly, dateTime, fieldErrors, get, num, str, useUrlState, vnDateKey, vnd } from "../kit";
 import type { Row } from "../kit";
 import { LEAVE_KIND, LEAVE_STATUS, PASS_LEVEL, TERM_PHASE, TERM_STATE, deliverySummary, extractPassToken, percent, registrationSummary, termState } from "../termsView";
 import type { PassLevel, TermEvaluationView } from "../termsView";
@@ -236,39 +236,60 @@ function CoachDetailDialog({ row, onClose }: { row: Row; onClose: () => void }) 
   const del = (ev.delivery ?? {}) as Row;
   const manual = row.manualExempt as Row | null;
   return (
-    <Dialog title={str(get(row, "coach.fullName"))} eyebrow={str(get(row, "coach.email"))} onClose={onClose} wide footer={<button className="cr-btn" onClick={onClose}>Đóng</button>}>
-      <p style={{ margin: 0 }}>
-        <Pill tone={tone}>{label}</Pill> {ev.final ? "Kết quả cuối kỳ" : "Kết quả tạm thời (kỳ chưa kết thúc)"}
-      </p>
-      {ev.reasons.length > 0 && (
-        <ul style={{ margin: "10px 0" }}>
-          {ev.reasons.map((r) => (
-            <li key={r}>{r}</li>
-          ))}
-        </ul>
-      )}
-      {ev.warnings.length > 0 && (
-        <div role="note" style={{ margin: "10px 0" }}>
-          <strong>Cảnh báo</strong>
-          <ul style={{ margin: "6px 0 0" }}>
-            {ev.warnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <Dl
-        items={[
-          ["Hạn tạo khóa", dateOnly(new Date(new Date(str(ev.deadlineAt)).getTime() - 1))],
-          ["Khóa hợp lệ", reg.ok ? `${str(reg.qualifyingClassName)} · ${str(reg.mainSessions)} buổi, trải ${str(reg.spanDays)} ngày` : `Chưa có (cần ≥ ${str(get(reg, "required.sessions"))} buổi, trải ≥ ${str(get(reg, "required.spanDays"))} ngày)`],
-          ["Đã dạy / hủy / chưa hoàn tất", `${str(del.completed)} / ${str(del.cancelled)} / ${str(del.awaitingComplete)}`],
-          ["Tỷ lệ đã dạy", percent(del.completionRate)],
-          ["Tỷ lệ hủy", percent(del.cancelRate)],
-          ["Có bằng chứng dạy (điểm danh/QR)", `${percent(del.evidenceRate)} (${str(del.withEvidence)}/${str(del.completedWithStudents)} buổi có học viên)`],
-          ["Nghỉ phép được duyệt", `${str(get(ev, "leave.approvedDays"))} ngày (gia hạn ân hạn ${str(get(ev, "leave.graceExtensionDays"))} ngày)`],
-          ["Miễn trừ thủ công", manual ? `${str(manual.reason)} (${dateTime(manual.at)})` : ""],
-          ["Bậc nhắc đã gửi", str(row.lastReminderStage)],
-        ]}
+    <Dialog
+      title={str(get(row, "coach.fullName"))}
+      eyebrow={`${str(get(row, "coach.email"))} · ${ev.final ? "Kết quả cuối kỳ" : "Kết quả tạm thời (kỳ chưa kết thúc)"}`}
+      badge={<Pill tone={tone}>{label}</Pill>}
+      onClose={onClose}
+      size="detail"
+      footer={<button className="cr-btn" onClick={onClose}>Đóng</button>}
+    >
+      <DetailColumns
+        main={
+          <DetailSection title="Chỉ số trong kỳ">
+            <Dl
+              compact
+              items={[
+                ["Hạn tạo khóa", dateOnly(new Date(new Date(str(ev.deadlineAt)).getTime() - 1))],
+                ["Khóa hợp lệ", reg.ok ? `${str(reg.qualifyingClassName)} · ${str(reg.mainSessions)} buổi, trải ${str(reg.spanDays)} ngày` : `Chưa có (cần ≥ ${str(get(reg, "required.sessions"))} buổi, trải ≥ ${str(get(reg, "required.spanDays"))} ngày)`],
+                ["Đã dạy / hủy / chưa hoàn tất", `${str(del.completed)} / ${str(del.cancelled)} / ${str(del.awaitingComplete)}`],
+                ["Tỷ lệ đã dạy", percent(del.completionRate)],
+                ["Tỷ lệ hủy", percent(del.cancelRate)],
+                ["Có bằng chứng dạy (điểm danh/QR)", `${percent(del.evidenceRate)} (${str(del.withEvidence)}/${str(del.completedWithStudents)} buổi có học viên)`],
+                ["Nghỉ phép được duyệt", `${str(get(ev, "leave.approvedDays"))} ngày (gia hạn ân hạn ${str(get(ev, "leave.graceExtensionDays"))} ngày)`],
+                ["Miễn trừ thủ công", manual ? `${str(manual.reason)} (${dateTime(manual.at)})` : ""],
+                ["Bậc nhắc đã gửi", str(row.lastReminderStage)],
+              ]}
+            />
+          </DetailSection>
+        }
+        side={
+          <>
+            {ev.reasons.length === 0 && ev.warnings.length === 0 ? (
+              <DetailSection title="Kết luận">
+                <p className="cr-muted" style={{ margin: 0 }}>Không có lý do hay cảnh báo nào.</p>
+              </DetailSection>
+            ) : null}
+            {ev.reasons.length > 0 && (
+              <DetailSection title="Lý do">
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {ev.reasons.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </DetailSection>
+            )}
+            {ev.warnings.length > 0 && (
+              <DetailSection title="Cảnh báo" tone="warn">
+                <ul role="note" style={{ margin: 0, paddingLeft: 18 }}>
+                  {ev.warnings.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              </DetailSection>
+            )}
+          </>
+        }
       />
     </Dialog>
   );

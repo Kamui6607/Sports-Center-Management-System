@@ -21,7 +21,8 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   COMPLETED: [],
   EXPIRED: [],
   CANCELLED: [],
-  NOT_PICKED_UP: ["REFUNDED"],
+  // COMPLETED = khách đến nhận TRỄ trong `SHOP_LATE_PICKUP_DAYS` (tiền chưa hoàn, còn hàng) — chung trạng thái "Đã nhận".
+  NOT_PICKED_UP: ["REFUNDED", "COMPLETED"],
   // Từ chối hoàn tiền ⇒ quay về trạng thái ngay trước REFUND_REQUESTED.
   REFUND_REQUESTED: ["REFUNDED", "PAID", "PROCESSING", "READY_FOR_PICKUP"],
   REFUNDED: [],
@@ -91,6 +92,12 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   REFUND_REQUESTED: "Chờ hoàn tiền",
   REFUNDED: "Đã hoàn tiền",
 };
+
+/** Nhãn theo hình thức nhận: đơn tại quầy đã giao (đúng hạn hay trễ) đều là MỘT trạng thái "Đã nhận". */
+export function orderStatusLabel(status: OrderStatus, fulfillmentType?: "PICKUP" | "DELIVERY" | null): string {
+  if (status === "COMPLETED" && fulfillmentType === "PICKUP") return "Đã nhận";
+  return ORDER_STATUS_LABEL[status];
+}
 
 function defaultNotice(code: string, to: OrderStatus): { title: string; body: string } {
   const body: Record<OrderStatus, string> = {

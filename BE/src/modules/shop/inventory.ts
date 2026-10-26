@@ -11,6 +11,8 @@ export interface InventoryChange {
   orderId?: string | null;
   actorId?: string | null;
   note?: string | null;
+  /** SALE lấy thẳng từ hàng đang bán (đơn không còn giữ chỗ, VD khách nhận trễ): cần stock − reserved ≥ q, không đụng reserved. */
+  fromAvailable?: boolean;
 }
 
 type StockRow = { stockQuantity: number; reservedStock: number };
@@ -27,6 +29,7 @@ type StockRow = { stockQuantity: number; reservedStock: number };
  * | RESERVE |       | +q       | isActive AND stock − reserved ≥ q |
  * | RELEASE |       | −q       | (không âm)                        |
  * | SALE    | −q    | −q       | reserved ≥ q AND stock ≥ q        |
+ * | SALE*   | −q    |          | stock − reserved ≥ q (`fromAvailable`) |
  * | RETURN  | +q    |          |                                   |
  * | ADJUST  | +δ    |          | stock + δ ≥ reserved              |
  */
@@ -58,6 +61,13 @@ export async function applyInventory(tx: Tx, change: InventoryChange): Promise<S
         RETURNING "stockQuantity", "reservedStock"`;
       break;
     case "SALE":
+      if (change.fromAvailable) {
+        rows = await tx.$queryRaw<StockRow[]>`
+          UPDATE "Product" SET "stockQuantity" = "stockQuantity" - ${q}::int, "updatedAt" = NOW()
+          WHERE "id" = ${productId} AND "stockQuantity" - "reservedStock" >= ${q}::int
+          RETURNING "stockQuantity", "reservedStock"`;
+        break;
+      }
       rows = await tx.$queryRaw<StockRow[]>`
         UPDATE "Product" SET
           "stockQuantity" = "stockQuantity" - ${q}::int,

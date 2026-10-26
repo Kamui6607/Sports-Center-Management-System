@@ -1,12 +1,28 @@
 import { Prisma, type OrderStatus } from "@prisma/client";
 import { shopConfig } from "../../config/shop.js";
-import { isUnpaidCash, managerTransitionsFor, ORDER_STATUS_LABEL } from "./order-state.js";
+import { isUnpaidCash, managerTransitionsFor, orderStatusLabel } from "./order-state.js";
 import { maskPhone, pickupCodeFor, pickupQrPayload } from "./pickup-code.js";
 import { vnDateString } from "./pickup-schedule.js";
 
 /** Số tiền VND (số nguyên) — Decimal của Prisma trả về object/string. */
 export function money(value: unknown): number {
   return Math.round(Number(value ?? 0));
+}
+
+/**
+ * Hạn "nhận trễ" của đơn tại quầy đã quá hạn (NOT_PICKED_UP): `notPickedUpAt + SHOP_LATE_PICKUP_DAYS`, chỉ khi
+ * tiền chưa hoàn xong (không có Refund COMPLETED). null ⇒ không còn nhận trễ được.
+ */
+export function latePickupUntil(
+  o: { status: OrderStatus; fulfillmentType: string; notPickedUpAt: Date | null },
+  refunds: { status: string }[],
+  now = new Date()
+): Date | null {
+  const days = shopConfig().latePickupDays;
+  if (o.status !== "NOT_PICKED_UP" || o.fulfillmentType !== "PICKUP" || !o.notPickedUpAt || days <= 0) return null;
+  if (refunds.some((r) => r.status === "COMPLETED")) return null;
+  const until = new Date(o.notPickedUpAt.getTime() + days * 86_400_000);
+  return until > now ? until : null;
 }
 
 /** Nhóm trạng thái cho tab "Đơn của tôi" / lọc của Manager. */
@@ -76,7 +92,7 @@ export function orderSummaryView(o: ListOrder) {
     id: o.id,
     code: o.code,
     status: o.status,
-    statusLabel: ORDER_STATUS_LABEL[o.status],
+    statusLabel: orderStatusLabel(o.status, o.fulfillmentType),
     fulfillmentType: o.fulfillmentType,
     /** SEPAY = đã/đang chuyển khoản trước; CASH = trả tiền khi nhận tại quầy. */
     paymentMethod: o.paymentMethod,
@@ -144,7 +160,7 @@ function baseDetail(o: DetailOrder, now = new Date()) {
       id: h.id,
       fromStatus: h.fromStatus,
       toStatus: h.toStatus,
-      label: ORDER_STATUS_LABEL[h.toStatus],
+      label: orderStatusLabel(h.toStatus, o.fulfillmentType),
       reason: h.reason,
       byCustomer: h.actorId !== null && h.actorId === o.userId,
       bySystem: h.actorId === null,
@@ -170,7 +186,8 @@ function baseDetail(o: DetailOrder, now = new Date()) {
 
 /** Chi tiết đơn cho CHỦ ĐƠN: thêm mã nhận hàng (khi READY), quyền thao tác, quyền đánh giá từng dòng. */
 export function orderOwnerView(o: DetailOrder, now = new Date()) {
-  const pickupReady = o.status === "READY_FOR_PICKUP" && o.pickupCodeNonce;
+  const lateUntil = latePickupUntil(o, o.refunds, now);
+  const pickupReady = (o.status === "READY_FOR_PICKUP" || lateUntil !== null) && o.pickupCodeNonce && o.pickupCodeHash;
   const pickupCode = pickupReady ? pickupCodeFor(o.id, o.pickupCodeNonce!) : null;
   const cfg = shopConfig();
   const unpaidCash = isUnpaidCash(o);
@@ -185,7 +202,13 @@ export function orderOwnerView(o: DetailOrder, now = new Date()) {
     })),
     pickup:
       pickupReady && pickupCode
-        ? { code: pickupCode, qrPayload: pickupQrPayload(o.code, pickupCode), deadline: o.pickupDeadline }
+        ? {
+            code: pickupCode,
+            qrPayload: pickupQrPayload(o.code, pickupCode),
+            deadline: o.pickupDeadline,
+            /** Đơn đã quá hạn nhưng vẫn nhận trễ được tới mốc này (Trung tâm hủy hoàn tiền khi khách nhận). */
+            latePickupUntil: lateUntil,
+          }
         : null,
     actions: {
       canPay: o.status === "PENDING_PAYMENT" && !!o.paymentExpiresAt && o.paymentExpiresAt > now && !!o.payment,
@@ -204,8 +227,20 @@ export function orderOwnerView(o: DetailOrder, now = new Date()) {
 }
 
 /** Chi tiết đơn cho MANAGER: thông tin người mua, chuyển trạng thái được phép; KHÔNG lộ mã nhận hàng. */
-export function orderManagerView(o: DetailOrder, now = new Date(), buyerStats?: { noShowCount: number; cashPickupLockedUntil: Date | null }) {
+export interface PickupReceipt {
+  receivedAt: Date | null;
+  handedOverBy: { id: string; fullName: string } | null;
+  note: string | null;
+}
+
+export function orderManagerView(
+  o: DetailOrder,
+  now = new Date(),
+  buyerStats?: { noShowCount: number; cashPickupLockedUntil: Date | null },
+  receipt?: PickupReceipt | null
+) {
   const allowed = managerTransitionsFor(o);
+  const lateUntil = latePickupUntil(o, o.refunds, now);
   return {
     ...baseDetail(o, now),
     items: o.items.map((i) => ({
@@ -223,15 +258,30 @@ export function orderManagerView(o: DetailOrder, now = new Date(), buyerStats?: 
       cashPickupLockedUntil: buyerStats?.cashPickupLockedUntil ?? null,
     },
     recipientPhoneMasked: maskPhone(o.recipientPhone),
-    allowedTransitions: allowed.map((s) => ({ status: s, label: ORDER_STATUS_LABEL[s], requiresTrackingCode: s === "SHIPPING" })),
+    allowedTransitions: allowed.map((s) => ({ status: s, label: orderStatusLabel(s, o.fulfillmentType), requiresTrackingCode: s === "SHIPPING" })),
     pickup:
-      o.status === "READY_FOR_PICKUP"
+      o.status === "READY_FOR_PICKUP" || lateUntil
         ? {
             deadline: o.pickupDeadline,
+            /** Khách đến sau hạn: giao được tới mốc này (hủy yêu cầu hoàn đang chờ, lấy lại hàng từ kệ). */
+            late: lateUntil !== null,
+            latePickupUntil: lateUntil,
+            /** Mã còn hiệu lực (đơn quá hạn cũ đã xóa mã ⇒ chỉ đối chiếu SĐT + giấy tờ). */
+            hasCode: o.pickupCodeHash !== null,
             /** Đơn trả tại quầy: Manager phải thu tiền mặt khi giao. */
             requiresCashCollection: isUnpaidCash(o),
             failedAttempts: o.pickupFailedAttempts,
             lockedUntil: o.pickupLockedUntil && o.pickupLockedUntil > now ? o.pickupLockedUntil : null,
+          }
+        : null,
+    /** Đơn tại quầy "Đã nhận": thời điểm nhận, người giao, nhận trễ hạn hay không. */
+    receipt:
+      o.fulfillmentType === "PICKUP" && o.status === "COMPLETED"
+        ? {
+            receivedAt: receipt?.receivedAt ?? o.completedAt,
+            handedOverBy: receipt?.handedOverBy ?? null,
+            note: receipt?.note ?? null,
+            late: o.notPickedUpAt !== null || (!!o.pickupDeadline && !!o.completedAt && o.completedAt > o.pickupDeadline),
           }
         : null,
   };

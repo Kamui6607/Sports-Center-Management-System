@@ -239,6 +239,7 @@ abstract final class ShopJson {
               deadline: pickup.dateOrNull('deadline'),
               failedAttempts: pickup.integer('failedAttempts'),
               lockedUntil: pickup.dateOrNull('lockedUntil'),
+              latePickupUntil: pickup.dateOrNull('latePickupUntil'),
             ),
       canPay: actions.boolean('canPay'),
       canCancel: actions.boolean('canCancel'),

@@ -369,6 +369,8 @@ export function Dialog({
   footer,
   busy = false,
   wide = false,
+  size,
+  badge,
   onSubmit,
 }: {
   title: string;
@@ -378,6 +380,10 @@ export function Dialog({
   footer?: ReactNode;
   busy?: boolean;
   wide?: boolean;
+  /** "detail" ⇒ popup xem chi tiết rộng, vừa một màn hình desktop (dùng kèm `DetailColumns`). */
+  size?: "detail";
+  /** Nhãn cạnh tiêu đề (VD trạng thái). */
+  badge?: ReactNode;
   onSubmit?: (e: FormEvent) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -387,6 +393,18 @@ export function Dialog({
     ref.current?.showModal();
     return () => opener?.focus?.({ preventScroll: true });
   }, []);
+  // Đã gõ/chọn trong popup ⇒ đóng bằng Esc / click nền phải xác nhận (tránh mất dữ liệu đang nhập).
+  const dirty = useRef(false);
+  const pressedOnBackdrop = useRef(false);
+  const isBackdrop = (e: { target: EventTarget; clientX: number; clientY: number }) => {
+    const box = ref.current?.getBoundingClientRect();
+    return e.target === ref.current && !!box && (e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom);
+  };
+  const requestClose = () => {
+    if (busy) return;
+    if (dirty.current && !window.confirm("Đóng popup? Nội dung đang nhập sẽ không được lưu.")) return;
+    onClose();
+  };
   const body = (
     <>
       <div className="cr-modal-body">{children}</div>
@@ -396,16 +414,26 @@ export function Dialog({
   return (
     <dialog
       ref={ref}
-      className={"cr-modal" + (wide ? " wide" : "")}
+      className={"cr-modal" + (size === "detail" ? " detail" : wide ? " wide" : "")}
       aria-labelledby={titleId}
       onCancel={(e) => {
         e.preventDefault();
-        if (!busy) onClose();
+        requestClose();
+      }}
+      onInput={() => (dirty.current = true)}
+      // Chỉ đóng khi nhấn VÀ thả chuột đều ở nền (kéo chọn chữ từ trong popup ra ngoài không đóng).
+      onMouseDown={(e) => (pressedOnBackdrop.current = isBackdrop(e))}
+      onClick={(e) => {
+        if (pressedOnBackdrop.current && isBackdrop(e)) requestClose();
+        pressedOnBackdrop.current = false;
       }}
     >
       <div className="cr-modal-head">
         <div>
-          <h2 id={titleId}>{title}</h2>
+          <h2 id={titleId}>
+            {title}
+            {badge ? <span className="cr-modal-badge">{badge}</span> : null}
+          </h2>
           {eyebrow && <p>{eyebrow}</p>}
         </div>
         <button type="button" className="cr-icon-btn" onClick={onClose} disabled={busy} aria-label="Đóng">
@@ -467,7 +495,7 @@ export function ConfirmDialog({
           <button type="button" className="cr-btn" onClick={onClose} disabled={busy}>
             Hủy
           </button>
-          <button type="submit" className={"cr-btn " + (danger ? "danger-solid" : "primary")} disabled={busy || invalid}>
+          <button type="submit" className={"cr-btn " + (danger ? "danger-solid" : "primary")} disabled={busy || invalid} aria-busy={busy || undefined}>
             {busy ? "Đang xử lý…" : confirmLabel}
           </button>
         </>
@@ -530,9 +558,9 @@ export function Field({
   );
 }
 
-export function Dl({ items }: { items: [string, ReactNode][] }) {
+export function Dl({ items, compact = false, cols }: { items: [string, ReactNode][]; compact?: boolean; cols?: 3 }) {
   return (
-    <dl className="cr-dl">
+    <dl className={"cr-dl" + (compact ? " compact" : "") + (cols === 3 ? " cols-3" : "")}>
       {items.map(([k, v]) => (
         <div key={k}>
           <dt>{k}</dt>
@@ -540,6 +568,65 @@ export function Dl({ items }: { items: [string, ReactNode][] }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+// ── Bố cục popup xem chi tiết (Dialog size="detail") ───────────────────────
+/** Hai cột: trái = thông tin (người, sản phẩm…), phải = tiền, trạng thái, hành động. Màn hẹp ⇒ một cột. */
+export function DetailColumns({ main, side }: { main: ReactNode; side: ReactNode }) {
+  return (
+    <div className="cr-detail">
+      <div className="cr-detail-col">{main}</div>
+      <div className="cr-detail-col side">{side}</div>
+    </div>
+  );
+}
+
+/** Khối gọn trong popup chi tiết (nhẹ hơn `Panel`). `tone` = nhấn mạnh khối hành động. */
+export function DetailSection({
+  title,
+  actions,
+  tone,
+  children,
+}: {
+  title?: ReactNode;
+  actions?: ReactNode;
+  tone?: "accent" | "warn";
+  children: ReactNode;
+}) {
+  return (
+    <section className={"cr-dsec" + (tone ? ` ${tone}` : "")}>
+      {(title || actions) && (
+        <div className="cr-dsec-head">
+          {title && <h3>{title}</h3>}
+          {actions}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+/** Ô tổng nổi bật (số tiền / con số chính) + các dòng phụ. */
+export function DetailTotal({ label, value, rows = [], extra }: { label: string; value: ReactNode; rows?: [string, ReactNode][]; extra?: ReactNode }) {
+  return (
+    <div className="cr-dtotal">
+      <div className="cr-dtotal-main">
+        <span>{label}</span>
+        <strong>{value}</strong>
+        {extra}
+      </div>
+      {rows.length > 0 && (
+        <dl className="cr-rows">
+          {rows.map(([k, v]) => (
+            <div key={k}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
   );
 }
 

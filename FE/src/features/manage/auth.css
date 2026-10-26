@@ -1,0 +1,153 @@
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@600;700;800&display=swap");
+
+/*
+ * Màn công khai của Web: Đăng nhập, Quên / Đặt lại mật khẩu.
+ * Trái: trường màu rêu của thương hiệu (câu chuyện + đường nhịp tim + video). Phải: biểu mẫu đặt thẳng trên nền, không hộp, không bóng.
+ */
+.pa {
+  --pa-field: #203d31;
+  --pa-ink: #ffffff;
+  --pa-ink-2: rgba(255, 255, 255, 0.78);
+  --pa-lime: #d3f879;
+  --pa-display: "Be Vietnam Pro", var(--font);
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(440px, 1fr);
+}
+html[data-theme="dark"] .pa { --pa-field: #15291f; }
+
+/* ── Trái: câu chuyện ───────────────────────────────── */
+.pa-story {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 28px;
+  padding: 36px 56px 0; background: var(--pa-field); color: var(--pa-ink);
+}
+.pa-word {
+  align-self: flex-start; display: inline-flex; align-items: baseline; gap: 10px;
+  font-family: var(--pa-display); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--pa-ink); text-decoration: none;
+}
+.pa-word span { color: var(--pa-lime); margin-left: -10px; }
+.pa-word small { font-family: var(--font); font-size: 14px; font-weight: 500; letter-spacing: 0; color: var(--pa-lime); }
+.pa-copy { margin-top: clamp(16px, 6vh, 72px); }
+.pa-story h1 {
+  margin: 0; font-family: var(--pa-display); font-weight: 700; color: var(--pa-ink);
+  font-size: clamp(36px, 3.7vw, 58px); line-height: 1.02; letter-spacing: -0.035em;
+}
+.pa-line { display: block; overflow: hidden; padding-bottom: 0.1em; margin-bottom: -0.1em; }
+.pa-line > span { display: block; }
+.pa-story p { margin: 20px 0 0; max-width: 44ch; font-size: 17px; line-height: 1.55; color: var(--pa-ink-2); }
+.pa-pulse { display: block; width: 100%; height: 56px; color: var(--pa-lime); flex: none; }
+.pulse-line path { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+.pulse-line-base { stroke: currentColor; stroke-width: 1.5; opacity: 0.18; }
+.pulse-line-trace { stroke: currentColor; stroke-width: 3; }
+.pa-film { margin: 0; flex: 1 1 auto; min-height: 220px; display: flex; flex-direction: column; gap: 14px; }
+.pa-film figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; font-size: 15px; }
+.pa-film figcaption strong { font-weight: 600; color: var(--pa-ink); }
+.pa-film figcaption span { color: var(--pa-lime); font-variant-numeric: tabular-nums; }
+.pa-shutter { position: relative; flex: 1; overflow: hidden; border-radius: 14px 14px 0 0; background: #10211a; }
+.pa-shutter video, .pa-shutter img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(0.85); }
+
+/* ── Phải: biểu mẫu ─────────────────────────────────── */
+.pa-side { display: grid; grid-template-rows: auto 1fr auto; gap: 24px; padding: 24px 56px 28px; background: var(--bg); min-width: 0; }
+.pa-side-top { display: flex; justify-content: space-between; align-items: center; }
+.pa-back {
+  display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px 0 8px; margin-left: -8px; border-radius: var(--r);
+  color: var(--text-2); font-weight: 500; text-decoration: none; transition: background-color var(--t-hover) ease, color var(--t-hover) ease;
+}
+.pa-form-wrap { display: grid; align-content: center; justify-items: center; }
+.pa-form { width: min(400px, 100%); display: grid; gap: 18px; }
+.pa-head h2 { margin: 0; font-family: var(--pa-display); font-size: 30px; line-height: 1.15; font-weight: 700; letter-spacing: -0.025em; color: var(--text); }
+.pa-head p { margin: 8px 0 0; color: var(--text-2); font-size: 15px; line-height: 1.55; }
+.pa-head p strong { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+.pa-field { display: grid; gap: 7px; }
+.pa-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.pa-label label { font-size: 14px; font-weight: 500; color: var(--text); }
+.pa-field small { color: var(--text-3); font-size: 13px; }
+.pa-field .cr-err { font-size: 13px; }
+.cr .pa :where(input:not([type="checkbox"]):not([type="radio"])) { height: 46px; font-size: 15px; border-radius: var(--r); }
+.cr .pa .cr-pass input { padding-right: 46px; }
+.pa .cr-pass button { width: 38px; height: 36px; }
+.pa-caps { color: var(--warning-text) !important; font-weight: 500; }
+.pa-check { display: inline-flex; align-items: center; gap: 6px; color: var(--text-3); transition: color var(--t-hover) ease; }
+.pa-check svg { opacity: 0.35; transition: opacity var(--t-hover) ease; }
+.pa-check.ok { color: var(--success-text); }
+.pa-check.ok svg { opacity: 1; }
+.pa-submit { height: 48px; width: 100%; font-size: 15px; font-weight: 600; margin-top: 4px; }
+.pa-link {
+  background: none; border: 0; padding: 0; font: inherit; font-size: 14px; font-weight: 500; color: var(--primary-text); cursor: pointer;
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 0.22em; text-decoration-thickness: 1.5px;
+  transition: text-decoration-color var(--t-hover) ease, color var(--t-hover) ease;
+}
+.pa-link:disabled { color: var(--text-3); cursor: default; }
+.pa-inline { display: inline; margin-top: 8px; }
+.pa-alt { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; }
+.pa-foot { margin: 0; text-align: center; color: var(--text-3); font-size: 13px; }
+@media (hover: hover) and (pointer: fine) {
+  .pa-link:hover:not(:disabled) { text-decoration-color: currentColor; }
+  .pa-back:hover { background: var(--surface-hover); color: var(--text); }
+}
+
+/* Ô mã 6 số: input thật phủ lên trên, 6 ô chỉ hiển thị. */
+.pa-otp { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; cursor: text; }
+.cr .pa .pa-otp input {
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; cursor: text; z-index: 1;
+}
+.pa-otp span {
+  height: 54px; display: grid; place-items: center; border: 1px solid var(--border-strong); border-radius: var(--r); background: var(--surface);
+  font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text);
+  transition: border-color var(--t-hover) ease, background-color var(--t-hover) ease, transform var(--t-press) var(--ease-out);
+}
+.pa-otp span.filled { background: var(--surface-2); }
+.pa-otp.focused span.active { border-color: var(--focus); outline: 2px solid var(--focus-ring); outline-offset: 0; }
+.pa-otp.focused span.active:empty::after { content: ""; width: 2px; height: 24px; background: var(--text); animation: pa-caret 1s steps(1) infinite; }
+.pa-otp.invalid span { border-color: var(--danger); }
+@keyframes pa-caret { 50% { opacity: 0; } }
+
+.pa-done { justify-items: start; }
+.pa-done-mark { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-fg); }
+
+/* ── Chuyển động lúc vào trang (xong trong ~1,2 giây, tối đa 4 nhóm) ─── */
+@media (prefers-reduced-motion: no-preference) {
+  .pa-line > span { transform: translateY(105%); animation: pa-line 820ms var(--ease-out) forwards; animation-delay: calc(100ms + var(--i, 0) * 90ms); }
+  .pa-story .pa-rise { opacity: 0; animation: pa-rise 520ms var(--ease-out) forwards; animation-delay: var(--d, 0ms); }
+  .pulse-line-trace { stroke-dasharray: 1; stroke-dashoffset: 1; animation: pa-draw 1100ms var(--ease-in-out) 260ms forwards; }
+  .pa-shutter { clip-path: inset(100% 0 0 0); animation: pa-open 1100ms var(--ease-in-out) 180ms forwards; }
+  .pa-shutter > * { transform: scale(1.12); animation: pa-settle 1500ms cubic-bezier(0.33, 1, 0.68, 1) 120ms forwards; }
+  .pa-film figcaption { opacity: 0; animation: pa-rise 520ms var(--ease-out) 700ms forwards; }
+  /* Biểu mẫu: tiêu đề → các ô → nút, so le 60ms. Đổi bước (quên mật khẩu → nhập mã) chạy lại vì form mới được gắn. */
+  /* `backwards` + keyframe chỉ có `from` ⇒ sau hiệu ứng phần tử trở về style gốc (nút bị khóa vẫn mờ 50%). */
+  .pa-form > .pa-rise, .pa-form > .cr-alert { animation: pa-in 460ms var(--ease-out) backwards; }
+  .pa-form > :nth-child(1) { animation-delay: 80ms; }
+  .pa-form > :nth-child(2) { animation-delay: 140ms; }
+  .pa-form > :nth-child(3) { animation-delay: 200ms; }
+  .pa-form > :nth-child(n + 4) { animation-delay: 260ms; }
+  .pa-done-mark { animation: pa-pop 520ms var(--ease-out) both; }
+  .pa-otp span.filled { animation: pa-digit 180ms var(--ease-out); }
+}
+@keyframes pa-line { to { transform: none; } }
+@keyframes pa-in { from { opacity: 0; transform: translateY(12px); } }
+@keyframes pa-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes pa-draw { to { stroke-dashoffset: 0; } }
+@keyframes pa-open { to { clip-path: inset(0); } }
+@keyframes pa-settle { to { transform: none; } }
+@keyframes pa-pop { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes pa-digit { from { transform: translateY(4px); } to { transform: none; } }
+
+/* ── Màn hẹp: dải thương hiệu gọn ở trên, biểu mẫu ngay dưới ─────────── */
+@media (max-width: 960px) {
+  .pa { grid-template-columns: minmax(0, 1fr); }
+  .pa-story { padding: 20px 24px 24px; gap: 16px; }
+  .pa-copy { margin-top: 8px; }
+  .pa-story h1 { font-size: clamp(30px, 6.4vw, 44px); }
+  .pa-story p, .pa-film { display: none; }
+  .pa-pulse { height: 40px; }
+  .pa-side { padding: 16px 24px 24px; }
+  .pa-form-wrap { align-content: start; padding-top: 8px; }
+}
+@media (max-width: 480px) {
+  .pa-story { padding: 16px 16px 20px; }
+  .pa-side { padding: 12px 16px 24px; }
+  .pa-head h2 { font-size: 26px; }
+  .pa-otp { gap: 6px; }
+  .pa-otp span { height: 50px; font-size: 20px; }
+}

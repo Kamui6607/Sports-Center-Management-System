@@ -635,6 +635,37 @@ a.cr-kpi:hover { background: var(--surface-2); }
 .cr-modal-head p { margin: 2px 0 0; color: var(--text-3); font-size: 13px; }
 .cr-modal-body { padding: 18px 22px; display: grid; gap: 16px; }
 .cr-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border); background: var(--surface-2); flex-wrap: wrap; border-radius: 0 0 16px 16px; }
+.cr-modal-badge { display: inline-flex; vertical-align: middle; margin-left: 10px; font-size: 13px; }
+/* Popup xem chi tiết: rộng, cao tối đa một màn hình, hai cột (trái thông tin · phải tiền/trạng thái/hành động) */
+.cr-modal.detail { width: min(1200px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+.cr-modal.detail .cr-modal-head { padding: 16px 22px 0; }
+.cr-modal.detail .cr-modal-body { padding: 14px 22px 18px; gap: 12px; }
+.cr-detail { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(340px, 1fr); gap: 14px; align-items: start; }
+.cr-detail-col { display: grid; gap: 12px; min-width: 0; align-content: start; }
+.cr-dsec { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface); min-width: 0; }
+.cr-dsec.accent { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); background: color-mix(in srgb, var(--primary) 6%, var(--surface)); }
+.cr-dsec.warn { border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); background: color-mix(in srgb, var(--warning) 6%, var(--surface)); }
+.cr-dsec-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.cr-dsec-head h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.cr-dsec .cr-form { gap: 10px 14px; }
+.cr-dsec .cr-table-wrap { margin: 0 -6px; }
+.cr-dsec .cr-table { min-width: 0; }
+.cr-dsec .cr-table th, .cr-dsec .cr-table td { padding-top: 6px; padding-bottom: 6px; }
+.cr-dsec details summary { cursor: pointer; color: var(--text-2); font-size: 13px; }
+.cr-dl.compact { gap: 10px 18px; }
+.cr-dl.compact dt { font-size: 12px; margin-bottom: 1px; }
+.cr-dl.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cr-dtotal { display: grid; gap: 6px; }
+.cr-dtotal-main { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.cr-dtotal-main span { color: var(--text-3); font-size: 12.5px; }
+.cr-dtotal-main strong { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.cr-dtotal .cr-rows > div { padding: 6px 0; font-size: 13.5px; }
+.cr-refund-item + .cr-refund-item { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+.cr-btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.cr-timeline { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.cr-timeline li { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; }
+.cr-timeline time { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.cr-timeline small { display: block; color: var(--text-3); }
 @keyframes cr-dialog { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
 .cr-confirm-target { padding: 11px 14px; border-radius: var(--r); background: var(--surface-2); border: 1px solid var(--border); }
 .cr-confirm-target small { display: block; color: var(--text-3); font-size: 12px; }
@@ -880,6 +911,8 @@ html[data-theme="dark"] body:has(.cr) .toast-info { color: #8ab8e0; }
   }
 }
 @media (max-width: 960px) {
+  .cr-detail { grid-template-columns: minmax(0, 1fr); }
+  .cr-dl.cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cr-grid-2 { grid-template-columns: minmax(0, 1fr); }
   .cr-menu-trigger .cr-menu-name { display: none; }
 }
@@ -898,6 +931,8 @@ html[data-theme="dark"] body:has(.cr) .toast-info { color: #8ab8e0; }
 }
 @media (max-width: 600px) {
   .cr-form, .cr-dl { grid-template-columns: minmax(0, 1fr); }
+  .cr-dl.cols-3 { grid-template-columns: minmax(0, 1fr); }
+  .cr-timeline li { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .cr-filters > *, .cr-filters .cr-search, .cr-toolbar .cr-search, .cr-toolbar .cr-field { max-width: none; flex-basis: 100%; }
   .cr-bar-row { grid-template-columns: minmax(0, 1fr) auto; }
   .cr-bar-row .cr-bar-track { grid-column: 1 / -1; grid-row: 2; }

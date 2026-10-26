@@ -212,6 +212,19 @@ class OrderDetailScreen extends ConsumerWidget {
             'Trung tâm sẽ báo khi hàng sẵn sàng; bạn thanh toán ${Money.format(o.amountDueAtCounter)} khi nhận tại quầy.',
       ),
       ShopOrderStatus.readyForPickup when o.pickup?.code != null => _PickupCard(order: o),
+      // Quá hạn nhưng còn nhận trễ được: vẫn hiện mã, kèm hạn nhận trễ.
+      ShopOrderStatus.notPickedUp when o.pickup?.code != null && o.pickup?.latePickupUntil != null => Column(
+        children: [
+          AlertBanner.warning(
+            title: 'Đơn quá hạn nhận — vẫn có thể nhận trễ',
+            message:
+                'Bạn vẫn đến quầy lấy được tới ${VnTime.dateTime(o.pickup!.latePickupUntil!)} nếu còn hàng. '
+                'Khi nhận, yêu cầu hoàn tiền của đơn sẽ được hủy. Lần trễ hạn này vẫn được tính vào số lần không đến lấy.',
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _PickupCard(order: o),
+        ],
+      ),
       ShopOrderStatus.paid => AlertBanner.info(
         message: o.isPickup
             ? 'Đã thanh toán. Trung tâm sẽ báo khi hàng sẵn sàng nhận tại quầy'
@@ -238,8 +251,10 @@ class OrderDetailScreen extends ConsumerWidget {
       ),
       ShopOrderStatus.refundRequested => const AlertBanner.info(message: 'Yêu cầu hoàn tiền đang chờ Quản lý duyệt.'),
       ShopOrderStatus.refunded => const AlertBanner.success(message: 'Đơn đã được hoàn tiền.'),
-      ShopOrderStatus.completed => const AlertBanner.success(
-        message: 'Đơn đã hoàn tất. Hãy đánh giá sản phẩm bạn đã mua.',
+      ShopOrderStatus.completed => AlertBanner.success(
+        message: o.isPickup
+            ? 'Bạn đã nhận hàng tại quầy. Hãy đánh giá sản phẩm bạn đã mua.'
+            : 'Đơn đã hoàn tất. Hãy đánh giá sản phẩm bạn đã mua.',
       ),
       _ => null,
     };
@@ -322,7 +337,7 @@ class _PickupCard extends StatelessWidget {
               style: context.text.titleSmall.copyWith(color: c.primary),
             ),
           ],
-          if (p.deadline != null)
+          if (p.deadline != null && p.latePickupUntil == null)
             Text(
               'Nhận tại quầy trước ${VnTime.dateTime(p.deadline!)} — đến sớm hơn ngày hẹn cũng được. '
               'Nhân viên sẽ hỏi 4 số cuối SĐT người nhận.',
