@@ -4,36 +4,28 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="feat: harden course sales, payments and revenue reporting (late-join pricing, sale cutoff, seat holds, class maintenance job, snapshot-based invoices with full unit price/quantity/shipping/total breakdown on checkout, payment, invoice and history screens), complete the membership flow (plan CRUD, rotating QR pass with entry log, queued plans, renewal reminders, manager cancellation with refunds, membership payment details) and split attendance and training plans per course with present/absent/upcoming sessions across BE, Mobile and Web 25/10">
+    <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="feat: add web landing page, redesign login/password reset and manager notifications (light/dark, &quot;view all&quot; page), add manager motion layer and shared detail dialogs, support shop late pickup with &quot;Received&quot; status, and redesign mobile welcome screen 26/10">
+      <change afterPath="$PROJECT_DIR$/.taste-skill/after/report.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/after/tablet-fold.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/after/tablet-page-01.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/after/tablet-page-02.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/before/desktop-fold.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/before/desktop-page-01.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/before/desktop-page-02.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/before/desktop-page-03.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/before/mobile-fold.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/before/mobile-page-01.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/before/mobile-page-02.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/before/report.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/before/tablet-fold.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/before/tablet-page-01.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/before/tablet-page-02.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.taste-skill/direction.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_19_10_2026_11_52_CH_[Changes]/shelved.patch" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_19_10_2026_11_52_CH__Changes_.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/config/shop.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/config/shop.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/inventory.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/inventory.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/order-state.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/order-state.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/order-view.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/order-view.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/orders.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/orders.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.controller.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.routes.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.routes.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.schema.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/tests/smoke-shop.local.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/tests/smoke-shop.local.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Doc/GYM_SCOPE_CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/Doc/GYM_SCOPE_CHANGES.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/auth/Session.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/auth/Session.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/AuthScreens.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/AuthScreens.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/ManagerLayout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/ManagerLayout.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/admin.css" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/admin.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/kit.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/kit.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/OrdersPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/OrdersPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/RefundsPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/RefundsPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/TermsPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/TermsPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/scheduleKit.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/scheduleKit.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/shared/Communication.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/shared/Communication.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/api/shop_json.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/api/shop_json.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/attendance_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/attendance_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/auth/presentation/screens/welcome_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/auth/presentation/screens/welcome_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/entities/shop.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/entities/shop.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/order_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/order_detail_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/orders_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/orders_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/shop_labels.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/shop_labels.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/widgets/order_sections.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/widgets/order_sections.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/landing/GymLanding.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/landing/GymLanding.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/landing/landing.css" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/landing/landing.css" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -86,7 +78,7 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "com.google.cloudcode.ide_session_index": "20261026_0006",
+    "com.google.cloudcode.ide_session_index": "20261027_0003",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "dart.analysis.tool.window.visible": "false",
     "git-widget-placeholder": "#1 on develop",
@@ -178,7 +170,9 @@
       <workItem from="1793015821752" duration="59000" />
       <workItem from="1793015898435" duration="6000" />
       <workItem from="1793017962155" duration="59000" />
-      <workItem from="1793027057764" duration="5452000" />
+      <workItem from="1793027057764" duration="7043000" />
+      <workItem from="1793063873288" duration="613000" />
+      <workItem from="1793064530518" duration="292000" />
     </task>
     <task id="LOCAL-00001" summary="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10">
       <option name="closed" value="true" />
@@ -236,7 +230,15 @@
       <option name="project" value="LOCAL" />
       <updated>1792934553725</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="feat: add web landing page, redesign login/password reset and manager notifications (light/dark, &quot;view all&quot; page), add manager motion layer and shared detail dialogs, support shop late pickup with &quot;Received&quot; status, and redesign mobile welcome screen 26/10">
+      <option name="closed" value="true" />
+      <created>1793034023522</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1793034023523</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -273,6 +275,7 @@
     <MESSAGE value="feat(shop): pickup date &amp; pay-at-counter, no-show handling, in-order refunds on web; collapsible manager sidebar 20/10&#10;&#10;- Ship fee 30.000 -&gt; 15.000. PICKUP: choose pickup date (today..+7), pick up early once ready,&#10;  hold until end of (pickup date + 3), reschedule once (max +3 days), reminder 24h before deadline&#10;- Pay at counter (CASH, PICKUP only): new status CONFIRMED (stock reserved, no Payment);&#10;  manager confirms code + phone + cash collected =&gt; CASH payment + COMPLETED; limits 2.000.000đ / 1 open order&#10;- Overdue pickup (no-show, counted over 90 days): unpaid =&gt; cancel + release stock, no refund;&#10;  paid =&gt; return stock + 100% refund (10% holding fee from 3rd no-show);&#10;  2nd no-show =&gt; pay-at-counter locked 30 days; pending refund &gt; 30 days flagged as stale&#10;- Refunds: payoutMethod BANK_TRANSFER | CASH, bank transfer requires customer bank info,&#10;  customer updates bank info in app, manager can remind (1/hour), cancel &amp; refund requires a reason&#10;- Web manager: order dialog shows payment + refund blocks with approve/reject/remind in place,&#10;  cash collection on pickup, queues (pickup today / refund pending / stale refund), no-show badge&#10;- Web manager sidebar: toggle button on the divider, collapsible parent groups,&#10;  groups also collapse when sidebar is collapsed&#10;- Mobile: pickup date chips + payment method on checkout, reschedule + bank form on order detail, mock + tests&#10;- Migration 20261020000000_shop_pickup_cash, e2e shop tests, OpenAPI/FE client regenerated, Doc/SHOP_FLOW_DESIGN.md §10" />
     <MESSAGE value="feat: harden course sales, payments, invoices and revenue reporting (late-join pricing, sale cutoff, seat holds, class maintenance job, snapshot-based invoices with full cost breakdown) and complete the membership flow (plan CRUD, rotating QR pass with entry log, queued plans, renewal reminders, manager cancellation with refunds) across BE, Mobile and Web 25/10" />
     <MESSAGE value="feat: harden course sales, payments and revenue reporting (late-join pricing, sale cutoff, seat holds, class maintenance job, snapshot-based invoices with full unit price/quantity/shipping/total breakdown on checkout, payment, invoice and history screens), complete the membership flow (plan CRUD, rotating QR pass with entry log, queued plans, renewal reminders, manager cancellation with refunds, membership payment details) and split attendance and training plans per course with present/absent/upcoming sessions across BE, Mobile and Web 25/10" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: harden course sales, payments and revenue reporting (late-join pricing, sale cutoff, seat holds, class maintenance job, snapshot-based invoices with full unit price/quantity/shipping/total breakdown on checkout, payment, invoice and history screens), complete the membership flow (plan CRUD, rotating QR pass with entry log, queued plans, renewal reminders, manager cancellation with refunds, membership payment details) and split attendance and training plans per course with present/absent/upcoming sessions across BE, Mobile and Web 25/10" />
+    <MESSAGE value="feat: add web landing page, redesign login/password reset and manager notifications (light/dark, &quot;view all&quot; page), add manager motion layer and shared detail dialogs, support shop late pickup with &quot;Received&quot; status, and redesign mobile welcome screen 26/10" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add web landing page, redesign login/password reset and manager notifications (light/dark, &quot;view all&quot; page), add manager motion layer and shared detail dialogs, support shop late pickup with &quot;Received&quot; status, and redesign mobile welcome screen 26/10" />
   </component>
 </project>

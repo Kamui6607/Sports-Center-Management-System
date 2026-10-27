@@ -1,0 +1,2207 @@
+{
+ "url": "http://127.0.0.1:5173",
+ "at": "2026-10-26T17:06:13.109Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 9,
+   "filled": [
+    1,
+    1,
+    1,
+    0.98,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "motion": {
+    "elements": 27,
+    "css": 12,
+    "transitions": 15,
+    "scripted": 0,
+    "videos": 1,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 7646,
+     "screens": 8.5,
+     "words": 338,
+     "img": 6,
+     "video": 1,
+     "canvas": 0,
+     "svg": 4,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 7,
+     "videoCount": 1,
+     "uiPictures": 0,
+     "pictureSamples": [
+      "photo-1593079831268-3381b0db4a77?auto=format&fit",
+      "photo-1558611848-73f7eb4001a1?auto=format&fit=cr",
+      "photo-1576678927484-cc907957088c?auto=format&fit",
+      "photo-1583454110551-21f2fa2afe61?auto=format&fit",
+      "photo-1599058917212-d750089bc07e?auto=format&fit",
+      "photo-1517836357463-d25dfeac3438?auto=format&fit"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "PULSE GYM",
+     "words": 2,
+     "chars": 9,
+     "lines": 1,
+     "size": 187.2,
+     "vw": 13,
+     "font": "Be Vietnam Pro",
+     "weight": 800,
+     "tracking": -0.05,
+     "leading": 0.9,
+     "upper": true,
+     "italic": false,
+     "mono": false,
+     "align": "left",
+     "position": "center",
+     "widthRatio": 0.95,
+     "top": 274,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "PULSE GYM",
+     "words": 2,
+     "lines": 1,
+     "size": 187.2,
+     "font": "Be Vietnam Pro"
+    },
+    "headings": [
+     {
+      "text": "PULSE GYM",
+      "words": 2,
+      "chars": 9,
+      "lines": 1,
+      "size": 187.2,
+      "vw": 13,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": true,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.95,
+      "top": 274,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "Tập trước giờ làm, tập cả sau giờ tan.",
+      "words": 9,
+      "chars": 38,
+      "lines": 2,
+      "size": 77.8,
+      "vw": 5.4,
+      "font": "Be Vietnam Pro",
+      "weight": 700,
+      "tracking": -0.035,
+      "leading": 1.04,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 1132,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Khóa học đang mở, tập cùng HLV.",
+      "words": 7,
+      "chars": 31,
+      "lines": 2,
+      "size": 77.8,
+      "vw": 5.4,
+      "font": "Be Vietnam Pro",
+      "weight": 700,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 2413,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Chọn gói.",
+      "words": 2,
+      "chars": 9,
+      "lines": 1,
+      "size": 187.2,
+      "vw": 13,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 3717,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Quét mã.",
+      "words": 2,
+      "chars": 8,
+      "lines": 1,
+      "size": 187.2,
+      "vw": 13,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 4617,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Tiến bộ.",
+      "words": 2,
+      "chars": 8,
+      "lines": 1,
+      "size": 187.2,
+      "vw": 13,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 5517,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "0889 555 559",
+      "words": 3,
+      "chars": 12,
+      "lines": 1,
+      "size": 109.4,
+      "vw": 7.6,
+      "font": "Be Vietnam Pro",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 6485,
+      "tag": "a",
+      "kind": "heading"
+     },
+     {
+      "text": "Hẹn bạn ở phòng tập.",
+      "words": 5,
+      "chars": 20,
+      "lines": 2,
+      "size": 77.8,
+      "vw": 5.4,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.045,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.32,
+      "top": 6818,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "pulse.",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 432,
+      "vw": 30,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.07,
+      "leading": 0.8,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.96,
+      "top": 7383,
+      "tag": "p",
+      "kind": "statement"
+     }
+    ],
+    "headingSummary": {
+     "count": 9,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 1,
+     "centered": 3,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Be Vietnam Pro",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      14,
+      17,
+      22,
+      78,
+      109,
+      187,
+      432
+     ],
+     "sizeCount": 7,
+     "notLoaded": [],
+     "body": {
+      "font": "Be Vietnam Pro",
+      "size": 17,
+      "leading": 1.5,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 5.5
+     },
+     "measureChars": 54,
+     "max": {
+      "size": 432,
+      "vw": 30,
+      "font": "Be Vietnam Pro",
+      "text": "pulse."
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0.01,
+     "centerShare": 0.14,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#0f1a16",
+     "bodyBgHsl": {
+      "h": 158,
+      "s": 0.27,
+      "l": 0.08
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#f6f8f7",
+       "top": 0,
+       "hsl": {
+        "h": 150,
+        "s": 0.12,
+        "l": 0.97
+       }
+      },
+      {
+       "color": "#10211a",
+       "top": 3366,
+       "hsl": {
+        "h": 155,
+        "s": 0.35,
+        "l": 0.1
+       }
+      },
+      {
+       "color": "#203d31",
+       "top": 6066,
+       "hsl": {
+        "h": 155,
+        "s": 0.31,
+        "l": 0.18
+       }
+      },
+      {
+       "color": "#d3f879",
+       "top": 6746,
+       "hsl": {
+        "h": 77,
+        "s": 0.9,
+        "l": 0.72
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#ffffff",
+       "share": 0.4
+      },
+      {
+       "color": "#1b2f27",
+       "share": 0.19
+      },
+      {
+       "color": "#203d31",
+       "share": 0.18
+      },
+      {
+       "color": "#3d4f46",
+       "share": 0.11
+      },
+      {
+       "color": "#58695f",
+       "share": 0.08
+      }
+     ],
+     "button": {
+      "bg": "#203d31",
+      "hsl": {
+       "h": 155,
+       "s": 0.31,
+       "l": 0.18
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 3,
+     "inHero": 2,
+     "radius": "pill",
+     "height": 54,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Bỏ qua tới nội dung",
+      "Chỉ đường tới phòng tập"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 1,
+     "boxRadius": 14,
+     "squareMedia": 6,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 4,
+     "fixed": false,
+     "height": 900,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "be vietnam pro"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 7646,
+    "margins": {
+     "left": 35,
+     "right": 35
+    },
+    "sections": [
+     {
+      "sel": "header.gl-hero",
+      "tag": "header",
+      "top": 0,
+      "height": 900,
+      "words": 52,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Pulse",
+       "size": 187,
+       "tag": "h1"
+      },
+      "left": 35,
+      "right": 35,
+      "textLeft": 35,
+      "textRight": 35,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "section#gioi-thieu.gl-intro",
+      "tag": "section",
+      "top": 932,
+      "height": 1361,
+      "words": 50,
+      "media": 2,
+      "middle": 0,
+      "heading": {
+       "text": "Tập trước giờ làm,",
+       "size": 78,
+       "tag": "h2"
+      },
+      "left": 67,
+      "right": 32,
+      "textLeft": 67,
+      "textRight": 694,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#khoa-hoc.gl-list",
+      "tag": "section",
+      "top": 2293,
+      "height": 1073,
+      "words": 54,
+      "media": 1,
+      "middle": 24,
+      "heading": {
+       "text": "Khóa học đang mở,",
+       "size": 78,
+       "tag": "h2"
+      },
+      "left": 67,
+      "right": 67,
+      "textLeft": 67,
+      "textRight": 67,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "article.gl-step",
+      "tag": "article",
+      "top": 3366,
+      "height": 900,
+      "words": 29,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Chọn gói.",
+       "size": 187,
+       "tag": "h3"
+      },
+      "left": 67,
+      "right": 306,
+      "textLeft": 67,
+      "textRight": 306,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "article.gl-step",
+      "tag": "article",
+      "top": 4266,
+      "height": 900,
+      "words": 25,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Quét mã.",
+       "size": 187,
+       "tag": "h3"
+      },
+      "left": 67,
+      "right": 326,
+      "textLeft": 67,
+      "textRight": 326,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "article.gl-step",
+      "tag": "article",
+      "top": 5166,
+      "height": 900,
+      "words": 23,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Tiến bộ.",
+       "size": 187,
+       "tag": "h3"
+      },
+      "left": 67,
+      "right": 369,
+      "textLeft": 67,
+      "textRight": 369,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#lien-he.gl-contact",
+      "tag": "section",
+      "top": 6066,
+      "height": 648,
+      "words": 49,
+      "media": 0,
+      "middle": 404,
+      "heading": {
+       "text": "0889 555 559",
+       "size": 109,
+       "tag": "a"
+      },
+      "left": 67,
+      "right": 67,
+      "textLeft": 67,
+      "textRight": 67,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.gl-foot",
+      "tag": "footer",
+      "top": 6746,
+      "height": 900,
+      "words": 34,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Hẹn bạn",
+       "size": 78,
+       "tag": "h2"
+      },
+      "left": 35,
+      "right": 35,
+      "textLeft": 35,
+      "textRight": 35,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [
+     {
+      "top": 836,
+      "height": 284
+     },
+     {
+      "top": 6184,
+      "height": 284
+     }
+    ],
+    "h1s": [
+     {
+      "text": "PULSE GYM",
+      "size": 187,
+      "top": 274,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 67,
+      "n": 9
+     },
+     {
+      "x": 35,
+      "n": 1
+     },
+     {
+      "x": 110,
+      "n": 1
+     },
+     {
+      "x": 979,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 12,
+    "bodySize": 17,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0.2,
+    "voidBox": {
+     "x": 0,
+     "y": 480,
+     "w": 1440,
+     "h": 180
+    }
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 7,
+   "filled": [
+    1,
+    1,
+    0.94,
+    1,
+    1,
+    1,
+    1
+   ],
+   "motion": {
+    "elements": 27,
+    "css": 12,
+    "transitions": 15,
+    "scripted": 0,
+    "videos": 1,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 6995,
+     "screens": 6.8,
+     "words": 336,
+     "img": 6,
+     "video": 1,
+     "canvas": 0,
+     "svg": 4,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 6,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [
+      "photo-1593079831268-3381b0db4a77?auto=format&fit",
+      "photo-1558611848-73f7eb4001a1?auto=format&fit=cr",
+      "photo-1576678927484-cc907957088c?auto=format&fit",
+      "photo-1583454110551-21f2fa2afe61?auto=format&fit",
+      "photo-1599058917212-d750089bc07e?auto=format&fit",
+      "photo-1517836357463-d25dfeac3438?auto=format&fit"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "PULSE GYM",
+     "words": 2,
+     "chars": 9,
+     "lines": 1,
+     "size": 99.8,
+     "vw": 13,
+     "font": "Be Vietnam Pro",
+     "weight": 800,
+     "tracking": -0.05,
+     "leading": 0.9,
+     "upper": true,
+     "italic": false,
+     "mono": false,
+     "align": "left",
+     "position": "center",
+     "widthRatio": 0.95,
+     "top": 375,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "PULSE GYM",
+     "words": 2,
+     "lines": 1,
+     "size": 99.8,
+     "font": "Be Vietnam Pro"
+    },
+    "headings": [
+     {
+      "text": "PULSE GYM",
+      "words": 2,
+      "chars": 9,
+      "lines": 1,
+      "size": 99.8,
+      "vw": 13,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": true,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.95,
+      "top": 375,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "Tập trước giờ làm, tập cả sau giờ tan.",
+      "words": 9,
+      "chars": 38,
+      "lines": 2,
+      "size": 44,
+      "vw": 5.7,
+      "font": "Be Vietnam Pro",
+      "weight": 700,
+      "tracking": -0.035,
+      "leading": 1.04,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 1168,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Khóa học đang mở, tập cùng HLV.",
+      "words": 7,
+      "chars": 31,
+      "lines": 2,
+      "size": 44,
+      "vw": 5.7,
+      "font": "Be Vietnam Pro",
+      "weight": 700,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 2115,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Chọn gói.",
+      "words": 2,
+      "chars": 9,
+      "lines": 1,
+      "size": 99.8,
+      "vw": 13,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 3207,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Quét mã.",
+      "words": 2,
+      "chars": 8,
+      "lines": 1,
+      "size": 99.8,
+      "vw": 13,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 4231,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Tiến bộ.",
+      "words": 2,
+      "chars": 8,
+      "lines": 1,
+      "size": 99.8,
+      "vw": 13,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 5255,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "0889 555 559",
+      "words": 3,
+      "chars": 12,
+      "lines": 1,
+      "size": 58.4,
+      "vw": 7.6,
+      "font": "Be Vietnam Pro",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 6025,
+      "tag": "a",
+      "kind": "heading"
+     },
+     {
+      "text": "Hẹn bạn ở phòng tập.",
+      "words": 5,
+      "chars": 20,
+      "lines": 2,
+      "size": 44,
+      "vw": 5.7,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.045,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.34,
+      "top": 6339,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "pulse.",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 230.4,
+      "vw": 30,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.07,
+      "leading": 0.8,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.96,
+      "top": 6855,
+      "tag": "p",
+      "kind": "statement"
+     }
+    ],
+    "headingSummary": {
+     "count": 9,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 1,
+     "centered": 3,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Be Vietnam Pro",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      14,
+      17,
+      22,
+      44,
+      58,
+      100,
+      230
+     ],
+     "sizeCount": 7,
+     "notLoaded": [],
+     "body": {
+      "font": "Be Vietnam Pro",
+      "size": 17,
+      "leading": 1.5,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 5.5
+     },
+     "measureChars": 54,
+     "max": {
+      "size": 230.4,
+      "vw": 30,
+      "font": "Be Vietnam Pro",
+      "text": "pulse."
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0.01,
+     "centerShare": 0.14,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#0f1a16",
+     "bodyBgHsl": {
+      "h": 158,
+      "s": 0.27,
+      "l": 0.08
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#f6f8f7",
+       "top": 0,
+       "hsl": {
+        "h": 150,
+        "s": 0.12,
+        "l": 0.97
+       }
+      },
+      {
+       "color": "#10211a",
+       "top": 2747,
+       "hsl": {
+        "h": 155,
+        "s": 0.35,
+        "l": 0.1
+       }
+      },
+      {
+       "color": "#203d31",
+       "top": 5819,
+       "hsl": {
+        "h": 155,
+        "s": 0.31,
+        "l": 0.18
+       }
+      },
+      {
+       "color": "#d3f879",
+       "top": 6267,
+       "hsl": {
+        "h": 77,
+        "s": 0.9,
+        "l": 0.72
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#ffffff",
+       "share": 0.4
+      },
+      {
+       "color": "#1b2f27",
+       "share": 0.19
+      },
+      {
+       "color": "#203d31",
+       "share": 0.19
+      },
+      {
+       "color": "#3d4f46",
+       "share": 0.11
+      },
+      {
+       "color": "#58695f",
+       "share": 0.08
+      }
+     ],
+     "button": {
+      "bg": "#203d31",
+      "hsl": {
+       "h": 155,
+       "s": 0.31,
+       "l": 0.18
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 3,
+     "inHero": 2,
+     "radius": "pill",
+     "height": 54,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Bỏ qua tới nội dung",
+      "Chỉ đường tới phòng tập"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 6,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 4,
+     "fixed": false,
+     "height": 1024,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "be vietnam pro"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 6995,
+    "margins": {
+     "left": 20,
+     "right": 20
+    },
+    "sections": [
+     {
+      "sel": "header.gl-hero",
+      "tag": "header",
+      "top": 0,
+      "height": 1024,
+      "words": 52,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Pulse",
+       "size": 100,
+       "tag": "h1"
+      },
+      "left": 20,
+      "right": 20,
+      "textLeft": 20,
+      "textRight": 20,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "section#gioi-thieu.gl-intro",
+      "tag": "section",
+      "top": 1048,
+      "height": 947,
+      "words": 50,
+      "media": 2,
+      "middle": 0,
+      "heading": {
+       "text": "Tập trước giờ làm,",
+       "size": 44,
+       "tag": "h2"
+      },
+      "left": 36,
+      "right": 16,
+      "textLeft": 36,
+      "textRight": 348,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#khoa-hoc.gl-list",
+      "tag": "section",
+      "top": 1995,
+      "height": 753,
+      "words": 52,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Khóa học đang mở,",
+       "size": 44,
+       "tag": "h2"
+      },
+      "left": 36,
+      "right": 36,
+      "textLeft": 36,
+      "textRight": 36,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "article.gl-step",
+      "tag": "article",
+      "top": 2747,
+      "height": 1024,
+      "words": 29,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Chọn gói.",
+       "size": 100,
+       "tag": "h3"
+      },
+      "left": 36,
+      "right": 163,
+      "textLeft": 36,
+      "textRight": 163,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "article.gl-step",
+      "tag": "article",
+      "top": 3771,
+      "height": 1024,
+      "words": 25,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Quét mã.",
+       "size": 100,
+       "tag": "h3"
+      },
+      "left": 36,
+      "right": 174,
+      "textLeft": 36,
+      "textRight": 174,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "article.gl-step",
+      "tag": "article",
+      "top": 4795,
+      "height": 1024,
+      "words": 23,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Tiến bộ.",
+       "size": 100,
+       "tag": "h3"
+      },
+      "left": 36,
+      "right": 197,
+      "textLeft": 36,
+      "textRight": 197,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#lien-he.gl-contact",
+      "tag": "section",
+      "top": 5819,
+      "height": 423,
+      "words": 49,
+      "media": 0,
+      "middle": 116,
+      "heading": {
+       "text": "0889 555 559",
+       "size": 58,
+       "tag": "a"
+      },
+      "left": 36,
+      "right": 36,
+      "textLeft": 36,
+      "textRight": 36,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.gl-foot",
+      "tag": "footer",
+      "top": 6267,
+      "height": 728,
+      "words": 34,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Hẹn bạn",
+       "size": 44,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 20,
+      "textLeft": 20,
+      "textRight": 198,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "PULSE GYM",
+      "size": 100,
+      "top": 375,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 36,
+      "n": 9
+     },
+     {
+      "x": 20,
+      "n": 1
+     },
+     {
+      "x": 59,
+      "n": 1
+     },
+     {
+      "x": 520,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 12,
+    "bodySize": 17,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 9,
+   "filled": [
+    1,
+    0.97,
+    0.9,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "motion": {
+    "elements": 27,
+    "css": 12,
+    "transitions": 15,
+    "scripted": 0,
+    "videos": 1,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 6811,
+     "screens": 8.1,
+     "words": 332,
+     "img": 6,
+     "video": 1,
+     "canvas": 0,
+     "svg": 4,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 7,
+     "videoCount": 1,
+     "uiPictures": 0,
+     "pictureSamples": [
+      "photo-1593079831268-3381b0db4a77?auto=format&fit",
+      "photo-1558611848-73f7eb4001a1?auto=format&fit=cr",
+      "photo-1576678927484-cc907957088c?auto=format&fit",
+      "photo-1583454110551-21f2fa2afe61?auto=format&fit",
+      "photo-1599058917212-d750089bc07e?auto=format&fit",
+      "photo-1517836357463-d25dfeac3438?auto=format&fit"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "PULSE GYM",
+     "words": 2,
+     "chars": 9,
+     "lines": 2,
+     "size": 81.9,
+     "vw": 21,
+     "font": "Be Vietnam Pro",
+     "weight": 800,
+     "tracking": -0.05,
+     "leading": 0.9,
+     "upper": true,
+     "italic": false,
+     "mono": false,
+     "align": "left",
+     "position": "center",
+     "widthRatio": 0.9,
+     "top": 125,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "PULSE GYM",
+     "words": 2,
+     "lines": 2,
+     "size": 81.9,
+     "font": "Be Vietnam Pro"
+    },
+    "headings": [
+     {
+      "text": "pulse.",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 22,
+      "vw": 5.6,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.03,
+      "leading": 1.55,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.16,
+      "top": 15,
+      "tag": "a",
+      "kind": "heading"
+     },
+     {
+      "text": "PULSE GYM",
+      "words": 2,
+      "chars": 9,
+      "lines": 2,
+      "size": 81.9,
+      "vw": 21,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": true,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.9,
+      "top": 125,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "Tập trước giờ làm, tập cả sau giờ tan.",
+      "words": 9,
+      "chars": 38,
+      "lines": 2,
+      "size": 32.8,
+      "vw": 8.4,
+      "font": "Be Vietnam Pro",
+      "weight": 700,
+      "tracking": -0.035,
+      "leading": 1.04,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.82,
+      "top": 964,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Khóa học đang mở, tập cùng HLV.",
+      "words": 7,
+      "chars": 31,
+      "lines": 2,
+      "size": 32.8,
+      "vw": 8.4,
+      "font": "Be Vietnam Pro",
+      "weight": 700,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.82,
+      "top": 2019,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Tập ở Pulse, ba việc trong ứng dụng",
+      "words": 8,
+      "chars": 35,
+      "lines": 2,
+      "size": 22,
+      "vw": 5.6,
+      "font": "Be Vietnam Pro",
+      "weight": 600,
+      "tracking": -0.014,
+      "leading": 1.3,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.82,
+      "top": 2828,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Chọn gói.",
+      "words": 2,
+      "chars": 9,
+      "lines": 1,
+      "size": 62.4,
+      "vw": 16,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.82,
+      "top": 3121,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Quét mã.",
+      "words": 2,
+      "chars": 8,
+      "lines": 1,
+      "size": 62.4,
+      "vw": 16,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.82,
+      "top": 3965,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Tiến bộ.",
+      "words": 2,
+      "chars": 8,
+      "lines": 1,
+      "size": 62.4,
+      "vw": 16,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.82,
+      "top": 4809,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "0889 555 559",
+      "words": 3,
+      "chars": 12,
+      "lines": 1,
+      "size": 42.9,
+      "vw": 11,
+      "font": "Be Vietnam Pro",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.82,
+      "top": 5778,
+      "tag": "a",
+      "kind": "heading"
+     },
+     {
+      "text": "Hẹn bạn ở phòng tập.",
+      "words": 5,
+      "chars": 20,
+      "lines": 2,
+      "size": 50.7,
+      "vw": 13,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.045,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.77,
+      "top": 6137,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "pulse.",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 179.4,
+      "vw": 46,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.07,
+      "leading": 0.8,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 6702,
+      "tag": "p",
+      "kind": "statement"
+     }
+    ],
+    "headingSummary": {
+     "count": 11,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 1,
+     "centered": 3,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Be Vietnam Pro",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      14,
+      17,
+      18,
+      22,
+      33,
+      43,
+      51,
+      62,
+      82,
+      179
+     ],
+     "sizeCount": 10,
+     "notLoaded": [],
+     "body": {
+      "font": "Be Vietnam Pro",
+      "size": 17,
+      "leading": 1.5,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 5.5
+     },
+     "measureChars": 37,
+     "max": {
+      "size": 179.4,
+      "vw": 46,
+      "font": "Be Vietnam Pro",
+      "text": "pulse."
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0.01,
+     "centerShare": 0.02,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#0f1a16",
+     "bodyBgHsl": {
+      "h": 158,
+      "s": 0.27,
+      "l": 0.08
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#f6f8f7",
+       "top": 0,
+       "hsl": {
+        "h": 150,
+        "s": 0.12,
+        "l": 0.97
+       }
+      },
+      {
+       "color": "#10211a",
+       "top": 2800,
+       "hsl": {
+        "h": 155,
+        "s": 0.35,
+        "l": 0.1
+       }
+      },
+      {
+       "color": "#203d31",
+       "top": 5332,
+       "hsl": {
+        "h": 155,
+        "s": 0.31,
+        "l": 0.18
+       }
+      },
+      {
+       "color": "#d3f879",
+       "top": 6081,
+       "hsl": {
+        "h": 77,
+        "s": 0.9,
+        "l": 0.72
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#ffffff",
+       "share": 0.4
+      },
+      {
+       "color": "#203d31",
+       "share": 0.19
+      },
+      {
+       "color": "#1b2f27",
+       "share": 0.19
+      },
+      {
+       "color": "#3d4f46",
+       "share": 0.11
+      },
+      {
+       "color": "#58695f",
+       "share": 0.08
+      }
+     ],
+     "button": {
+      "bg": "#203d31",
+      "hsl": {
+       "h": 155,
+       "s": 0.31,
+       "l": 0.18
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 3,
+     "inHero": 2,
+     "radius": "pill",
+     "height": 52,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Bỏ qua tới nội dung",
+      "Chỉ đường tới phòng tập"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 1,
+     "boxRadius": 14,
+     "squareMedia": 4,
+     "roundedMedia": 1,
+     "mediaRadius": 14,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [
+     {
+      "type": "video",
+      "ratio": 0.19
+     }
+    ],
+    "nav": {
+     "links": 2,
+     "fixed": false,
+     "height": 844,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "be vietnam pro"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 6811,
+    "margins": {
+     "left": 20,
+     "right": 20
+    },
+    "sections": [
+     {
+      "sel": "header.gl-hero",
+      "tag": "header",
+      "top": 0,
+      "height": 844,
+      "words": 48,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Pulse",
+       "size": 82,
+       "tag": "h1"
+      },
+      "left": 20,
+      "right": 20,
+      "textLeft": 20,
+      "textRight": 20,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "section#gioi-thieu.gl-intro",
+      "tag": "section",
+      "top": 868,
+      "height": 1071,
+      "words": 50,
+      "media": 2,
+      "middle": 0,
+      "heading": {
+       "text": "Tập trước giờ làm,",
+       "size": 33,
+       "tag": "h2"
+      },
+      "left": 36,
+      "right": 16,
+      "textLeft": 36,
+      "textRight": 39,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#khoa-hoc.gl-list",
+      "tag": "section",
+      "top": 1939,
+      "height": 860,
+      "words": 52,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Khóa học đang mở,",
+       "size": 33,
+       "tag": "h2"
+      },
+      "left": 36,
+      "right": 36,
+      "textLeft": 36,
+      "textRight": 36,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "article.gl-step",
+      "tag": "article",
+      "top": 2800,
+      "height": 844,
+      "words": 29,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Chọn gói.",
+       "size": 62,
+       "tag": "h3"
+      },
+      "left": 36,
+      "right": 46,
+      "textLeft": 36,
+      "textRight": 46,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "article.gl-step",
+      "tag": "article",
+      "top": 3644,
+      "height": 844,
+      "words": 25,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Quét mã.",
+       "size": 62,
+       "tag": "h3"
+      },
+      "left": 36,
+      "right": 57,
+      "textLeft": 36,
+      "textRight": 57,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "article.gl-step",
+      "tag": "article",
+      "top": 4488,
+      "height": 844,
+      "words": 23,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Tiến bộ.",
+       "size": 62,
+       "tag": "h3"
+      },
+      "left": 36,
+      "right": 60,
+      "textLeft": 36,
+      "textRight": 60,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#lien-he.gl-contact",
+      "tag": "section",
+      "top": 5332,
+      "height": 726,
+      "words": 49,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "0889 555 559",
+       "size": 43,
+       "tag": "a"
+      },
+      "left": 36,
+      "right": 42,
+      "textLeft": 36,
+      "textRight": 42,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.gl-foot",
+      "tag": "footer",
+      "top": 6081,
+      "height": 729,
+      "words": 34,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Hẹn bạn",
+       "size": 51,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 20,
+      "textLeft": 20,
+      "textRight": 65,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [
+     {
+      "top": 5420,
+      "height": 352
+     }
+    ],
+    "h1s": [
+     {
+      "text": "PULSE GYM",
+      "size": 82,
+      "top": 125,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 36,
+      "n": 10
+     },
+     {
+      "x": 20,
+      "n": 3
+     }
+    ],
+    "leftBlocks": 13,
+    "bodySize": 17,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "WARN",
+   "id": "grey-body",
+   "width": 1440,
+   "message": "The running text is a soft grey on its ground (5.5:1).",
+   "fix": "Set body copy in the full ink (7:1 or more). Keep the muted ink for secondary notes; pages read thin and unfinished when everything is grey.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "size-count",
+   "width": 390,
+   "message": "10 different font sizes (14, 17, 18, 22, 33, 43, 51, 62, 82, 179).",
+   "fix": "A page needs about five: display, heading, lead, body, small."
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\before\\desktop-fold.jpg",
+   "pages": [
+    "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\before\\desktop-page-01.jpg",
+    "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\before\\desktop-page-02.jpg",
+    "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\before\\desktop-page-03.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\before\\tablet-fold.jpg",
+   "pages": [
+    "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\before\\tablet-page-01.jpg",
+    "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\before\\tablet-page-02.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\before\\mobile-fold.jpg",
+   "pages": [
+    "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\before\\mobile-page-01.jpg",
+    "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\before\\mobile-page-02.jpg"
+   ],
+   "film": []
+  }
+ ]
+}
