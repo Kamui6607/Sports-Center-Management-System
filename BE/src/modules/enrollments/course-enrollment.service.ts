@@ -193,22 +193,7 @@ export async function evaluateCourseEligibility(
     });
   }
 
-  if (penalty) {
-    blockers.push({
-      code: "ATTENDANCE_PENALTY_ACTIVE",
-      message:
-        `Bạn đang bị tạm khoá đặt chỗ lớp này đến ` +
-        `${penalty.blockedUntil ? vnDateTime(penalty.blockedUntil) : "khi có thông báo mới"} ` +
-        `do chuyên cần ${penalty.attendanceRate}% (${penalty.sampleSize} buổi được tính). ` +
-        `Vui lòng liên hệ quản lý nếu cần khiếu nại.`,
-      details: {
-        penaltyId: penalty.id,
-        blockedUntil: penalty.blockedUntil,
-        attendanceRate: penalty.attendanceRate,
-        sampleSize: penalty.sampleSize,
-      },
-    });
-  }
+  // Nghiệp vụ: Khách hàng đã trả tiền không bị chặn đăng ký vì chuyên cần.
 
   const alreadyHoldingClass = quotaUsage.classes.some((c: any) => c.classId === cls.id);
   if (

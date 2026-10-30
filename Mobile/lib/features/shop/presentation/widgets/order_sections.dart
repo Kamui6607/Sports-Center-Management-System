@@ -86,12 +86,30 @@ class OrderItemsCard extends StatelessWidget {
               unit: 'cái',
               total: l.total,
               footer: l.review == null
-                  ? null
+                  ? (l.isReviewExpired
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.xxs),
+                          child: Text('Đã hết hạn đánh giá (quá 30 ngày)', style: context.text.caption.copyWith(color: context.colors.textMuted)),
+                        )
+                      : null)
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: AppSpacing.xxs),
-                        RatingStars(rating: l.review!.rating.toDouble()),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            RatingStars(rating: l.review!.rating.toDouble()),
+                            if (l.review!.isAnonymous) ...[
+                              const SizedBox(width: AppSpacing.xs),
+                              const StatusTag(label: 'Ẩn danh', tone: StatusTone.neutral, dense: true),
+                            ],
+                            if (l.review!.editCount > 0) ...[
+                              const SizedBox(width: AppSpacing.xs),
+                              Text('(Đã sửa 1 lần)', style: context.text.caption.copyWith(color: context.colors.textMuted)),
+                            ],
+                          ],
+                        ),
                         if (l.review!.comment != null) Text(l.review!.comment!, style: context.text.small),
                         if (l.review!.isHidden)
                           const StatusTag(label: 'Đánh giá đã bị ẩn', tone: StatusTone.neutral, dense: true),

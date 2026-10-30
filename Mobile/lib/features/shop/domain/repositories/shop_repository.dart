@@ -72,7 +72,10 @@ abstract interface class ShopRepository {
   Future<ShopOrder> updateRefundBank(String id, RefundBankInput bank);
 
   /// `POST /shop/order-items/:id/review`.
-  Future<void> reviewItem(String orderItemId, int rating, String? comment);
+  Future<void> reviewItem(String orderItemId, int rating, String? comment, {bool isAnonymous = false});
+
+  /// `PATCH /shop/order-items/:id/review`.
+  Future<void> updateReviewItem(String orderItemId, {int? rating, String? comment, bool? isAnonymous});
 
   // ── Manager ──────────────────────────────────────────────────────────
   Future<ShopSummary> managerSummary();

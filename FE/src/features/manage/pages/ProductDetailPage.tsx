@@ -298,7 +298,11 @@ function Reviews({ id, onChanged }: { id: string; onChanged: () => void }) {
                   title: "Khách",
                   render: (r) => (
                     <div className="cr-cell-main">
-                      <strong>{str((r.user as Row)?.fullName)}</strong>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <strong>{str((r.user as Row)?.fullName)}</strong>
+                        {Boolean(r.isAnonymous) && <Pill>Ẩn danh</Pill>}
+                        {Number(r.editCount) > 0 && <small className="cr-muted">(Đã sửa 1 lần)</small>}
+                      </div>
                       <small>{dateTime(r.createdAt)}</small>
                     </div>
                   ),

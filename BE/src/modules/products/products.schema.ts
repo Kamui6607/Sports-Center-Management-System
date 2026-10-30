@@ -67,6 +67,7 @@ export const CreateOrderSchema = z.object({
 export const CreateProductReviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
   comment: z.string().optional(),
+  isAnonymous: z.boolean().optional(),
   /** Dòng đơn COMPLETED cần đánh giá (bỏ trống ⇒ tự chọn dòng cũ nhất chưa đánh giá). */
   orderItemId: z.string().min(1).optional(),
 });

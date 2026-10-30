@@ -48,15 +48,8 @@ async function assertCanBook(
     );
   }
 
-  // §12: hình phạt chuyên cần đang hiệu lực chỉ chặn đúng Class đó (không chặn Class khác).
-  const penalty = await findActivePenalty(tx, memberProfileId, schedule.class.id);
-  if (penalty) {
-    const until = penalty.blockedUntil?.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) ?? "";
-    throw new AppError(
-      `Bạn đang bị tạm khoá đặt chỗ lớp này đến ${until} do chuyên cần ${penalty.attendanceRate}% (${penalty.sampleSize} buổi được tính). Vui lòng liên hệ quản lý nếu cần khiếu nại.`,
-      403
-    );
-  }
+  // Nghiệp vụ: Khách hàng đã trả tiền nên không bị thu hồi/chặn chỗ tập vì chuyên cần.
+  // Chỉ gửi thông báo nhắc nhở để khách nắm tình hình vắng/trễ.
 
   // Capacity check (đếm BOOKED + COMPLETED, khớp _count ở schedule detail).
   const bookedCount = await tx.enrollment.count({

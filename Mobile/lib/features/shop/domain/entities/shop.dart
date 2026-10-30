@@ -360,11 +360,22 @@ class PlacedOrder {
 }
 
 class OrderLineReview {
-  const OrderLineReview({required this.id, required this.rating, this.comment, this.isHidden = false});
+  const OrderLineReview({
+    required this.id,
+    required this.rating,
+    this.comment,
+    this.isAnonymous = false,
+    this.editCount = 0,
+    this.canEdit = false,
+    this.isHidden = false,
+  });
 
   final String id;
   final int rating;
   final String? comment;
+  final bool isAnonymous;
+  final int editCount;
+  final bool canEdit;
   final bool isHidden;
 }
 
@@ -379,6 +390,8 @@ class ShopOrderLine {
     this.imageUrl,
     this.review,
     this.canReview = false,
+    this.canEditReview = false,
+    this.isReviewExpired = false,
   });
 
   final String id;
@@ -390,6 +403,8 @@ class ShopOrderLine {
   final int total;
   final OrderLineReview? review;
   final bool canReview;
+  final bool canEditReview;
+  final bool isReviewExpired;
 }
 
 class OrderHistoryEntry {

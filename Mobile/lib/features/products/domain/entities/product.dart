@@ -56,6 +56,7 @@ class ProductReview {
     this.avatarUrl,
     this.isMine = false,
     this.isHidden = false,
+    this.isAnonymous = false,
   });
 
   final String id;
@@ -68,4 +69,5 @@ class ProductReview {
 
   /// Quản lý đã ẩn (chỉ Quản lý thấy).
   final bool isHidden;
+  final bool isAnonymous;
 }

@@ -152,14 +152,25 @@ class OrderDetailScreen extends ConsumerWidget {
             const SectionHeader(title: 'Sản phẩm'),
             OrderItemsCard(
               order: o,
-              lineTrailing: (l) => l.canReview
-                  ? AppButton.secondary(
-                      label: 'Đánh giá',
-                      icon: AppIcons.star,
-                      size: AppButtonSize.small,
-                      onPressed: () => showOrderItemReviewSheet(context, line: l),
-                    )
-                  : null,
+              lineTrailing: (l) {
+                if (l.canReview) {
+                  return AppButton.secondary(
+                    label: 'Đánh giá',
+                    icon: AppIcons.star,
+                    size: AppButtonSize.small,
+                    onPressed: () => showOrderItemReviewSheet(context, line: l),
+                  );
+                }
+                if (l.canEditReview) {
+                  return AppButton.secondary(
+                    label: 'Sửa đánh giá',
+                    icon: AppIcons.edit,
+                    size: AppButtonSize.small,
+                    onPressed: () => showOrderItemReviewSheet(context, line: l, isEditing: true),
+                  );
+                }
+                return null;
+              },
             ),
             const SizedBox(height: AppSpacing.md),
             SectionHeader(
@@ -547,27 +558,37 @@ class _ReasonFormState extends State<_ReasonForm> {
   );
 }
 
-/// Đánh giá một sản phẩm trong đơn đã hoàn tất (mỗi dòng đơn 1 lần).
-Future<void> showOrderItemReviewSheet(BuildContext context, {required ShopOrderLine line}) => showAppBottomSheet<void>(
+/// Đánh giá hoặc chỉnh sửa đánh giá một sản phẩm (trong 30 ngày, sửa tối đa 1 lần).
+Future<void> showOrderItemReviewSheet(BuildContext context, {required ShopOrderLine line, bool isEditing = false}) => showAppBottomSheet<void>(
   context: context,
-  title: 'Đánh giá ${line.productName}',
-  builder: (_) => _ReviewForm(line: line),
+  title: isEditing ? 'Chỉnh sửa đánh giá' : 'Đánh giá ${line.productName}',
+  builder: (_) => _ReviewForm(line: line, isEditing: isEditing),
 );
 
 class _ReviewForm extends ConsumerStatefulWidget {
-  const _ReviewForm({required this.line});
+  const _ReviewForm({required this.line, this.isEditing = false});
 
   final ShopOrderLine line;
+  final bool isEditing;
 
   @override
   ConsumerState<_ReviewForm> createState() => _ReviewFormState();
 }
 
 class _ReviewFormState extends ConsumerState<_ReviewForm> {
-  int _rating = 0;
+  late int _rating;
+  late bool _isAnonymous;
+  late final TextEditingController _comment;
   bool _sending = false;
   String? _error;
-  final _comment = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _rating = widget.line.review?.rating ?? 0;
+    _isAnonymous = widget.line.review?.isAnonymous ?? false;
+    _comment = TextEditingController(text: widget.line.review?.comment ?? '');
+  }
 
   @override
   void dispose() {
@@ -581,11 +602,25 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
       _error = null;
     });
     try {
-      await ref.read(shopRepositoryProvider).reviewItem(widget.line.id, _rating, _comment.text);
+      if (widget.isEditing) {
+        await ref.read(shopRepositoryProvider).updateReviewItem(
+          widget.line.id,
+          rating: _rating,
+          comment: _comment.text,
+          isAnonymous: _isAnonymous,
+        );
+      } else {
+        await ref.read(shopRepositoryProvider).reviewItem(
+          widget.line.id,
+          _rating,
+          _comment.text,
+          isAnonymous: _isAnonymous,
+        );
+      }
       ref.read(dataRevisionProvider.notifier).bump();
       if (!mounted) return;
       Navigator.of(context).pop();
-      AppSnackbar.success(context, 'Cảm ơn bạn đã đánh giá!');
+      AppSnackbar.success(context, widget.isEditing ? 'Đã cập nhật đánh giá!' : 'Cảm ơn bạn đã đánh giá!');
     } on Object catch (e) {
       if (mounted) setState(() => _error = ShopErrors.message(e));
     } finally {
@@ -600,9 +635,27 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
       RatingInput(value: _rating, onChanged: (v) => setState(() => _rating = v)),
       const SizedBox(height: AppSpacing.md),
       AppTextField(label: 'Nhận xét (không bắt buộc)', controller: _comment, maxLines: 3, maxLength: 500),
+      const SizedBox(height: AppSpacing.sm),
+      CheckboxListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Đánh giá ẩn danh'),
+        subtitle: const Text('Tên và ảnh đại diện của bạn sẽ không hiển thị công khai.'),
+        value: _isAnonymous,
+        onChanged: (v) => setState(() => _isAnonymous = v ?? false),
+        controlAffinity: ListTileControlAffinity.leading,
+      ),
+      Text(
+        'Lưu ý: Bạn có thể đánh giá trong vòng 30 ngày và chỉ được chỉnh sửa lại tối đa 1 lần.',
+        style: context.text.caption.copyWith(color: context.colors.textMuted),
+      ),
       if (_error != null) ...[const SizedBox(height: AppSpacing.xs), AlertBanner.error(message: _error!)],
       const SizedBox(height: AppSpacing.md),
-      AppButton(label: 'Gửi đánh giá', expand: true, loading: _sending, onPressed: _rating == 0 ? null : _submit),
+      AppButton(
+        label: widget.isEditing ? 'Lưu chỉnh sửa' : 'Gửi đánh giá',
+        expand: true,
+        loading: _sending,
+        onPressed: _rating == 0 ? null : _submit,
+      ),
     ],
   );
 }

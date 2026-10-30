@@ -155,7 +155,6 @@ PurchaseInfo coursePurchaseInfo(MockServer server, ClassRow row, String memberPr
   if (pending != null) return PurchaseInfo(status: PurchaseStatus.pendingPayment, pendingPaymentId: pending.id);
 
   final blockers = <PurchaseBlocker>[];
-  final now = db.now();
   if (row.status != ClassStatus.approved) {
     blockers.add(const PurchaseBlocker('CLASS_NOT_AVAILABLE', 'Khóa học hiện không mở bán.'));
   } else if (sessions.isEmpty) {
@@ -173,22 +172,6 @@ PurchaseInfo coursePurchaseInfo(MockServer server, ClassRow row, String memberPr
       ),
     );
   }
-  final penalty = db.penalties
-      .where(
-        (p) =>
-            p.memberProfileId == memberProfileId &&
-            p.classId == row.id &&
-            p.status == PenaltyStatus.applied &&
-            (p.blockedUntil?.isAfter(now) ?? false),
-      )
-      .firstOrNull;
-  if (penalty != null) {
-    blockers.add(
-      PurchaseBlocker(
-        'ATTENDANCE_PENALTY_ACTIVE',
-        'Bạn đang bị phạt chuyên cần ở khóa này đến ${VnTime.date(penalty.blockedUntil!)}.',
-      ),
-    );
-  }
+  // Khách hàng không bị chặn vì chuyên cần
   return PurchaseInfo(status: PurchaseStatus.none, blockers: blockers);
 }

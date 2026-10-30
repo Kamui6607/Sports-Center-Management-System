@@ -172,7 +172,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  Text(p.description, style: context.text.body),
+                  ExpandableText(p.description, style: context.text.body, maxLines: 4),
                   const SizedBox(height: AppSpacing.md),
                   const AlertBanner.info(
                     message: 'Thanh toán trước bằng chuyển khoản VietQR. Nhận tại trung tâm (mang mã nhận hàng) hoặc giao tận nơi.',

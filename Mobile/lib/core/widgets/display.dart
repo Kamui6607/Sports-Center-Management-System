@@ -203,3 +203,101 @@ class ResponsiveGrid extends StatelessWidget {
     );
   }
 }
+
+/// Đoạn văn bản có thể thu gọn / mở rộng khi vượt quá giới hạn dòng.
+/// - Thu gọn: hiển thị [maxLines] dòng kèm dấu 3 chấm "..." và nút "Xem thêm".
+/// - Mở rộng: hiển thị toàn bộ nội dung và nút "Thu gọn".
+/// - Khách hàng có thể thao tác đóng / mở thủ công.
+class ExpandableText extends StatefulWidget {
+  const ExpandableText(
+    this.text, {
+    super.key,
+    this.style,
+    this.maxLines = 4,
+    this.expandLabel = 'Xem thêm',
+    this.collapseLabel = 'Thu gọn',
+    this.trimLength = 160,
+  });
+
+  final String text;
+  final TextStyle? style;
+  final int maxLines;
+  final String expandLabel;
+  final String collapseLabel;
+  final int trimLength;
+
+  @override
+  State<ExpandableText> createState() => _ExpandableTextState();
+}
+
+class _ExpandableTextState extends State<ExpandableText> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = widget.text.trim();
+    if (text.isEmpty) return const SizedBox.shrink();
+
+    final textStyle = widget.style ?? context.text.body;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final span = TextSpan(text: text, style: textStyle);
+        final tp = TextPainter(
+          text: span,
+          maxLines: widget.maxLines,
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: constraints.maxWidth);
+
+        final isOverflowing = tp.didExceedMaxLines || text.length > widget.trimLength;
+
+        if (!isOverflowing) {
+          return Text(text, style: textStyle);
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topLeft,
+              child: Text(
+                text,
+                style: textStyle,
+                maxLines: _expanded ? null : widget.maxLines,
+                overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: AppRadius.controlAll,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _expanded ? widget.collapseLabel : widget.expandLabel,
+                      style: context.text.caption.copyWith(
+                        color: context.colors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xxs),
+                    Icon(
+                      _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      size: AppSizes.iconSm,
+                      color: context.colors.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}

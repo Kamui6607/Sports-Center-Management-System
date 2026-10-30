@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/theme/theme.dart';
-import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../classes/presentation/providers/course_providers.dart';
 import '../../../schedule/domain/entities/session.dart';
@@ -47,9 +46,6 @@ class CourseAttendanceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessions = ref.watch(myAllSessionsProvider);
     final course = ref.watch(myCoursesProvider).value?.where((c) => c.course.id == classId).firstOrNull;
-    final penalty = (ref.watch(myPenaltiesProvider).value ?? const <AttendancePenalty>[])
-        .where((p) => p.classId == classId && p.status == PenaltyStatus.applied)
-        .firstOrNull;
     return AppScaffold(
       title: 'Chuyên cần khóa học',
       body: AsyncValueView(
@@ -74,15 +70,7 @@ class CourseAttendanceScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
               ],
-              if (penalty != null) ...[
-                AlertBanner.error(
-                  title: 'Đang bị tạm khóa đặt chỗ khóa này',
-                  message:
-                      'Chuyên cần ${penalty.ratePercent}%: ${penalty.reason}'
-                      '${penalty.blockedUntil != null ? ' Mở lại từ ${VnTime.date(penalty.blockedUntil!)}.' : ''}',
-                ),
-                const SizedBox(height: AppSpacing.md),
-              ],
+
               if (mine.isEmpty)
                 const EmptyState(
                   compact: true,

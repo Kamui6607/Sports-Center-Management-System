@@ -148,94 +148,161 @@ class _CartLineCard extends ConsumerWidget {
     final l = line;
     final c = context.colors;
     final notifier = ref.read(cartProvider.notifier);
+    final hasIssues = !l.purchasable;
+    final hasPriceChange = l.priceChange != null;
     final blocking = l.warnings.where((w) => !w.isPriceChange).toList();
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Checkbox.adaptive(
-                value: selected,
-                onChanged: l.purchasable ? (v) => onSelected(v ?? false) : null,
-                semanticLabel: 'Chọn ${l.productName}',
-              ),
-              SizedBox.square(
-                dimension: AppSpacing.xxl + AppSpacing.sm,
-                child: AppNetworkImage(
-                  url: l.imageUrl,
-                  seed: l.productId,
-                  placeholderIcon: productIcon(l.productName),
-                  iconSize: AppSizes.icon,
+          Opacity(
+            opacity: hasIssues ? 0.55 : 1.0,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Checkbox.adaptive(
+                  value: selected && l.purchasable,
+                  onChanged: l.purchasable ? (v) => onSelected(v ?? false) : null,
+                  semanticLabel: 'Chọn ${l.productName}',
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(l.productName, maxLines: 2, overflow: TextOverflow.ellipsis, style: context.text.bodyStrong),
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        MoneyText(l.unitPrice, style: context.text.small.copyWith(color: c.primary)),
-                        if (l.priceChange?.oldPrice != null)
-                          Text(
-                            Money.format(l.priceChange!.oldPrice!),
-                            style: context.text.caption.copyWith(
-                              color: c.textMuted,
-                              decoration: TextDecoration.lineThrough,
+                SizedBox.square(
+                  dimension: AppSpacing.xxl + AppSpacing.sm,
+                  child: AppNetworkImage(
+                    url: l.imageUrl,
+                    seed: l.productId,
+                    placeholderIcon: productIcon(l.productName),
+                    iconSize: AppSizes.icon,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l.productName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.text.bodyStrong,
                             ),
                           ),
-                      ],
+                          if (!l.isActive) ...[
+                            const SizedBox(width: AppSpacing.xxs),
+                            const StatusTag(label: 'Ngừng bán', tone: StatusTone.danger, dense: true),
+                          ] else if (l.availableStock <= 0) ...[
+                            const SizedBox(width: AppSpacing.xxs),
+                            const StatusTag(label: 'Hết hàng', tone: StatusTone.danger, dense: true),
+                          ] else if (hasPriceChange) ...[
+                            const SizedBox(width: AppSpacing.xxs),
+                            const StatusTag(label: 'Giá đổi', tone: StatusTone.warning, dense: true),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          MoneyText(l.unitPrice, style: context.text.small.copyWith(color: hasIssues ? c.textMuted : c.primary)),
+                          if (l.priceChange?.oldPrice != null)
+                            Text(
+                              Money.format(l.priceChange!.oldPrice!),
+                              style: context.text.caption.copyWith(
+                                color: c.textMuted,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                AppIconButton(
+                  icon: AppIcons.delete,
+                  tooltip: 'Xóa khỏi giỏ',
+                  onPressed: () => runShopAction(context, ref, () => notifier.remove(l.productId), refresh: false),
+                ),
+              ],
+            ),
+          ),
+          for (final w in l.warnings)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: (w.isPriceChange ? c.warningText : c.errorText).withValues(alpha: 0.08),
+                  borderRadius: AppRadius.controlAll,
+                  border: Border.all(color: (w.isPriceChange ? c.warningText : c.errorText).withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      w.isPriceChange ? AppIcons.info : AppIcons.warning,
+                      size: AppSizes.iconSm,
+                      color: w.isPriceChange ? c.warningText : c.errorText,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        w.message,
+                        style: context.text.caption.copyWith(
+                          color: w.isPriceChange ? c.warningText : c.errorText,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              AppIconButton(
-                icon: AppIcons.delete,
-                tooltip: 'Xóa khỏi giỏ',
-                onPressed: () => runShopAction(context, ref, () => notifier.remove(l.productId), refresh: false),
-              ),
-            ],
-          ),
-          for (final w in l.warnings)
+            ),
+          if (hasPriceChange)
             Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.xxs),
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Icon(
-                    w.isPriceChange ? AppIcons.info : AppIcons.warning,
-                    size: AppSizes.iconSm,
-                    color: w.isPriceChange ? c.textMuted : c.errorText,
+                  AppButton.ghost(
+                    label: 'Xem sản phẩm',
+                    size: AppButtonSize.small,
+                    onPressed: () => context.push(AppRoutes.productDetail(l.productId)),
                   ),
-                  const SizedBox(width: AppSpacing.xxs),
-                  Expanded(
-                    child: Text(
-                      w.message,
-                      style: context.text.caption.copyWith(color: w.isPriceChange ? c.textMuted : c.errorText),
+                  const SizedBox(width: AppSpacing.xs),
+                  AppButton.outline(
+                    label: 'Cập nhật giá mới',
+                    size: AppButtonSize.small,
+                    onPressed: () => runShopAction(
+                      context,
+                      ref,
+                      () => notifier.acceptPrices(),
+                      refresh: false,
                     ),
                   ),
                 ],
               ),
             ),
           const SizedBox(height: AppSpacing.xs),
-          Row(
-            children: [
-              if (l.isActive && l.availableStock > 0)
-                QuantityStepper(
-                  value: l.quantity.clamp(1, l.maxSelectable),
-                  max: l.maxSelectable,
-                  onChanged: (v) =>
-                      runShopAction(context, ref, () => notifier.setQuantity(l.productId, v), refresh: false),
-                )
-              else
-                Text('Số lượng: ${l.quantity}', style: context.text.small),
-              const Spacer(),
-              MoneyText(l.lineTotal, style: context.text.bodyStrong),
-            ],
+          Opacity(
+            opacity: hasIssues ? 0.55 : 1.0,
+            child: Row(
+              children: [
+                if (l.isActive && l.availableStock > 0)
+                  QuantityStepper(
+                    value: l.quantity.clamp(1, l.maxSelectable),
+                    max: l.maxSelectable,
+                    onChanged: (v) => runShopAction(context, ref, () => notifier.setQuantity(l.productId, v), refresh: false),
+                  )
+                else
+                  Text('Số lượng: ${l.quantity}', style: context.text.small),
+                const Spacer(),
+                MoneyText(l.lineTotal, style: context.text.bodyStrong),
+              ],
+            ),
           ),
           if (blocking.isNotEmpty && l.isActive && l.availableStock > 0 && l.quantity > l.maxSelectable)
             Align(

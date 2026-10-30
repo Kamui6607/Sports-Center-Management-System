@@ -58,13 +58,16 @@ class ProductApiRepository implements ProductRepository {
       for (final r in (results[0] as Json).objList('reviews'))
         ProductReview(
           id: r.str('id'),
-          userName: r.obj('user').str('fullName', 'Người dùng'),
-          avatarUrl: ApiClient.absoluteUrl(r.obj('user').strOrNull('avatarUrl')),
+          userName: r.boolean('isAnonymous') && me != r.str('userId')
+              ? 'Người dùng ẩn danh'
+              : (r.boolean('isAnonymous') ? '${r.obj('user').str('fullName', 'Người dùng')} (Ẩn danh)' : r.obj('user').str('fullName', 'Người dùng')),
+          avatarUrl: r.boolean('isAnonymous') ? null : ApiClient.absoluteUrl(r.obj('user').strOrNull('avatarUrl')),
           rating: r.integer('rating'),
           comment: r.strOrNull('comment'),
           createdAt: r.date('createdAt'),
           isMine: me != null && r.str('userId') == me,
           isHidden: r.boolean('isHidden'),
+          isAnonymous: r.boolean('isAnonymous'),
         ),
     ];
   }

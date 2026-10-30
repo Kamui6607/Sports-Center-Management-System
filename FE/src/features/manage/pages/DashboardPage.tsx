@@ -52,11 +52,10 @@ import { ScheduleDetailDialog } from "./scheduleKit";
 const TZ = "Asia/Ho_Chi_Minh";
 
 const PERIODS: [string, string][] = [
-  ["month", "Tháng này"],
   ["today", "Hôm nay"],
-  ["7d", "7 ngày qua"],
+  ["week", "Tuần này"],
+  ["month", "Tháng này"],
   ["last-month", "Tháng trước"],
-  ["30d", "30 ngày"],
   ["custom", "Tùy chọn"],
 ];
 
@@ -92,20 +91,15 @@ export function calcDashboardRange(preset: string, from: string, to: string): [s
   switch (preset) {
     case "today":
       return [today, today];
-    case "7d": {
-      const d = new Date(`${today}T12:00:00+07:00`);
-      d.setUTCDate(d.getUTCDate() - 6);
-      return [vnDateKey(d), today];
+    case "week": {
+      const dow = dowOf(today); // 0 = T2, ..., 6 = CN
+      const monday = addDays(today, -dow);
+      return [monday, addDays(monday, 6)]; // Từ Thứ 2 đến Chủ nhật tuần này
     }
     case "last-month": {
       const yy = m === 1 ? y - 1 : y;
       const mm = m === 1 ? 12 : m - 1;
       return [`${yy}-${pad(mm)}-01`, `${yy}-${pad(mm)}-${pad(lastDay(yy, mm))}`];
-    }
-    case "30d": {
-      const d = new Date(`${today}T12:00:00+07:00`);
-      d.setUTCDate(d.getUTCDate() - 29);
-      return [vnDateKey(d), today];
     }
     case "custom":
       return [from || today, to || today];
@@ -189,7 +183,29 @@ export default function DashboardPage({ user }: { user: ProfileOk["data"] }) {
           </h1>
           <p>Tổng quan hoạt động và vận hành của trung tâm thể thao</p>
         </div>
-        <div className="cr-head-actions">
+      </header>
+
+      <div className="cr-dash-toolbar">
+        <div className="cr-dash-filters-left">
+          <div className="cr-seg" role="group" aria-label="Kỳ lọc số liệu">
+            {PERIODS.map(([v, l]) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={preset === v}
+                onClick={() => {
+                  if (v === "custom") {
+                    s.set({ preset: v, from: start, to: end });
+                  } else {
+                    s.set({ preset: v, from: "", to: "" });
+                  }
+                }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+
           {preset === "custom" && (
             <div className="cr-custom-range-bar">
               <label className="cr-date-field-inline">
@@ -217,26 +233,9 @@ export default function DashboardPage({ user }: { user: ProfileOk["data"] }) {
             <CalendarDays size={16} aria-hidden="true" />
             {start === end ? dmy(start) : `${dmy(start)} – ${dmy(end)}`}
           </span>
+        </div>
 
-          <div className="cr-seg" role="group" aria-label="Kỳ lọc số liệu">
-            {PERIODS.map(([v, l]) => (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={preset === v}
-                onClick={() => {
-                  if (v === "custom") {
-                    s.set({ preset: v, from: start, to: end });
-                  } else {
-                    s.set({ preset: v, from: "", to: "" });
-                  }
-                }}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-
+        <div className="cr-dash-actions-right">
           <Link className="cr-btn soft" to="/manager/memberships">
             <WalletCards size={16} aria-hidden="true" /> Quét thẻ
           </Link>
@@ -247,7 +246,7 @@ export default function DashboardPage({ user }: { user: ProfileOk["data"] }) {
             <FileBarChart size={16} aria-hidden="true" /> Báo cáo & xuất CSV
           </Link>
         </div>
-      </header>
+      </div>
 
       {invalidRange && (
         <div className="cr-alert warn">

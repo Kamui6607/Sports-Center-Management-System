@@ -155,21 +155,8 @@ export async function applyPenalty(input: {
       },
     });
 
-    // §11.2: chỉ cancel BOOKED ở các buổi CHƯA bắt đầu của đúng lớp này.
-    const future = await tx.enrollment.findMany({
-      where: {
-        memberId: input.memberId,
-        status: "BOOKED",
-        schedule: { classId: input.classId, startTime: { gt: decidedAt }, status: "SCHEDULED" },
-      },
-      select: { id: true },
-    });
-    if (future.length > 0) {
-      await tx.enrollment.updateMany({
-        where: { id: { in: future.map((f) => f.id) } },
-        data: { status: "CANCELLED", cancelledAt: decidedAt },
-      });
-    }
+    // Nghiệp vụ: KHÔNG thu hồi chỗ của khách hàng (khách đã mua gói/lớp).
+    const future: { id: string }[] = [];
 
     return tx.attendancePenalty.update({
       where: { id: created.id },
@@ -186,9 +173,7 @@ export async function applyPenalty(input: {
     penalty.member.user.id,
     "ATTENDANCE_PENALTY",
     `Hình phạt chuyên cần: ${penalty.class.name}`,
-    `Bạn bị thu hồi ${penalty.releasedCount} chỗ đặt lớp "${penalty.class.name}" do chuyên cần ${penalty.attendanceRate}% (${penalty.sampleSize} buổi được tính). ` +
-      `Lý do: ${penalty.reason} Bạn không thể đặt lại lớp này đến ${penalty.blockedUntil ? fmt(penalty.blockedUntil) : "khi có thông báo mới"}. ` +
-      `Nếu có lý do chính đáng, hãy gửi khiếu nại trong ${ATTENDANCE.APPEAL_WINDOW_HOURS} giờ.`,
+    `Thông tin chuyên cần lớp "${penalty.class.name}": Tỷ lệ chuyên cần của bạn hiện là ${penalty.attendanceRate}% trên ${penalty.sampleSize} buổi được tính. Hãy cố gắng tham gia đều đặn các buổi học sắp tới nhé!`,
     {
       metadata: {
         penaltyId: penalty.id,

@@ -3,6 +3,7 @@ import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { broadcastNotification, createNotification } from "../notifications/notifications.service.js";
 import { evaluateCourseEligibility } from "../enrollments/course-enrollment.service.js";
+import { cleanNotificationsForClass } from "../notifications/notifications.service.js";
 import { buildClassSummaries, getMemberPurchase, withClassSummaries } from "./class-summary.service.js";
 import { computeGoalMatch, FITNESS_GOALS, GYM_FITNESS, type GoalMatch } from "../../config/fitness-goals.js";
 import { foldVietnamese } from "../../utils/i18n.js";
@@ -358,6 +359,7 @@ export async function updateClass(id: string, data: any, actor?: { id: string; r
       where: { classId: id, status: "SCHEDULED", startTime: { gte: new Date() } },
     });
     if (upcoming > 0) throw new AppError("Cannot deactivate class with upcoming schedules", 400);
+    cleanNotificationsForClass(id).catch(() => {});
   }
 
   // A11: KHÔNG cho giảm sức chứa xuống dưới số chỗ đã giữ ở các buổi sắp tới.
@@ -410,6 +412,7 @@ export async function deleteClass(id: string) {
     where: { classId: id, status: "SCHEDULED", startTime: { gte: new Date() } },
   });
   if (upcoming > 0) throw new AppError("Cannot deactivate class with upcoming schedules", 400);
+  cleanNotificationsForClass(id).catch(() => {});
   return prisma.class.update({ where: { id }, data: { isActive: false } });
 }
 

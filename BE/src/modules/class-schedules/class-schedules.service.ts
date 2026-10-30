@@ -4,7 +4,7 @@ import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { broadcastNotification } from "../notifications/notifications.service.js";
 import { ATTENDANCE } from "../../config/attendance.js";
-import { scanAttendanceWarnings } from "../attendance/attendance.service.js";
+import { scanAttendanceWarnings, notifyMemberAttendanceStatus } from "../attendance/attendance.service.js";
 import { lockSchedule } from "../../utils/dbLocks.js";
 import { createSessionRefundsTx, notifyManagersNewRefunds } from "../refunds/refunds.service.js";
 import { addDaysToDateKey, vnDateKey, vnDateTime, weekdayIsoOfDateKey } from "../../utils/vnTime.js";
@@ -1093,6 +1093,7 @@ export async function completeSchedule(id: string, actor: ScheduleActor) {
     throw new AppError("Cannot complete a schedule that has not ended yet", 400);
   }
 
+  let missingMemberIds: string[] = [];
   const completed = await prisma.$transaction(async (tx) => {
     // A12: lock cùng khoá với booking + CAS trạng thái (không hoàn tất lịch vừa bị hủy).
     await lockSchedule(tx, id);
@@ -1121,6 +1122,7 @@ export async function completeSchedule(id: string, actor: ScheduleActor) {
       const markedSet = new Set(marked.map((m) => m.memberId));
       const missing = booked.filter((b) => !markedSet.has(b.memberId));
       if (missing.length > 0) {
+        missingMemberIds = missing.map((m) => m.memberId);
         await tx.attendance.createMany({
           data: missing.map((m) => ({
             scheduleId: id,
@@ -1159,6 +1161,7 @@ export async function completeSchedule(id: string, actor: ScheduleActor) {
   // §7: quét lại chuyên cần của lớp và gửi warning cho các bucket WARN (dedupe theo rate).
   // Fire-and-forget để không chặn response; không ảnh hưởng kết quả complete.
   scanAttendanceWarnings(schedule.classId).catch(() => {});
+  missingMemberIds.forEach((mId) => notifyMemberAttendanceStatus(mId, id, "ABSENT", ATTENDANCE.SYSTEM_NO_SHOW_NOTE).catch(() => {}));
 
   return completed;
 }

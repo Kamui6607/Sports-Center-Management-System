@@ -370,30 +370,103 @@ async function recomputeRatingTx(tx: Tx, productId: string) {
   await tx.product.update({ where: { id: productId }, data: { rating: agg._avg.rating ?? 0, reviewCount: agg._count.rating } });
 }
 
-/** Đánh giá MỘT dòng đơn: dòng thuộc đơn COMPLETED của chính mình, mỗi dòng tối đa 1 đánh giá. */
-export async function reviewOrderItem(userId: string, orderItemId: string, data: { rating: number; comment?: string }) {
+/** Đánh giá MỘT dòng đơn: dòng thuộc đơn COMPLETED của chính mình, trong vòng 30 ngày, mỗi dòng tối đa 1 đánh giá. */
+export async function reviewOrderItem(
+  userId: string,
+  orderItemId: string,
+  data: { rating: number; comment?: string; isAnonymous?: boolean }
+) {
   const item = await prisma.orderItem.findFirst({
     where: { id: orderItemId, order: { userId } },
-    include: { order: { select: { status: true } }, review: { select: { id: true } } },
+    include: {
+      order: { select: { status: true, completedAt: true, deliveredAt: true, updatedAt: true } },
+      review: { select: { id: true } },
+    },
   });
   if (!item) throw new AppError("Không tìm thấy sản phẩm trong đơn của bạn.", 404, { code: "ORDER_ITEM_NOT_FOUND" });
   if (item.order.status !== "COMPLETED") {
     throw new AppError("Chỉ đánh giá được sản phẩm trong đơn đã hoàn tất.", 403, { code: "REVIEW_NOT_ALLOWED" });
   }
-  if (item.review) throw new AppError("Bạn đã đánh giá sản phẩm này trong đơn.", 409, { code: "REVIEW_EXISTS", reviewId: item.review.id });
+
+  // Kiểm tra thời hạn 30 ngày kể từ khi đơn hoàn tất
+  const completedTime = item.order.completedAt ?? item.order.deliveredAt ?? item.order.updatedAt;
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  if (Date.now() - completedTime.getTime() > THIRTY_DAYS_MS) {
+    throw new AppError("Đã quá thời hạn 30 ngày kể từ khi hoàn tất đơn, bạn không thể đánh giá sản phẩm này.", 403, {
+      code: "REVIEW_EXPIRED",
+    });
+  }
+
+  if (item.review) throw new AppError("Bạn đã đánh giá sản phẩm này trong đơn. Bạn có thể chỉnh sửa lại đánh giá.", 409, { code: "REVIEW_EXISTS", reviewId: item.review.id });
   try {
     return await prisma.$transaction(async (tx) => {
       const review = await tx.productReview.create({
-        data: { productId: item.productId, userId, orderItemId: item.id, rating: data.rating, comment: data.comment?.trim() || null },
+        data: {
+          productId: item.productId,
+          userId,
+          orderItemId: item.id,
+          rating: data.rating,
+          comment: data.comment?.trim() || null,
+          isAnonymous: data.isAnonymous ?? false,
+          editCount: 0,
+        },
       });
       await recomputeRatingTx(tx, item.productId);
       return review;
     });
   } catch (err) {
-    // Hai request đồng thời cho cùng dòng: UNIQUE(orderItemId) chặn bản thứ hai.
     if ((err as { code?: string }).code === "P2002") throw new AppError("Bạn đã đánh giá sản phẩm này trong đơn.", 409, { code: "REVIEW_EXISTS" });
     throw err;
   }
+}
+
+/** Chỉnh sửa lại đánh giá: chỉ được sửa tối đa 1 lần, trong vòng 30 ngày kể từ khi đơn hoàn tất. */
+export async function updateOrderItemReview(
+  userId: string,
+  orderItemId: string,
+  data: { rating?: number; comment?: string; isAnonymous?: boolean }
+) {
+  const item = await prisma.orderItem.findFirst({
+    where: { id: orderItemId, order: { userId } },
+    include: {
+      order: { select: { status: true, completedAt: true, deliveredAt: true, updatedAt: true } },
+      review: true,
+    },
+  });
+  if (!item) throw new AppError("Không tìm thấy sản phẩm trong đơn của bạn.", 404, { code: "ORDER_ITEM_NOT_FOUND" });
+  if (!item.review) {
+    throw new AppError("Sản phẩm chưa có đánh giá để chỉnh sửa.", 404, { code: "REVIEW_NOT_FOUND" });
+  }
+
+  // 1. Kiểm tra thời hạn 30 ngày
+  const completedTime = item.order.completedAt ?? item.order.deliveredAt ?? item.order.updatedAt;
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  if (Date.now() - completedTime.getTime() > THIRTY_DAYS_MS) {
+    throw new AppError("Đã quá thời hạn 30 ngày kể từ khi hoàn tất đơn, bạn không thể chỉnh sửa lại đánh giá này.", 403, {
+      code: "REVIEW_EXPIRED",
+    });
+  }
+
+  // 2. Kiểm tra số lần chỉnh sửa (tối đa 1 lần)
+  if (item.review.editCount >= 1) {
+    throw new AppError("Đánh giá này đã được chỉnh sửa 1 lần trước đó, không thể chỉnh sửa thêm.", 403, {
+      code: "REVIEW_EDIT_LIMIT_EXCEEDED",
+    });
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    const updated = await tx.productReview.update({
+      where: { id: item.review!.id },
+      data: {
+        ...(typeof data.rating === "number" ? { rating: data.rating } : {}),
+        ...(data.comment !== undefined ? { comment: data.comment.trim() || null } : {}),
+        ...(typeof data.isAnonymous === "boolean" ? { isAnonymous: data.isAnonymous } : {}),
+        editCount: { increment: 1 },
+      },
+    });
+    await recomputeRatingTx(tx, item.productId);
+    return updated;
+  });
 }
 
 /** API cũ `POST /products/:id/reviews`: tự chọn dòng đơn COMPLETED cũ nhất chưa đánh giá của sản phẩm. */

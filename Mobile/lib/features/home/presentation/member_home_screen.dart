@@ -127,20 +127,15 @@ class _AttendanceAlerts extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final penalties = ref.watch(myPenaltiesProvider).value ?? const [];
     final summary = ref.watch(myAttendanceSummaryProvider).value ?? const [];
-    final now = DateTime.now();
-    final active = penalties.where((p) => p.blockedUntil?.isAfter(now) ?? false).toList();
-    final warnings = summary.where((s) => s.isWarning && !active.any((p) => p.classId == s.classId)).toList();
-    if (active.isEmpty && warnings.isEmpty) return const SizedBox.shrink();
+    final warnings = summary.where((s) => s.isWarning).toList();
+    if (warnings.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: AlertBanner(
-        tone: active.isNotEmpty ? StatusTone.danger : StatusTone.warning,
-        title: active.isNotEmpty ? 'Bạn đang bị phạt chuyên cần' : 'Cảnh báo chuyên cần',
-        message: active.isNotEmpty
-            ? 'Khóa "${active.first.className}" đã thu hồi ${active.first.releasedCount} buổi sắp tới.'
-            : 'Tỷ lệ tham gia khóa "${warnings.first.className}" chỉ ${(warnings.first.rate * 100).round()}%, dưới mức 80%.',
+        tone: StatusTone.warning,
+        title: 'Nhắc nhở chuyên cần',
+        message: 'Tỷ lệ tham gia khóa "${warnings.first.className}" đạt ${(warnings.first.rate * 100).round()}%. Hãy sắp xếp tham gia các buổi tới nhé!',
         action: TextButton(onPressed: () => context.push(AppRoutes.attendance), child: const Text('Xem chuyên cần')),
       ),
     );

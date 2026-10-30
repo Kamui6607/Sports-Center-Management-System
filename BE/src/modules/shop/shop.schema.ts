@@ -121,6 +121,13 @@ export const RefundBankSchema = z.object({
 export const ReviewOrderItemSchema = z.object({
   rating: z.number().int().min(1).max(5),
   comment: z.string().trim().max(1000).optional(),
+  isAnonymous: z.boolean().optional(),
+});
+
+export const UpdateReviewOrderItemSchema = z.object({
+  rating: z.number().int().min(1).max(5).optional(),
+  comment: z.string().trim().max(1000).optional(),
+  isAnonymous: z.boolean().optional(),
 });
 
 // ── Manager ──────────────────────────────────────────────────────────────────

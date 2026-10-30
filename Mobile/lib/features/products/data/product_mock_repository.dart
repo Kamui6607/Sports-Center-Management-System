@@ -1,5 +1,6 @@
 import '../../../core/data/paged.dart';
 import '../../../core/error/app_failure.dart';
+import '../../../core/utils/vn_text.dart';
 import '../../../mock/mock_server.dart';
 import '../../../mock/mock_tables.dart';
 import '../../auth/domain/entities/app_user.dart';
@@ -34,10 +35,9 @@ class ProductMockRepository implements ProductRepository {
 
   @override
   Future<Paged<Product>> products({String search = '', int page = 1}) => _server.run(() {
-    final q = search.toLowerCase();
     final list = _server.db.products
         .where((p) => p.isActive)
-        .where((p) => q.isEmpty || p.name.toLowerCase().contains(q) || p.description.toLowerCase().contains(q))
+        .where((p) => search.trim().isEmpty || VnText.matches(p.name, search) || (p.description.isNotEmpty && VnText.matches(p.description, search)))
         .map(_toProduct)
         .toList();
     return Paged.slice(list, page: page, limit: _pageSize);
@@ -57,15 +57,19 @@ class ProductMockRepository implements ProductRepository {
     final isManager = _server.currentUser?.role == UserRole.manager;
     return db.productReviews.where((r) => r.productId == productId && (isManager || !r.isHidden)).map((r) {
       final u = db.user(r.userId);
+      final anon = r.isAnonymous;
       return ProductReview(
         id: r.id,
-        userName: u.fullName,
-        avatarUrl: u.avatarUrl,
+        userName: anon && r.userId != me
+            ? 'Người dùng ẩn danh'
+            : (anon ? '${u.fullName} (Ẩn danh)' : u.fullName),
+        avatarUrl: anon ? null : u.avatarUrl,
         rating: r.rating,
         comment: r.comment,
         createdAt: r.createdAt,
         isMine: r.userId == me,
         isHidden: r.isHidden,
+        isAnonymous: anon,
       );
     }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   });

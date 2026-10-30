@@ -4,35 +4,49 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="Update Web UI 27/10">
-      <change afterPath="$PROJECT_DIR$/Doc/brand/preview.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Doc/brand/preview.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-app-icon-foreground.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-app-icon-foreground.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-app-icon.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-app-icon.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-glyph.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-logo-horizontal-dark.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-logo-horizontal-light.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-mark-on-dark.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-mark.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/FE/public/apple-touch-icon.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/FE/public/favicon.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/FE/src/shared/PulseMark.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Mobile/lib/core/widgets/image_viewer.dart" afterDir="false" />
+    <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="Update Web UI 30/10">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/FE/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/landing/GymLanding.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/landing/GymLanding.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/landing/landing.css" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/landing/landing.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/AuthScreens.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/AuthScreens.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/ManagerLayout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/ManagerLayout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/BE/prisma/schema.prisma" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/attendance/attendance-penalties.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/attendance/attendance-penalties.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/class-schedules/class-schedules.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/class-schedules/class-schedules.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/classes/classes.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/classes/classes.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/enrollments/course-enrollment.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/enrollments/course-enrollment.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/notifications/notifications.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/notifications/notifications.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/products/products.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/products/products.schema.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/products/products.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/products/products.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/cart.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/cart.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/order-view.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/order-view.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/orders.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/orders.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.controller.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.routes.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.routes.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.schema.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FE/src/features/manage/admin.css" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/admin.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/auth.css" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/auth.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/shared/Brand.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/shared/Brand.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/theme/app_palette.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/theme/app_palette.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/widgets/widgets.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/widgets/widgets.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/products/presentation/product_labels.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/products/presentation/product_labels.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/DashboardPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/DashboardPage.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/OrdersPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/OrdersPage.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/ProductDetailPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/ProductDetailPage.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/api/shop_json.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/api/shop_json.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/widgets/display.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/widgets/display.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/attendance_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/attendance_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/course_attendance_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/course_attendance_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/classes/data/course_mock_rules.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/classes/data/course_mock_rules.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/home/presentation/member_home_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/home/presentation/member_home_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/notifications/data/notification_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/notifications/data/notification_mock_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/products/data/product_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/products/data/product_api_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/products/data/product_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/products/data/product_mock_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/products/domain/entities/product.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/products/domain/entities/product.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Mobile/lib/features/products/presentation/screens/product_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/products/presentation/screens/product_detail_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_api_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_mock_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/entities/shop.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/entities/shop.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/repositories/shop_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/repositories/shop_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/cart_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/cart_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/checkout_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/checkout_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/order_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/order_detail_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/orders_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/orders_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/widgets/order_sections.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/widgets/order_sections.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/mock/tables/commerce_tables.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/mock/tables/commerce_tables.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -187,7 +201,7 @@
       <workItem from="1793283230643" duration="611000" />
       <workItem from="1793332627212" duration="30000" />
       <workItem from="1793333483620" duration="1596000" />
-      <workItem from="1793336343968" duration="2028000" />
+      <workItem from="1793336343968" duration="5510000" />
     </task>
     <task id="LOCAL-00001" summary="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10">
       <option name="closed" value="true" />
@@ -261,7 +275,15 @@
       <option name="project" value="LOCAL" />
       <updated>1793064882110</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="Update Web UI 30/10">
+      <option name="closed" value="true" />
+      <created>1793340877642</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1793340877642</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -300,6 +322,7 @@
     <MESSAGE value="feat: harden course sales, payments and revenue reporting (late-join pricing, sale cutoff, seat holds, class maintenance job, snapshot-based invoices with full unit price/quantity/shipping/total breakdown on checkout, payment, invoice and history screens), complete the membership flow (plan CRUD, rotating QR pass with entry log, queued plans, renewal reminders, manager cancellation with refunds, membership payment details) and split attendance and training plans per course with present/absent/upcoming sessions across BE, Mobile and Web 25/10" />
     <MESSAGE value="feat: add web landing page, redesign login/password reset and manager notifications (light/dark, &quot;view all&quot; page), add manager motion layer and shared detail dialogs, support shop late pickup with &quot;Received&quot; status, and redesign mobile welcome screen 26/10" />
     <MESSAGE value="Update Web UI 27/10" />
-    <option name="LAST_COMMIT_MESSAGE" value="Update Web UI 27/10" />
+    <MESSAGE value="Update Web UI 30/10" />
+    <option name="LAST_COMMIT_MESSAGE" value="Update Web UI 30/10" />
   </component>
 </project>

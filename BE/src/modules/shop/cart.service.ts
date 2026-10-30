@@ -82,7 +82,7 @@ function cartView(cart: CartWithItems | null) {
       maxPerOrder: p.maxPerOrder,
       isActive: p.isActive,
       warnings,
-      purchasable: !warnings.some((w) => w.code !== "PRICE_CHANGED"),
+      purchasable: warnings.length === 0,
     };
   });
   const purchasable = items.filter((i) => i.purchasable);

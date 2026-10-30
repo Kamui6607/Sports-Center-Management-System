@@ -205,6 +205,8 @@ class ProductReviewRow {
   /// Dòng đơn được đánh giá (null với dữ liệu cũ).
   final String? orderLineId;
   bool isHidden = false;
+  bool isAnonymous = false;
+  int editCount = 0;
 }
 
 /// Dòng giỏ hàng (giỏ không giữ hàng).

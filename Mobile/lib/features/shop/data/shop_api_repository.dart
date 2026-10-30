@@ -122,10 +122,23 @@ class ShopApiRepository implements ShopRepository {
   );
 
   @override
-  Future<void> reviewItem(String orderItemId, int rating, String? comment) => _api.post(
+  Future<void> reviewItem(String orderItemId, int rating, String? comment, {bool isAnonymous = false}) => _api.post(
     '/shop/order-items/$orderItemId/review',
-    body: {'rating': rating, if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim()},
+    body: {
+      'rating': rating,
+      'isAnonymous': isAnonymous,
+      if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+    },
   );
+
+  @override
+  Future<void> updateReviewItem(String orderItemId, {int? rating, String? comment, bool? isAnonymous}) {
+    final body = <String, dynamic>{};
+    if (rating != null) body['rating'] = rating;
+    if (isAnonymous != null) body['isAnonymous'] = isAnonymous;
+    if (comment != null && comment.trim().isNotEmpty) body['comment'] = comment.trim();
+    return _api.patch('/shop/order-items/$orderItemId/review', body: body);
+  }
 
   // ── Manager ──────────────────────────────────────────────────────────
 

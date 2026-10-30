@@ -1053,6 +1053,8 @@ model ProductReview {
   orderItem    OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   rating       Int
   comment      String?
+  isAnonymous  Boolean    @default(false)
+  editCount    Int        @default(0)
   /// Manager ẩn đánh giá (không hiển thị công khai, không tính điểm trung bình).
   isHidden     Boolean    @default(false)
   hiddenReason String?

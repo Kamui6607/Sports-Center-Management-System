@@ -19,6 +19,7 @@ import {
   RequestRefundSchema,
   ReschedulePickupSchema,
   ReviewOrderItemSchema,
+  UpdateReviewOrderItemSchema,
   ReviewQuerySchema,
   ReviewVisibilitySchema,
   UpdateAddressSchema,
@@ -422,6 +423,7 @@ router.put("/orders/:id/refund-bank", ...buyer, validate(RefundBankSchema), c.up
  *       409: { description: REVIEW_EXISTS }
  */
 router.post("/order-items/:id/review", ...buyer, reviewLimit, validate(ReviewOrderItemSchema), c.reviewOrderItem);
+router.patch("/order-items/:id/review", ...buyer, reviewLimit, validate(UpdateReviewOrderItemSchema), c.updateOrderItemReview);
 
 // ── Manager ──────────────────────────────────────────────────────────────────
 

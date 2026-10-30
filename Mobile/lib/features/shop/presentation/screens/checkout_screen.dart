@@ -13,6 +13,7 @@ import '../../../../core/utils/money.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../auth/presentation/providers/session_provider.dart';
+import '../../../products/presentation/product_labels.dart';
 import '../../data/shop_repository_provider.dart';
 import '../../domain/entities/shop.dart';
 import '../providers/shop_providers.dart';
@@ -244,6 +245,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   for (final (i, l) in p.lines.indexed) ...[
                     if (i > 0) const Divider(height: AppSpacing.md),
                     CostLineItem(
+                      leading: SizedBox.square(
+                        dimension: AppSpacing.xxl,
+                        child: AppNetworkImage(
+                          url: l.imageUrl,
+                          seed: l.productId,
+                          placeholderIcon: productIcon(l.productName),
+                          iconSize: AppSizes.icon,
+                        ),
+                      ),
                       name: l.productName,
                       unitPrice: l.unitPrice,
                       quantity: l.quantity,

@@ -316,7 +316,40 @@ function OrderDialog({ id, onClose }: { id: string; onClose: () => void }) {
         rows={(o.items as Row[] | undefined) ?? []}
         label="Dòng hàng"
         columns={[
-          { key: "n", title: "Sản phẩm", render: (r) => str(r.productName) },
+          {
+            key: "n",
+            title: "Sản phẩm",
+            render: (r) => (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {r.productImageUrl ? (
+                  <img
+                    src={str(r.productImageUrl)}
+                    alt=""
+                    style={{ width: 36, height: 36, borderRadius: 6, objectFit: "cover", flexShrink: 0, background: "var(--surface-2)" }}
+                  />
+                ) : (
+                  <span
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 6,
+                      background: "var(--surface-2)",
+                      border: "1px solid var(--border)",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 11,
+                      color: "var(--text-muted)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    SP
+                  </span>
+                )}
+                <span>{str(r.productName)}</span>
+              </div>
+            ),
+          },
           { key: "q", title: "SL", className: "num", render: (r) => num(r.quantity) },
           { key: "p", title: "Đơn giá lúc đặt", className: "num", render: (r) => vnd(r.unitPrice) },
           { key: "t", title: "Thành tiền", className: "num", render: (r) => vnd(r.totalAmount) },

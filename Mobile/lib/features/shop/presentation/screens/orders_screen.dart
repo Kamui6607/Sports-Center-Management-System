@@ -118,14 +118,40 @@ class OrderCard extends ConsumerWidget {
           const SizedBox(height: AppSpacing.xs),
           Row(
             children: [
-              SizedBox.square(
-                dimension: AppSpacing.xxl,
-                child: AppNetworkImage(
-                  url: first?.imageUrl,
-                  seed: first?.productId ?? o.id,
-                  placeholderIcon: productIcon(first?.productName ?? ''),
-                  iconSize: AppSizes.icon,
-                ),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  SizedBox.square(
+                    dimension: AppSpacing.xxl,
+                    child: AppNetworkImage(
+                      url: first?.imageUrl,
+                      seed: first?.productId ?? o.id,
+                      placeholderIcon: productIcon(first?.productName ?? ''),
+                      iconSize: AppSizes.icon,
+                    ),
+                  ),
+                  if (o.lines.length > 1)
+                    Positioned(
+                      right: -3,
+                      bottom: -3,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: c.surface,
+                          borderRadius: AppRadius.pillAll,
+                          border: Border.all(color: c.border),
+                        ),
+                        child: Text(
+                          '+${o.lines.length - 1}',
+                          style: context.text.caption.copyWith(
+                            fontSize: 10,
+                            color: c.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(

@@ -863,12 +863,16 @@ class ShopMockRepository implements ShopRepository {
   });
 
   @override
-  Future<void> reviewItem(String orderItemId, int rating, String? comment) => _server.run(() {
+  Future<void> reviewItem(String orderItemId, int rating, String? comment, {bool isAnonymous = false}) => _server.run(() {
     final u = _buyer();
     final o = _db.shopOrders.where((x) => x.userId == u.id && x.lines.any((l) => l.id == orderItemId)).firstOrNull;
     if (o == null) throw const AppFailure.notFound('Không tìm thấy sản phẩm trong đơn của bạn.');
     if (o.status != ShopOrderStatus.completed) {
       throw const AppFailure.forbidden('Chỉ đánh giá được sản phẩm trong đơn đã hoàn tất.');
+    }
+    final completedAt = o.history.where((h) => h.to == ShopOrderStatus.completed).lastOrNull?.at ?? o.createdAt;
+    if (_db.now().difference(completedAt).inDays > 30) {
+      throw const AppFailure.forbidden('Đã quá thời hạn 30 ngày kể từ khi hoàn tất đơn, bạn không thể đánh giá sản phẩm.');
     }
     if (_db.productReviews.any((r) => r.orderLineId == orderItemId)) {
       throw const AppFailure.conflict('Bạn đã đánh giá sản phẩm này trong đơn.', code: 'REVIEW_EXISTS');
@@ -885,8 +889,47 @@ class ShopMockRepository implements ShopRepository {
         createdAt: _db.now(),
         comment: c == null || c.isEmpty ? null : c,
         orderLineId: orderItemId,
-      ),
+      )..isAnonymous = isAnonymous,
     );
+  });
+
+  @override
+  Future<void> updateReviewItem(String orderItemId, {int? rating, String? comment, bool? isAnonymous}) => _server.run(() {
+    final u = _buyer();
+    final o = _db.shopOrders.where((x) => x.userId == u.id && x.lines.any((l) => l.id == orderItemId)).firstOrNull;
+    if (o == null) throw const AppFailure.notFound('Không tìm thấy sản phẩm trong đơn của bạn.');
+    final completedAt = o.history.where((h) => h.to == ShopOrderStatus.completed).lastOrNull?.at ?? o.createdAt;
+    if (_db.now().difference(completedAt).inDays > 30) {
+      throw const AppFailure.forbidden('Đã quá thời hạn 30 ngày kể từ khi hoàn tất đơn, bạn không thể chỉnh sửa đánh giá.');
+    }
+    final r = _db.productReviews.where((x) => x.orderLineId == orderItemId && x.userId == u.id).firstOrNull;
+    if (r == null) throw const AppFailure.notFound('Chưa có đánh giá để chỉnh sửa.');
+    if (r.editCount >= 1) {
+      throw const AppFailure.conflict('Đánh giá này đã được chỉnh sửa 1 lần trước đó, không thể chỉnh sửa thêm.');
+    }
+    if (rating != null) {
+      if (rating < 1 || rating > 5) throw const AppFailure.validation('Đánh giá từ 1 đến 5 sao.');
+      // r.rating is final in mock so we recreate row
+    }
+    r.editCount += 1;
+    if (isAnonymous != null) r.isAnonymous = isAnonymous;
+    if (comment != null) {
+      final c = comment.trim();
+      // create new row with updated comment & rating
+      final idx = _db.productReviews.indexOf(r);
+      _db.productReviews[idx] = ProductReviewRow(
+        id: r.id,
+        productId: r.productId,
+        userId: r.userId,
+        rating: rating ?? r.rating,
+        createdAt: r.createdAt,
+        comment: c.isEmpty ? null : c,
+        orderLineId: r.orderLineId,
+      )
+        ..isHidden = r.isHidden
+        ..isAnonymous = isAnonymous ?? r.isAnonymous
+        ..editCount = r.editCount;
+    }
   });
 
   // ── Manager ──────────────────────────────────────────────────────────

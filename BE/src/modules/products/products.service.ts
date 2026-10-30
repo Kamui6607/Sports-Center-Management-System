@@ -1,3 +1,4 @@
+import { foldVietnamese } from "../../utils/i18n.js";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
@@ -45,13 +46,23 @@ export async function listProducts(query: any) {
   const skip = (page - 1) * limit;
 
   const where: any = {};
-  if (query.search) {
-    where.name = { contains: query.search, mode: "insensitive" };
-  }
   // Mặc định chỉ trả sản phẩm đang bán (màn mua hàng của Member/Coach).
   // ?isActive=false: chỉ sản phẩm đã ngừng bán; ?isActive=all: tất cả (màn quản lý của Manager).
   if (query.isActive !== "all") {
     where.isActive = query.isActive !== "false";
+  }
+
+  // Tìm kiếm không phân biệt có dấu / không dấu (Vietnamese accent-insensitive search)
+  if (query.search && String(query.search).trim()) {
+    const needle = foldVietnamese(String(query.search));
+    const candidates = await prisma.product.findMany({
+      where,
+      select: { id: true, name: true, description: true },
+    });
+    const matchedIds = candidates
+      .filter((c) => foldVietnamese(c.name).includes(needle) || (c.description && foldVietnamese(c.description).includes(needle)))
+      .map((c) => c.id);
+    where.id = { in: matchedIds };
   }
 
   const [total, products] = await Promise.all([
@@ -81,7 +92,23 @@ export async function getProductById(id: string, viewer?: { id: string; role: st
     },
   });
   if (!product) throw new AppError("Product not found", 404);
-  return withStock(product);
+
+  // Bảo vệ ẩn danh: nếu review tick chọn ẩn danh và người xem không phải Manager, giấu tên và avatar
+  const formattedReviews = product.reviews.map((r) => {
+    if (r.isAnonymous && !isManager) {
+      return {
+        ...r,
+        user: {
+          id: r.user.id,
+          fullName: "Người dùng ẩn danh",
+          avatarUrl: null,
+        },
+      };
+    }
+    return r;
+  });
+
+  return withStock({ ...product, reviews: formattedReviews });
 }
 
 /**

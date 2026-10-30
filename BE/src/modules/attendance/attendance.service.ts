@@ -488,7 +488,7 @@ export async function scanAttendanceWarnings(classId?: string, now = new Date())
       `Cảnh báo chuyên cần: ${bucket.className}`,
       `Chuyên cần của bạn ở lớp "${bucket.className}" hiện là ${bucket.attendanceRate}% trên ${bucket.sampleSize} buổi được tính ` +
         `(${bucket.presentCount} có mặt, ${bucket.lateCount} đi muộn, ${bucket.absentCount} vắng, ${bucket.noShowCount} không điểm danh). ` +
-        `Dưới ${ATTENDANCE.WARN_THRESHOLD}% bạn có thể bị thu hồi chỗ đặt. Vui lòng sắp xếp tham gia đầy đủ hoặc gửi khiếu nại nếu có lý do chính đáng.`,
+        `Hãy sắp xếp tham gia đều đặn các buổi học sắp tới để duy trì thể lực và đạt hiệu quả tập luyện tốt nhất nhé!`,
       {
         metadata: {
           classId: bucket.classId,
@@ -503,6 +503,61 @@ export async function scanAttendanceWarnings(classId?: string, now = new Date())
 
   return { checked: buckets.length, warnBuckets: warnBuckets.length, sent, skippedDuplicate };
 }
+
+/**
+ * Gửi thông báo cho hội viên khi vắng hoặc đi trễ buổi học để họ biết tình trạng tham gia.
+ * Theo yêu cầu người dùng: khách hàng đã trả tiền nên không bị phạt hay thu hồi chỗ,
+ * chỉ gửi thông báo nhắc nhở mang tính đồng hành.
+ */
+export async function notifyMemberAttendanceStatus(
+  memberId: string,
+  scheduleId: string,
+  status: "ABSENT" | "LATE",
+  note?: string | null
+) {
+  try {
+    const member = await prisma.memberProfile.findUnique({
+      where: { id: memberId },
+      select: { userId: true },
+    });
+    if (!member?.userId) return;
+
+    const schedule = await prisma.classSchedule.findUnique({
+      where: { id: scheduleId },
+      include: { class: { select: { id: true, name: true } }, room: { select: { name: true } } },
+    });
+    if (!schedule) return;
+
+    const dateStr = schedule.startTime.toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+    const timeStr = `${schedule.startTime.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Ho_Chi_Minh",
+    })} - ${schedule.endTime.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Ho_Chi_Minh",
+    })}`;
+
+    const isAbsent = status === "ABSENT";
+    const title = isAbsent ? `Thông báo vắng buổi học: ${schedule.class.name}` : `Ghi nhận đi muộn: ${schedule.class.name}`;
+    const body = isAbsent
+      ? `Bạn đã vắng mặt ở buổi học lớp "${schedule.class.name}" (${timeStr}, ngày ${dateStr}). Hãy sắp xếp thời gian tham gia các buổi học tiếp theo để không bỏ lỡ kiến thức nhé!`
+      : `Bạn đã tham gia buổi học lớp "${schedule.class.name}" (${timeStr}, ngày ${dateStr}) nhưng có mặt muộn hơn giờ bắt đầu. Hãy cố gắng đến sớm hơn một chút ở các buổi tới nhé!`;
+
+    createNotification(member.userId, "ATTENDANCE_WARNING", title, body, {
+      metadata: {
+        classId: schedule.class.id,
+        scheduleId: schedule.id,
+        status,
+        note: note ?? null,
+      },
+    }).catch(() => {});
+  } catch (err) {
+    // Fire-and-forget
+  }
+}
+
 // ─── BE-18: ĐIỂM DANH HÀNG LOẠT + THU HỒI MÃ ───────────────────────────────
 
 /**
@@ -536,6 +591,12 @@ export const saveAttendanceBulk = async (
     });
   }
 
+  const existingAttendances = await prisma.attendance.findMany({
+    where: { scheduleId, memberId: { in: memberIds } },
+    select: { memberId: true, status: true },
+  });
+  const oldStatusMap = new Map(existingAttendances.map((a) => [a.memberId, a.status]));
+
   await prisma.$transaction(
     items.map((item) =>
       prisma.attendance.upsert({
@@ -545,6 +606,17 @@ export const saveAttendanceBulk = async (
       })
     )
   );
+
+  // Gửi thông báo cho học viên khi vắng hoặc đi trễ
+  for (const item of items) {
+    if (item.status === "ABSENT" || item.status === "LATE") {
+      const oldStatus = oldStatusMap.get(item.memberId);
+      if (oldStatus !== item.status) {
+        notifyMemberAttendanceStatus(item.memberId, scheduleId, item.status, item.note).catch(() => {});
+      }
+    }
+  }
+
   return getAttendancesBySchedule(scheduleId, user);
 };
 

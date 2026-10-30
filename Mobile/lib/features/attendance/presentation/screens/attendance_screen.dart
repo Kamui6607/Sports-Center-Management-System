@@ -37,8 +37,8 @@ class AttendanceScreen extends ConsumerWidget {
             const AlertBanner.info(
               message:
                   'Có mặt hoặc đi trễ được tính là tham gia; vắng có phép không tính. '
-                  'Mỗi khóa xét ${ClassAttendanceStat.sampleWindow} buổi đã qua gần nhất, từ ${ClassAttendanceStat.minSample} buổi trở lên: '
-                  'dưới 80% sẽ bị cảnh báo; tiếp tục vắng có thể bị thu hồi chỗ và chặn đặt lại.',
+                  'Mỗi khóa xét ${ClassAttendanceStat.sampleWindow} buổi đã qua gần nhất. '
+                  'Khi vắng hoặc đi trễ, bạn sẽ nhận được thông báo nhắc nhở để sắp xếp lịch học tốt hơn.',
             ),
             const SizedBox(height: AppSpacing.md),
             for (final p in penalties) ...[_PenaltyCard(penalty: p), const SizedBox(height: AppSpacing.sm)],

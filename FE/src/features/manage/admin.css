@@ -1002,7 +1002,26 @@ html[data-theme="dark"] body:has(.cr) .toast-info { color: #8ab8e0; }
 /* ── Dashboard Grid & Spacing ──────────────────────── */
 .cr-dash-stack {
   display: grid;
-  gap: 22px;
+  gap: 20px;
+}
+.cr-dash-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.cr-dash-filters-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cr-dash-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 .cr-dash-row {
   display: grid;

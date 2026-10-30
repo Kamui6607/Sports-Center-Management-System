@@ -34,7 +34,10 @@ export const ORDER_STATUS_GROUPS: Record<string, OrderStatus[]> = {
 };
 
 export const ORDER_LIST_INCLUDE = {
-  items: { orderBy: { createdAt: "asc" as const } },
+  items: {
+    orderBy: { createdAt: "asc" as const },
+    include: { product: { select: { id: true, imageUrl: true } } },
+  },
   payment: { select: { id: true, status: true, transactionCode: true, paidAt: true } },
 } satisfies Prisma.OrderInclude;
 
@@ -75,11 +78,12 @@ type ListOrder = Prisma.OrderGetPayload<{ include: typeof ORDER_LIST_INCLUDE }>;
 type DetailOrder = Prisma.OrderGetPayload<{ include: typeof ORDER_DETAIL_INCLUDE }>;
 
 function itemView(i: ListOrder["items"][number]) {
+  const fallbackImg = (i as unknown as { product?: { imageUrl?: string | null } }).product?.imageUrl;
   return {
     id: i.id,
     productId: i.productId,
     productName: i.productName ?? "",
-    productImageUrl: i.productImageUrl,
+    productImageUrl: i.productImageUrl ?? fallbackImg ?? null,
     quantity: i.quantity,
     unitPrice: money(i.unitPrice),
     totalAmount: money(i.totalAmount),
@@ -193,13 +197,31 @@ export function orderOwnerView(o: DetailOrder, now = new Date()) {
   const unpaidCash = isUnpaidCash(o);
   return {
     ...baseDetail(o, now),
-    items: o.items.map((i) => ({
-      ...itemView(i),
-      review: i.review
-        ? { id: i.review.id, rating: i.review.rating, comment: i.review.comment, isHidden: i.review.isHidden, createdAt: i.review.createdAt }
-        : null,
-      canReview: o.status === "COMPLETED" && !i.review,
-    })),
+    items: o.items.map((i) => {
+      const completedTime = o.completedAt ?? o.deliveredAt ?? o.updatedAt;
+      const isWithin30Days = o.status === "COMPLETED" && (now.getTime() - completedTime.getTime() <= 30 * 86_400_000);
+      const canEdit = !!(i.review && isWithin30Days && (i.review.editCount ?? 0) < 1);
+      const canReview = o.status === "COMPLETED" && !i.review && isWithin30Days;
+      return {
+        ...itemView(i),
+        review: i.review
+          ? {
+              id: i.review.id,
+              rating: i.review.rating,
+              comment: i.review.comment,
+              isAnonymous: i.review.isAnonymous ?? false,
+              editCount: i.review.editCount ?? 0,
+              canEdit,
+              isHidden: i.review.isHidden,
+              createdAt: i.review.createdAt,
+              updatedAt: i.review.updatedAt,
+            }
+          : null,
+        canReview,
+        canEditReview: canEdit,
+        isReviewExpired: o.status === "COMPLETED" && !isWithin30Days,
+      };
+    }),
     pickup:
       pickupReady && pickupCode
         ? {

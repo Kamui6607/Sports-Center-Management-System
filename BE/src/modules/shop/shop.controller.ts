@@ -95,6 +95,9 @@ export const confirmReceived = wrap(async (req, res) =>
 export const reviewOrderItem = wrap(async (req, res) =>
   sendCreated(res, await orders.reviewOrderItem(req.user!.id, id(req), req.body), "Review added")
 );
+export const updateOrderItemReview = wrap(async (req, res) =>
+  sendSuccess(res, await orders.updateOrderItemReview(req.user!.id, id(req), req.body), "Review updated")
+);
 
 // ── Manager ──────────────────────────────────────────────────────────────────
 export const managerListOrders = wrap(async (req, res) => {
