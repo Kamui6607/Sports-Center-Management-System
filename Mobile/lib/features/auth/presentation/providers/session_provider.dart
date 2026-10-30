@@ -14,6 +14,9 @@ import '../../domain/entities/auth_models.dart';
 final sessionProvider = AsyncNotifierProvider<SessionNotifier, AuthSession?>(SessionNotifier.new);
 
 class SessionNotifier extends AsyncNotifier<AuthSession?> {
+  /// Người dùng vừa chủ động đăng xuất ⇒ router đưa về Chào mừng thay vì Đăng nhập.
+  bool userSignedOut = false;
+
   @override
   Future<AuthSession?> build() {
     // Refresh token thất bại / tài khoản bị khóa ⇒ xóa phiên, router đưa về Đăng nhập.
@@ -48,6 +51,7 @@ class SessionNotifier extends AsyncNotifier<AuthSession?> {
       await ref.read(authRepositoryProvider).logout().catchError((_) {});
       throw const AppFailure.forbidden(managerUseWebMessage);
     }
+    userSignedOut = false;
     state = AsyncData(session);
     ref.read(dataRevisionProvider.notifier).bump();
     return session;
@@ -56,7 +60,10 @@ class SessionNotifier extends AsyncNotifier<AuthSession?> {
   /// Member ⇒ trả null (đăng nhập lại); Coach ⇒ phiên tạm để nộp CV.
   Future<AuthSession?> register(RegisterInput input) async {
     final session = await ref.read(authRepositoryProvider).register(input);
-    if (session != null) state = AsyncData(session);
+    if (session != null) {
+      userSignedOut = false;
+      state = AsyncData(session);
+    }
     return session;
   }
 
@@ -66,6 +73,7 @@ class SessionNotifier extends AsyncNotifier<AuthSession?> {
     } finally {
       // Đóng kết nối realtime của phiên cũ (không còn token).
       ref.read(realtimeClientProvider).disconnect();
+      userSignedOut = true;
       state = const AsyncData(null);
       ref.read(dataRevisionProvider.notifier).bump();
     }

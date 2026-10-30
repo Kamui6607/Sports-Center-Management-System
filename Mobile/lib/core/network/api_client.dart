@@ -147,9 +147,18 @@ class ApiClient {
   /// URL tuyệt đối cho đường dẫn file tương đối của BE (VD `uploads/cvs/x.pdf`).
   static String? absoluteUrl(String? path) {
     if (path == null || path.isEmpty) return null;
-    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      // BE lưu ảnh local kèm origin của request lúc upload (thường `http://localhost:8081`
+      // từ Web) ⇒ điện thoại/emulator không tới được: đổi sang origin BE app đang dùng.
+      final uri = Uri.tryParse(path);
+      if (uri == null || !_loopbackHosts.contains(uri.host)) return path;
+      final base = Uri.parse(Env.apiBaseUrl);
+      return uri.replace(scheme: base.scheme, host: base.host, port: base.port).toString();
+    }
     return '${Env.apiBaseUrl}/${path.startsWith('/') ? path.substring(1) : path}';
   }
+
+  static const _loopbackHosts = {'localhost', '127.0.0.1', '0.0.0.0'};
 
   static const _mimeByExtension = {
     'pdf': 'application/pdf',

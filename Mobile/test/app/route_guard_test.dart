@@ -24,6 +24,14 @@ void main() {
     expect(go(AppRoutes.memberHome, null), startsWith(AppRoutes.login));
   });
 
+  test('vừa đăng xuất ⇒ về Chào mừng, màn công khai giữ nguyên', () {
+    String? out(String location) =>
+        RouteGuard.redirect(loading: false, session: null, location: location, signedOut: true);
+    expect(out(AppRoutes.memberAccount), AppRoutes.welcome);
+    expect(out(AppRoutes.coachHome), AppRoutes.welcome);
+    expect(out(AppRoutes.login), isNull);
+  });
+
   test('đúng vai trò về đúng trang chủ, sai vai trò bị chặn', () {
     expect(go(AppRoutes.login, _session(UserRole.member)), AppRoutes.memberHome);
     expect(go(AppRoutes.coachHome, _session(UserRole.member)), AppRoutes.memberHome);

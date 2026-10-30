@@ -91,13 +91,18 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: refresh,
     redirect: (context, state) {
       final session = ref.read(sessionProvider);
-      return RouteGuard.redirect(
+      final notifier = ref.read(sessionProvider.notifier);
+      final to = RouteGuard.redirect(
         // Lỗi mạng khi khôi phục phiên ⇒ ở lại Splash (hiển thị "Thử lại").
         loading: (session.isLoading || session.hasError) && !session.hasValue,
         session: session.value,
         location: state.matchedLocation,
         from: state.uri.queryParameters['from'],
+        signedOut: notifier.userSignedOut,
       );
+      // Đã về Chào mừng sau đăng xuất ⇒ các lần sau Guest vào màn riêng tư lại đi Đăng nhập.
+      if ((to ?? state.matchedLocation) == AppRoutes.welcome) notifier.userSignedOut = false;
+      return to;
     },
     routes: [
       // ── Chung / công khai ────────────────────────────────────────────

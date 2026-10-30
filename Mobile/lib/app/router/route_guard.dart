@@ -46,17 +46,20 @@ abstract final class RouteGuard {
   /// Trả path cần chuyển tới, hoặc `null` nếu được ở lại.
   /// [loading] = đang khôi phục phiên lần đầu.
   /// [from] = màn người dùng định vào trước khi bị yêu cầu đăng nhập.
+  /// [signedOut] = vừa chủ động đăng xuất ⇒ về Chào mừng (giống lúc mở app), không về Đăng nhập.
   static String? redirect({
     required bool loading,
     required AuthSession? session,
     required String location,
     String? from,
+    bool signedOut = false,
   }) {
     if (loading) return location == AppRoutes.splash ? null : AppRoutes.splash;
 
     if (session == null) {
       if (location == AppRoutes.splash) return AppRoutes.welcome;
       if (isPublic(location)) return null;
+      if (signedOut) return AppRoutes.welcome;
       return '${AppRoutes.login}?from=${Uri.encodeComponent(location)}';
     }
 
