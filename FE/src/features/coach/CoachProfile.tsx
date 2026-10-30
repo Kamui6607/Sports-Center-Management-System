@@ -1,3 +1,4 @@
+import { UserAvatar } from "../../components/UserAvatar";
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../../shared/api";
@@ -60,7 +61,7 @@ export function CoachProfile({ user }: Pick<PortalProps, "user">) {
       />
       <div className="coach-profile-grid">
         <aside className="panel coach-profile-summary">
-          <span className="avatar">{user.fullName.slice(0, 1)}</span>
+          <UserAvatar name={user.fullName} url={user.avatarUrl} size={64} className="avatar" />
           <h2>{user.fullName}</h2>
           <p>{user.email}</p>
           <span className="coach-badge">Huấn luyện viên</span>

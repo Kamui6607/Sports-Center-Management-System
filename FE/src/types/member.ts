@@ -24,6 +24,7 @@ export interface User {
   id: string;
   email: string;
   fullName: string;
+  avatarUrl?: string | null;
   phone?: string | null;
   gender?: Gender | null;
   dateOfBirth?: string | null;

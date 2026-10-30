@@ -1,3 +1,4 @@
+import { UserAvatar } from "../../../components/UserAvatar";
 import { useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
@@ -74,7 +75,7 @@ export default function UsersPage({ selfId }: { selfId: string }) {
                     title: "Người dùng",
                     render: (u) => (
                       <div className="cr-cell-media">
-                        <span className="cr-avatar" aria-hidden="true">{str(u.fullName).trim().slice(0, 1).toUpperCase()}</span>
+                        <UserAvatar name={str(u.fullName)} url={u.avatarUrl as string} size={32} className="cr-avatar" />
                         <div className="cr-cell-main">
                           <Link to={`/manager/users/${str(u.id)}`}>
                             {str(u.fullName)} {u.id === selfId && <span className="cr-subtle">(bạn)</span>}

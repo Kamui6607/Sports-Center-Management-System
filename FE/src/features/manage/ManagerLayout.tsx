@@ -1,3 +1,4 @@
+import { UserAvatar } from "../../components/UserAvatar";
 import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import {
@@ -261,7 +262,7 @@ function UserMenu({ user, onLogout }: { user: ProfileOk["data"]; onLogout: () =>
   return (
     <div className="cr-menu" ref={root}>
       <button className="cr-menu-trigger" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <span className="cr-avatar" aria-hidden="true">{initials(user.fullName)}</span>
+        <UserAvatar name={user.fullName} url={user.avatarUrl} size={32} className="cr-avatar" />
         <span className="cr-menu-name">
           {user.fullName}
           <small>Quản lý trung tâm</small>

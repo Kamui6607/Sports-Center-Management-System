@@ -46,6 +46,12 @@ export const authApi = {
     return apiClient.post<User>("/auth/register", data);
   },
 
+  async uploadAvatar(file: File): Promise<User> {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    return apiClient.post<User>("/auth/me/avatar", formData);
+  },
+
   async logout(): Promise<void> {
     const refreshToken = getRefreshToken();
     try {

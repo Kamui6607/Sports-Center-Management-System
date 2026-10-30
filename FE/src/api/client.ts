@@ -48,7 +48,11 @@ export async function request<T>(
     params,
     query: Object.fromEntries(url.searchParams),
     body:
-      typeof options.body === "string" ? JSON.parse(options.body) : undefined,
+      typeof FormData !== "undefined" && options.body instanceof FormData
+        ? options.body
+        : typeof options.body === "string"
+        ? JSON.parse(options.body)
+        : options.body,
     signal: options.signal || undefined,
   });
   const collection = (
@@ -72,12 +76,22 @@ export const apiClient = {
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, {
       method: "POST",
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body:
+        body === undefined
+          ? undefined
+          : typeof FormData !== "undefined" && body instanceof FormData
+          ? body
+          : JSON.stringify(body),
     }),
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, {
       method: "PATCH",
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body:
+        body === undefined
+          ? undefined
+          : typeof FormData !== "undefined" && body instanceof FormData
+          ? body
+          : JSON.stringify(body),
     }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };

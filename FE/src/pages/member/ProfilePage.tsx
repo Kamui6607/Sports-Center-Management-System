@@ -1,8 +1,10 @@
+import { UserAvatar } from "../../components/UserAvatar";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { authApi } from "../../api/auth.api";
 import {
+  Camera,
   UserCircle,
   Lock,
   Save,
@@ -31,6 +33,34 @@ export function ProfilePage() {
   const [trainingPreference, setTrainingPreference] = useState(
     user?.memberProfile?.trainingPreference || "",
   );
+
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileMsg({ type: "error", text: "Ảnh đại diện không được vượt quá 5MB." });
+      return;
+    }
+
+    setUploadingAvatar(true);
+    setProfileMsg(null);
+    try {
+      const updated = await authApi.uploadAvatar(file);
+      updateUser(updated);
+      setProfileMsg({ type: "success", text: "Cập nhật ảnh đại diện thành công!" });
+    } catch (err: unknown) {
+      setProfileMsg({
+        type: "error",
+        text: err instanceof Error ? err.message : "Tải ảnh đại diện thất bại.",
+      });
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = "";
+    }
+  };
 
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -140,6 +170,53 @@ export function ProfilePage() {
             <AlertBanner type={profileMsg.type} message={profileMsg.text} />
           </div>
         )}
+
+        {/* AVATAR SECTION */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 20,
+            paddingBottom: 20,
+            borderBottom: "1px solid #f0f4f2",
+            marginBottom: 10,
+          }}
+        >
+          <UserAvatar name={user?.fullName || "Member"} url={user?.avatarUrl} size={72} />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#203d31", marginBottom: 4 }}>
+              Ảnh đại diện
+            </div>
+            <div style={{ fontSize: 12, color: "#667085", marginBottom: 10 }}>
+              Hỗ trợ JPG, PNG, WEBP, GIF (tối đa 5MB)
+            </div>
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
+                backgroundColor: "#f0fdf4",
+                color: "#166534",
+                border: "1px solid #bbf7d0",
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: uploadingAvatar ? "not-allowed" : "pointer",
+              }}
+            >
+              <Camera size={15} />
+              {uploadingAvatar ? "Đang tải ảnh lên..." : "Tải ảnh mới"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                disabled={uploadingAvatar}
+                onChange={handleAvatarUpload}
+                style={{ display: "none" }}
+              />
+            </label>
+          </div>
+        </div>
 
         <form onSubmit={handleUpdateProfile} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>

@@ -1,4 +1,6 @@
 import "dotenv/config";
+import path from "path";
+import fs from "fs";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -44,7 +46,11 @@ app.set("etag", false);
 // Global middlewares
 // Chạy sau 1 proxy (Render): lấy IP thật từ X-Forwarded-For cho rate limit.
 app.set("trust proxy", 1);
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 app.use(cors());
 app.use(morgan("dev"));
 app.use(
@@ -116,8 +122,12 @@ app.use(`${v1}/terms`, termRoutes);
 // Static files for uploads
 // D03: CHỈ avatar là tài nguyên công khai (hiển thị qua <img src>). File chat riêng tư nằm ở
 // `uploads/chat` và phải tải qua `GET /api/v1/chat/attachments/:id` (auth + phân quyền).
-app.use("/uploads/avatars", express.static("uploads/avatars"));
-app.use("/uploads/products", express.static("uploads/products"));
+const uploadsRoot = fs.existsSync(path.resolve(process.cwd(), "uploads"))
+  ? path.resolve(process.cwd(), "uploads")
+  : path.resolve(process.cwd(), "BE", "uploads");
+
+app.use("/uploads/avatars", express.static(path.join(uploadsRoot, "avatars")));
+app.use("/uploads/products", express.static(path.join(uploadsRoot, "products")));
 
 // 404
 app.use((_req, res) => {

@@ -1,3 +1,4 @@
+import { UserAvatar } from "../components/UserAvatar";
 import { useEffect, useId, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
@@ -158,7 +159,7 @@ export function PortalLayout({
                 <strong>{user.fullName}</strong>
                 <small>{title}</small>
               </div>
-              <span className="avatar">{user.fullName.slice(0, 1)}</span>
+              <UserAvatar name={user.fullName} url={user.avatarUrl} size={36} className="avatar" />
             </Link>
           </div>
         </header>

@@ -93,6 +93,10 @@ export async function updateProduct(id: string, data: any, actorId?: string) {
   if (!product) throw new AppError("Product not found", 404);
 
   const { stockQuantity, ...rest } = data;
+  if (rest.imageUrl && !rest.imageUrls) {
+    const oldUrls = (product.imageUrls as string[]) || [];
+    rest.imageUrls = [rest.imageUrl, ...oldUrls.filter((u) => u !== rest.imageUrl)];
+  }
   return prisma.$transaction(async (tx) => {
     if (Object.keys(rest).length > 0) {
       await tx.product.update({ where: { id }, data: rest });
