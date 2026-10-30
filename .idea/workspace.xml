@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="NONE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="Update Web UI 30/10">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/BE/prisma/schema.prisma" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/attendance/attendance-penalties.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/attendance/attendance-penalties.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/class-schedules/class-schedules.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/class-schedules/class-schedules.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/classes/classes.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/classes/classes.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/enrollments/course-enrollment.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/enrollments/course-enrollment.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/notifications/notifications.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/notifications/notifications.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/products/products.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/products/products.schema.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/products/products.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/products/products.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/cart.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/cart.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/order-view.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/order-view.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/orders.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/orders.service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.controller.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.routes.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.routes.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BE/src/modules/shop/shop.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/shop/shop.schema.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/admin.css" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/admin.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/DashboardPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/DashboardPage.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/OrdersPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/OrdersPage.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/ProductDetailPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/ProductDetailPage.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/api/shop_json.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/api/shop_json.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/widgets/display.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/widgets/display.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/attendance_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/attendance_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/course_attendance_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/course_attendance_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/classes/data/course_mock_rules.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/classes/data/course_mock_rules.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/home/presentation/member_home_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/home/presentation/member_home_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/notifications/data/notification_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/notifications/data/notification_mock_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/products/data/product_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/products/data/product_api_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/products/data/product_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/products/data/product_mock_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/products/domain/entities/product.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/products/domain/entities/product.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/products/presentation/screens/product_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/products/presentation/screens/product_detail_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_api_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/data/shop_mock_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/entities/shop.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/entities/shop.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/repositories/shop_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/domain/repositories/shop_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/cart_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/cart_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/checkout_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/checkout_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/order_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/order_detail_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/orders_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/screens/orders_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/widgets/order_sections.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/shop/presentation/widgets/order_sections.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/mock/tables/commerce_tables.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/mock/tables/commerce_tables.dart" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;Vu219&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/Kamui6607/Sports-Center-Management-System.git&quot;,
+    &quot;accountId&quot;: &quot;b2110c29-7de2-44a5-b839-a4426e3c72c8&quot;
+  }
+}</component>
+  <component name="KubernetesApiPersistence">{}</component>
+  <component name="KubernetesApiProvider">{
+  &quot;isMigrated&quot;: true
+}</component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3KEVZNAWIbqALDrxZAH9Da5OuaQ" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "com.google.cloudcode.ide_session_index": "20261030_0007",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "dart.analysis.tool.window.visible": "false",
+    "git-widget-placeholder": "#1 on develop",
+    "junie.onboarding.icon.badge.shown": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "D:/FA26/PRM/Sports-Center-Management-System",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.0",
+    "project.structure.side.proportion": "0.0",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "show.migrate.to.gradle.popup": "false",
+    "to.speed.mode.migration.done": "true",
+    "ts.external.directory.path": "C:\\Program Files\\JetBrains\\IntelliJ IDEA 2025.2.1\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external",
+    "vue.rearranger.settings.migration": "true"
+  },
+  "keyToStringList": {
+    "DatabaseDriversLRU": [
+      "postgresql"
+    ]
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\FA26\PRM\Sports-Center-Management-System" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration default="true" type="JetRunConfigurationType">
+      <module name="Sports-Center-Management-System" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="Sports-Center-Management-System" />
+      <option name="filePath" />
+      <method v="2" />
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.31033.145" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.31033.145" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="" />
+      <created>1791122768339</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1791122768339</updated>
+      <workItem from="1791127339188" duration="14000" />
+      <workItem from="1791395480636" duration="2378000" />
+      <workItem from="1791423363035" duration="3692000" />
+      <workItem from="1791451835329" duration="15000" />
+      <workItem from="1791513432116" duration="277000" />
+      <workItem from="1791566465796" duration="2898000" />
+      <workItem from="1791601208491" duration="6334000" />
+      <workItem from="1791698791390" duration="15000" />
+      <workItem from="1791725129729" duration="3520000" />
+      <workItem from="1791737821861" duration="18000" />
+      <workItem from="1791863920460" duration="1504000" />
+      <workItem from="1792111818097" duration="1584000" />
+      <workItem from="1792119460117" duration="17000" />
+      <workItem from="1792120198555" duration="221000" />
+      <workItem from="1792120885299" duration="18000" />
+      <workItem from="1792381527861" duration="620000" />
+      <workItem from="1792407648012" duration="4285000" />
+      <workItem from="1792423385236" duration="712000" />
+      <workItem from="1792428118227" duration="2638000" />
+      <workItem from="1792458042593" duration="1223000" />
+      <workItem from="1792460158742" duration="1578000" />
+      <workItem from="1792463670435" duration="1298000" />
+      <workItem from="1792477027944" duration="15000" />
+      <workItem from="1792846768904" duration="89000" />
+      <workItem from="1792846938771" duration="499000" />
+      <workItem from="1792855247623" duration="823000" />
+      <workItem from="1792914375075" duration="1598000" />
+      <workItem from="1792930699433" duration="262000" />
+      <workItem from="1792933225717" duration="1314000" />
+      <workItem from="1792934943815" duration="2478000" />
+      <workItem from="1793015821752" duration="59000" />
+      <workItem from="1793015898435" duration="6000" />
+      <workItem from="1793017962155" duration="59000" />
+      <workItem from="1793027057764" duration="7043000" />
+      <workItem from="1793063873288" duration="613000" />
+      <workItem from="1793064530518" duration="399000" />
+      <workItem from="1793065008439" duration="368000" />
+      <workItem from="1793083261594" duration="1349000" />
+      <workItem from="1793103679119" duration="427000" />
+      <workItem from="1793112591647" duration="1974000" />
+      <workItem from="1793283230643" duration="611000" />
+      <workItem from="1793332627212" duration="30000" />
+      <workItem from="1793333483620" duration="1596000" />
+      <workItem from="1793336343968" duration="5510000" />
+    </task>
+    <task id="LOCAL-00001" summary="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10">
+      <option name="closed" value="true" />
+      <created>1791124553142</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1791124553142</updated>
+    </task>
+    <task id="LOCAL-00002" summary="feat(Mobile): build mock-data UI for Member, Coach and Manager flows 8/10">
+      <option name="closed" value="true" />
+      <created>1791432886520</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1791432886520</updated>
+    </task>
+    <task id="LOCAL-00003" summary="feat: connect mobile to real API and implement shop flow 10/10&#10;&#10;- BE: mobile API gaps, auth security fixes (OTP reset, login order),&#10;  shop module (cart, addresses, checkout, order state machine,&#10;  inventory ledger, pickup code, manager tools, anti-abuse limits),&#10;  SePay/refund integration, migrations 20261010000000_mobile_api_gaps&#10;  and 20261011000000_shop_flow, local e2e/smoke tests&#10;- Mobile: network layer + realtime, real API by default, shop screens&#10;  (cart, checkout, orders, addresses) and manager screens (orders,&#10;  pickup scan, inventory), mocks and tests&#10;- Docs: shop flow design, BE API changes, mobile integration notes">
+      <option name="closed" value="true" />
+      <created>1791614496318</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1791614496318</updated>
+    </task>
+    <task id="LOCAL-00004" summary="update">
+      <option name="closed" value="true" />
+      <created>1792113203015</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1792113203015</updated>
+    </task>
+    <task id="LOCAL-00005" summary="feat(shop): pickup date &amp; pay-at-counter, no-show handling, in-order refunds on web; collapsible manager sidebar 20/10&#10;&#10;- Ship fee 30.000 -&gt; 15.000. PICKUP: choose pickup date (today..+7), pick up early once ready,&#10;  hold until end of (pickup date + 3), reschedule once (max +3 days), reminder 24h before deadline&#10;- Pay at counter (CASH, PICKUP only): new status CONFIRMED (stock reserved, no Payment);&#10;  manager confirms code + phone + cash collected =&gt; CASH payment + COMPLETED; limits 2.000.000đ / 1 open order&#10;- Overdue pickup (no-show, counted over 90 days): unpaid =&gt; cancel + release stock, no refund;&#10;  paid =&gt; return stock + 100% refund (10% holding fee from 3rd no-show);&#10;  2nd no-show =&gt; pay-at-counter locked 30 days; pending refund &gt; 30 days flagged as stale&#10;- Refunds: payoutMethod BANK_TRANSFER | CASH, bank transfer requires customer bank info,&#10;  customer updates bank info in app, manager can remind (1/hour), cancel &amp; refund requires a reason&#10;- Web manager: order dialog shows payment + refund blocks with approve/reject/remind in place,&#10;  cash collection on pickup, queues (pickup today / refund pending / stale refund), no-show badge&#10;- Web manager sidebar: toggle button on the divider, collapsible parent groups,&#10;  groups also collapse when sidebar is collapsed&#10;- Mobile: pickup date chips + payment method on checkout, reschedule + bank form on order detail, mock + tests&#10;- Migration 20261020000000_shop_pickup_cash, e2e shop tests, OpenAPI/FE client regenerated, Doc/SHOP_FLOW_DESIGN.md §10">
+      <option name="closed" value="true" />
+      <created>1792460733492</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1792460733492</updated>
+    </task>
+    <task id="LOCAL-00006" summary="feat: harden course sales, payments, invoices and revenue reporting (late-join pricing, sale cutoff, seat holds, class maintenance job, snapshot-based invoices with full cost breakdown) and complete the membership flow (plan CRUD, rotating QR pass with entry log, queued plans, renewal reminders, manager cancellation with refunds) across BE, Mobile and Web 25/10">
+      <option name="closed" value="true" />
+      <created>1792916128072</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1792916128073</updated>
+    </task>
+    <task id="LOCAL-00007" summary="feat: harden course sales, payments and revenue reporting (late-join pricing, sale cutoff, seat holds, class maintenance job, snapshot-based invoices with full unit price/quantity/shipping/total breakdown on checkout, payment, invoice and history screens), complete the membership flow (plan CRUD, rotating QR pass with entry log, queued plans, renewal reminders, manager cancellation with refunds, membership payment details) and split attendance and training plans per course with present/absent/upcoming sessions across BE, Mobile and Web 25/10">
+      <option name="closed" value="true" />
+      <created>1792934553725</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1792934553725</updated>
+    </task>
+    <task id="LOCAL-00008" summary="feat: add web landing page, redesign login/password reset and manager notifications (light/dark, &quot;view all&quot; page), add manager motion layer and shared detail dialogs, support shop late pickup with &quot;Received&quot; status, and redesign mobile welcome screen 26/10">
+      <option name="closed" value="true" />
+      <created>1793034023522</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1793034023523</updated>
+    </task>
+    <task id="LOCAL-00009" summary="Update Web UI 27/10">
+      <option name="closed" value="true" />
+      <created>1793064882110</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1793064882110</updated>
+    </task>
+    <task id="LOCAL-00010" summary="Update Web UI 30/10">
+      <option name="closed" value="true" />
+      <created>1793340877642</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1793340877642</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="develop" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10" />
+    <MESSAGE value="feat(Mobile): build mock-data UI for Member, Coach and Manager flows 8/10" />
+    <MESSAGE value="feat: connect mobile to real API and implement shop flow 10/10&#10;&#10;- BE: mobile API gaps, auth security fixes (OTP reset, login order),&#10;  shop module (cart, addresses, checkout, order state machine,&#10;  inventory ledger, pickup code, manager tools, anti-abuse limits),&#10;  SePay/refund integration, migrations 20261010000000_mobile_api_gaps&#10;  and 20261011000000_shop_flow, local e2e/smoke tests&#10;- Mobile: network layer + realtime, real API by default, shop screens&#10;  (cart, checkout, orders, addresses) and manager screens (orders,&#10;  pickup scan, inventory), mocks and tests&#10;- Docs: shop flow design, BE API changes, mobile integration notes" />
+    <MESSAGE value="update" />
+    <MESSAGE value="feat(shop): pickup date &amp; pay-at-counter, no-show handling, in-order refunds on web; collapsible manager sidebar 20/10&#10;&#10;- Ship fee 30.000 -&gt; 15.000. PICKUP: choose pickup date (today..+7), pick up early once ready,&#10;  hold until end of (pickup date + 3), reschedule once (max +3 days), reminder 24h before deadline&#10;- Pay at counter (CASH, PICKUP only): new status CONFIRMED (stock reserved, no Payment);&#10;  manager confirms code + phone + cash collected =&gt; CASH payment + COMPLETED; limits 2.000.000đ / 1 open order&#10;- Overdue pickup (no-show, counted over 90 days): unpaid =&gt; cancel + release stock, no refund;&#10;  paid =&gt; return stock + 100% refund (10% holding fee from 3rd no-show);&#10;  2nd no-show =&gt; pay-at-counter locked 30 days; pending refund &gt; 30 days flagged as stale&#10;- Refunds: payoutMethod BANK_TRANSFER | CASH, bank transfer requires customer bank info,&#10;  customer updates bank info in app, manager can remind (1/hour), cancel &amp; refund requires a reason&#10;- Web manager: order dialog shows payment + refund blocks with approve/reject/remind in place,&#10;  cash collection on pickup, queues (pickup today / refund pending / stale refund), no-show badge&#10;- Web manager sidebar: toggle button on the divider, collapsible parent groups,&#10;  groups also collapse when sidebar is collapsed&#10;- Mobile: pickup date chips + payment method on checkout, reschedule + bank form on order detail, mock + tests&#10;- Migration 20261020000000_shop_pickup_cash, e2e shop tests, OpenAPI/FE client regenerated, Doc/SHOP_FLOW_DESIGN.md §10" />
+    <MESSAGE value="feat: harden course sales, payments, invoices and revenue reporting (late-join pricing, sale cutoff, seat holds, class maintenance job, snapshot-based invoices with full cost breakdown) and complete the membership flow (plan CRUD, rotating QR pass with entry log, queued plans, renewal reminders, manager cancellation with refunds) across BE, Mobile and Web 25/10" />
+    <MESSAGE value="feat: harden course sales, payments and revenue reporting (late-join pricing, sale cutoff, seat holds, class maintenance job, snapshot-based invoices with full unit price/quantity/shipping/total breakdown on checkout, payment, invoice and history screens), complete the membership flow (plan CRUD, rotating QR pass with entry log, queued plans, renewal reminders, manager cancellation with refunds, membership payment details) and split attendance and training plans per course with present/absent/upcoming sessions across BE, Mobile and Web 25/10" />
+    <MESSAGE value="feat: add web landing page, redesign login/password reset and manager notifications (light/dark, &quot;view all&quot; page), add manager motion layer and shared detail dialogs, support shop late pickup with &quot;Received&quot; status, and redesign mobile welcome screen 26/10" />
+    <MESSAGE value="Update Web UI 27/10" />
+    <MESSAGE value="Update Web UI 30/10" />
+    <option name="LAST_COMMIT_MESSAGE" value="Update Web UI 30/10" />
+  </component>
+</project>

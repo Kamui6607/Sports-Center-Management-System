@@ -1,0 +1,2731 @@
+/*
+ * Pulse Sports Center — Bảng định kiểu trang giới thiệu công khai
+ * Hướng thiết kế: "One motif" (seed 1104067200) — Vòm Sân Vận Động & Vòng Đếm Ngược QR
+ * Tuân thủ nghiêm ngặt:
+ *  - Không dùng gradient (flat surfaces + clip-path + hình khối kiến trúc)
+ *  - 6 cấp cỡ chữ chuẩn hóa trên toàn trang (--fs-giant, --fs-h1, --fs-h2, --fs-lead, --fs-body, --fs-sm)
+ *  - Độ tương phản chữ >= 10:1 trên cả nền sáng và nền xanh rừng đậm
+ *  - Chuyển động mượt mà có kiểm soát @media (prefers-reduced-motion: no-preference)
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap");
+
+.gl {
+  /* Bảng màu độ tương phản cao (>= 10.5:1 cho toàn bộ văn bản) */
+  --ground: #f3f7f4;
+  --surface-soft: #e3ece7;
+  --surface-card: #ffffff;
+  --forest: #0d1f17;
+  --forest-2: #152e23;
+  --deep: #08140f;
+  --lime: #b8f246;
+  --lime-soft: #d9f99d;
+
+  --ink: #0c1c15;
+  --ink-2: #1b352a;
+  --snow: #f4f8f5;
+  --snow-2: #d6e6dd;
+
+  /* 6 cấp cỡ chữ duy nhất trên toàn trang (giữ size-count <= 6 ở mọi độ phân giải) */
+  --fs-giant: clamp(3rem, 5.6vw, 4.75rem);
+  --fs-h1: clamp(2.4rem, 3.7vw, 3.65rem);
+  --fs-h2: clamp(1.85rem, 2.6vw, 2.55rem);
+  --fs-lead: clamp(1.125rem, 1.25vw, 1.25rem);
+  --fs-body: 1rem;
+  --fs-sm: 0.875rem;
+
+  /* Nhịp khung & đường cong motif vòm */
+  --m: clamp(20px, 4.5vw, 64px);
+  --max-w: 1360px;
+  --arch-radius: 999px 999px 28px 28px;
+  --card-radius: 28px;
+  --pill-radius: 999px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  background-color: var(--ground);
+  color: var(--ink);
+  font-family: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+}
+
+.gl *,
+.gl *::before,
+.gl *::after {
+  box-sizing: border-box;
+}
+
+/* Ghi đè padding mặc định của thẻ main từ styles.css toàn cục để giữ lề trang cân đối tuyệt đối */
+.gl main {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+  width: 100%;
+}
+
+/* Chuẩn hóa cỡ chữ kế thừa với độ ưu tiên 0 (:where) để không ghi đè các lớp chữ hiển thị */
+:where(.gl) :where(p, li, dd, button, input, select, textarea, a, span, b, strong, del) {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+:where(.gl) :where(small, dt) {
+  font-size: var(--fs-sm);
+}
+
+.gl figure {
+  margin: 0;
+}
+
+.gl img,
+.gl video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Trợ năng: nút nhảy nội dung & nhãn ẩn cho trình đọc màn hình */
+.gl-skip {
+  position: absolute;
+  top: -100px;
+  left: var(--m);
+  z-index: 100;
+  padding: 12px 20px;
+  background-color: var(--forest);
+  color: var(--snow);
+  border-radius: var(--pill-radius);
+  text-decoration: none;
+  font-weight: 700;
+  transition: transform 200ms var(--ease-out);
+}
+
+.gl-skip:focus {
+  top: 16px;
+}
+
+.gl-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── KIỂU CHỮ CHỦ ĐẠO (TYPOGRAPHY) ── */
+.gl-h1,
+.gl-h2 {
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.gl-h1 {
+  font-size: var(--fs-h1);
+}
+
+.gl-h2 {
+  font-size: var(--fs-h2);
+}
+
+.gl-h2.light {
+  color: var(--snow);
+}
+
+.gl-subhead {
+  display: block;
+  font-size: var(--fs-lead);
+  font-weight: 700;
+  line-height: 1.35;
+  margin-bottom: 10px;
+  color: var(--ink);
+}
+
+.gl-subhead.light {
+  color: var(--lime);
+}
+
+/* Danh sách gắn ký hiệu vòng tạ đồng tâm (Motif Bullet) */
+.gl-motif-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.gl-motif-list li {
+  position: relative;
+  padding-left: 28px;
+  max-width: 62ch;
+  color: var(--ink-2);
+}
+
+.gl-motif-list.light li {
+  color: var(--snow-2);
+}
+
+.gl-motif-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--lime);
+}
+
+.gl-motif-list li::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: calc(0.45em + 4px);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--forest);
+}
+
+/* ── NÚT BẤM & LIÊN KẾT (BUTTONS & LINKS) ── */
+.gl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px 26px;
+  border-radius: var(--pill-radius);
+  background-color: var(--lime);
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  border: 0;
+  transition:
+    transform 240ms var(--ease-out),
+    background-color 240ms var(--ease-out),
+    color 240ms var(--ease-out);
+}
+
+.gl-btn:hover {
+  transform: translateY(-2px);
+  background-color: var(--lime-soft);
+}
+
+.gl-btn:active {
+  transform: scale(0.98);
+}
+
+.gl-btn.ghost {
+  background-color: var(--surface-soft);
+  color: var(--ink);
+}
+
+.gl-btn.ghost:hover {
+  background-color: var(--forest);
+  color: var(--snow);
+}
+
+.gl-btn.dark {
+  background-color: var(--forest);
+  color: var(--snow);
+}
+
+.gl-btn.dark:hover {
+  background-color: var(--ink);
+}
+
+.gl-btn.ghost-dark {
+  background-color: var(--surface-card);
+  color: var(--ink);
+}
+
+.gl-btn.ghost-dark:hover {
+  background-color: var(--forest-2);
+  color: var(--snow);
+}
+
+.gl-textlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+  transition: color 200ms var(--ease-out);
+}
+
+.gl-textlink.light {
+  color: var(--lime);
+}
+
+.gl-textlink:hover {
+  color: var(--snow);
+}
+
+/* ── THANH ĐIỀU HƯỚNG BÁM DÍNH (STICKY TOPBAR) & MÀN ĐẦU (HERO) ── */
+.gl-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  width: 100%;
+  background-color: var(--ground);
+  color: var(--ink);
+  transition:
+    background-color 260ms var(--ease-out),
+    color 260ms var(--ease-out);
+}
+
+.gl-topbar.is-scrolled {
+  background-color: var(--forest);
+  color: var(--snow);
+}
+
+.gl-nav {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 18px var(--m);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  transition: padding 240ms var(--ease-out);
+}
+
+.gl-topbar.is-scrolled .gl-nav {
+  padding: 12px var(--m);
+}
+
+.gl-nav-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.gl-word {
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 200ms var(--ease-out);
+}
+
+.gl-topbar.is-scrolled .gl-word {
+  color: var(--snow);
+}
+
+.gl-word-mark {
+  display: inline-block;
+  vertical-align: -7px;
+  margin-right: 10px;
+  --pm-bg: var(--forest-2);
+  --pm-fg: var(--lime);
+}
+
+.gl-topbar.is-scrolled .gl-word-mark {
+  --pm-bg: var(--lime);
+  --pm-fg: var(--forest-2);
+}
+
+.gl-word span {
+  color: var(--forest-2);
+  display: inline-block;
+  margin-left: 1px;
+  transition: color 200ms var(--ease-out);
+}
+
+.gl-topbar.is-scrolled .gl-word span {
+  color: var(--lime);
+}
+
+.gl-nav-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: var(--pill-radius);
+  background-color: var(--surface-soft);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    background-color 200ms var(--ease-out),
+    color 200ms var(--ease-out);
+}
+
+.gl-topbar.is-scrolled .gl-nav-status {
+  background-color: var(--forest-2);
+  color: var(--snow-2);
+}
+
+.gl-nav-status i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--ink-2);
+  display: inline-block;
+}
+
+.gl-nav-status i.is-open {
+  background-color: var(--forest);
+}
+
+.gl-topbar.is-scrolled .gl-nav-status i.is-open {
+  background-color: var(--lime);
+}
+
+.gl-nav-links {
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 2.4vw, 32px);
+}
+
+.gl-nav-links a {
+  color: var(--ink-2);
+  text-decoration: none;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 180ms var(--ease-out);
+}
+
+.gl-nav-links a:hover {
+  color: var(--ink);
+}
+
+.gl-topbar.is-scrolled .gl-nav-links a {
+  color: var(--snow-2);
+}
+
+.gl-topbar.is-scrolled .gl-nav-links a:hover {
+  color: var(--lime);
+}
+
+.gl-nav-links .gl-nav-cta {
+  padding: 10px 20px;
+  border-radius: var(--pill-radius);
+  background-color: var(--forest);
+  color: var(--snow);
+  font-weight: 700;
+  transition:
+    transform 220ms var(--ease-out),
+    background-color 220ms var(--ease-out),
+    color 220ms var(--ease-out);
+}
+
+.gl-topbar.is-scrolled .gl-nav-links .gl-nav-cta {
+  background-color: var(--lime);
+  color: var(--ink);
+}
+
+.gl-nav-links .gl-nav-cta:hover {
+  color: var(--ink);
+  background-color: var(--lime-soft);
+  transform: translateY(-2px);
+}
+
+.gl-scroll-progress {
+  width: 100%;
+  height: 3px;
+  background-color: var(--lime);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  opacity: 0;
+  transition: opacity 200ms var(--ease-out);
+}
+
+.gl-topbar.is-scrolled .gl-scroll-progress {
+  opacity: 1;
+}
+
+.gl section[id] {
+  scroll-margin-top: 84px;
+}
+
+.gl-hero {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: clamp(20px, 3vw, 36px) var(--m) clamp(48px, 5vw, 80px);
+  min-height: calc(100svh - 76px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+}
+
+.gl-hero-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  align-items: center;
+  gap: clamp(32px, 4.5vw, 64px);
+}
+
+.gl-hero-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 22px;
+}
+
+.gl-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.06em;
+}
+
+.gl-line > span {
+  display: block;
+}
+
+.gl-lead {
+  margin: 0;
+  font-size: var(--fs-lead);
+  color: var(--ink-2);
+  max-width: 54ch;
+  line-height: 1.6;
+}
+
+.gl-lead strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.gl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.gl-hero-facts {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 6px;
+}
+
+.gl-fact-pill {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 10px;
+  padding: 9px 18px;
+  border-radius: var(--pill-radius);
+  background-color: var(--surface-soft);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.gl-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--ink-2);
+  flex-shrink: 0;
+}
+
+.gl-dot.is-open {
+  background-color: var(--forest);
+}
+
+/* Cột thông số mở trên nền trang (tránh lặp các hộp thẻ đóng khung) */
+.gl-hero-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.gl-hero-metrics > div {
+  background-color: transparent;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gl-hero-metrics strong {
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.gl-hero-metrics span {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+/* Motif Vòm Sân Vận Động & Bảng Ca Tập bên phải Hero */
+.gl-hero-motif {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+.gl-arch-backdrop {
+  position: absolute;
+  top: -14px;
+  right: 0;
+  width: 82%;
+  height: 76%;
+  background-color: var(--lime);
+  border-radius: var(--arch-radius);
+  z-index: 0;
+}
+
+.gl-arch-video {
+  position: relative;
+  z-index: 1;
+  aspect-ratio: 16 / 11;
+  border-radius: var(--arch-radius);
+  overflow: hidden;
+  background-color: var(--forest);
+}
+
+.gl-arch-scrim {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  padding: 10px 18px;
+  border-radius: var(--pill-radius);
+  background-color: var(--forest);
+  color: var(--snow);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-sm);
+}
+
+.gl-arch-scrim strong {
+  color: var(--lime);
+  font-weight: 700;
+}
+
+/* Bảng điều khiển ca tập trực tiếp (data-ui) */
+.gl-hero-dial[data-ui] {
+  position: relative;
+  z-index: 2;
+  background-color: var(--forest);
+  color: var(--snow);
+  border-radius: 24px;
+  padding: 20px 22px;
+  border: 1px solid var(--forest-2);
+  box-shadow: 0 20px 44px -20px rgba(8, 20, 15, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gl-dial-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gl-dial-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--snow-2);
+}
+
+.gl-dial-state i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: var(--lime);
+  display: inline-block;
+}
+
+.gl-dial-clock {
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  color: var(--lime);
+}
+
+.gl-dial-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.gl-dial-tabs button {
+  padding: 9px 10px;
+  border-radius: 14px;
+  background-color: var(--forest-2);
+  color: var(--snow-2);
+  border: 0;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 200ms var(--ease-out),
+    color 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+
+.gl-dial-tabs button.is-active {
+  background-color: var(--lime);
+  color: var(--ink);
+}
+
+.gl-dial-tabs button:hover:not(.is-active) {
+  background-color: var(--deep);
+  color: var(--snow);
+}
+
+.gl-dial-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gl-dial-body strong {
+  font-size: var(--fs-lead);
+  color: var(--snow);
+}
+
+.gl-dial-body p {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--snow-2);
+  max-width: 60ch;
+}
+
+.gl-dial-foot {
+  margin-top: 4px;
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-sm);
+}
+
+.gl-dial-foot span {
+  color: var(--lime);
+  font-weight: 600;
+}
+
+.gl-dial-foot a {
+  color: var(--snow);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* ── MỤC 1 (ABOUT): Inset panel, shaped portrait ── */
+.gl-about-wrap {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: clamp(32px, 4vw, 56px) var(--m);
+}
+
+.gl-about-panel {
+  background-color: var(--forest);
+  color: var(--snow);
+  border-radius: 36px;
+  padding: clamp(24px, 4.5vw, 56px);
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: clamp(28px, 4.5vw, 56px);
+  align-items: start;
+}
+
+.gl-about-left {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.gl-zone-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.gl-zone-tab {
+  padding: 10px 18px;
+  border-radius: var(--pill-radius);
+  background-color: var(--forest-2);
+  color: var(--snow-2);
+  border: 0;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 220ms var(--ease-out),
+    color 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
+}
+
+.gl-zone-tab.is-active {
+  background-color: var(--lime);
+  color: var(--ink);
+}
+
+.gl-zone-tab:hover:not(.is-active) {
+  background-color: var(--deep);
+  color: var(--snow);
+}
+
+.gl-about-photos {
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr;
+  gap: 16px;
+  align-items: end;
+}
+
+.gl-arch-portrait {
+  aspect-ratio: 4 / 5;
+  border-radius: var(--arch-radius);
+  overflow: hidden;
+  background-color: var(--forest-2);
+}
+
+.gl-arch-mini {
+  aspect-ratio: 4 / 5;
+  border-radius: 24px 999px 24px 24px;
+  overflow: hidden;
+  background-color: var(--forest-2);
+}
+
+.gl-about-right {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  justify-content: space-between;
+}
+
+.gl-about-block {
+  background-color: transparent;
+  padding: 0;
+}
+
+.gl-about-block p {
+  margin: 0;
+  color: var(--snow-2);
+  max-width: 60ch;
+}
+
+.gl-center-dl {
+  margin: 16px 0 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.gl-center-dl > div {
+  background-color: var(--forest-2);
+  border-radius: 16px;
+  padding: 12px 16px;
+}
+
+.gl-center-dl dt {
+  color: var(--lime);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.gl-center-dl dd {
+  margin: 0;
+  color: var(--snow);
+  font-weight: 600;
+}
+
+.gl-about-actions {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* ── MỤC 2 (SHOWCASE — ONE LIVE THING): Trình khám phá khóa học & Tính học phí vào muộn ── */
+.gl-showcase {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: clamp(56px, 6.5vw, 100px) var(--m);
+  transition: background-color 320ms var(--ease-out);
+}
+
+.gl-showcase.is-alt {
+  background-color: var(--surface-soft);
+  border-radius: 36px;
+}
+
+.gl-showcase-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.gl-showcase-sub {
+  margin: 12px 0 0;
+  max-width: 62ch;
+  color: var(--ink-2);
+}
+
+.gl-mode-switch[data-ui] {
+  display: inline-flex;
+  padding: 6px;
+  border-radius: var(--pill-radius);
+  background-color: var(--surface-soft);
+  border: 1px solid var(--ink-2);
+  gap: 6px;
+}
+
+.gl-mode-switch button {
+  padding: 10px 18px;
+  border-radius: var(--pill-radius);
+  border: 0;
+  background-color: transparent;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 200ms var(--ease-out),
+    color 200ms var(--ease-out);
+}
+
+.gl-mode-switch button.is-active {
+  background-color: var(--forest);
+  color: var(--snow);
+}
+
+.gl-showcase-board {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.gl-goal-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.gl-goal-chip {
+  padding: 9px 16px;
+  border-radius: var(--pill-radius);
+  background-color: var(--surface-soft);
+  color: var(--ink-2);
+  border: 0;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 200ms var(--ease-out),
+    color 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+
+.gl-goal-chip.is-active {
+  background-color: var(--forest);
+  color: var(--lime);
+}
+
+.gl-goal-chip:hover:not(.is-active) {
+  background-color: var(--surface-card);
+  color: var(--ink);
+}
+
+.gl-explorer-grid {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.gl-course-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gl-ui-note,
+.gl-ui-empty {
+  padding: 20px;
+  border-radius: 20px;
+  background-color: var(--surface-soft);
+  color: var(--ink-2);
+}
+
+.gl-ui-reset {
+  margin-top: 12px;
+  padding: 10px 18px;
+  border-radius: var(--pill-radius);
+  background-color: var(--forest);
+  color: var(--snow);
+  border: 0;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Danh sách chỉ mục khóa học mở trên nền trang; chỉ khóa đang chọn nổi khối xanh rừng */
+.gl-course-card {
+  width: 100%;
+  text-align: left;
+  padding: 16px 20px;
+  border-radius: 22px;
+  background-color: transparent;
+  color: var(--ink);
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition:
+    background-color 220ms var(--ease-out),
+    color 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
+}
+
+.gl-course-card:hover {
+  transform: translateY(-2px);
+  background-color: var(--surface-soft);
+}
+
+.gl-course-card.is-selected {
+  background-color: var(--forest);
+  color: var(--snow);
+}
+
+.gl-course-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gl-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: var(--pill-radius);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.gl-badge.is-live {
+  background-color: var(--lime);
+  color: var(--ink);
+}
+
+.gl-badge.is-sample {
+  background-color: var(--surface-soft);
+  color: var(--ink);
+}
+
+.gl-course-card.is-selected .gl-badge.is-sample {
+  background-color: var(--forest-2);
+  color: var(--lime);
+}
+
+.gl-course-meta {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.gl-course-card.is-selected .gl-course-meta {
+  color: var(--snow-2);
+}
+
+.gl-course-title {
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.gl-course-coach {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.gl-course-card.is-selected .gl-course-coach {
+  color: var(--snow-2);
+}
+
+.gl-course-card-foot {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gl-course-slots {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.gl-course-card.is-selected .gl-course-slots {
+  color: var(--lime);
+}
+
+.gl-course-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.gl-course-price del {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.gl-course-card.is-selected .gl-course-price del {
+  color: var(--snow-2);
+}
+
+.gl-course-price b {
+  font-size: var(--fs-lead);
+  font-weight: 800;
+}
+
+/* Cột phải: Chi tiết khóa học & Bộ mô phỏng khấu trừ vào muộn */
+.gl-course-inspector {
+  background-color: var(--surface-card);
+  border-radius: 28px;
+  padding: clamp(20px, 3vw, 28px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.gl-inspector-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.gl-inspector-tag {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-bottom: 4px;
+}
+
+.gl-inspector-title {
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.gl-inspector-tier {
+  padding: 6px 14px;
+  border-radius: var(--pill-radius);
+  background-color: var(--surface-soft);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.gl-inspector-goal {
+  margin: 0;
+  color: var(--ink-2);
+  max-width: 62ch;
+}
+
+.gl-inspector-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gl-inspector-label {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.gl-slot-pills {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.gl-slot-pill {
+  background-color: transparent;
+  padding: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gl-slot-pill b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.gl-slot-pill span {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.gl-prorate-box[data-ui] {
+  background-color: var(--forest);
+  color: var(--snow);
+  border-radius: 22px;
+  padding: 20px 22px;
+  border: 1px solid var(--forest-2);
+  box-shadow: 0 20px 40px -20px rgba(8, 20, 15, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gl-prorate-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gl-prorate-top strong {
+  color: var(--lime);
+  font-weight: 700;
+}
+
+.gl-prorate-top span {
+  font-size: var(--fs-sm);
+  color: var(--snow-2);
+}
+
+.gl-prorate-slider-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+  color: var(--snow-2);
+}
+
+.gl-prorate-slider-label b {
+  color: var(--snow);
+}
+
+.gl-prorate-box input[type="range"] {
+  width: 100%;
+  accent-color: var(--lime);
+  cursor: pointer;
+}
+
+.gl-prorate-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 6px;
+  align-items: center;
+}
+
+.gl-prorate-summary > div {
+  background-color: transparent;
+  padding: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gl-prorate-summary small {
+  color: var(--snow-2);
+}
+
+.gl-prorate-summary span {
+  font-weight: 700;
+  color: var(--snow);
+}
+
+.gl-discount-val {
+  color: var(--lime);
+}
+
+.gl-prorate-summary .gl-prorate-final {
+  background-color: var(--lime);
+  color: var(--ink);
+  border-radius: 16px;
+  padding: 10px 14px;
+}
+
+.gl-prorate-summary .gl-prorate-final small {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.gl-prorate-summary .gl-prorate-final strong {
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* ── MỤC 3 (HOW-IT-WORKS): Drag through the stages — 4 bước ứng dụng Pulse ── */
+.gl-stages {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: clamp(44px, 5.5vw, 88px) var(--m);
+}
+
+.gl-stages-split {
+  background-color: var(--forest);
+  color: var(--snow);
+  border-radius: 36px 36px 24px 24px;
+  padding: clamp(24px, 4.5vw, 56px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(28px, 4.5vw, 56px);
+  align-items: center;
+}
+
+.gl-stages-left {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.gl-stages-lead {
+  margin: 0;
+  color: var(--snow-2);
+  max-width: 58ch;
+}
+
+.gl-stage-photo {
+  margin-top: 4px;
+  aspect-ratio: 16 / 10;
+  border-radius: 24px;
+  overflow: hidden;
+  background-color: var(--forest-2);
+}
+
+.gl-stages-right {
+  display: flex;
+  flex-direction: column;
+}
+
+.gl-app-stage[data-ui] {
+  background-color: var(--surface-card);
+  color: var(--ink);
+  border-radius: 28px;
+  padding: clamp(20px, 3vw, 28px);
+  border: 1px solid var(--surface-soft);
+  box-shadow: 0 24px 48px -20px rgba(8, 20, 15, 0.5);
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.gl-app-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+}
+
+.gl-app-brand {
+  font-weight: 800;
+  color: var(--forest);
+}
+
+.gl-app-step-tag {
+  padding: 5px 14px;
+  border-radius: var(--pill-radius);
+  background-color: var(--lime);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.gl-app-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gl-app-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.gl-app-card-head strong {
+  color: var(--forest);
+  font-weight: 700;
+}
+
+.gl-app-invoice {
+  background-color: var(--ground);
+  border-radius: 20px;
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.gl-app-invoice > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gl-app-invoice span {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.gl-app-invoice b,
+.gl-app-invoice strong {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.gl-app-invoice-total strong {
+  font-size: var(--fs-lead);
+  color: var(--forest);
+}
+
+.gl-app-qr-preview {
+  background-color: var(--forest);
+  color: var(--snow);
+  border-radius: 20px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.gl-app-qr-preview p {
+  margin: 4px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--snow-2);
+}
+
+.gl-qr-matrix {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  background-color: var(--lime);
+  border-radius: 14px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.gl-qr-matrix.large {
+  width: 88px;
+  height: 88px;
+  padding: 12px;
+  gap: 6px;
+}
+
+.gl-qr-matrix span {
+  background-color: var(--ink);
+  border-radius: 3px;
+}
+
+.gl-qr-matrix span:nth-child(even) {
+  background-color: var(--forest-2);
+}
+
+.gl-pass-ring-wrap {
+  background-color: var(--ground);
+  border-radius: 22px;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.gl-pass-ring {
+  padding: 12px;
+  border-radius: 50%;
+  background-color: var(--forest);
+  flex-shrink: 0;
+}
+
+.gl-pass-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gl-pass-meta strong {
+  font-size: var(--fs-lead);
+  color: var(--ink);
+}
+
+.gl-pass-meta p {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.gl-app-mini-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: var(--pill-radius);
+  background-color: var(--forest);
+  color: var(--lime);
+  border: 0;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gl-app-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gl-session-row {
+  background-color: var(--ground);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.gl-session-row > span:first-child {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.gl-session-row div {
+  display: flex;
+  flex-direction: column;
+}
+
+.gl-session-row b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.gl-session-row small {
+  color: var(--ink-2);
+}
+
+.gl-session-pill {
+  padding: 4px 12px;
+  border-radius: var(--pill-radius);
+  background-color: var(--surface-soft);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.gl-session-pill.ok {
+  background-color: var(--lime);
+  color: var(--ink);
+}
+
+.gl-session-pill.warn {
+  background-color: var(--forest);
+  color: var(--lime);
+}
+
+.gl-app-plan {
+  background-color: var(--ground);
+  border-radius: 18px;
+  padding: 16px 18px;
+}
+
+.gl-app-plan strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink);
+}
+
+.gl-app-plan p {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.gl-app-pickup {
+  background-color: var(--forest);
+  color: var(--snow);
+  border-radius: 18px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.gl-app-pickup div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gl-app-pickup span,
+.gl-app-pickup small {
+  font-size: var(--fs-sm);
+  color: var(--snow-2);
+}
+
+.gl-app-pickup strong {
+  color: var(--lime);
+}
+
+/* Thanh trượt điều khiển 4 bước (data-ui) */
+.gl-stages-control[data-ui] {
+  margin-top: 14px;
+  background-color: var(--surface-soft);
+  border-radius: 24px;
+  padding: 18px 22px;
+  border: 1px solid var(--surface-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gl-range {
+  width: 100%;
+  accent-color: var(--forest);
+  cursor: pointer;
+}
+
+.gl-stage-stops {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.gl-stage-stop {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background-color: transparent;
+  color: var(--ink-2);
+  border: 0;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 200ms var(--ease-out),
+    color 200ms var(--ease-out);
+}
+
+.gl-stage-stop.is-active {
+  background-color: var(--forest);
+  color: var(--lime);
+}
+
+/* ── MỤC 4 (FEATURES): Close-ups on a board — Bảng 12 cột 7 ô lấp kín 100% ── */
+.gl-board-sec {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: clamp(52px, 6.5vw, 96px) var(--m);
+}
+
+.gl-board {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.gl-tile {
+  border-radius: 28px;
+  padding: clamp(20px, 2.8vw, 30px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  overflow: hidden;
+  position: relative;
+}
+
+.gl-tile-6x2 {
+  grid-column: span 6;
+}
+
+.gl-tile-6x4 {
+  grid-column: span 6;
+  grid-row: span 2;
+}
+
+.gl-tile-3x4 {
+  grid-column: span 3;
+  grid-row: span 2;
+}
+
+.gl-tile-3x2 {
+  grid-column: span 3;
+}
+
+/* Ô tiêu đề đầu tiên mở trực tiếp trên nền trang (--ground) theo đúng đặc tả scenes.md */
+.gl-tile.is-ground {
+  background-color: transparent;
+  color: var(--ink);
+  padding: 4px 16px 16px 0;
+}
+
+.gl-tile.is-forest {
+  background-color: var(--forest);
+  color: var(--snow);
+}
+
+.gl-tile.is-lime {
+  background-color: var(--lime);
+  color: var(--ink);
+}
+
+.gl-tile.is-soft {
+  background-color: var(--surface-soft);
+  color: var(--ink);
+}
+
+.gl-tile.is-deep {
+  background-color: var(--deep);
+  color: var(--snow);
+}
+
+.gl-tile.is-photo {
+  padding: 0;
+  background-color: var(--forest);
+  min-height: 220px;
+}
+
+.gl-tile.is-photo img {
+  position: absolute;
+  inset: 0;
+}
+
+.gl-tile-scrim {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  background-color: var(--forest);
+  color: var(--snow);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gl-tile-scrim span {
+  font-size: var(--fs-sm);
+  color: var(--snow-2);
+}
+
+.gl-tile-lead {
+  margin: 0;
+  color: var(--ink-2);
+  max-width: 54ch;
+}
+
+.gl-coach-macro[data-ui] {
+  background-color: var(--forest-2);
+  border: 1px solid var(--forest-2);
+  border-radius: 22px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gl-coach-macro-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gl-coach-badge {
+  padding: 4px 12px;
+  border-radius: var(--pill-radius);
+  background-color: var(--lime);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.gl-coach-rating {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--lime);
+}
+
+.gl-coach-name {
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  color: var(--snow);
+}
+
+.gl-coach-spec {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--lime);
+}
+
+.gl-coach-bio {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--snow-2);
+}
+
+.gl-coach-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.gl-coach-stats > div {
+  background-color: transparent;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gl-coach-stats b {
+  font-size: var(--fs-lead);
+  color: var(--snow);
+}
+
+.gl-coach-stats span {
+  font-size: var(--fs-sm);
+  color: var(--snow-2);
+}
+
+.gl-macro-figure[data-ui] {
+  background-color: var(--surface-card);
+  color: var(--ink);
+  border-radius: 20px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gl-macro-figure.light[data-ui] {
+  background-color: var(--forest-2);
+  color: var(--snow);
+}
+
+.gl-macro-figure span {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.gl-macro-figure strong {
+  font-size: var(--fs-h2);
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.gl-macro-figure.light strong {
+  color: var(--lime);
+}
+
+.gl-macro-figure small {
+  color: var(--ink-2);
+}
+
+.gl-macro-figure.light small {
+  color: var(--snow-2);
+}
+
+.gl-macro-pill[data-ui] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gl-macro-pill span {
+  padding: 7px 14px;
+  border-radius: var(--pill-radius);
+  background-color: var(--forest);
+  color: var(--lime);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.gl-macro-row[data-ui] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gl-macro-row span {
+  padding: 7px 14px;
+  border-radius: var(--pill-radius);
+  background-color: var(--surface-card);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.gl-tile-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gl-tile-caption strong {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.gl-tile-caption span {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.gl-tile-caption.light strong {
+  color: var(--snow);
+}
+
+.gl-tile-caption.light span {
+  color: var(--snow-2);
+}
+
+/* ── MỤC 5 (GALLERY): Wall of word tiles — Pro Shop & Con số đặc trưng ── */
+.gl-wall-sec {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: clamp(52px, 6.5vw, 96px) var(--m);
+}
+
+.gl-wall-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.gl-wall-sub {
+  margin: 12px 0 0;
+  max-width: 60ch;
+  color: var(--ink-2);
+}
+
+.gl-pickup-bar[data-ui] {
+  background-color: var(--forest);
+  color: var(--snow);
+  border-radius: 22px;
+  padding: 16px 22px;
+  border: 1px solid var(--forest-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gl-pickup-bar > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gl-pickup-bar span {
+  font-size: var(--fs-sm);
+  color: var(--snow-2);
+}
+
+.gl-pickup-bar strong {
+  font-size: var(--fs-lead);
+  color: var(--lime);
+}
+
+.gl-pickup-link {
+  font-size: var(--fs-sm);
+  color: var(--snow);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.gl-wall-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.gl-wall-cell {
+  border-radius: 24px;
+  padding: 20px;
+  min-height: 186px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+  border: 0;
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 220ms var(--ease-out),
+    background-color 220ms var(--ease-out);
+}
+
+/* Ô đầu tiên và các ô con số đặt cụm chữ sát nhau ở đáy ô để không tạo nhãn rời phía trên hàng kế tiếp */
+.gl-wall-cell.is-ground {
+  background-color: transparent;
+  color: var(--ink);
+  padding-left: 0;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.gl-wall-cell.is-forest {
+  background-color: var(--forest);
+  color: var(--snow);
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.gl-wall-cell.is-lime {
+  background-color: var(--lime);
+  color: var(--ink);
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.gl-wall-cell.is-deep {
+  background-color: var(--deep);
+  color: var(--snow);
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.gl-wall-cell.is-product {
+  background-color: var(--surface-soft);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.gl-wall-cell.is-product:hover {
+  transform: translateY(-3px);
+}
+
+.gl-wall-cell.is-product.is-picked {
+  background-color: var(--forest);
+  color: var(--snow);
+}
+
+.gl-wall-cell.is-photo {
+  padding: 0;
+  background-color: var(--forest);
+}
+
+.gl-wall-cell.is-photo img {
+  position: absolute;
+  inset: 0;
+}
+
+.gl-wall-cell.is-photo .gl-wall-cap {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  background-color: var(--forest);
+  padding: 10px 14px;
+}
+
+.gl-wall-big {
+  font-size: var(--fs-h1);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.gl-wall-cell.is-forest .gl-wall-big,
+.gl-wall-cell.is-deep .gl-wall-big {
+  color: var(--lime);
+}
+
+.gl-prod-stock {
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: var(--pill-radius);
+  background-color: var(--surface-card);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.gl-wall-cell.is-product.is-picked .gl-prod-stock {
+  background-color: var(--lime);
+  color: var(--ink);
+}
+
+.gl-prod-price {
+  font-size: var(--fs-lead);
+  font-weight: 800;
+}
+
+.gl-wall-cell.is-product.is-picked .gl-prod-price {
+  color: var(--lime);
+}
+
+.gl-wall-cap {
+  font-size: var(--fs-body);
+  color: var(--ink-2);
+}
+
+.gl-wall-cap.light,
+.gl-wall-cell.is-forest .gl-wall-cap,
+.gl-wall-cell.is-product.is-picked .gl-wall-cap {
+  color: var(--snow-2);
+}
+
+.gl-wall-cell.is-product.is-picked .gl-wall-cap b {
+  color: var(--snow);
+}
+
+/* ── MỤC 6 (CONTACT): Clip-out coupon form — Phiếu hẹn tư vấn 2 nửa cân xứng ── */
+.gl-coupon-sec {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: clamp(44px, 5.5vw, 88px) var(--m);
+}
+
+.gl-coupon {
+  position: relative;
+  background-color: var(--forest);
+  color: var(--snow);
+  border-radius: 36px;
+  padding: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+}
+
+/* Hai rãnh khuyết tròn (Notches) của cuống vé Coupon mà không dùng radial-gradient */
+.gl-coupon::before,
+.gl-coupon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--ground);
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.gl-coupon::before {
+  top: -18px;
+}
+
+.gl-coupon::after {
+  bottom: -18px;
+}
+
+.gl-coupon-left {
+  padding: clamp(24px, 4vw, 48px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.gl-coupon-lead {
+  margin: 12px 0 0;
+  color: var(--snow-2);
+  max-width: 52ch;
+}
+
+.gl-coupon-direct {
+  background-color: var(--forest-2);
+  border-radius: 24px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gl-hotline-big {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--fs-h2);
+  font-weight: 800;
+  color: var(--lime);
+  text-decoration: none;
+}
+
+.gl-coupon-address {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--snow-2);
+}
+
+.gl-coupon-address strong {
+  color: var(--snow);
+}
+
+.gl-coupon-address span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+}
+
+.gl-coupon-form {
+  background-color: var(--surface-card);
+  color: var(--ink);
+  padding: clamp(24px, 4vw, 48px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+
+.gl-form-title {
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.gl-field input,
+.gl-field select {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background-color: var(--ground);
+  color: var(--ink);
+  border: 1px solid var(--surface-soft);
+  font-weight: 600;
+  outline: none;
+  transition: background-color 200ms var(--ease-out);
+}
+
+.gl-field input::placeholder {
+  color: var(--ink-2);
+  opacity: 1;
+}
+
+.gl-field input:focus,
+.gl-field select:focus {
+  background-color: var(--surface-soft);
+  border-color: var(--forest);
+}
+
+.gl-submit-bar {
+  margin-top: 4px;
+  width: 100%;
+  padding: 16px 24px;
+  border-radius: 18px;
+  background-color: var(--forest);
+  color: var(--lime);
+  border: 0;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition:
+    background-color 220ms var(--ease-out),
+    color 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
+}
+
+.gl-submit-bar:hover {
+  background-color: var(--lime);
+  color: var(--ink);
+  transform: translateY(-2px);
+}
+
+.gl-coupon-confirm {
+  background-color: var(--surface-soft);
+  color: var(--ink);
+  border-radius: 18px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gl-coupon-confirm span {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.gl-coupon-confirm a {
+  color: var(--forest);
+  font-weight: 700;
+}
+
+/* ── CHÂN TRANG (FOOTER): The mark, built large ── */
+.gl-foot {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: clamp(48px, 6vw, 88px) var(--m) 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.gl-foot-top {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: clamp(32px, 5vw, 64px);
+  align-items: start;
+}
+
+.gl-foot-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.gl-foot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.gl-foot-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.gl-foot-cols > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gl-foot-cols strong {
+  color: var(--ink);
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.gl-foot-cols a,
+.gl-foot-cols span {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.gl-foot-cols a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.gl-foot-pulse {
+  color: var(--forest);
+  padding: 4px 0;
+}
+
+.gl-pulse {
+  width: 100%;
+  height: 36px;
+  display: block;
+}
+
+/* Khối chữ kiến trúc khổng lồ P U L S E . ("The mark, built large") */
+.gl-mark-blocks {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  min-height: 180px;
+}
+
+.gl-mark-block {
+  background-color: var(--forest);
+  color: var(--snow);
+  border-radius: 28px 28px 16px 16px;
+  padding: 18px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  transition: transform 280ms var(--ease-out), background-color 280ms var(--ease-out);
+}
+
+.gl-mark-block:hover {
+  transform: translateY(-6px);
+  background-color: var(--forest-2);
+}
+
+.gl-mark-block.h-100 {
+  height: 180px;
+}
+
+.gl-mark-block.h-96 {
+  height: 168px;
+}
+
+.gl-mark-block.h-92 {
+  height: 156px;
+}
+
+.gl-mark-block.h-82 {
+  height: 140px;
+}
+
+.gl-mark-block.h-76 {
+  height: 128px;
+}
+
+.gl-mark-block.h-64.is-dot {
+  height: 112px;
+  background-color: var(--lime);
+  color: var(--ink);
+  border-radius: 999px 999px 16px 16px;
+}
+
+.gl-mark-block span {
+  font-family: "Syne", "Be Vietnam Pro", sans-serif;
+  font-size: var(--fs-giant);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+
+.gl-legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+/* ── NÚT THAO TÁC NHANH KÉO LÊN ĐẦU TRANG (FLOATING BACK-TO-TOP) ── */
+.gl-totop[data-ui] {
+  position: fixed;
+  right: 20px;
+  bottom: 22px;
+  z-index: 55;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px 7px 7px;
+  border-radius: var(--pill-radius);
+  background-color: var(--forest);
+  color: var(--snow);
+  border: 2px solid var(--lime);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(18px);
+  pointer-events: none;
+  transition:
+    opacity 240ms var(--ease-out),
+    transform 240ms var(--ease-out),
+    background-color 220ms var(--ease-out),
+    color 220ms var(--ease-out);
+}
+
+.gl-totop[data-ui].is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.gl-totop[data-ui]:hover {
+  background-color: var(--lime);
+  color: var(--ink);
+  transform: translateY(-3px);
+}
+
+.gl-totop-ring {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background-color: var(--lime);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    background-color 220ms var(--ease-out),
+    color 220ms var(--ease-out);
+}
+
+.gl-totop[data-ui]:hover .gl-totop-ring {
+  background-color: var(--forest);
+  color: var(--lime);
+}
+
+/* ── CHUYỂN ĐỘNG & HIỆU ỨNG CUỘN TRANG (MOTION CHOREOGRAPHY) ── */
+@media (prefers-reduced-motion: no-preference) {
+  .gl [data-line] {
+    transform: translateY(108%);
+    animation: glLineUp 720ms var(--ease-out) calc(var(--i, 0) * 110ms + 80ms) forwards;
+  }
+
+  .gl-load {
+    opacity: 0;
+    transform: translateY(18px);
+    animation: glFadeUp 680ms var(--ease-out) var(--d, 260ms) forwards;
+  }
+
+  .gl-shutter-hero {
+    clip-path: inset(0 0 100% 0 round 999px 999px 28px 28px);
+    animation: glShutterHero 920ms var(--ease-out) 180ms forwards;
+  }
+
+  .js .gl [data-reveal] {
+    opacity: 0;
+    transform: translateY(20px);
+    transition:
+      opacity 420ms var(--ease-out) calc(var(--i, 0) * 40ms),
+      transform 420ms var(--ease-out) calc(var(--i, 0) * 40ms);
+  }
+
+  .js .gl [data-reveal].is-in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glLineUp {
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes glFadeUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glShutterHero {
+  to {
+    clip-path: inset(0 0 0% 0 round 999px 999px 28px 28px);
+  }
+}
+
+/* ── ĐÁP ỨNG MÀN HÌNH TABLET & MOBILE (RESPONSIVE) ── */
+@media (max-width: 1024px) {
+  .gl {
+    --fs-giant: 2.75rem;
+    --fs-h1: 2.35rem;
+    --fs-h2: 1.9rem;
+    --fs-lead: 1.125rem;
+  }
+
+  .gl-hero-grid,
+  .gl-about-panel,
+  .gl-explorer-grid,
+  .gl-stages-split,
+  .gl-coupon,
+  .gl-foot-top {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-nav {
+    gap: 12px;
+  }
+
+  .gl-nav-status {
+    display: none;
+  }
+
+  .gl-nav-links {
+    gap: 14px;
+  }
+
+  .gl-nav-links a {
+    font-size: var(--fs-sm);
+  }
+
+  .gl-mode-switch[data-ui],
+  .gl-pickup-bar[data-ui] {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .gl-mode-switch[data-ui] {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .gl-coupon::before,
+  .gl-coupon::after {
+    display: none;
+  }
+
+  .gl-board {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .gl-tile-6x2 {
+    grid-column: span 12;
+  }
+
+  .gl-tile-6x4 {
+    grid-column: span 7;
+    grid-row: span 2;
+  }
+
+  .gl-tile-3x4 {
+    grid-column: span 5;
+    grid-row: span 1;
+  }
+
+  .gl-board > .gl-tile:nth-child(4) {
+    grid-column: span 5;
+  }
+
+  .gl-board > .gl-tile:nth-child(5),
+  .gl-board > .gl-tile:nth-child(6),
+  .gl-board > .gl-tile:nth-child(7) {
+    grid-column: span 4;
+  }
+
+  .gl-wall-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .gl {
+    --fs-giant: 1.875rem;
+    --fs-h1: 1.875rem;
+    --fs-h2: 1.5rem;
+    --fs-lead: 1.125rem;
+  }
+
+  .gl-hide-sm {
+    display: none;
+  }
+
+  .gl-dial-tabs,
+  .gl-center-dl,
+  .gl-prorate-summary,
+  .gl-app-invoice,
+  .gl-stage-stops,
+  .gl-foot-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-stage-stops {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gl-pass-ring-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .gl-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gl-board > .gl-tile:nth-child(n),
+  .gl-tile-3x4,
+  .gl-tile-3x2 {
+    grid-column: span 1;
+    grid-row: auto;
+  }
+
+  .gl-board > .gl-tile.gl-tile-6x2,
+  .gl-board > .gl-tile.gl-tile-6x4 {
+    grid-column: span 2;
+    grid-row: auto;
+  }
+
+  .gl-totop[data-ui] {
+    right: 16px;
+    bottom: 16px;
+    padding: 6px;
+  }
+
+  .gl-wall-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .gl-wall-cell {
+    padding: 16px;
+    min-height: 156px;
+  }
+
+  .gl-mark-blocks {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+    min-height: 96px;
+  }
+
+  .gl-mark-block {
+    padding: 10px 8px;
+    border-radius: 16px 16px 10px 10px;
+  }
+
+  .gl-mark-block.h-100 {
+    height: 96px;
+  }
+
+  .gl-mark-block.h-96 {
+    height: 90px;
+  }
+
+  .gl-mark-block.h-92 {
+    height: 84px;
+  }
+
+  .gl-mark-block.h-82 {
+    height: 78px;
+  }
+
+  .gl-mark-block.h-76 {
+    height: 72px;
+  }
+
+  .gl-mark-block.h-64.is-dot {
+    height: 64px;
+  }
+}

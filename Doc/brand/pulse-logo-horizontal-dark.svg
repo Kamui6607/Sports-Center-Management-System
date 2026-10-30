@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" role="img" aria-label="pulse. Sports Center">
+  <rect width="64" height="64" rx="16" fill="#D3F879"/>
+  <path d="M10 33H20L25.5 18L32.5 48L37.5 33H41" fill="none" stroke="#203D31" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="50" cy="33" r="4.5" fill="#203D31"/>
+  <text x="80" y="38" font-family="'Be Vietnam Pro', system-ui, sans-serif" font-weight="800" font-size="36" letter-spacing="-1" fill="#FFFFFF">pulse<tspan fill="#D3F879">.</tspan></text>
+  <text x="82" y="56" font-family="'Be Vietnam Pro', system-ui, sans-serif" font-weight="600" font-size="10.5" letter-spacing="2.6" fill="#A4CB62">SPORTS CENTER</text>
+</svg>

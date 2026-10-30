@@ -1,0 +1,83 @@
+/*
+ * Thông báo của Quản lý: popup ở chuông + trang /manager/notifications.
+ * Chỉ dùng token của `.cr` (tự đổi theo giao diện Sáng/Tối) — ghi đè mọi mã màu cố định của styles.css cũ.
+ */
+
+/* ── Popup ở chuông ──────────────────────────────── */
+.cr .notification-popover {
+  width: min(400px, calc(100vw - 24px)); top: calc(100% + 10px); overflow: hidden;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-pop);
+  transform-origin: top right; animation: cr-pop var(--t-ui, 240ms) var(--ease-out, ease);
+  display: flex; flex-direction: column;
+}
+.cr .notification-popover > header {
+  padding: 14px 14px 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.cr .notification-popover > header strong { font-size: 15px; font-weight: 600; color: var(--text); }
+.cr .notification-popover header small { font-size: 12.5px; color: var(--text-3); }
+.cr .notification-popover .icon-button {
+  width: 34px; height: 34px; display: grid; place-items: center; border-radius: var(--r-sm); cursor: pointer;
+  background: transparent; color: var(--text-2); border: 1px solid var(--border);
+  transition: background-color var(--t-hover, 180ms) ease, color var(--t-hover, 180ms) ease, transform var(--t-press, 140ms) var(--ease-out, ease);
+}
+.cr .notification-popover .icon-button:hover:not(:disabled) { background: var(--surface-hover); color: var(--primary-text); }
+.cr .notification-popover .icon-button:active:not(:disabled) { transform: scale(0.95); }
+.cr .notification-popover .icon-button:disabled { opacity: 0.4; cursor: default; }
+
+.cr .notification-popover-list { max-height: min(460px, calc(100vh - 190px)); overflow-y: auto; overscroll-behavior: contain; background: var(--surface); }
+.cr .notification-popover-item {
+  grid-template-columns: 8px minmax(0, 1fr); gap: 12px; padding: 12px 16px; color: var(--text);
+  background: transparent; border: 0; border-bottom: 1px solid var(--border); font-family: var(--font);
+  transition: background-color var(--t-hover, 180ms) ease;
+}
+.cr .notification-popover-item:last-child { border-bottom: 0; }
+.cr .notification-popover-item.unread { background: var(--primary-subtle); }
+.cr .notification-popover-item:hover { background: var(--surface-hover); }
+.cr .notification-popover-item:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.cr .notification-popover-item strong { font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--text); margin-bottom: 3px; }
+.cr .notification-popover-item p { font-size: 13px; line-height: 1.45; color: var(--text-2); margin-bottom: 4px; }
+.cr .notification-popover-item small { font-size: 12px; color: var(--text-3); }
+.cr .notification-popover-item .notification-dot { background: transparent; margin-top: 6px; }
+.cr .notification-popover-item.unread .notification-dot { background: var(--accent-strong); }
+html[data-theme="dark"] .cr .notification-popover-item.unread .notification-dot { background: var(--accent); }
+
+/* Trạng thái trong popup (tải / trống / lỗi) dùng component cũ ⇒ đổi sang token. */
+.cr .notification-popover .skeleton { padding: 12px 16px; background: transparent; }
+.cr .notification-popover .skeleton-block { background: var(--surface-hover); }
+.cr .notification-popover .empty { padding: 28px 16px; background: transparent; color: var(--text-3); text-align: center; }
+.cr .notification-popover .empty h3, .cr .notification-popover .empty p { color: var(--text-2); }
+.cr .notification-popover .error-state { margin: 12px 16px; background: var(--danger-soft); color: var(--text); border-color: transparent; }
+
+.cr .notification-popover-foot { border-top: 1px solid var(--border); background: var(--surface-2); }
+.cr .notification-popover-foot a {
+  display: flex; align-items: center; justify-content: center; height: 44px; font-size: 13.5px; font-weight: 600;
+  color: var(--primary-text); text-decoration: none; transition: background-color var(--t-hover, 180ms) ease;
+}
+.cr .notification-popover-foot a:hover { background: var(--surface-hover); }
+.cr .notification-popover-foot a:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+/* ── Trang Thông báo ─────────────────────────────── */
+.cr-notes section + section { margin-top: 4px; }
+.cr-notes-day { margin: 0; padding: 14px 22px 6px; font-size: 12.5px; font-weight: 600; color: var(--text-3); }
+.cr-notes ul { list-style: none; margin: 0; padding: 0; }
+.cr-notes li {
+  display: grid; grid-template-columns: 8px minmax(0, 1fr) auto auto; gap: 6px 14px; align-items: start;
+  padding: 12px 22px; border-top: 1px solid var(--border); transition: background-color var(--t-hover, 180ms) ease;
+}
+.cr-notes li.unread { background: var(--primary-subtle); }
+.cr-notes li:hover { background: var(--row-hover); }
+.cr-notes-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; background: transparent; }
+.cr-notes li.unread .cr-notes-dot { background: var(--accent-strong); }
+html[data-theme="dark"] .cr-notes li.unread .cr-notes-dot { background: var(--accent); }
+.cr-notes-main { min-width: 0; }
+.cr-notes-main strong { display: block; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text); }
+.cr-notes li:not(.unread) .cr-notes-main strong { font-weight: 500; }
+.cr-notes-main p { margin: 2px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--text-2); overflow-wrap: anywhere; }
+.cr-notes-main .cr-notes-reason { color: var(--text-3); }
+.cr-notes time { font-size: 12.5px; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; padding-top: 2px; }
+.cr-notes-actions { display: flex; gap: 6px; align-items: center; min-width: 32px; justify-content: flex-end; }
+@media (max-width: 640px) {
+  .cr-notes li { grid-template-columns: 8px minmax(0, 1fr) auto; padding: 12px 16px; }
+  .cr-notes-actions { grid-column: 2 / -1; justify-content: flex-start; }
+  .cr-notes-day { padding: 14px 16px 6px; }
+}

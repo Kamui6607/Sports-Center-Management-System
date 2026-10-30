@@ -1,0 +1,93 @@
+/*
+ * PULSE Manager — lớp chuyển động (tách khỏi admin.css để dễ chỉnh riêng).
+ * Nguyên tắc: chuyển động là phản hồi, ngắn và cùng một nhịp — chỉ animate transform / opacity / clip-path.
+ * Mọi trạng thái ẩn nằm trong `prefers-reduced-motion: no-preference` ⇒ người dùng tắt hiệu ứng thấy ngay bản hoàn chỉnh.
+ */
+
+.cr {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-exit: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+  --t-press: 140ms;
+  --t-hover: 180ms;
+  --t-ui: 240ms;
+}
+
+/* ── Thanh tiến trình khi đổi trang / tải dữ liệu / lưu ─────────────── */
+.cr-progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 80; pointer-events: none;
+  transform-origin: 0 50%; transform: scaleX(0); opacity: 0;
+  background: var(--accent-strong);
+}
+html[data-theme="dark"] .cr-progress { background: var(--accent); }
+.cr-progress[data-state="running"] {
+  opacity: 1;
+  /* Chạy nhanh tới ~70% rồi chậm dần — không bao giờ tự "xong" khi dữ liệu chưa về. */
+  animation: cr-progress-run 8s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+}
+.cr-progress[data-state="done"] {
+  opacity: 0; transform: scaleX(1);
+  transition: transform 200ms var(--ease-out), opacity 260ms ease 160ms;
+}
+@keyframes cr-progress-run { from { transform: scaleX(0.08); } 30% { transform: scaleX(0.62); } to { transform: scaleX(0.94); } }
+
+/* ── Trang mới vào: hiện + nâng nhẹ, một lần, không so le từng dòng ───── */
+@media (prefers-reduced-motion: no-preference) {
+  .cr-page { animation: cr-page-in 260ms var(--ease-out) both; }
+  /* Skeleton → nội dung thật: chỉ mờ dần, không xê dịch bố cục. */
+  .cr-page .cr-panel, .cr-page .cr-table-wrap { animation: cr-fade-in 200ms ease both; }
+}
+@keyframes cr-page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes cr-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── Nút bấm: lún khi nhấn, hover chỉ đổi màu (sau `hover: hover` để không kẹt trên cảm ứng) ── */
+.cr-btn, .cr-round, .cr-icon-btn, .cr-menu-item, .cr-theme button, .cr-seg button, .cr-side-link {
+  transition:
+    transform var(--t-press) var(--ease-out),
+    background-color var(--t-hover) ease,
+    border-color var(--t-hover) ease,
+    color var(--t-hover) ease,
+    box-shadow var(--t-hover) ease,
+    opacity var(--t-hover) ease;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cr-btn:active:not(:disabled),
+  .cr-round:active,
+  .cr-icon-btn:active:not(:disabled),
+  .cr-theme button:active,
+  .cr-seg button:active { transform: scale(0.97); }
+}
+.cr :is(.cr-btn, .cr-round, .cr-icon-btn, a, button):focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 2px;
+}
+
+/* Đang xử lý: `aria-busy="true"` ⇒ vòng quay nhỏ trước nhãn, giữ nguyên bề rộng nút. */
+.cr-btn[aria-busy="true"] { cursor: progress; opacity: 1; }
+.cr-btn[aria-busy="true"] > svg { display: none; }
+.cr-btn[aria-busy="true"]::before {
+  content: ""; width: 14px; height: 14px; flex: none; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: cr-spin 0.7s linear infinite;
+}
+@keyframes cr-spin { to { transform: rotate(360deg); } }
+
+/* ── Skeleton: nhịp mờ đều, các dòng lệch pha nhẹ (không dùng dải gradient quét) ── */
+.cr-skel span { animation: cr-pulse 1.4s ease-in-out infinite; }
+.cr-skel span:nth-child(2n) { animation-delay: 120ms; }
+.cr-skel span:nth-child(3n) { animation-delay: 240ms; }
+
+/* ── Menu / popup mở ra từ chỗ bấm; hộp thoại nở từ giữa ───────────── */
+.cr-menu-pop { transform-origin: top right; animation: cr-pop var(--t-ui) var(--ease-out); }
+.cr-gsearch-pop { transform-origin: top center; animation: cr-pop var(--t-ui) var(--ease-out); }
+@keyframes cr-pop { from { opacity: 0; transform: translateY(-6px) scale(0.98); } to { opacity: 1; transform: none; } }
+.cr-modal[open] { animation: cr-dialog var(--t-ui) var(--ease-out); }
+.cr-modal[open]::backdrop { animation: cr-fade-in var(--t-ui) ease; }
+@keyframes cr-dialog { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+/* ── Giảm chuyển động: giữ đổi màu/độ mờ, bỏ di chuyển và vòng lặp ── */
+@media (prefers-reduced-motion: reduce) {
+  .cr *, .cr *::before, .cr *::after, .cr-progress {
+    animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important;
+  }
+  .cr-skel span { opacity: 0.7; }
+}

@@ -1,0 +1,661 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
+import '../../../../app/router/app_routes.dart';
+import '../../../../core/data/data_revision.dart';
+import '../../../../core/icons/app_icons.dart';
+import '../../../../core/theme/app_palette.dart';
+import '../../../../core/theme/theme.dart';
+import '../../../../core/utils/money.dart';
+import '../../../../core/utils/vn_time.dart';
+import '../../../../core/widgets/widgets.dart';
+import '../../data/shop_repository_provider.dart';
+import '../../domain/entities/shop.dart';
+import '../providers/shop_providers.dart';
+import '../shop_action.dart';
+import '../shop_labels.dart';
+import '../widgets/order_sections.dart';
+
+/// S08 — Chi tiết đơn của tôi: timeline, QR + mã nhận hàng, mã vận đơn, hủy / yêu cầu hoàn tiền / đã nhận hàng,
+/// đổi ngày lấy tại quầy, gửi STK nhận hoàn, đánh giá từng sản phẩm sau khi hoàn tất.
+class OrderDetailScreen extends ConsumerWidget {
+  const OrderDetailScreen({super.key, required this.orderId});
+
+  final String orderId;
+
+  Future<void> _cancel(BuildContext context, WidgetRef ref, ShopOrder o) async {
+    final reason = await _askReason(
+      context,
+      title: 'Hủy đơn ${o.code}?',
+      message: o.paymentMethod == ShopPaymentMethod.cash
+          ? 'Hàng đang giữ cho bạn sẽ được nhả. Hủy trước khi nhận không mất phí và không bị tính là "không đến lấy".'
+          : 'Hàng đang giữ cho bạn sẽ được nhả. Nếu bạn ĐÃ chuyển khoản, đừng hủy — hãy chờ hệ thống xác nhận.',
+      confirm: 'Hủy đơn',
+      required: false,
+    );
+    if (reason == null || !context.mounted) return;
+    await runShopAction(
+      context,
+      ref,
+      () => ref.read(shopRepositoryProvider).cancelOrder(o.id, reason: reason),
+      success: 'Đã hủy đơn hàng.',
+    );
+  }
+
+  Future<void> _requestRefund(BuildContext context, WidgetRef ref, ShopOrder o) async {
+    final reason = await _askReason(
+      context,
+      title: 'Yêu cầu hủy & hoàn tiền',
+      message:
+          'Trung tâm chưa xử lý đơn nên bạn có thể yêu cầu hủy. Quản lý sẽ chuyển khoản hoàn tiền rồi xác nhận; '
+          'nếu hàng đã được chuẩn bị, yêu cầu có thể bị từ chối.',
+      confirm: 'Gửi yêu cầu',
+      required: true,
+    );
+    if (reason == null || !context.mounted) return;
+    await runShopAction(
+      context,
+      ref,
+      () => ref.read(shopRepositoryProvider).requestRefund(o.id, reason),
+      success: 'Đã gửi yêu cầu hoàn tiền.',
+    );
+  }
+
+  Future<void> _reschedule(BuildContext context, WidgetRef ref, ShopOrder o) async {
+    final config = ref.read(shopConfigProvider).value ?? const ShopConfig();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final current = o.preferredPickupDate ?? today;
+    final base = current.isAfter(today) ? current : today;
+    final last = DateTime(base.year, base.month, base.day + config.pickupRescheduleMaxDays);
+    final picked = await showAppBottomSheet<DateTime>(
+      context: context,
+      title: 'Đổi ngày lấy hàng',
+      builder: (_) =>
+          _ReschedulePicker(first: today, last: last, current: current, maxTimes: config.pickupMaxReschedules),
+    );
+    if (picked == null || !context.mounted) return;
+    await runShopAction(
+      context,
+      ref,
+      () => ref.read(shopRepositoryProvider).reschedulePickup(o.id, picked),
+      success: 'Đã đổi ngày lấy hàng sang ${shopDayLabel(picked)}.',
+    );
+  }
+
+  Future<void> _updateBank(BuildContext context, WidgetRef ref, ShopOrder o) async {
+    final r = o.pendingRefund;
+    final bank = await showAppBottomSheet<RefundBankInput>(
+      context: context,
+      title: 'Tài khoản nhận tiền hoàn',
+      builder: (_) => _BankForm(initial: r),
+    );
+    if (bank == null || !context.mounted) return;
+    await runShopAction(
+      context,
+      ref,
+      () => ref.read(shopRepositoryProvider).updateRefundBank(o.id, bank),
+      success: 'Đã lưu số tài khoản. Trung tâm sẽ chuyển khoản hoàn tiền cho bạn.',
+    );
+  }
+
+  Future<void> _confirmReceived(BuildContext context, WidgetRef ref, ShopOrder o) async {
+    final ok = await showConfirmSheet(
+      context: context,
+      title: 'Bạn đã nhận được hàng?',
+      message: 'Xác nhận để hoàn tất đơn ${o.code}. Sau đó bạn có thể đánh giá sản phẩm.',
+      confirmLabel: 'Đã nhận hàng',
+    );
+    if (!ok || !context.mounted) return;
+    await runShopAction(
+      context,
+      ref,
+      () => ref.read(shopRepositoryProvider).confirmReceived(o.id),
+      success: 'Đơn hàng đã hoàn tất. Cảm ơn bạn!',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = ref.watch(orderDetailProvider(orderId));
+    final o = value.value;
+    return AppScaffold(
+      title: 'Chi tiết đơn hàng',
+      bottomBar: o == null ? null : _actions(context, ref, o),
+      body: AsyncValueView(
+        value: value,
+        loading: const SkeletonDetail(),
+        onRetry: () => ref.invalidate(orderDetailProvider(orderId)),
+        data: (o) => RefreshableScroll(
+          onRefresh: () => ref.refresh(orderDetailProvider(orderId).future),
+          children: [
+            OrderHeaderCard(order: o),
+            const SizedBox(height: AppSpacing.md),
+            ..._statusBlock(context, ref, o),
+            if (o.canUpdateRefundBank && o.pendingRefund != null && !o.pendingRefund!.hasBankInfo) ...[
+              AlertBanner.warning(
+                title: 'Cần số tài khoản để hoàn tiền',
+                message:
+                    'Trung tâm sẽ hoàn ${Money.format(o.pendingRefund!.amount)} cho bạn. Nhập số tài khoản nhận tiền, '
+                    'hoặc đến quầy để nhận tiền mặt.',
+                action: AppButton.secondary(
+                  label: 'Nhập STK',
+                  icon: AppIcons.bank,
+                  size: AppButtonSize.small,
+                  onPressed: () => _updateBank(context, ref, o),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            const SectionHeader(title: 'Sản phẩm'),
+            OrderItemsCard(
+              order: o,
+              lineTrailing: (l) {
+                if (l.canReview) {
+                  return AppButton.secondary(
+                    label: 'Đánh giá',
+                    icon: AppIcons.star,
+                    size: AppButtonSize.small,
+                    onPressed: () => showOrderItemReviewSheet(context, line: l),
+                  );
+                }
+                if (l.canEditReview) {
+                  return AppButton.secondary(
+                    label: 'Sửa đánh giá',
+                    icon: AppIcons.edit,
+                    size: AppButtonSize.small,
+                    onPressed: () => showOrderItemReviewSheet(context, line: l, isEditing: true),
+                  );
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SectionHeader(
+              title: 'Thanh toán & Hóa đơn',
+              actionLabel: 'Lịch sử thanh toán',
+              onAction: () => context.push(AppRoutes.invoices),
+            ),
+            OrderPaymentCard(order: o),
+            const SizedBox(height: AppSpacing.md),
+            SectionHeader(title: o.isPickup ? 'Người nhận' : 'Giao tới'),
+            OrderRecipientCard(order: o),
+            if (o.refunds.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              SectionHeader(
+                title: 'Hoàn tiền',
+                actionLabel: o.canUpdateRefundBank && (o.pendingRefund?.hasBankInfo ?? false) ? 'Sửa STK' : null,
+                onAction: o.canUpdateRefundBank && (o.pendingRefund?.hasBankInfo ?? false)
+                    ? () => _updateBank(context, ref, o)
+                    : null,
+              ),
+              OrderRefundsCard(order: o),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            const SectionHeader(title: 'Lịch sử đơn hàng'),
+            OrderTimeline(order: o),
+            const SizedBox(height: AppSpacing.xl),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _statusBlock(BuildContext context, WidgetRef ref, ShopOrder o) {
+    final c = context.colors;
+    final block = switch (o.status) {
+      ShopOrderStatus.pendingPayment when o.canPay => AlertBanner.warning(
+        title: 'Chờ thanh toán',
+        message: 'Chuyển khoản VietQR trước khi hết hạn giữ hàng.',
+        action: CountdownText(
+          deadline: o.paymentExpiresAt!,
+          prefix: 'Còn ',
+          style: context.text.label.copyWith(color: c.warningText),
+          onExpired: () => ref.read(dataRevisionProvider.notifier).bump(),
+        ),
+      ),
+      ShopOrderStatus.confirmed => AlertBanner.info(
+        title: 'Đã giữ hàng cho bạn',
+        message:
+            '${o.preferredPickupDate == null ? '' : 'Hẹn lấy ngày ${shopDayLabel(o.preferredPickupDate!)}. '}'
+            'Trung tâm sẽ báo khi hàng sẵn sàng; bạn thanh toán ${Money.format(o.amountDueAtCounter)} khi nhận tại quầy.',
+      ),
+      ShopOrderStatus.readyForPickup when o.pickup?.code != null => _PickupCard(order: o),
+      // Quá hạn nhưng còn nhận trễ được: vẫn hiện mã, kèm hạn nhận trễ.
+      ShopOrderStatus.notPickedUp when o.pickup?.code != null && o.pickup?.latePickupUntil != null => Column(
+        children: [
+          AlertBanner.warning(
+            title: 'Đơn quá hạn nhận — vẫn có thể nhận trễ',
+            message:
+                'Bạn vẫn đến quầy lấy được tới ${VnTime.dateTime(o.pickup!.latePickupUntil!)} nếu còn hàng. '
+                'Khi nhận, yêu cầu hoàn tiền của đơn sẽ được hủy. Lần trễ hạn này vẫn được tính vào số lần không đến lấy.',
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _PickupCard(order: o),
+        ],
+      ),
+      ShopOrderStatus.paid => AlertBanner.info(
+        message: o.isPickup
+            ? 'Đã thanh toán. Trung tâm sẽ báo khi hàng sẵn sàng nhận tại quầy'
+                  '${o.preferredPickupDate == null ? '' : ' (hẹn lấy ngày ${shopDayLabel(o.preferredPickupDate!)})'}.'
+            : 'Đã thanh toán. Trung tâm đang chuẩn bị giao hàng.',
+      ),
+      ShopOrderStatus.processing => const AlertBanner.info(message: 'Trung tâm đang đóng gói đơn hàng của bạn.'),
+      ShopOrderStatus.shipping => AlertBanner.info(
+        title: 'Đang giao hàng',
+        message: o.trackingCode == null ? 'Đơn đang trên đường giao.' : 'Tra cứu với mã vận đơn ${o.trackingCode}.',
+      ),
+      ShopOrderStatus.delivered => const AlertBanner.success(
+        message: 'Đơn đã được giao. Bấm "Đã nhận hàng" để hoàn tất (tự hoàn tất sau 3 ngày).',
+      ),
+      ShopOrderStatus.expired => const AlertBanner.warning(
+        message: 'Đơn đã hết hạn thanh toán, hàng giữ đã được nhả. Nếu bạn ĐÃ chuyển khoản, trung tâm sẽ hoàn tiền.',
+      ),
+      ShopOrderStatus.cancelled => AlertBanner.error(
+        message: o.cancelNote == null ? 'Đơn đã bị hủy.' : 'Đơn đã bị hủy: ${o.cancelNote}',
+      ),
+      ShopOrderStatus.notPickedUp => AlertBanner.warning(
+        title: 'Đơn quá hạn nhận tại quầy',
+        message: o.refunds.isNotEmpty ? 'Hàng đã được trả về kho. Trung tâm sẽ hoàn tiền theo chính sách.' : 'Đơn đã bị hủy vì bạn chưa đến lấy. Không đến lấy 2 lần trong 90 ngày sẽ tạm khóa hình thức trả tại quầy.',
+      ),
+      ShopOrderStatus.refundRequested => const AlertBanner.info(message: 'Yêu cầu hoàn tiền đang chờ Quản lý duyệt.'),
+      ShopOrderStatus.refunded => const AlertBanner.success(message: 'Đơn đã được hoàn tiền.'),
+      ShopOrderStatus.completed => AlertBanner.success(
+        message: o.isPickup
+            ? 'Bạn đã nhận hàng tại quầy. Hãy đánh giá sản phẩm bạn đã mua.'
+            : 'Đơn đã hoàn tất. Hãy đánh giá sản phẩm bạn đã mua.',
+      ),
+      _ => null,
+    };
+    return [
+      if (block != null) ...[block, const SizedBox(height: AppSpacing.md)],
+    ];
+  }
+
+  Widget? _actions(BuildContext context, WidgetRef ref, ShopOrder o) {
+    final buttons = <Widget>[
+      if (o.canCancel) AppButton.outline(label: 'Hủy đơn', onPressed: () => _cancel(context, ref, o)),
+      if (o.canReschedulePickup)
+        AppButton.outline(
+          label: 'Đổi ngày lấy',
+          icon: AppIcons.calendar,
+          onPressed: () => _reschedule(context, ref, o),
+        ),
+      if (o.canPay && o.paymentId != null)
+        AppButton(
+          label: 'Thanh toán',
+          icon: AppIcons.qr,
+          onPressed: () => context.push(AppRoutes.payment(o.paymentId!)),
+        ),
+      if (o.canRequestRefund)
+        AppButton.outline(
+          label: 'Yêu cầu hủy & hoàn tiền',
+          icon: AppIcons.refund,
+          onPressed: () => _requestRefund(context, ref, o),
+        ),
+      if (o.canConfirmReceived)
+        AppButton(label: 'Đã nhận hàng', icon: AppIcons.check, onPressed: () => _confirmReceived(context, ref, o)),
+    ];
+    if (buttons.isEmpty) return null;
+    return StickyBottomBar(
+      child: Row(
+        children: [
+          for (final (i, b) in buttons.indexed) ...[
+            if (i > 0) const SizedBox(width: AppSpacing.sm),
+            Expanded(child: b),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// QR + mã nhận hàng (chủ đơn đưa cho nhân viên quét / đọc mã).
+class _PickupCard extends StatelessWidget {
+  const _PickupCard({required this.order});
+
+  final ShopOrder order;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = order.pickup!;
+    final c = context.colors;
+    return AppCard(
+      borderColor: c.primary,
+      child: Column(
+        children: [
+          Text('Mã nhận hàng', style: context.text.titleSmall),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            decoration: const BoxDecoration(color: AppPalette.white, borderRadius: AppRadius.sheetAll),
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: QrImageView(
+              data: p.qrPayload ?? p.code!,
+              size: AppSpacing.xxl * 4,
+              semanticsLabel: 'Mã QR nhận hàng',
+              eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: c.primary),
+              dataModuleStyle: QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: c.primary),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          CopyableField(label: 'Mã nhập tay', value: p.code!, emphasize: true),
+          if (order.amountDueAtCounter > 0) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Thanh toán ${Money.format(order.amountDueAtCounter)} khi nhận',
+              style: context.text.titleSmall.copyWith(color: c.primary),
+            ),
+          ],
+          if (p.deadline != null && p.latePickupUntil == null)
+            Text(
+              'Nhận tại quầy trước ${VnTime.dateTime(p.deadline!)} — đến sớm hơn ngày hẹn cũng được. '
+              'Nhân viên sẽ hỏi 4 số cuối SĐT người nhận.',
+              textAlign: TextAlign.center,
+              style: context.text.caption.copyWith(color: c.textMuted),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Chọn ngày lấy mới (đổi ngày / gia hạn — có giới hạn số lần).
+class _ReschedulePicker extends StatefulWidget {
+  const _ReschedulePicker({required this.first, required this.last, required this.current, required this.maxTimes});
+
+  final DateTime first;
+  final DateTime last;
+  final DateTime current;
+  final int maxTimes;
+
+  @override
+  State<_ReschedulePicker> createState() => _ReschedulePickerState();
+}
+
+class _ReschedulePickerState extends State<_ReschedulePicker> {
+  late DateTime _selected = widget.current.isBefore(widget.first) ? widget.first : widget.current;
+
+  static const _weekday = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+  @override
+  Widget build(BuildContext context) {
+    final days = [for (var d = widget.first; !d.isAfter(widget.last); d = DateTime(d.year, d.month, d.day + 1)) d];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Bạn được đổi ngày ${widget.maxTimes} lần cho mỗi đơn, dời tối đa tới ${shopDayLabel(widget.last)}. '
+          'Hạn giữ hàng sẽ tính lại theo ngày mới.',
+          style: context.text.body,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final d in days)
+              AppChip(
+                label:
+                    '${_weekday[d.weekday - 1]} ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}',
+                selected: DateUtils.isSameDay(d, _selected),
+                onTap: () => setState(() => _selected = d),
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppButton(
+          label: 'Đổi sang ${shopDayLabel(_selected)}',
+          expand: true,
+          onPressed: DateUtils.isSameDay(_selected, widget.current) ? null : () => Navigator.of(context).pop(_selected),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        AppButton.ghost(label: 'Quay lại', expand: true, onPressed: () => Navigator.of(context).pop()),
+      ],
+    );
+  }
+}
+
+/// Nhập STK nhận tiền hoàn.
+class _BankForm extends StatefulWidget {
+  const _BankForm({this.initial});
+
+  final OrderRefundInfo? initial;
+
+  @override
+  State<_BankForm> createState() => _BankFormState();
+}
+
+class _BankFormState extends State<_BankForm> {
+  late final _bank = TextEditingController(text: widget.initial?.bankName ?? '');
+  late final _number = TextEditingController(text: widget.initial?.bankAccountNumber ?? '');
+  late final _name = TextEditingController(text: widget.initial?.bankAccountName ?? '');
+  Map<String, String> _errors = const {};
+
+  @override
+  void dispose() {
+    for (final c in [_bank, _number, _name]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _submit() {
+    final number = _number.text.replaceAll(RegExp(r'\s'), '');
+    final errors = <String, String>{
+      if (_bank.text.trim().length < 2) 'bank': 'Nhập tên ngân hàng',
+      if (!RegExp(r'^\d{6,30}$').hasMatch(number)) 'number': 'Số tài khoản chỉ gồm 6–30 chữ số',
+      if (_name.text.trim().length < 2) 'name': 'Nhập tên chủ tài khoản',
+    };
+    if (errors.isNotEmpty) {
+      setState(() => _errors = errors);
+      return;
+    }
+    Navigator.of(context)
+        .pop(RefundBankInput(bankName: _bank.text.trim(), accountNumber: number, accountName: _name.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(
+        'Trung tâm chuyển khoản hoàn tiền vào tài khoản này. Kiểm tra kỹ tên chủ tài khoản.',
+        style: context.text.body,
+      ),
+      const SizedBox(height: AppSpacing.md),
+      AppTextField(
+        label: 'Ngân hàng',
+        hint: 'VD: MBBank, Vietcombank',
+        controller: _bank,
+        errorText: _errors['bank'],
+        requiredField: true,
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      AppTextField(
+        label: 'Số tài khoản',
+        controller: _number,
+        keyboardType: TextInputType.number,
+        errorText: _errors['number'],
+        requiredField: true,
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      AppTextField(
+        label: 'Tên chủ tài khoản',
+        controller: _name,
+        textCapitalization: TextCapitalization.characters,
+        errorText: _errors['name'],
+        requiredField: true,
+      ),
+      const SizedBox(height: AppSpacing.md),
+      AppButton(label: 'Lưu tài khoản', icon: AppIcons.bank, expand: true, onPressed: _submit),
+    ],
+  );
+}
+
+Future<String?> _askReason(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirm,
+  required bool required,
+}) => showAppBottomSheet<String>(
+  context: context,
+  title: title,
+  builder: (_) => _ReasonForm(message: message, confirm: confirm, required: required),
+);
+
+class _ReasonForm extends StatefulWidget {
+  const _ReasonForm({required this.message, required this.confirm, required this.required});
+
+  final String message;
+  final String confirm;
+  final bool required;
+
+  @override
+  State<_ReasonForm> createState() => _ReasonFormState();
+}
+
+class _ReasonFormState extends State<_ReasonForm> {
+  final _reason = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = _reason.text.trim();
+    if (widget.required && v.length < 3) {
+      setState(() => _error = 'Nhập lý do (tối thiểu 3 ký tự)');
+      return;
+    }
+    Navigator.of(context).pop(v);
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(widget.message, style: context.text.body),
+      const SizedBox(height: AppSpacing.md),
+      AppTextField(
+        label: widget.required ? 'Lý do' : 'Lý do (không bắt buộc)',
+        controller: _reason,
+        maxLines: 3,
+        maxLength: 500,
+        errorText: _error,
+        requiredField: widget.required,
+      ),
+      const SizedBox(height: AppSpacing.md),
+      AppButton(label: widget.confirm, expand: true, variant: AppButtonVariant.danger, onPressed: _submit),
+      const SizedBox(height: AppSpacing.xs),
+      AppButton.ghost(label: 'Quay lại', expand: true, onPressed: () => Navigator.of(context).pop()),
+    ],
+  );
+}
+
+/// Đánh giá hoặc chỉnh sửa đánh giá một sản phẩm (trong 30 ngày, sửa tối đa 1 lần).
+Future<void> showOrderItemReviewSheet(BuildContext context, {required ShopOrderLine line, bool isEditing = false}) => showAppBottomSheet<void>(
+  context: context,
+  title: isEditing ? 'Chỉnh sửa đánh giá' : 'Đánh giá ${line.productName}',
+  builder: (_) => _ReviewForm(line: line, isEditing: isEditing),
+);
+
+class _ReviewForm extends ConsumerStatefulWidget {
+  const _ReviewForm({required this.line, this.isEditing = false});
+
+  final ShopOrderLine line;
+  final bool isEditing;
+
+  @override
+  ConsumerState<_ReviewForm> createState() => _ReviewFormState();
+}
+
+class _ReviewFormState extends ConsumerState<_ReviewForm> {
+  late int _rating;
+  late bool _isAnonymous;
+  late final TextEditingController _comment;
+  bool _sending = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _rating = widget.line.review?.rating ?? 0;
+    _isAnonymous = widget.line.review?.isAnonymous ?? false;
+    _comment = TextEditingController(text: widget.line.review?.comment ?? '');
+  }
+
+  @override
+  void dispose() {
+    _comment.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    try {
+      if (widget.isEditing) {
+        await ref.read(shopRepositoryProvider).updateReviewItem(
+          widget.line.id,
+          rating: _rating,
+          comment: _comment.text,
+          isAnonymous: _isAnonymous,
+        );
+      } else {
+        await ref.read(shopRepositoryProvider).reviewItem(
+          widget.line.id,
+          _rating,
+          _comment.text,
+          isAnonymous: _isAnonymous,
+        );
+      }
+      ref.read(dataRevisionProvider.notifier).bump();
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      AppSnackbar.success(context, widget.isEditing ? 'Đã cập nhật đánh giá!' : 'Cảm ơn bạn đã đánh giá!');
+    } on Object catch (e) {
+      if (mounted) setState(() => _error = ShopErrors.message(e));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      RatingInput(value: _rating, onChanged: (v) => setState(() => _rating = v)),
+      const SizedBox(height: AppSpacing.md),
+      AppTextField(label: 'Nhận xét (không bắt buộc)', controller: _comment, maxLines: 3, maxLength: 500),
+      const SizedBox(height: AppSpacing.sm),
+      CheckboxListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Đánh giá ẩn danh'),
+        subtitle: const Text('Tên và ảnh đại diện của bạn sẽ không hiển thị công khai.'),
+        value: _isAnonymous,
+        onChanged: (v) => setState(() => _isAnonymous = v ?? false),
+        controlAffinity: ListTileControlAffinity.leading,
+      ),
+      Text(
+        'Lưu ý: Bạn có thể đánh giá trong vòng 30 ngày và chỉ được chỉnh sửa lại tối đa 1 lần.',
+        style: context.text.caption.copyWith(color: context.colors.textMuted),
+      ),
+      if (_error != null) ...[const SizedBox(height: AppSpacing.xs), AlertBanner.error(message: _error!)],
+      const SizedBox(height: AppSpacing.md),
+      AppButton(
+        label: widget.isEditing ? 'Lưu chỉnh sửa' : 'Gửi đánh giá',
+        expand: true,
+        loading: _sending,
+        onPressed: _rating == 0 ? null : _submit,
+      ),
+    ],
+  );
+}

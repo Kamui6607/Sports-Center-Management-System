@@ -1,0 +1,1526 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// BaseEntity — field chung của MỌI model (Prisma không hỗ trợ kế thừa model,
+// nên mỗi model tự khai báo đủ 3 field dưới đây, ĐÚNG định nghĩa này):
+//
+//   id        String   @id @default(uuid())
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @default(now()) @updatedAt
+//
+// `@default(now())` của updatedAt giúp INSERT bằng SQL thô ($executeRaw) không lỗi NOT NULL.
+// Thêm model mới ⇒ khai báo đủ 3 field + thêm model vào `src/types/base-entity.ts`
+// (tsc sẽ báo lỗi nếu thiếu).
+// ─────────────────────────────────────────
+
+// ─────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────
+
+enum ClassApprovalStatus {
+  /// Coach đang soạn (wizard tự lưu) — chưa giữ phòng, chưa tạo buổi; chỉ chủ khóa thấy.
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum TrainingLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum ClassType {
+  REGULAR
+  PREMIUM
+}
+
+enum AreaType {
+  POOL
+  INDOOR
+  OUTDOOR
+}
+
+enum ScheduleStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+/// Phương án xử lý khi hủy buổi đã có học viên đặt chỗ (BE-20).
+enum ScheduleCancelResolution {
+  MAKEUP
+  REFUND
+}
+
+enum EnrollmentStatus {
+  BOOKED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  SEPAY
+}
+
+/// Trạng thái xử lý một webhook SePay (bảng `SepayWebhookEvent`).
+enum SepayWebhookStatus {
+  PENDING // Đã claim sepayId, đang xử lý trong transaction (không thấy được nếu transaction rollback)
+  PROCESSED // Đã chốt giao dịch (kích hoạt gói)
+  DUPLICATE // Webhook lặp (cùng sepayId) hoặc giao dịch đã SUCCESS trước đó
+  LATE // Tiền về sau khi giao dịch đã đóng (hết hạn/thất bại) — cần đối soát, KHÔNG kích hoạt
+  MISMATCH // Lệch số tiền hoặc số tài khoản — cần đối soát, KHÔNG kích hoạt
+  IGNORED // Tiền ra / không khớp mã đơn nào — bỏ qua
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+/// A06: trạng thái CẤP QUYỀN của giao dịch — tách khỏi `status` (trạng thái TIỀN).
+/// `REQUIRES_REVIEW` = tiền ĐÃ thu nhưng gói chưa được cấp (cần quản lý xử lý/đối soát).
+enum PaymentActivationStatus {
+  ACTIVATED
+  REQUIRES_REVIEW
+}
+
+/// F01: vòng đời bản ghi outbox notification.
+enum OutboxStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+}
+
+/// Kênh giao của một dòng outbox: thông báo trong app hoặc email (Brevo).
+enum OutboxChannel {
+  IN_APP
+  EMAIL
+}
+
+// ─────────────────────────────────────────
+// AUTH / USER
+// ─────────────────────────────────────────
+
+/// Vai trò người dùng (bảng tra cứu). Hệ thống dùng 3 dòng: MEMBER, COACH, MANAGER
+/// (tạo sẵn bởi migration `20261005010000_role_table` và `prisma/seed.ts`).
+/// Code tra vai trò theo `name` (UNIQUE) — xem `src/utils/roles.ts`.
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  users User[]
+}
+
+model User {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  password    String
+  fullName    String
+  phone       String?   @unique
+  gender      Gender?
+  dateOfBirth DateTime?
+  avatarUrl   String?
+  roleId      String
+  role        Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  isActive    Boolean   @default(true)
+  /// Cửa hàng: tạm khóa đặt hàng tới thời điểm này (để đơn hết hạn quá nhiều lần) — null = không khóa.
+  checkoutLockedUntil DateTime?
+  /// Cửa hàng: tạm khóa hình thức "thanh toán tại quầy" tới thời điểm này (bùng hàng nhiều lần) — null = không khóa.
+  cashPickupLockedUntil DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  memberProfile              MemberProfile?
+  coachProfile               CoachProfile?
+  managerProfile             ManagerProfile?
+  refreshTokens              RefreshToken[]
+  passwordResetOtp           PasswordResetOtp?
+  createdPayments            Payment[]              @relation("PaymentCreatedBy")
+  sentMessages               ChatMessage[]          @relation("SentMessages")
+  receivedMessages           ChatMessage[]          @relation("ReceivedMessages")
+  chatAttachmentsOwned       ChatAttachment[]       @relation("ChatAttachmentOwner")
+  chatAttachmentsReceived    ChatAttachment[]       @relation("ChatAttachmentReceiver")
+  notifications              Notification[]
+  decidedAttendancePenalties AttendancePenalty[]    @relation("AttendancePenaltyDecidedBy")
+  createdManualCodes         AttendanceManualCode[] @relation("AttendanceManualCodeCreatedBy")
+  createdProducts            Product[]              @relation("ProductCreatedBy")
+  productReviews             ProductReview[]        @relation("ProductReviewUser")
+  orders                     Order[]                @relation("OrderUser")
+  refundsRequested           Refund[]               @relation("RefundRequestedBy")
+  refundsProcessed           Refund[]               @relation("RefundProcessedBy")
+  cart                       Cart?
+  addresses                  UserAddress[]
+  trainingPlanAttachments    TrainingPlanAttachment[] @relation("TrainingPlanAttachmentUploader")
+
+  @@index([roleId])
+}
+
+/// Mã OTP 6 số đặt lại mật khẩu (Mobile). Mỗi user tối đa 1 mã đang hiệu lực — gửi lại ⇒ ghi đè.
+/// Chỉ lưu HASH (bcrypt); hết hạn 15 phút; sai quá 5 lần ⇒ mã bị khóa; gửi lại tối thiểu sau 60 giây.
+model PasswordResetOtp {
+  id         String    @id @default(uuid())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpHash    String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  lastSentAt DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────
+// PROFILES
+// ─────────────────────────────────────────
+
+model MemberProfile {
+  id                 String         @id @default(uuid())
+  userId             String         @unique
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Ghi chú mục tiêu tự do (ngoài danh mục gợi ý).
+  fitnessGoal        String?
+  /// Mã mục tiêu chọn từ danh mục gợi ý (`src/config/fitness-goals.ts`) — dùng tính độ phù hợp khóa học.
+  fitnessGoals       String[]       @default([])
+  trainingLevel      TrainingLevel?
+  trainingPreference String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @default(now()) @updatedAt
+
+  enrollments        Enrollment[]
+  payments           Payment[]
+  attendances        Attendance[]
+  trainingPlans      TrainingPlan[]
+  feedbacks          CoachFeedback[]
+  penalties          AttendancePenalty[]
+  manualCodeAttempts AttendanceManualCodeAttempt[]
+  refunds            Refund[]
+  memberships        Membership[]
+  passScans          MemberPassScan[]
+}
+
+enum CoachApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CoachProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialization  String?
+  experienceYears Int?
+  bio             String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  /// Hồ sơ chứng nhận HLV (CV) — xem model Certification.
+  certification Certification?
+  classes       Class[]
+  wallet        CoachWallet?
+  trainingPlans TrainingPlan[]
+  feedbacks     CoachFeedback[]
+  /// Kết quả "đạt kỳ" theo từng kỳ học, đơn xin nghỉ phép và nhật ký quét thẻ Coach.
+  termStatuses  CoachTermStatus[]
+  leaves        CoachLeave[]
+  passScans     CoachPassScan[]
+  /// Nhật ký dùng phòng gym theo ngày (check-in) và phí phát sinh.
+  checkIns      CoachCheckIn[]
+}
+
+/// Hồ sơ chứng nhận HLV (CV) để Manager xét duyệt — 1–1 với CoachProfile.
+/// Nộp lại CV ⇒ GHI ĐÈ fileUrl, status về PENDING, xóa kết quả duyệt cũ.
+/// Duyệt APPROVED ⇒ tài khoản Coach được kích hoạt (User.isActive = true).
+model Certification {
+  id           String              @id @default(uuid())
+  coachId      String              @unique
+  coach        CoachProfile        @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  /// Đường dẫn file CV (PDF). NULL = hồ sơ được duyệt khi chưa có luồng nộp CV (dữ liệu cũ / seed).
+  fileUrl      String?
+  status       CoachApprovalStatus @default(PENDING)
+  /// Thời điểm nộp CV lần gần nhất.
+  submittedAt  DateTime            @default(now())
+  /// Lý do Manager từ chối (chỉ có khi status = REJECTED; nộp lại CV thì xóa).
+  rejectReason String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @default(now()) @updatedAt
+
+  @@index([status])
+}
+
+model ManagerProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// ─────────────────────────────────────────
+// MEMBERSHIP
+// ─────────────────────────────────────────
+
+// ─────────────────────────────────────────
+// ROOMS
+// ─────────────────────────────────────────
+
+model Room {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  capacity  Int
+  /// Khu vực trong trung tâm (VD "Khu tạ tự do").
+  location  String?
+  /// Tầng (VD "Tầng 2").
+  floor     String?
+  /// Chỉ dẫn đường đi tới phòng (VD "Thang máy lên tầng 2, rẽ trái").
+  directions String?
+  areaType  AreaType
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  schedules ClassSchedule[]
+}
+
+// ─────────────────────────────────────────
+// CLASS
+// ─────────────────────────────────────────
+
+model Class {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  /// Mục tiêu của lớp (HLV ghi) để Member xem và tự đánh giá có phù hợp trước khi đăng ký.
+  /// Khác MemberProfile.fitnessGoal (mục tiêu của Member, để HLV đọc).
+  goal        String?
+  /// Mã mục tiêu khóa (danh mục `src/config/fitness-goals.ts`) — so với `MemberProfile.fitnessGoals`.
+  goalTags    String[]            @default([])
+  /// Trình độ phù hợp (null = mọi trình độ).
+  targetLevel TrainingLevel?
+  /// Ngày khai giảng / kết thúc (buổi chưa hủy sớm nhất / muộn nhất) — BE tự cập nhật khi lịch thay đổi.
+  startDate   DateTime?
+  endDate     DateTime?
+  /// Trạng thái wizard của bản nháp (DRAFT) — phòng, lịch lặp, danh sách buổi dự kiến…
+  draftData   Json?
+  /// Môn tập của lớp (Yoga, HIIT, Bơi...). Chuỗi tự do do Coach nhập — KHÔNG còn bảng bộ môn / quan hệ nhiều-nhiều.
+  fitness     String
+
+  price       Decimal             @default(0) @db.Decimal(12, 2)
+  status      ClassApprovalStatus @default(PENDING)
+  /// BE-2: lý do Manager từ chối (xóa khi Coach gửi lại — BE-3).
+  rejectReason String?
+  /// HLV tạo và phụ trách lớp — mỗi lớp đúng 1 HLV (nhận 85% doanh thu). Chỉ Coach được tạo lớp.
+  coachId     String
+  coach       CoachProfile        @relation(fields: [coachId], references: [id])
+  capacity    Int
+  classType   ClassType           @default(REGULAR)
+  // Khu vực mà lớp học yêu cầu (POOL | INDOOR | OUTDOOR).
+  // Khác với classType (REGULAR | PREMIUM là hạng lớp).
+  areaType    AreaType
+  isActive    Boolean             @default(true)
+  /// Bậc cảnh báo "khóa chưa có học viên" đã gửi cho HLV (0 = chưa gửi, 1 = trước khai giảng 24h, 2 = đã khai giảng) — chống gửi trùng.
+  alertStage  Int                 @default(0)
+  /// Lý do hệ thống tự đóng/từ chối khóa (REVIEW_EXPIRED | NO_ENROLLMENT | ENDED) và thời điểm đóng.
+  closedReason String?
+  closedAt    DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @default(now()) @updatedAt
+
+  schedules          ClassSchedule[]
+  feedbacks          CoachFeedback[]
+  penalties          AttendancePenalty[]
+  walletTransactions WalletTransaction[]
+  payments           Payment[]
+  refunds            Refund[]
+  trainingPlans      TrainingPlan[]
+
+  @@index([coachId])
+}
+
+model ClassSchedule {
+  id        String         @id @default(uuid())
+  classId   String
+  class     Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  roomId    String
+  room      Room           @relation(fields: [roomId], references: [id])
+  startTime DateTime
+  endTime   DateTime
+  status    ScheduleStatus @default(SCHEDULED)
+  /// BE-20: lý do & phương án khi buổi bị hủy (null nếu chưa hủy / hủy khi chưa ai đặt chỗ).
+  cancelReason     String?
+  cancelResolution ScheduleCancelResolution?
+  /// Mã hủy do HỆ THỐNG (REVIEW_EXPIRED | NO_ENROLLMENT) — null = HLV/Manager hủy. Buổi hệ thống hủy không tính vào tỷ lệ hủy buổi của HLV.
+  cancelCode       String?
+  /// Buổi DẠY BÙ: trỏ tới buổi bị hủy mà buổi này thay thế (NULL = buổi chính của lớp).
+  /// Tiền 1 buổi khi hoàn = tiền lớp ÷ số buổi CHÍNH (không tính buổi bù).
+  makeupForId String?        @unique
+  makeupFor   ClassSchedule? @relation("ScheduleMakeup", fields: [makeupForId], references: [id], onDelete: SetNull)
+  makeup      ClassSchedule? @relation("ScheduleMakeup")
+  /// Dời lịch bởi HLV: giờ bắt đầu ban đầu, số lần dời (tối đa 2), lý do, thời điểm dời gần nhất.
+  originalStartTime DateTime?
+  rescheduleCount   Int       @default(0)
+  rescheduleReason  String?
+  rescheduledAt     DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @default(now()) @updatedAt
+
+  enrollments Enrollment[]
+  attendances Attendance[]
+  manualCodes AttendanceManualCode[]
+  refunds     Refund[]
+
+  @@index([classId])
+  @@index([roomId])
+  @@index([startTime, endTime])
+}
+
+// ─────────────────────────────────────────
+// ENROLLMENT
+// ─────────────────────────────────────────
+
+model Enrollment {
+  id          String           @id @default(uuid())
+  memberId    String
+  member      MemberProfile    @relation(fields: [memberId], references: [id])
+  /// Giữ chỗ theo TỪNG BUỔI; lớp của buổi lấy qua `schedule.classId` (không lưu trùng classId).
+  scheduleId  String
+  schedule    ClassSchedule    @relation(fields: [scheduleId], references: [id])
+  status      EnrollmentStatus @default(BOOKED)
+  bookedAt    DateTime         @default(now())
+  cancelledAt DateTime?
+  /// Đổi buổi sang khóa tương đương: khóa hội viên ĐÃ TRẢ TIỀN (null = chính khóa của buổi).
+  sourceClassId     String?
+  /// Chỗ cũ mà chỗ này được đổi từ đó (null = không phải đổi buổi).
+  transferredFromId String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @default(now()) @updatedAt
+
+  @@unique([memberId, scheduleId])
+  @@index([memberId])
+  @@index([scheduleId])
+}
+
+// ─────────────────────────────────────────
+// PAYMENT
+// ─────────────────────────────────────────
+
+model Payment {
+  id                String                   @id @default(uuid())
+  /// NULL khi người mua không phải hội viên (HLV mua sản phẩm) — người mua lấy từ Order.userId.
+  memberId          String?
+  member            MemberProfile?           @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  /// Gói hội viên mà giao dịch này muốn mua — cần cho giao dịch ONLINE: Payment PENDING
+  /// được tạo TRƯỚC khi có subscription (chỉ tạo subscription khi cổng thanh toán xác nhận SUCCESS).
+  amount            Decimal                  @db.Decimal(12, 2)
+  method            PaymentMethod
+  classId           String?
+  class             Class?                   @relation(fields: [classId], references: [id])
+  classNameSnapshot String?
+  /// Ảnh chụp thông tin mặt hàng TẠI THỜI ĐIỂM MUA (khóa: tên/giá/HLV/số buổi/ngày…; gói thành viên: tên/số ngày/giá).
+  /// Lịch sử mua, hóa đơn và thống kê đọc snapshot + `amount` ⇒ không đổi khi giá/thông tin bị sửa sau.
+  purchaseSnapshot  Json?
+  /// Đơn mua sản phẩm mà giao dịch này thanh toán. Một giao dịch chỉ trỏ tới classId HOẶC orderId.
+  orderId           String?                  @unique
+  order             Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  status            PaymentStatus            @default(PENDING)
+  /// Mã đơn/mã thanh toán duy nhất — với giao dịch SePay đây là mã SePay bóc tách từ nội dung CK.
+  transactionCode   String?                  @unique
+  /// Cổng thanh toán online (VD "SEPAY"). NULL cho giao dịch tại quầy (CASH/BANK_TRANSFER).
+  gateway           String?
+  /// Mã giao dịch phía ngân hàng/SePay (referenceCode) để đối soát.
+  gatewayTransId    String?
+  /// Metadata thô của webhook SePay (payload đầy đủ + thông tin QR) để audit & tra soát.
+  gatewayPayload    Json?
+  note              String?
+  paidAt            DateTime?
+  /// A07 — snapshot điều khoản gói TẠI THỜI ĐIỂM TẠO ĐƠN: chốt tiền theo đúng offer đã bán,
+  /// không đọc cấu hình plan hiện tại (giá/duration/tier/quota có thể bị sửa trong lúc chờ CK).
+  /// A06 — trạng thái CẤP QUYỀN (tách khỏi `status` là trạng thái TIỀN). NULL = giao dịch
+  /// chưa chốt/không cần theo dõi (dữ liệu cũ).
+  activationStatus  PaymentActivationStatus?
+  /// Lý do cần đối soát (VD: PLAN_MISSING / thông điệp chặn kích hoạt) — null khi đã xử lý.
+  reviewReason      String?
+  reviewedAt        DateTime?
+  reviewedById      String?
+  createdById       String?
+  createdBy         User?                    @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @default(now()) @updatedAt
+
+  sepayWebhookEvents SepayWebhookEvent[]
+  bankTransactions   SepayBankTransaction[]
+  refunds            Refund[]
+  walletTransactions WalletTransaction[]
+  /// Gói thành viên được cấp khi giao dịch mua gói (note `MEMBERSHIP_PLAN:<planId>`) thu tiền thành công.
+  membership         Membership?
+
+  @@index([memberId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([gateway, status])
+  @@index([activationStatus])
+}
+
+/// A14 — Ledger giao dịch ngân hàng (SePay): một movement chỉ được ghi nhận & phân bổ MỘT LẦN,
+/// dùng chung cho webhook và đối soát API ⇒ idempotency xuyên hai kênh.
+model SepayBankTransaction {
+  id               String    @id @default(uuid())
+  /// Danh tính chuẩn hoá của movement: `ref:<referenceCode>` khi có (chung cho webhook + API),
+  /// ngược lại `sepay:<payload.id>` (webhook/mock) hoặc `api:<uuid>` (đối soát API).
+  externalId       String    @unique
+  sepayId          Int?      @unique
+  apiTransactionId String?   @unique
+  referenceCode    String?
+  gateway          String?
+  accountNumber    String?
+  transferType     String
+  amount           Decimal   @db.Decimal(12, 2)
+  content          String?
+  /// Mã đơn bóc tách được tại thời điểm ghi ledger.
+  code             String?
+  payload          Json?
+  /// MỘT movement chỉ được cấp quyền cho ĐÚNG MỘT payment (UNIQUE) — chống cấp gói 2 lần.
+  paymentId        String?   @unique
+  payment          Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  allocatedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  @@index([createdAt])
+  @@index([referenceCode])
+}
+
+/// F01 — Transactional outbox cho notification: ghi TRONG transaction nghiệp vụ, gửi SAU commit,
+/// retry khi lỗi ⇒ không mất thông báo khi transaction rollback hoặc process chết giữa chừng.
+model NotificationOutbox {
+  id          String       @id @default(uuid())
+  userId      String
+  /// IN_APP ⇒ tạo Notification; EMAIL ⇒ gửi qua Brevo (title = subject, body = HTML, email = người nhận).
+  channel     OutboxChannel @default(IN_APP)
+  email       String?
+  type        String
+  title       String
+  body        String
+  reason      String?
+  metadata    Json?
+  status      OutboxStatus @default(PENDING)
+  attempts    Int          @default(0)
+  lastError   String?
+  availableAt DateTime     @default(now())
+  sentAt      DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @default(now()) @updatedAt
+
+  @@index([status, availableAt])
+  @@index([userId])
+}
+
+/// Log webhook nhận từ SePay — `sepayId` UNIQUE chống xử lý trùng khi SePay retry/replay webhook.
+/// Một giao dịch chuyển khoản chỉ được kích hoạt gói ĐÚNG MỘT LẦN (claim + chốt trong cùng transaction).
+model SepayWebhookEvent {
+  id        String             @id @default(uuid())
+  /// `payload.id` của SePay — không đổi qua mọi lần retry/replay.
+  sepayId   Int                @unique
+  paymentId String?
+  payment   Payment?           @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  status    SepayWebhookStatus @default(PENDING)
+  /// Lý do trạng thái cuối (VD ORDER_NOT_FOUND, AMOUNT_MISMATCH, LATE_RESULT…).
+  reason    String?
+  payload   Json
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @default(now()) @updatedAt
+
+  @@index([paymentId])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────
+// CHAT MESSAGE
+// ─────────────────────────────────────────
+
+model ChatMessage {
+  id         String   @id @default(uuid())
+  senderId   String
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiverId String?
+  receiver   User?    @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  content    String?
+  fileUrl    String?
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  attachment ChatAttachment?
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+}
+
+/// D03 — Metadata của file chat (KHÔNG phục vụ tĩnh công khai):
+/// quyết định AI được tải file (owner / receiver / MANAGER; phòng chung = mọi user đăng nhập)
+/// và cho phép dọn file khi request bị từ chối.
+model ChatAttachment {
+  id         String       @id @default(uuid())
+  ownerId    String
+  owner      User         @relation("ChatAttachmentOwner", fields: [ownerId], references: [id])
+  /// Người nhận (NULL = phòng chung).
+  receiverId String?
+  receiver   User?        @relation("ChatAttachmentReceiver", fields: [receiverId], references: [id])
+  messageId  String?      @unique
+  message    ChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  /// Tên file trên disk do SERVER sinh (không dùng tên gốc của client).
+  storedName String
+  mimeType   String
+  size       Int
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @default(now()) @updatedAt
+
+  @@index([ownerId])
+  @@index([receiverId])
+}
+
+// ─────────────────────────────────────────
+// TRAINING & ATTENDANCE (FLOW 4)
+// ─────────────────────────────────────────
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+model Attendance {
+  id         String           @id @default(uuid())
+  scheduleId String
+  schedule   ClassSchedule    @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  memberId   String
+  member     MemberProfile    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  status     AttendanceStatus @default(PRESENT)
+  note       String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @default(now()) @updatedAt
+
+  @@unique([scheduleId, memberId])
+  @@index([scheduleId])
+  @@index([memberId])
+}
+
+/// Mã dự phòng nhập tay cho Member không quét được QR (camera/điện thoại lỗi).
+/// Sinh cùng lượt với QR ở POST /attendance/generate-qr; TTL ngắn (90s) và mã cũ của cùng
+/// buổi học bị thu hồi khi mã mới được cấp (mỗi thời điểm chỉ có 1 mã hợp lệ / schedule).
+/// `attempts` đếm số lần nhập SAI vào chính mã này; vượt ngưỡng → mã bị vô hiệu (revokedAt).
+model AttendanceManualCode {
+  id         String        @id @default(uuid())
+  code       String        @unique
+  scheduleId String
+  schedule   ClassSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  /// userId (COACH/MANAGER) đã cấp mã — audit.
+  createdBy  String
+  creator    User          @relation("AttendanceManualCodeCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  attempts   Int           @default(0)
+  revokedAt  DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @default(now()) @updatedAt
+
+  attemptLogs AttendanceManualCodeAttempt[]
+
+  @@index([scheduleId, expiresAt])
+  @@index([createdBy])
+}
+
+/// Log mọi lần thử nhập mã dự phòng (kể cả sai/hết hạn) — dùng cho rate-limit theo member + audit.
+model AttendanceManualCodeAttempt {
+  id        String                @id @default(uuid())
+  memberId  String
+  member    MemberProfile         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  codeId    String?
+  code      AttendanceManualCode? @relation(fields: [codeId], references: [id], onDelete: SetNull)
+  success   Boolean
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @default(now()) @updatedAt
+
+  @@index([memberId, createdAt])
+}
+
+enum AttendancePenaltyStatus {
+  /// Reserved: hiện KHÔNG có flow nào persist PENDING (preview là read-only, apply tạo thẳng APPLIED).
+  /// Giữ lại cho luồng "đề xuất chờ duyệt" trong tương lai; không tạo record PENDING giả.
+  PENDING
+  APPLIED
+  REVOKED
+  EXPIRED
+}
+
+/// Lịch sử hình phạt chuyên cần theo (member × class): thu hồi slot tương lai + chặn đặt lại.
+model AttendancePenalty {
+  id                    String                  @id @default(uuid())
+  memberId              String
+  member                MemberProfile           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  classId               String
+  class                 Class                   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  reason                String
+  attendanceRate        Float
+  sampleSize            Int
+  releasedCount         Int                     @default(0)
+  releasedEnrollmentIds Json?
+  blockedUntil          DateTime?
+  status                AttendancePenaltyStatus @default(PENDING)
+  decidedBy             String?
+  decider               User?                   @relation("AttendancePenaltyDecidedBy", fields: [decidedBy], references: [id], onDelete: SetNull)
+  decidedAt             DateTime?
+  appealReason          String?
+  appealedAt            DateTime?
+  revokedBy             String?
+  revokedAt             DateTime?
+  revokedReason         String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @default(now()) @updatedAt
+
+  @@index([memberId, classId])
+  @@index([status, blockedUntil])
+}
+
+model TrainingPlan {
+  id          String        @id @default(uuid())
+  memberId    String
+  member      MemberProfile @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  coachId     String
+  coach       CoachProfile  @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  /// Khóa học mà lộ trình này phục vụ (null = lộ trình chung với HLV, dữ liệu cũ) — để xem lộ trình riêng từng khóa.
+  classId     String?
+  class       Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
+  name        String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
+
+  results     TrainingResult[]
+  /// Tệp (PDF/Excel) Coach đính kèm vào lộ trình cho học viên.
+  attachments TrainingPlanAttachment[]
+
+  @@index([memberId])
+  @@index([classId])
+  @@index([coachId])
+}
+
+/// Tệp PDF/Excel đính kèm lộ trình tập luyện. Lưu RIÊNG trên disk (`uploads/plans`, không phục vụ tĩnh) —
+/// chỉ tải qua API có kiểm tra quyền (Coach của kế hoạch, Member của kế hoạch, Manager).
+model TrainingPlanAttachment {
+  id           String       @id @default(uuid())
+  planId       String
+  plan         TrainingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   User         @relation("TrainingPlanAttachmentUploader", fields: [uploadedById], references: [id])
+  /// Tên file gốc người dùng thấy (đã làm sạch); KHÔNG dùng để lưu trên disk.
+  originalName String
+  /// Tên file trên disk do SERVER sinh.
+  storedName   String
+  mimeType     String
+  size         Int
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @default(now()) @updatedAt
+
+  @@index([planId])
+}
+
+model TrainingResult {
+  id        String       @id @default(uuid())
+  planId    String
+  plan      TrainingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  date      DateTime
+  metrics   Json? // Custom metrics like weight, body fat
+  coachNote String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @default(now()) @updatedAt
+
+  @@index([planId])
+}
+
+// ─────────────────────────────────────────
+// COACH FEEDBACK
+// ─────────────────────────────────────────
+
+model CoachFeedback {
+  id          String        @id @default(uuid())
+  coachId     String
+  coach       CoachProfile  @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  memberId    String
+  member      MemberProfile @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  classId     String?
+  class       Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
+  rating      Int // 1-5 sao
+  comment     String?
+  isAnonymous Boolean       @default(false)
+  /// Số lần đã sửa đánh giá — chỉ được sửa 1 lần.
+  editCount   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
+
+  @@unique([coachId, memberId, classId])
+  @@index([coachId])
+  @@index([memberId])
+}
+
+// ─────────────────────────────────────────
+// NOTIFICATIONS (BR-24)
+// ─────────────────────────────────────────
+
+enum NotificationType {
+  // ── Tài khoản ──
+  MEMBER_REGISTERED // Chào mừng hội viên mới đăng ký
+  // ── Chat ──
+  CHAT_MESSAGE // Nhận tin nhắn mới
+  // ── Gói tập ──
+  // ── Lịch học ──
+  UPCOMING_CLASS // Nhắc lớp sắp học (24h trước)
+  SCHEDULE_CANCELLED // Lịch học bị hủy
+  SCHEDULE_UPDATED // Lịch học được dời giờ
+  // ── Đặt lớp ──
+  ENROLLMENT_CONFIRMED // Đặt lớp thành công
+  ENROLLMENT_CANCELLED // Hủy đặt lớp
+  // ── Kế hoạch tập luyện ──
+  TRAINING_PLAN_ASSIGNED // HLV giao kế hoạch tập mới
+  // ── Lớp học ──
+  CLASS_APPROVED
+  CLASS_REJECTED
+  WITHDRAWAL_APPROVED
+  WITHDRAWAL_REJECTED
+  NEW_CLASS // Lớp học mới được mở
+  COACH_CHANGED // Đổi HLV cho lớp
+  // ── Chuyên cần (Attendance) ──
+  ATTENDANCE_WARNING // Cảnh báo chuyên cần dưới 80%
+  ATTENDANCE_PENALTY // Hình phạt chuyên cần: thu hồi slot + chặn đặt lại
+  ATTENDANCE_PENALTY_REVOKED // Hình phạt chuyên cần được gỡ
+  SCHEDULE_ROOM_CHANGED // Lịch học đổi phòng (bulk transfer Room hư)
+  // ── Thanh toán ──
+  PAYMENT_SUCCESS // Thanh toán thành công
+  PAYMENT_REFUNDED // Hoàn tiền
+  // ── Cửa hàng ──
+  ORDER_UPDATED // Đơn hàng đổi trạng thái (đã thanh toán, sẵn sàng nhận, đang giao, hết hạn…)
+  // ── Chung ──
+  GENERAL
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  reason    String? // Lý do (dùng cho hủy gói, hủy lịch…)
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  metadata  Json? // e.g. { scheduleId, classId, subscriptionId, senderId }
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────
+// COACH WALLET
+// ─────────────────────────────────────────
+
+model CoachWallet {
+  id        String       @id @default(uuid())
+  coachId   String       @unique
+  coach     CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  balance   Decimal      @default(0) @db.Decimal(12, 2)
+  /// Phí check-in còn nợ (ví không đủ tiền ròng của khóa để trừ) — trừ dần khi có tiền, và trừ vào số dư khả dụng khi rút.
+  feeDebt   Decimal      @default(0) @db.Decimal(12, 2)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @default(now()) @updatedAt
+
+  transactions WalletTransaction[]
+  refunds      Refund[]
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  /// Trừ ví HLV khi hoàn tiền cho hội viên (hủy khóa / hủy buổi không dạy bù).
+  REFUND_DEBIT
+  /// Phí check-in phòng gym của HLV — trừ vào tiền ròng của khóa CŨ NHẤT còn dư (khớp cách tính rút tiền theo từng khóa).
+  CHECKIN_FEE
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+model WalletTransaction {
+  id        String            @id @default(uuid())
+  walletId  String
+  wallet    CoachWallet       @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  amount    Decimal           @db.Decimal(12, 2)
+  type      TransactionType
+  status    TransactionStatus @default(PENDING)
+  classId   String?
+  class     Class?            @relation(fields: [classId], references: [id], onDelete: SetNull)
+  /// Giao dịch thanh toán gốc (DEPOSIT: tiền lớp được cộng vào ví; REFUND_DEBIT: tiền hoàn bị trừ).
+  paymentId String?
+  payment   Payment?          @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  bankInfo  Json?
+  note      String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @default(now()) @updatedAt
+
+  @@index([walletId])
+  @@index([status])
+  @@index([paymentId])
+}
+
+// ─────────────────────────────────────────
+// HOÀN TIỀN (REFUND)
+// ─────────────────────────────────────────
+
+enum RefundReason {
+  MEMBER_CANCEL_COURSE // Hội viên hủy khóa trước khai giảng ≥ 3 ngày — hoàn 100% phần còn lại của giao dịch (hủy muộn hơn: không hoàn, không tạo Refund)
+  MEMBER_CANCEL_COURSE_LATE // Hội viên hủy khóa < 3 ngày trước khai giảng và xin hoàn ngoại lệ — Manager duyệt kèm phí chiết khấu
+  MEMBER_CANCEL_SESSION // Hội viên hủy MỘT buổi lẻ trước giờ học ≥ 24h — hoàn 80% tiền của buổi đó
+  SESSION_RESCHEDULED // HLV dời buổi, hội viên không đi được và hủy buổi đó — hoàn 100% tiền buổi
+  SESSION_CANCELLED // Buổi học bị hủy và chọn hoàn tiền (không dạy bù) — hoàn tiền 1 buổi
+  ORDER_CANCELLED // Đơn hàng đã thanh toán bị hủy (khách yêu cầu / trung tâm hủy) — hoàn toàn bộ
+  ORDER_NOT_PICKED_UP // Khách không đến lấy hàng đúng hạn — hoàn theo chính sách (SHOP_NOT_PICKED_UP_REFUND_PERCENT)
+  ORDER_LATE_PAYMENT // Tiền về sau khi đơn đã hết hạn/hủy — không khôi phục đơn, hoàn lại tiền
+  MEMBERSHIP_CANCELLED // Manager hủy gói thành viên của hội viên — hoàn phần giá trị còn lại (tùy chọn)
+  COURSE_NOT_FULFILLED // Đã thu tiền khóa nhưng không ghi danh đủ số buổi đã tính tiền (hết chỗ / buổi bị hủy trong lúc chờ CK) — hoàn phần thiếu
+}
+
+enum RefundStatus {
+  PENDING // Chờ Manager chuyển khoản tay rồi duyệt
+  COMPLETED // Đã hoàn: ví HLV đã bị trừ, hội viên đã nhận tiền
+  REJECTED // Manager từ chối (kèm lý do)
+  CANCELLED // Người gửi tự hủy yêu cầu khi còn PENDING
+}
+
+/// Yêu cầu hoàn tiền cho hội viên. SePay không có API hoàn ⇒ Manager chuyển khoản tay rồi duyệt;
+/// lúc duyệt mới trừ ví HLV (`coachDebitAmount`) và (nếu hủy khóa) đổi Payment sang REFUNDED.
+model Refund {
+  id               String        @id @default(uuid())
+  paymentId        String
+  payment          Payment       @relation(fields: [paymentId], references: [id])
+  /// Hội viên nhận hoàn (null khi người mua đơn hàng là HLV — người nhận lấy từ `order.userId`).
+  memberId         String?
+  member           MemberProfile? @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  /// Đơn hàng được hoàn (lý do ORDER_*); null với hoàn tiền khóa học.
+  orderId          String?
+  order            Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  classId          String?
+  class            Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
+  /// Buổi bị hủy (chỉ với SESSION_CANCELLED).
+  scheduleId       String?
+  schedule         ClassSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  reason           RefundReason
+  /// Số tiền hoàn cho hội viên.
+  amount           Decimal       @db.Decimal(12, 2)
+  /// Phần trừ vào ví HLV khi duyệt (tỷ lệ theo số tiền HLV đã được cộng từ giao dịch gốc).
+  coachDebitAmount Decimal       @default(0) @db.Decimal(12, 2)
+  /// Hoàn ngoại lệ (MEMBER_CANCEL_COURSE_LATE): giá trị gốc trước phí + % phí chiết khấu (Manager chốt khi duyệt).
+  grossAmount      Decimal?      @db.Decimal(12, 2)
+  feePercent       Int?
+  coachWalletId    String?
+  coachWallet      CoachWallet?  @relation(fields: [coachWalletId], references: [id], onDelete: SetNull)
+  note             String?
+  /// L8: ghi chú của Member khi gửi yêu cầu (cột `note` cũ giữ cho Web).
+  memberNote       String?
+  /// L8: ghi chú của Manager khi duyệt (VD mã giao dịch chuyển khoản hoàn tiền).
+  managerNote      String?
+  /// Ngân hàng nhận tiền hoàn (tên hoặc mã, VD: MBBank, VCB). Đơn hàng: khách bổ sung sau qua app nếu chưa có.
+  bankName         String?
+  /// Số tài khoản nhận tiền hoàn.
+  bankAccountNumber String?
+  /// Tên chủ tài khoản nhận tiền hoàn (in hoa).
+  bankAccountName  String?
+  /// Cách Manager trả tiền hoàn khi duyệt: BANK_TRANSFER (chuyển khoản tay) hoặc CASH (tiền mặt tại quầy).
+  payoutMethod     PaymentMethod?
+  /// Lần gần nhất Manager nhắc khách cung cấp số tài khoản nhận hoàn.
+  bankInfoRequestedAt DateTime?
+  status           RefundStatus  @default(PENDING)
+  requestedById    String?
+  requestedBy      User?         @relation("RefundRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  processedById    String?
+  processedBy      User?         @relation("RefundProcessedBy", fields: [processedById], references: [id], onDelete: SetNull)
+  processedAt      DateTime?
+  rejectReason     String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @default(now()) @updatedAt
+
+  /// Một buổi bị hủy chỉ hoàn MỘT lần cho mỗi giao dịch.
+  @@unique([paymentId, scheduleId])
+  @@index([status])
+  @@index([memberId])
+  @@index([coachWalletId, status])
+  @@index([orderId])
+}
+
+// ─────────────────────────────────────────
+// CỬA HÀNG (Product, Cart, Order…) — xem Doc/SHOP_FLOW_DESIGN.md
+// ─────────────────────────────────────────
+
+model Product {
+  id            String          @id @default(uuid())
+  name          String
+  description   String
+  price         Decimal         @db.Decimal(12, 2)
+  /// Tồn THỰC TẾ trên kệ. Có thể bán = `stockQuantity − reservedStock` (API trả `availableStock`).
+  stockQuantity Int             @default(0)
+  /// Số lượng đang GIỮ cho đơn chờ thanh toán (PENDING_PAYMENT) — nhả khi hết hạn/hủy, trừ hẳn khi PAID.
+  reservedStock Int             @default(0)
+  /// BE-6: ảnh sản phẩm (URL tuyệt đối hoặc đường dẫn tĩnh).
+  imageUrl      String?
+  /// Bộ ảnh phụ (ảnh đầu tiên trùng `imageUrl` nếu có).
+  imageUrls     String[]        @default([])
+  /// Số lượng tối đa của sản phẩm trong MỘT đơn.
+  maxPerOrder   Int             @default(10)
+  /// Số lượng tối đa MỘT người được đặt trong một ngày (giờ VN, không tính đơn hết hạn/đã hủy).
+  maxPerDay     Int             @default(20)
+  /// Ngưỡng cảnh báo sắp hết hàng (theo số có thể bán).
+  lowStockThreshold Int         @default(5)
+  rating        Decimal         @default(0) @db.Decimal(3, 2)
+  reviewCount   Int             @default(0)
+  isActive      Boolean         @default(true)
+  createdById   String
+  createdBy     User            @relation("ProductCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+
+  reviews       ProductReview[]
+  orderItems    OrderItem[]
+  cartItems     CartItem[]
+  inventoryTransactions InventoryTransaction[]
+}
+
+/// Đánh giá sản phẩm: chỉ cho dòng đơn (OrderItem) thuộc đơn COMPLETED, mỗi dòng tối đa 1 đánh giá.
+/// Đánh giá cũ (trước luồng mới) có `orderItemId = null`.
+model ProductReview {
+  id           String     @id @default(uuid())
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation("ProductReviewUser", fields: [userId], references: [id], onDelete: Cascade)
+  orderItemId  String?    @unique
+  orderItem    OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  rating       Int
+  comment      String?
+  isAnonymous  Boolean    @default(false)
+  editCount    Int        @default(0)
+  /// Manager ẩn đánh giá (không hiển thị công khai, không tính điểm trung bình).
+  isHidden     Boolean    @default(false)
+  hiddenReason String?
+  hiddenById   String?
+  hiddenAt     DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
+
+  @@index([productId, isHidden])
+  @@index([userId])
+}
+
+/// Giỏ hàng lưu ở server (một giỏ / người). Giỏ KHÔNG giữ tồn kho.
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now()) @updatedAt
+
+  items     CartItem[]
+}
+
+model CartItem {
+  id                String   @id @default(uuid())
+  cartId            String
+  cart              Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity          Int
+  /// Giá lúc thêm vào giỏ — khác giá hiện tại ⇒ cảnh báo PRICE_CHANGED (giá thanh toán luôn do server tính).
+  unitPriceSnapshot Decimal  @db.Decimal(12, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  @@unique([cartId, productId])
+  @@index([productId])
+}
+
+/// Sổ địa chỉ giao hàng của người dùng (đơn DELIVERY lưu SNAPSHOT địa chỉ, không trỏ bảng này).
+model UserAddress {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientName String
+  phone         String
+  province      String
+  /// Không bắt buộc: địa giới 2 cấp (Tỉnh → Phường/Xã) không còn Quận/Huyện.
+  district      String?
+  ward          String?
+  /// Mã địa danh (provinces.open-api.vn v2) để mở lại dropdown đúng mục đã chọn.
+  provinceCode  Int?
+  wardCode      Int?
+  street        String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@index([userId])
+}
+
+enum FulfillmentType {
+  PICKUP // Nhận tại quầy trung tâm (mã nhận hàng)
+  DELIVERY // Giao tận nơi (mã vận đơn)
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  /// Mã đơn dễ đọc, duy nhất (VD DH241011-7KQ3XM) — KHÁC mã chuyển khoản SePay (`Payment.transactionCode`).
+  code        String      @unique
+  userId      String
+  user        User        @relation("OrderUser", fields: [userId], references: [id])
+  fulfillmentType FulfillmentType @default(PICKUP)
+  /// SEPAY = chuyển khoản trước; CASH = trả tiền khi nhận tại quầy (chỉ PICKUP, đơn bắt đầu ở CONFIRMED, chưa có Payment).
+  paymentMethod   PaymentMethod   @default(SEPAY)
+  /// Tạm tính = Σ `OrderItem.totalAmount` (server tính).
+  subtotal    Decimal     @db.Decimal(12, 2)
+  shippingFee Decimal     @default(0) @db.Decimal(12, 2)
+  /// Tổng phải trả = subtotal + shippingFee — cũng là số tiền của Payment / mã QR.
+  totalPrice  Decimal     @db.Decimal(12, 2)
+  status      OrderStatus @default(PENDING_PAYMENT)
+  /// Snapshot người nhận (cả PICKUP — đối chiếu 4 số cuối SĐT khi nhận hàng).
+  recipientName    String?
+  recipientPhone   String?
+  /// Snapshot địa chỉ giao (DELIVERY).
+  shippingAddress  String?
+  shippingProvince String?
+  note        String?
+  /// Hạn chuyển khoản; quá hạn ⇒ job chuyển EXPIRED + nhả hàng.
+  paymentExpiresAt DateTime?
+  /// Mã nhận hàng (PICKUP, sinh khi READY_FOR_PICKUP): chỉ lưu SHA-256; mã hiển thị = HMAC(secret, id:nonce).
+  pickupCodeHash       String?  @unique
+  pickupCodeNonce      String?
+  pickupDeadline       DateTime?
+  /// Ngày khách dự định đến lấy (00:00 giờ VN). Hạn nhận = cuối ngày (max(ngày dự định, ngày sẵn sàng) + SHOP_PICKUP_DAYS).
+  preferredPickupDate  DateTime?
+  /// Số lần khách đã đổi ngày/gia hạn lấy hàng (tối đa SHOP_PICKUP_MAX_RESCHEDULES).
+  pickupRescheduleCount Int     @default(0)
+  /// Đã gửi nhắc "sắp hết hạn nhận hàng" (job) — tránh nhắc lặp.
+  pickupReminderSentAt DateTime?
+  pickupFailedAttempts Int      @default(0)
+  pickupLockedUntil    DateTime?
+  trackingCode String?
+  carrier      String?
+  /// BE-21: lý do đơn bị hủy (null khi chưa hủy).
+  cancelReason OrderCancelReason?
+  cancelNote   String?
+  cancelledById String?
+  /// Chống tạo đơn trùng (header Idempotency-Key) — `idempotencyHash` = hash nội dung request.
+  idempotencyKey  String?
+  idempotencyHash String?
+  paidAt        DateTime?
+  processingAt  DateTime?
+  readyAt       DateTime?
+  shippedAt     DateTime?
+  deliveredAt   DateTime?
+  completedAt   DateTime?
+  cancelledAt   DateTime?
+  expiredAt     DateTime?
+  notPickedUpAt DateTime?
+  refundedAt    DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @default(now()) @updatedAt
+
+  /// Các dòng hàng của đơn (một đơn có thể mua nhiều sản phẩm).
+  items       OrderItem[]
+  /// Giao dịch thanh toán của đơn (SePay). PENDING = đang giữ hàng chờ chuyển khoản.
+  payment     Payment?
+  history     OrderStatusHistory[]
+  refunds     Refund[]
+  inventoryTransactions InventoryTransaction[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status])
+  @@index([status, paymentExpiresAt])
+  @@index([status, pickupDeadline])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  /// Snapshot tên/ảnh sản phẩm lúc đặt.
+  productName     String?
+  productImageUrl String?
+  quantity    Int
+  /// Đơn giá tại thời điểm đặt (snapshot — đổi giá sản phẩm sau này không ảnh hưởng đơn cũ).
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  /// Thành tiền của dòng = quantity × unitPrice.
+  totalAmount Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  review      ProductReview?
+
+  @@unique([orderId, productId])
+  @@index([productId])
+}
+
+/// Lịch sử chuyển trạng thái đơn (actorId null = hệ thống: webhook, job).
+model OrderStatusHistory {
+  id         String       @id @default(uuid())
+  orderId    String
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  actorId    String?
+  reason     String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @default(now()) @updatedAt
+
+  @@index([orderId, createdAt])
+}
+
+enum InventoryTransactionType {
+  IN // Nhập hàng (+stock)
+  RESERVE // Giữ hàng khi tạo đơn (+reserved)
+  RELEASE // Nhả hàng khi đơn hết hạn/hủy trước khi thanh toán (−reserved)
+  SALE // Thanh toán thành công: hàng thuộc khách (−stock, −reserved)
+  RETURN // Hoàn tiền đơn đã thanh toán mà hàng còn ở trung tâm (+stock)
+  ADJUST // Điều chỉnh kiểm kê/hư hỏng (±stock)
+}
+
+/// Nhật ký kho bất biến — mọi thay đổi `stockQuantity` / `reservedStock` đều có một dòng.
+model InventoryTransaction {
+  id            String                   @id @default(uuid())
+  productId     String
+  product       Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type          InventoryTransactionType
+  /// Số lượng (dương); riêng ADJUST có thể âm.
+  quantity      Int
+  stockAfter    Int
+  reservedAfter Int
+  orderId       String?
+  order         Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  actorId       String?
+  note          String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @default(now()) @updatedAt
+
+  @@index([productId, createdAt])
+  @@index([orderId])
+}
+
+/// Ai/điều gì hủy đơn: người mua, hết hạn chờ chuyển khoản, hay Manager (BE-21).
+enum OrderCancelReason {
+  BUYER
+  EXPIRED
+  MANAGER
+}
+
+/// Xem máy trạng thái ở Doc/SHOP_FLOW_DESIGN.md §3.
+enum OrderStatus {
+  PENDING_PAYMENT
+  CONFIRMED // Đơn trả tiền tại quầy: đã giữ hàng, chờ Trung tâm chuẩn bị (chưa thu tiền)
+  PAID
+  PROCESSING
+  READY_FOR_PICKUP
+  SHIPPING
+  DELIVERED
+  COMPLETED
+  EXPIRED
+  CANCELLED
+  NOT_PICKED_UP
+  REFUND_REQUESTED
+  REFUNDED
+}
+
+// ── Gói thành viên (tập gym tự do, không qua lớp/HLV) ────────────────────────
+
+/// Gói thành viên theo thời gian do Manager cấu hình.
+model MembershipPlan {
+  id           String       @id @default(uuid())
+  /// VD: "Gói 1 tháng", "Gói 3 tháng".
+  name         String
+  /// Số ngày hiệu lực (30, 90, 180…).
+  durationDays Int
+  price        Decimal      @db.Decimal(12, 2)
+  description  String?
+  /// Manager bật/tắt gói (gói tắt không bán nữa, membership đã mua vẫn giữ).
+  isActive     Boolean      @default(true)
+  /// Quyền lợi hiển thị trên thẻ gói (tối đa 8 dòng).
+  benefits     String[]     @default([])
+  /// Gói nổi bật ("Phổ biến") trên màn chọn gói.
+  isFeatured   Boolean      @default(false)
+  /// Thứ tự hiển thị (nhỏ trước), cùng thứ tự thì rẻ trước.
+  sortOrder    Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @default(now()) @updatedAt
+  memberships  Membership[]
+}
+
+/// Một lần mua gói thành viên — tạo khi SePay xác nhận đã thu tiền.
+/// Mua tiếp khi còn hạn ⇒ gói mới bắt đầu ngay sau ngày hết hạn gói hiện tại (cộng dồn).
+model Membership {
+  id        String           @id @default(uuid())
+  memberId  String
+  member    MemberProfile    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      MembershipPlan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+  paymentId String?          @unique
+  payment   Payment?         @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  startDate DateTime
+  endDate   DateTime
+  status    MembershipStatus @default(ACTIVE)
+  /// Bậc nhắc gia hạn đã gửi (0 = chưa, 1 = còn 7 ngày, 2 = còn 1 ngày, 3 = đã hết hạn) — chống gửi trùng.
+  reminderStage Int          @default(0)
+  /// Manager hủy gói: thời điểm, lý do, người hủy.
+  cancelledAt   DateTime?
+  cancelReason  String?
+  cancelledById String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
+
+  scans     MemberPassScan[]
+
+  @@index([memberId])
+  @@index([status])
+}
+
+/// Nhật ký quét thẻ thành viên ở cửa (Manager/HLV quét mã QR động của hội viên) — để đối soát, không tự khóa ai.
+model MemberPassScan {
+  id           String         @id @default(uuid())
+  memberId     String
+  member       MemberProfile  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// Gói đang hiệu lực lúc quét (null = không có gói).
+  membershipId String?
+  membership   Membership?    @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  scannedBy    String
+  valid        Boolean
+  reason       String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now()) @updatedAt
+
+  @@index([memberId, createdAt])
+  @@index([createdAt])
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+// ── Thông tin trung tâm (1 bản ghi, id = "default") ────────────────────────
+
+/// Địa chỉ & thông tin liên hệ của trung tâm Gym — hiển thị cho Member/Coach để biết nơi tập.
+model CenterSetting {
+  id           String   @id @default("default")
+  name         String
+  address      String
+  /// Link Google Maps (tùy chọn) — app mở bản đồ bằng link này, không có thì tìm theo địa chỉ.
+  mapUrl       String?
+  hotline      String?
+  email        String?
+  /// Giờ mở cửa (chữ tự do, VD "05:30 – 22:00 hằng ngày").
+  openingHours String?
+  /// Ghi chú gửi xe / lối vào.
+  parkingNote  String?
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
+// ── Kỳ học & quyền lợi của Coach (Doc/COACH_TERMS.md) ──────────────────────────
+// Quyền tập gym miễn phí của Coach gắn với việc dạy thật: mỗi kỳ (4 tháng, 3 kỳ/năm) Coach phải
+// có khóa học hợp lệ trong hạn ân hạn và dạy đủ buổi. Hệ thống chỉ ĐÁNH GIÁ + BÁO CÁO + NHẮC;
+// việc từ chối vào cửa do người quét thẻ Coach quyết định (không tự khóa tài khoản).
+
+enum CoachTermState {
+  /// Chưa đủ điều kiện nhưng còn trong thời gian (trước hạn ân hạn hoặc kỳ chưa kết thúc).
+  PENDING
+  COMPLIANT
+  NON_COMPLIANT
+  /// Được miễn kỳ (Manager miễn trừ hoặc nghỉ phép được duyệt ≥ 50% kỳ).
+  EXEMPT
+}
+
+enum CoachLeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// Kỳ học: 3 kỳ/năm dương lịch (T1–4, T5–8, T9–12), tạo tự động. Mốc thời gian theo giờ Việt Nam.
+model AcademicTerm {
+  id        String   @id @default(uuid())
+  /// VD "Kỳ 3/2026".
+  name      String
+  year      Int
+  /// Thứ tự kỳ trong năm: 1..3.
+  seq       Int
+  /// 00:00 giờ VN của ngày đầu kỳ.
+  startDate DateTime
+  /// 23:59:59.999 giờ VN của ngày cuối kỳ.
+  endDate   DateTime
+  /// Số ngày ân hạn kể từ đầu kỳ để Coach có khóa học hợp lệ.
+  graceDays Int      @default(14)
+  /// Bậc báo cáo tổng hợp đã gửi cho Manager (0 = chưa gửi) — chống gửi trùng.
+  managerReportStage Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  coachStatuses CoachTermStatus[]
+
+  @@unique([year, seq])
+  @@index([startDate, endDate])
+}
+
+/// Kết quả đánh giá của một Coach trong một kỳ (1 dòng / Coach × kỳ), ghi lại khi chạy đánh giá.
+model CoachTermStatus {
+  id          String         @id @default(uuid())
+  termId      String
+  term        AcademicTerm   @relation(fields: [termId], references: [id], onDelete: Cascade)
+  coachId     String
+  coach       CoachProfile   @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  state       CoachTermState @default(PENDING)
+  /// Manager miễn trừ thủ công — đánh giá tự động không ghi đè.
+  manualExempt Boolean       @default(false)
+  exemptReason String?
+  exemptBy     String?
+  exemptAt     DateTime?
+  /// Ảnh chụp số liệu lúc đánh giá (số buổi, tỷ lệ, lý do...).
+  metrics     Json?
+  evaluatedAt DateTime?
+  /// Bậc nhắc cuối đã gửi cho Coach (0 = chưa gửi) — chống gửi trùng.
+  lastReminderStage Int       @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @default(now()) @updatedAt
+
+  @@unique([termId, coachId])
+  @@index([termId, state])
+  @@index([coachId])
+}
+
+/// Đơn xin nghỉ phép/ốm của Coach — nghỉ được duyệt: gia hạn ân hạn, không tính buổi hủy trong thời gian nghỉ,
+/// nghỉ ≥ 50% kỳ thì miễn cả kỳ.
+model CoachLeave {
+  id         String           @id @default(uuid())
+  coachId    String
+  coach      CoachProfile     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  /// 00:00 giờ VN của ngày bắt đầu nghỉ.
+  startDate  DateTime
+  /// 23:59:59.999 giờ VN của ngày kết thúc nghỉ.
+  endDate    DateTime
+  /// SICK | PERSONAL | OTHER.
+  kind       String           @default("PERSONAL")
+  reason     String
+  status     CoachLeaveStatus @default(PENDING)
+  reviewedBy String?
+  reviewedAt DateTime?
+  reviewNote String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @default(now()) @updatedAt
+
+  @@index([coachId, status])
+  @@index([status, createdAt])
+}
+
+/// Nhật ký quét thẻ Coach ở cửa (người quét là Manager) — để đối chiếu, không dùng để tự động khóa.
+model CoachPassScan {
+  id        String          @id @default(uuid())
+  coachId   String
+  coach     CoachProfile    @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  scannedBy String
+  valid     Boolean
+  state     CoachTermState?
+  termId    String?
+  reason    String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @default(now()) @updatedAt
+
+  @@index([coachId, createdAt])
+  @@index([createdAt])
+}
+
+/// Một ngày HLV dùng phòng gym (quét QR check-in do Manager tạo). Mỗi HLV tối đa 1 dòng / ngày VN.
+/// Trong số ngày miễn phí của tháng (và HLV đạt kỳ) ⇒ `free`; ngược lại phát sinh `feeAssessed`,
+/// phần trừ được từ ví là `feeCharged`, phần chưa trừ được ghi nợ `feeDebt`.
+model CoachCheckIn {
+  id          String          @id @default(uuid())
+  coachId     String
+  coach       CoachProfile    @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  /// Ngày dùng phòng YYYY-MM-DD (giờ VN) và tháng YYYY-MM để đếm hạn mức.
+  dayKey      String
+  monthKey    String
+  checkedInAt DateTime        @default(now())
+  /// Thứ tự ngày dùng trong tháng (1, 2, ...).
+  dayIndex    Int
+  free        Boolean
+  feeAssessed Decimal         @default(0) @db.Decimal(12, 2)
+  feeCharged  Decimal         @default(0) @db.Decimal(12, 2)
+  feeDebt     Decimal         @default(0) @db.Decimal(12, 2)
+  /// Trạng thái kỳ của HLV lúc check-in (để đối chiếu vì sao miễn phí / bị tính phí).
+  termState   CoachTermState?
+  /// Manager phát hành mã QR đã được quét.
+  qrIssuedBy  String?
+  note        String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @default(now()) @updatedAt
+
+  @@unique([coachId, dayKey])
+  @@index([coachId, monthKey])
+  @@index([dayKey])
+}

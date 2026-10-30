@@ -1,0 +1,224 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../app/router/app_routes.dart';
+import '../../../../core/data/data_revision.dart';
+import '../../../../core/icons/app_icons.dart';
+import '../../../../core/theme/theme.dart';
+import '../../../../core/utils/validators.dart';
+import '../../../../core/utils/vn_time.dart';
+import '../../../../core/widgets/widgets.dart';
+import '../../data/attendance_repository_provider.dart';
+import '../../domain/entities/attendance.dart';
+import '../providers/attendance_providers.dart';
+
+/// M12 — Chuyên cần: tỷ lệ theo khóa, phạt & khiếu nại, lịch sử điểm danh.
+class AttendanceScreen extends ConsumerWidget {
+  const AttendanceScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summary = ref.watch(myAttendanceSummaryProvider);
+    final penalties = ref.watch(myPenaltiesProvider).value ?? const [];
+    return AppScaffold(
+      title: 'Chuyên cần',
+      body: AsyncValueView(
+        value: summary,
+        onRetry: () => ref.invalidate(myAttendanceSummaryProvider),
+        data: (stats) => RefreshableScroll(
+          onRefresh: () async {
+            ref
+              ..invalidate(myPenaltiesProvider)
+              ..invalidate(myAttendanceSummaryProvider);
+            await ref.read(myAttendanceSummaryProvider.future);
+          },
+          children: [
+            const AlertBanner.info(
+              message:
+                  'Có mặt hoặc đi trễ được tính là tham gia; vắng có phép không tính. '
+                  'Mỗi khóa xét ${ClassAttendanceStat.sampleWindow} buổi đã qua gần nhất. '
+                  'Khi vắng hoặc đi trễ, bạn sẽ nhận được thông báo nhắc nhở để sắp xếp lịch học tốt hơn.',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            for (final p in penalties) ...[_PenaltyCard(penalty: p), const SizedBox(height: AppSpacing.sm)],
+            const SectionHeader(title: 'Tỷ lệ chuyên cần theo khóa'),
+            Text(
+              'Nhấn vào từng khóa để xem lịch sử điểm danh chi tiết.',
+              style: context.text.caption.copyWith(color: context.colors.textMuted),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            if (stats.isEmpty)
+              const EmptyState(compact: true, icon: AppIcons.attendance, title: 'Chưa có dữ liệu điểm danh')
+            else
+              for (final s in stats) ...[_StatCard(stat: s), const SizedBox(height: AppSpacing.sm)],
+            const SizedBox(height: AppSpacing.xl),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({required this.stat});
+
+  final ClassAttendanceStat stat;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = stat.isWarning ? StatusTone.danger : StatusTone.success;
+    Widget count(String label, int v, StatusTone t) => Expanded(
+      child: Column(
+        children: [
+          Text('$v', style: context.text.titleSmall.copyWith(color: context.tones.of(t).foreground)),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: context.text.caption.copyWith(color: context.colors.textMuted),
+          ),
+        ],
+      ),
+    );
+    return AppCard(
+      borderColor: stat.isWarning ? context.tones.of(StatusTone.danger).border : null,
+      onTap: () => context.push(AppRoutes.myCourseAttendance(stat.classId)),
+      semanticLabel: 'Xem lịch sử điểm danh ${stat.className}',
+      child: Column(
+        children: [
+          Row(
+            children: [
+              ProgressRing(ratio: stat.rate, color: context.tones.of(tone).foreground),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(stat.className, style: context.text.bodyStrong),
+                    Text(
+                      stat.counted < ClassAttendanceStat.minSample
+                          ? '${stat.counted} buổi tính chuyên cần · chưa đủ ${ClassAttendanceStat.minSample} buổi để xét cảnh báo'
+                          : '${stat.counted} buổi tính chuyên cần (${ClassAttendanceStat.sampleWindow} buổi gần nhất)',
+                      style: context.text.caption.copyWith(color: context.colors.textMuted),
+                    ),
+                    if (stat.isWarning) ...[
+                      const SizedBox(height: AppSpacing.xxs),
+                      const StatusLabel('Dưới 80% — cảnh báo', StatusTone.danger).tag(dense: true),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(AppIcons.chevronRight, color: context.colors.textMuted),
+            ],
+          ),
+          const Divider(height: AppSpacing.lg),
+          Row(
+            children: [
+              count('Có mặt', stat.present, StatusTone.success),
+              count('Đi trễ', stat.late, StatusTone.warning),
+              count('Vắng', stat.absent, StatusTone.danger),
+              count('Có phép', stat.excused, StatusTone.info),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PenaltyCard extends ConsumerWidget {
+  const _PenaltyCard({required this.penalty});
+
+  final AttendancePenalty penalty;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = penalty;
+    final now = DateTime.now();
+    final active = p.status == PenaltyStatus.applied && (p.blockedUntil?.isAfter(now) ?? false);
+    final pending = p.status == PenaltyStatus.pending;
+    return AlertBanner(
+      tone: pending ? StatusTone.warning : (active ? StatusTone.danger : StatusTone.neutral),
+      icon: AppIcons.ban,
+      title: pending
+          ? 'Đang chờ áp dụng · ${p.className}'
+          : (active ? 'Phạt chuyên cần · ${p.className}' : 'Phạt đã hết hiệu lực · ${p.className}'),
+      message: [
+        p.reason,
+        if (!pending) 'Đã thu hồi ${p.releasedCount} buổi sắp tới.',
+        if (p.blockedUntil != null) 'Chặn đặt lại đến ${VnTime.date(p.blockedUntil!)}.',
+        if (p.appealedAt != null) 'Đã gửi khiếu nại lúc ${VnTime.dateTime(p.appealedAt!)} — chờ Quản lý xem xét.',
+      ].join('\n'),
+      action: p.canAppeal(now)
+          ? AppButton.outline(
+              label: 'Khiếu nại (hạn ${VnTime.dateTime(p.appealDeadline!)})',
+              size: AppButtonSize.small,
+              onPressed: () => showAppBottomSheet<void>(
+                context: context,
+                title: 'Khiếu nại quyết định phạt',
+                builder: (_) => _AppealForm(penaltyId: p.id),
+              ),
+            )
+          : null,
+    );
+  }
+}
+
+class _AppealForm extends ConsumerStatefulWidget {
+  const _AppealForm({required this.penaltyId});
+
+  final String penaltyId;
+
+  @override
+  ConsumerState<_AppealForm> createState() => _AppealFormState();
+}
+
+class _AppealFormState extends ConsumerState<_AppealForm> with SubmittingState {
+  final _form = GlobalKey<FormState>();
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_form.currentState!.validate()) return;
+    var ok = false;
+    await submit(() async {
+      await ref.read(attendanceRepositoryProvider).appeal(widget.penaltyId, _reason.text);
+      ok = true;
+    });
+    if (!ok || !mounted) return;
+    ref.read(dataRevisionProvider.notifier).bump();
+    Navigator.of(context).pop();
+    AppSnackbar.success(context, 'Đã gửi khiếu nại tới Quản lý.');
+  }
+
+  @override
+  Widget build(BuildContext context) => Form(
+    key: _form,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppTextField(
+          label: 'Lý do khiếu nại',
+          requiredField: true,
+          controller: _reason,
+          maxLines: 4,
+          maxLength: 1000,
+          hint: 'VD: Tôi có giấy khám bệnh cho các buổi vắng…',
+          validator: Validators.minLength(5, 'Lý do'),
+          errorText: fieldErrors['reason'],
+        ),
+        if (formError != null && fieldErrors.isEmpty) ...[
+          const SizedBox(height: AppSpacing.xs),
+          AlertBanner.error(message: formError!),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        AppButton(label: 'Gửi khiếu nại', expand: true, loading: submitting, onPressed: _submit),
+      ],
+    ),
+  );
+}

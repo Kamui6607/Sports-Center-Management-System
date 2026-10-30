@@ -1,0 +1,62 @@
+import { Request, Response, NextFunction } from "express";
+import * as schedulesService from "./class-schedules.service.js";
+import { sendSuccess, sendCreated } from "../../utils/response.js";
+
+export async function listSchedules(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = req.user ? { id: req.user.id, role: req.user.role } : undefined;
+    const { schedules, pagination } = await schedulesService.listSchedules(req.query, actor);
+    sendSuccess(res, schedules, "Schedules retrieved successfully", 200, pagination);
+  } catch (err) { next(err); }
+}
+export async function createSchedule(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schedule = await schedulesService.createSchedule(req.body, { id: req.user!.id, role: req.user!.role });
+    sendCreated(res, schedule, "Schedule created successfully");
+  } catch (err) { next(err); }
+}
+export async function createActivityPlan(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = { id: req.user!.id, role: req.user!.role };
+    const result = await schedulesService.createActivityPlan(req.body, actor);
+    sendCreated(res, result, "Activity plan created successfully");
+  } catch (err) { next(err); }
+}
+export async function getScheduleById(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schedule = await schedulesService.getScheduleById(req.params.id as string);
+    sendSuccess(res, schedule, "Schedule retrieved successfully");
+  } catch (err) { next(err); }
+}
+export async function updateSchedule(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schedule = await schedulesService.updateSchedule(req.params.id as string, req.body, { id: req.user!.id, role: req.user!.role });
+    sendSuccess(res, schedule, "Schedule updated successfully");
+  } catch (err) { next(err); }
+}
+export async function deleteSchedule(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schedule = await schedulesService.deleteSchedule(req.params.id as string, { id: req.user!.id, role: req.user!.role });
+    sendSuccess(res, schedule, "Schedule cancelled successfully");
+  } catch (err) { next(err); }
+}
+export async function cancelSchedule(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = { id: req.user!.id, role: req.user!.role };
+    const result = await schedulesService.cancelScheduleWithResolution(req.params.id as string, req.body, actor);
+    sendSuccess(res, result, "Schedule cancelled successfully");
+  } catch (err) { next(err); }
+}
+export async function rescheduleSchedule(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = { id: req.user!.id, role: req.user!.role };
+    const result = await schedulesService.rescheduleSchedule(req.params.id as string, req.body, actor);
+    sendSuccess(res, result, "Đã dời lịch buổi học và thông báo cho học viên");
+  } catch (err) { next(err); }
+}
+export async function completeSchedule(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schedule = await schedulesService.completeSchedule(req.params.id as string, { id: req.user!.id, role: req.user!.role });
+    sendSuccess(res, schedule, "Schedule marked as completed");
+  } catch (err) { next(err); }
+}

@@ -1,0 +1,889 @@
+{
+ "url": "http://127.0.0.1:5173",
+ "at": "2026-10-26T17:51:09.680Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 11,
+   "filled": [
+    0.96,
+    1,
+    1,
+    0.53,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "motion": {
+    "elements": 57,
+    "css": 6,
+    "transitions": 50,
+    "scripted": 1,
+    "videos": 1,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 10842,
+     "screens": 10.6,
+     "words": 1680,
+     "img": 7,
+     "video": 1,
+     "canvas": 0,
+     "svg": 10,
+     "sections": 8,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 12,
+     "uiAbuse": false,
+     "realPictures": 8,
+     "videoCount": 1,
+     "uiPictures": 4,
+     "pictureSamples": [
+      "photo-1593079831268-3381b0db4a77?auto=format&fit",
+      "photo-1558611848-73f7eb4001a1?auto=format&fit=cr",
+      "photo-1583454110551-21f2fa2afe61?auto=format&fit",
+      "photo-1558611848-73f7eb4001a1?auto=format&fit=cr",
+      "photo-1576678927484-cc907957088c?auto=format&fit",
+      "photo-1517836357463-d25dfeac3438?auto=format&fit",
+      "photo-1599058917212-d750089bc07e?auto=format&fit"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Sàn tập mở sớm, học cùng HLV.",
+     "words": 7,
+     "chars": 29,
+     "lines": 2,
+     "size": 37.6,
+     "vw": 4.9,
+     "font": "Be Vietnam Pro",
+     "weight": 800,
+     "tracking": -0.03,
+     "leading": 1.1,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "left",
+     "position": "left",
+     "widthRatio": 0.39,
+     "top": 104,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Sàn tập mở sớm, học cùng HLV.",
+     "words": 7,
+     "lines": 2,
+     "size": 37.6,
+     "font": "Be Vietnam Pro"
+    },
+    "headings": [
+     {
+      "text": "Sàn tập mở sớm, học cùng HLV.",
+      "words": 7,
+      "chars": 29,
+      "lines": 2,
+      "size": 37.6,
+      "vw": 4.9,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.03,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.39,
+      "top": 104,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "Ba khu vực tập, một thẻ hội viên.",
+      "words": 8,
+      "chars": 33,
+      "lines": 2,
+      "size": 30.4,
+      "vw": 4,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.03,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.82,
+      "top": 1483,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Chọn mục tiêu, ra đúng khóa học.",
+      "words": 7,
+      "chars": 32,
+      "lines": 2,
+      "size": 30.4,
+      "vw": 4,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.03,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.87,
+      "top": 2905,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Chọn gói tập, quét VietQR.",
+      "words": 5,
+      "chars": 26,
+      "lines": 2,
+      "size": 30.4,
+      "vw": 4,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.03,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.82,
+      "top": 4731,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Mọi quy tắc, rõ từng con số.",
+      "words": 7,
+      "chars": 28,
+      "lines": 2,
+      "size": 30.4,
+      "vw": 4,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.03,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.89,
+      "top": 6134,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "-40.000đ",
+      "words": 1,
+      "chars": 8,
+      "lines": 1,
+      "size": 30.4,
+      "vw": 4,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": 0,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.26,
+      "top": 6373,
+      "tag": "strong",
+      "kind": "heading"
+     },
+     {
+      "text": "15 phút",
+      "words": 2,
+      "chars": 7,
+      "lines": 1,
+      "size": 30.4,
+      "vw": 4,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": 0,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.19,
+      "top": 6907,
+      "tag": "strong",
+      "kind": "heading"
+     },
+     {
+      "text": "Đồ tập tại quầy, đặt trước qua app.",
+      "words": 8,
+      "chars": 35,
+      "lines": 2,
+      "size": 30.4,
+      "vw": 4,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.03,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.84,
+      "top": 7261,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "05:30",
+      "words": 1,
+      "chars": 5,
+      "lines": 1,
+      "size": 37.6,
+      "vw": 4.9,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.42,
+      "top": 7682,
+      "tag": "strong",
+      "kind": "heading"
+     },
+     {
+      "text": "60s",
+      "words": 1,
+      "chars": 3,
+      "lines": 1,
+      "size": 37.6,
+      "vw": 4.9,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.39,
+      "top": 8490,
+      "tag": "strong",
+      "kind": "heading"
+     },
+     {
+      "text": "22:00",
+      "words": 1,
+      "chars": 5,
+      "lines": 1,
+      "size": 37.6,
+      "vw": 4.9,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.39,
+      "top": 8692,
+      "tag": "strong",
+      "kind": "heading"
+     },
+     {
+      "text": "Hẹn lịch tư vấn tại phòng tập.",
+      "words": 7,
+      "chars": 30,
+      "lines": 2,
+      "size": 30.4,
+      "vw": 4,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.03,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.83,
+      "top": 8910,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "0889 555 559",
+      "words": 3,
+      "chars": 12,
+      "lines": 1,
+      "size": 30.4,
+      "vw": 4,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": 0,
+      "leading": 1.6,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.77,
+      "top": 9091,
+      "tag": "a",
+      "kind": "heading"
+     },
+     {
+      "text": "Sẵn sàng vào ca tập hôm nay.",
+      "words": 7,
+      "chars": 28,
+      "lines": 2,
+      "size": 30.4,
+      "vw": 4,
+      "font": "Be Vietnam Pro",
+      "weight": 800,
+      "tracking": -0.03,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 9891,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "P U L S E .",
+      "words": 6,
+      "chars": 11,
+      "lines": 1,
+      "size": 44,
+      "vw": 5.7,
+      "font": "Syne",
+      "weight": 800,
+      "tracking": -0.04,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 10533,
+      "tag": "div",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 15,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": 6,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Be Vietnam Pro",
+       "share": 1,
+       "mono": false
+      },
+      {
+       "family": "Syne",
+       "share": 0,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      14,
+      16,
+      18,
+      30,
+      38,
+      44
+     ],
+     "sizeCount": 6,
+     "notLoaded": [],
+     "body": {
+      "font": "Be Vietnam Pro",
+      "size": 16,
+      "leading": 1.75,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 13.2
+     },
+     "measureChars": 79,
+     "max": {
+      "size": 44,
+      "vw": 5.7,
+      "font": "Syne",
+      "text": "P"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.06,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#0f1a16",
+     "bodyBgHsl": {
+      "h": 158,
+      "s": 0.27,
+      "l": 0.08
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#f3f7f4",
+       "top": 0,
+       "hsl": {
+        "h": 135,
+        "s": 0.2,
+        "l": 0.96
+       }
+      },
+      {
+       "color": "#b8f246",
+       "top": 597,
+       "hsl": {
+        "h": 80,
+        "s": 0.87,
+        "l": 0.61
+       }
+      },
+      {
+       "color": "#0d1f17",
+       "top": 611,
+       "hsl": {
+        "h": 153,
+        "s": 0.41,
+        "l": 0.09
+       }
+      },
+      {
+       "color": "#ffffff",
+       "top": 4011,
+       "hsl": {
+        "h": 0,
+        "s": 0,
+        "l": 1
+       }
+      },
+      {
+       "color": "#152e23",
+       "top": 4985,
+       "hsl": {
+        "h": 154,
+        "s": 0.37,
+        "l": 0.13
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#1b352a",
+       "share": 0.36
+      },
+      {
+       "color": "#d6e6dd",
+       "share": 0.27
+      },
+      {
+       "color": "#0c1c15",
+       "share": 0.17
+      },
+      {
+       "color": "#f4f8f5",
+       "share": 0.11
+      },
+      {
+       "color": "#b8f246",
+       "share": 0.08
+      }
+     ],
+     "button": {
+      "bg": "#0d1f17",
+      "hsl": {
+       "h": 153,
+       "s": 0.41,
+       "l": 0.09
+      },
+      "fg": "#0c1c15"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 26,
+     "inHero": 5,
+     "radius": "pill",
+     "height": 40,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Bỏ qua tới nội dung chính",
+      "Đăng nhập quản lý",
+      "Khám phá khóa học đang mở",
+      "Chỉ đường tới phòng tập",
+      "Đầu trang"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 3,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 41,
+     "boxRadius": 24,
+     "squareMedia": 0,
+     "roundedMedia": 8,
+     "mediaRadius": 24,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 11,
+       "iconTopped": false,
+       "rounded": true,
+       "top": 7587
+      }
+     ]
+    },
+    "heroMedia": [
+     {
+      "type": "video",
+      "ratio": 0.37
+     }
+    ],
+    "nav": {
+     "links": 7,
+     "fixed": true,
+     "height": 81,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "be vietnam pro",
+     "syne"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 10842,
+    "margins": {
+     "left": 35,
+     "right": 35
+    },
+    "sections": [
+     {
+      "sel": "section.gl-hero",
+      "tag": "section",
+      "top": 81,
+      "height": 1335,
+      "words": 177,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Sàn tập mở sớm,",
+       "size": 38,
+       "tag": "h1"
+      },
+      "left": 35,
+      "right": 35,
+      "textLeft": 35,
+      "textRight": 42,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#khong-gian.gl-about-wrap",
+      "tag": "section",
+      "top": 1417,
+      "height": 1432,
+      "words": 153,
+      "media": 2,
+      "middle": 0,
+      "heading": {
+       "text": "Ba khu vực tập,",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 69,
+      "right": 69,
+      "textLeft": 69,
+      "textRight": 69,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.gl-showcase-top",
+      "tag": "div",
+      "top": 2905,
+      "height": 214,
+      "words": 45,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "ra đúng khóa học.",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 35,
+      "right": 42,
+      "textLeft": 35,
+      "textRight": 74,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.gl-showcase-board",
+      "tag": "div",
+      "top": 3147,
+      "height": 1449,
+      "words": 315,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 35,
+      "right": 35,
+      "textLeft": 51,
+      "textRight": 55,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#quy-inh-app.gl-stages",
+      "tag": "section",
+      "top": 4652,
+      "height": 1425,
+      "words": 145,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Chọn gói tập,",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 58,
+      "right": 56,
+      "textLeft": 69,
+      "textRight": 70,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.gl-board-sec",
+      "tag": "section",
+      "top": 6078,
+      "height": 1131,
+      "words": 242,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Mọi quy tắc,",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 35,
+      "right": 35,
+      "textLeft": 35,
+      "textRight": 65,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#cua-hang.gl-wall-sec",
+      "tag": "section",
+      "top": 7209,
+      "height": 1626,
+      "words": 215,
+      "media": 3,
+      "middle": 0,
+      "heading": {
+       "text": "05:30",
+       "size": 38,
+       "tag": "strong"
+      },
+      "left": 35,
+      "right": 35,
+      "textLeft": 35,
+      "textRight": 60,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#lien-he.gl-coupon-sec",
+      "tag": "section",
+      "top": 8835,
+      "height": 1008,
+      "words": 86,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Hẹn lịch tư vấn",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 65,
+      "right": 65,
+      "textLeft": 65,
+      "textRight": 147,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.gl-foot",
+      "tag": "footer",
+      "top": 9843,
+      "height": 998,
+      "words": 119,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Sẵn sàng vào ca",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 35,
+      "right": 35,
+      "textLeft": 35,
+      "textRight": 35,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Sàn tập mở sớm, học cùng HLV.",
+      "size": 38,
+      "top": 104,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 35,
+      "n": 12
+     },
+     {
+      "x": 69,
+      "n": 7
+     },
+     {
+      "x": 58,
+      "n": 4
+     }
+    ],
+    "leftBlocks": 23,
+    "bodySize": 16,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  }
+ ],
+ "findings": [],
+ "images": [
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\after\\tablet-fold.jpg",
+   "pages": [
+    "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\after\\tablet-page-01.jpg",
+    "D:\\FA26\\PRM\\Sports-Center-Management-System\\.taste-skill\\after\\tablet-page-02.jpg"
+   ],
+   "film": []
+  }
+ ]
+}
