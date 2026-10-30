@@ -24,6 +24,7 @@ export 'date_time_field.dart';
 export 'display.dart';
 export 'file_picker_tile.dart';
 export 'icon_tile.dart';
+export 'image_viewer.dart';
 export 'quantity_stepper.dart';
 export 'rating.dart';
 export 'refreshable_list.dart';

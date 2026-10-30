@@ -325,6 +325,19 @@
   color: var(--snow);
 }
 
+.gl-word-mark {
+  display: inline-block;
+  vertical-align: -7px;
+  margin-right: 10px;
+  --pm-bg: var(--forest-2);
+  --pm-fg: var(--lime);
+}
+
+.gl-topbar.is-scrolled .gl-word-mark {
+  --pm-bg: var(--lime);
+  --pm-fg: var(--forest-2);
+}
+
 .gl-word span {
   color: var(--forest-2);
   display: inline-block;

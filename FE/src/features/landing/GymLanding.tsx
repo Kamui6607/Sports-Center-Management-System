@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, ArrowUpRight, Check, MapPin, PhoneCall, RefreshCw, Sparkles } from "lucide-react";
 import { api } from "../../shared/api";
 import { PulseLine } from "../../shared/PulseLine";
+import { PulseMark } from "../../shared/PulseMark";
 import "./landing.css";
 
 /*
@@ -806,6 +807,7 @@ export default function GymLanding({ signedIn }: { signedIn: boolean }) {
         <nav className="gl-nav" aria-label="Điều hướng chính">
           <div className="gl-nav-left">
             <Link to="/" className="gl-word" aria-label="Pulse Sports Center — trang chủ">
+              <PulseMark size={30} className="gl-word-mark" />
               pulse<span>.</span>
             </Link>
             <span className="gl-nav-status gl-hide-sm">
@@ -836,7 +838,7 @@ export default function GymLanding({ signedIn }: { signedIn: boolean }) {
               </Link>
             ) : (
               <Link to="/login" className="gl-nav-cta">
-                Đăng nhập quản lý
+                Đăng nhập
               </Link>
             )}
           </div>
@@ -1903,7 +1905,7 @@ export default function GymLanding({ signedIn }: { signedIn: boolean }) {
               {signedIn ? (
                 <Link to="/manager/dashboard">Bảng điều khiển Quản lý</Link>
               ) : (
-                <Link to="/login">Đăng nhập Quản lý</Link>
+                <Link to="/login">Đăng nhập</Link>
               )}
               <a href={mapLink} target="_blank" rel="noreferrer">
                 Bản đồ Google Maps

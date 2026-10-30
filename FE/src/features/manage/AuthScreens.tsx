@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Check, Eye, EyeOff, MailCheck, ShieldAlert } from "lucide-react";
 import { api } from "../../shared/api";
 import { PulseLine } from "../../shared/PulseLine";
+import { PulseMark } from "../../shared/PulseMark";
 import { ErrorBox, fieldErrors } from "./kit";
 import { ThemeToggle, useThemePref } from "./theme";
 import "./admin.css";
@@ -50,6 +51,7 @@ function AuthFrame({ title, lead, children }: { title: [string, string]; lead: s
       <div className="pa">
         <section className="pa-story">
           <Link to="/" className="pa-word" aria-label="Pulse — về trang chủ">
+            <PulseMark size={34} className="pa-mark" />
             pulse<span>.</span>
             <small>Manager</small>
           </Link>

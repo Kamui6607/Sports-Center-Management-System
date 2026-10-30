@@ -22,6 +22,8 @@ abstract final class AppPalette {
   static const textMuted = Color(0xFF58695F);
   static const white = Color(0xFFFFFFFF);
   static const scrim = Color(0x8010211A);
+  /// Nền xem ảnh toàn màn hình (cả light & dark).
+  static const viewerBackground = Color(0xF20B1511);
 
   // Chữ trạng thái đậm (alert, số tiền)
   static const successText = Color(0xFF365F29);

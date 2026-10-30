@@ -1,8 +1,8 @@
 import { UserAvatar } from "../../components/UserAvatar";
+import { PulseMark } from "../../shared/PulseMark";
 import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import {
-  Activity,
   Building2,
   CalendarDays,
   CalendarClock,
@@ -361,7 +361,7 @@ export function ManagerLayout({ user, onLogout }: { user: ProfileOk["data"]; onL
       <aside id={sideId} className={"cr-side" + (open ? " open" : "")} aria-label="Điều hướng quản trị">
         <Link to="/manager/dashboard" className="cr-brand" title="Pulse — Quản lý trung tâm thể thao">
           <span className="cr-brand-mark" aria-hidden="true">
-            <Activity size={19} strokeWidth={2.4} />
+            <PulseMark size={34} />
           </span>
           <span className="cr-brand-name">
             Pulse

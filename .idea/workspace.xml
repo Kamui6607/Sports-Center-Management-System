@@ -5,12 +5,34 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="Update Web UI 27/10">
+      <change afterPath="$PROJECT_DIR$/Doc/brand/preview.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Doc/brand/preview.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-app-icon-foreground.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-app-icon-foreground.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-app-icon.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-app-icon.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-glyph.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-logo-horizontal-dark.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-logo-horizontal-light.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-mark-on-dark.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Doc/brand/pulse-mark.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/FE/public/apple-touch-icon.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/FE/public/favicon.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/FE/src/shared/PulseMark.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Mobile/lib/core/widgets/image_viewer.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/app/router/app_router.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/app/router/app_router.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/app/router/route_guard.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/app/router/route_guard.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/network/api_client.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/network/api_client.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/auth/presentation/providers/session_provider.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/auth/presentation/providers/session_provider.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/test/app/route_guard_test.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/test/app/route_guard_test.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/FE/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/landing/GymLanding.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/landing/GymLanding.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/landing/landing.css" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/landing/landing.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/AuthScreens.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/AuthScreens.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/ManagerLayout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/ManagerLayout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/admin.css" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/admin.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/auth.css" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/auth.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FE/src/shared/Brand.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/shared/Brand.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/theme/app_palette.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/theme/app_palette.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/widgets/widgets.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/widgets/widgets.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/products/presentation/product_labels.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/products/presentation/product_labels.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/products/presentation/screens/product_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/products/presentation/screens/product_detail_screen.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -63,7 +85,7 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "com.google.cloudcode.ide_session_index": "20261030_0003",
+    "com.google.cloudcode.ide_session_index": "20261030_0007",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "dart.analysis.tool.window.visible": "false",
     "git-widget-placeholder": "#1 on develop",
@@ -165,6 +187,7 @@
       <workItem from="1793283230643" duration="611000" />
       <workItem from="1793332627212" duration="30000" />
       <workItem from="1793333483620" duration="1596000" />
+      <workItem from="1793336343968" duration="2028000" />
     </task>
     <task id="LOCAL-00001" summary="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10">
       <option name="closed" value="true" />

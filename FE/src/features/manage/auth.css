@@ -27,6 +27,7 @@ html[data-theme="dark"] .pa { --pa-field: #15291f; }
   font-family: var(--pa-display); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--pa-ink); text-decoration: none;
 }
 .pa-word span { color: var(--pa-lime); margin-left: -10px; }
+.pa-word .pa-mark { align-self: center; flex: none; --pm-bg: var(--pa-lime); --pm-fg: #203d31; }
 .pa-word small { font-family: var(--font); font-size: 14px; font-weight: 500; letter-spacing: 0; color: var(--pa-lime); }
 .pa-copy { margin-top: clamp(16px, 6vh, 72px); }
 .pa-story h1 {

@@ -122,12 +122,18 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           children: [
             AspectRatio(
               aspectRatio: 1.6,
-              child: AppNetworkImage(
-                url: p.imageUrl,
-                seed: p.id,
-                placeholderIcon: productIcon(p.name),
-                borderRadius: BorderRadius.zero,
-                iconSize: AppSpacing.xxl,
+              child: GestureDetector(
+                // Chạm ảnh ⇒ xem toàn màn hình, phóng to được.
+                onTap: p.imageUrl == null || p.imageUrl!.isEmpty
+                    ? null
+                    : () => showImageViewer(context, url: p.imageUrl!, semanticLabel: p.name),
+                child: AppNetworkImage(
+                  url: p.imageUrl,
+                  seed: p.id,
+                  placeholderIcon: productIcon(p.name),
+                  borderRadius: BorderRadius.zero,
+                  iconSize: AppSpacing.xxl,
+                ),
               ),
             ),
             Padding(

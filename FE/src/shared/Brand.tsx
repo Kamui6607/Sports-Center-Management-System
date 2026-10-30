@@ -1,9 +1,9 @@
-import { Activity } from "lucide-react";
+import { PulseMark } from "./PulseMark";
 export function Brand() {
   return (
     <span className="brand">
       <span className="brand-mark">
-        <Activity size={25} strokeWidth={2.7} />
+        <PulseMark size={30} boxed={false} />
       </span>
       <span>
         pulse<span className="brand-dot">.</span>

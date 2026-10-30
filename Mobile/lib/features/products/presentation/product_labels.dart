@@ -5,11 +5,12 @@ import '../../../core/theme/status_colors.dart';
 import '../../../core/widgets/status_tag.dart';
 import '../domain/entities/product.dart';
 
+/// Nhãn tồn kho cho người mua: không lộ số lượng còn lại, chỉ báo trạng thái.
 StatusLabel stockLabel(Product p) {
   if (!p.isActive) return const StatusLabel('Ngừng bán', StatusTone.neutral);
   if (!p.inStock) return const StatusLabel('Hết hàng', StatusTone.danger);
-  if (p.lowStock) return StatusLabel('Chỉ còn ${p.availableStock}', StatusTone.warning);
-  return StatusLabel('Còn ${p.availableStock}', StatusTone.success);
+  if (p.lowStock) return const StatusLabel('Sắp hết hàng', StatusTone.warning);
+  return const StatusLabel('Còn hàng', StatusTone.success);
 }
 
 /// Icon placeholder theo loại sản phẩm (khi sản phẩm chưa có ảnh).
