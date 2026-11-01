@@ -4,9 +4,12 @@ import '../../../mock/mock_server.dart';
 import '../../../mock/mock_tables.dart';
 import '../../attendance/domain/entities/attendance.dart';
 import '../../classes/domain/entities/course.dart';
+import '../../makeup/data/makeup_mock_repository.dart';
+import '../../makeup/domain/entities/makeup.dart';
 import '../../notifications/domain/entities/app_notification.dart';
 import '../domain/entities/session.dart';
 import '../domain/repositories/schedule_repository.dart';
+import 'absence_mock_rules.dart';
 import 'session_cancel_mock_rules.dart';
 
 /// Mock theo `BE/src/modules/class-schedules` + `enrollments` + `attendance`.
@@ -37,8 +40,9 @@ class ScheduleMockRepository implements ScheduleRepository {
     } else if (!now.isBefore(s.start)) {
       block = 'Buổi học đã bắt đầu hoặc đã kết thúc.';
     }
-    String? transferBlock = block;
-    if (transferBlock == null && _targets(e).every((t) => t.blockReason != null)) {
+    String? transferBlock = block ?? (e.makeupRequestId != null ? 'Buổi học bù không đổi được.' : null);
+    final targets = transferBlock == null ? _targets(e) : const <TransferOption>[];
+    if (transferBlock == null && targets.every((t) => t.blockReason != null)) {
       transferBlock = 'Không còn buổi nào khác của khóa còn chỗ để đổi.';
     }
     final refund = db.refunds.where((r) => r.scheduleId == s.id && r.memberProfileId == e.memberProfileId).firstOrNull;
@@ -50,6 +54,18 @@ class ScheduleMockRepository implements ScheduleRepository {
       cancelBlockReason: block,
       transferBlockReason: transferBlock,
       refundId: refund?.id,
+      absenceReason: memberAbsenceReason(att),
+      absencesLeft: memberAbsencesLeft(db, e.memberProfileId, s.classId),
+      transferEmptyReason: block != null
+          ? null
+          : e.makeupRequestId != null
+          ? TransferEmptyReason.notAvailable
+          : transferEmptyReasonOf(null, targets),
+      makeupRequest: switch (mockRequestOfEnrollment(db, e.id)) {
+        final r? => mockMakeupRequest(db, r),
+        null => null,
+      },
+      isMakeupEnrollment: e.makeupRequestId != null,
     );
   }
 
@@ -96,6 +112,11 @@ class ScheduleMockRepository implements ScheduleRepository {
     e
       ..status = EnrollmentStatus.cancelled
       ..cancelledAt = db.now();
+    releaseMockMakeup(db, e.memberProfileId, e.sessionId);
+    clearMemberAbsence(db, e.memberProfileId, e.sessionId);
+    for (final r in db.makeupRequests.where((r) => r.id == e.makeupRequestId)) {
+      r.status = MakeupStatus.cancelled;
+    }
     final s = db.session(e.sessionId);
     db.notify(
       member.userId,
@@ -116,7 +137,9 @@ class ScheduleMockRepository implements ScheduleRepository {
         .toList();
     return db
         .sessionsOf(current.classId)
-        .where((s) => s.id != current.id && s.status == ScheduleStatus.scheduled && s.start.isAfter(now))
+        .where(
+          (s) => s.id != current.id && !s.isMakeupSlot && s.status == ScheduleStatus.scheduled && s.start.isAfter(now),
+        )
         .map((s) {
           String? reason;
           if (mine.any((m) => m.id == s.id)) {
@@ -139,7 +162,15 @@ class ScheduleMockRepository implements ScheduleRepository {
     final member = _server.requireMember();
     final e = _server.db.enrollments.firstWhere((x) => x.id == enrollmentId);
     if (e.memberProfileId != member.id) throw const AppFailure.forbidden();
-    return TransferOptions(options: _targets(e));
+    final targets = _targets(e);
+    final s = _server.db.session(e.sessionId);
+    final request = mockRequestOfEnrollment(_server.db, e.id);
+    return TransferOptions(
+      options: targets,
+      emptyReason: transferEmptyReasonOf(null, targets),
+      absencesLeft: memberAbsencesLeft(_server.db, e.memberProfileId, s.classId),
+      makeupRequest: request == null ? null : mockMakeupRequest(_server.db, request),
+    );
   });
 
   @override
@@ -150,10 +181,13 @@ class ScheduleMockRepository implements ScheduleRepository {
     if (e.memberProfileId != member.id) throw const AppFailure.forbidden('Bạn chỉ đổi được chỗ của mình.');
     final block = _toMySession(e).cancelBlockReason;
     if (block != null) throw AppFailure.business(block);
+    if (e.makeupRequestId != null) throw const AppFailure.business('Buổi học bù không đổi được.');
     final target = _targets(e).where((t) => t.session.id == targetSessionId).firstOrNull;
     if (target == null) throw const AppFailure.business('Buổi đích không hợp lệ (phải cùng khóa, chưa diễn ra).');
     if (target.blockReason != null) throw AppFailure.conflict(target.blockReason!);
     final from = db.session(e.sessionId);
+    releaseMockMakeup(db, e.memberProfileId, from.id);
+    clearMemberAbsence(db, e.memberProfileId, from.id);
     e.sessionId = targetSessionId;
     final to = db.session(targetSessionId);
     db.notify(
@@ -164,6 +198,23 @@ class ScheduleMockRepository implements ScheduleRepository {
       metadata: {'scheduleId': to.id, 'classId': to.classId},
     );
   });
+
+  EnrollmentRow _ownEnrollment(String enrollmentId) {
+    final member = _server.requireMember();
+    final e = _server.db.enrollments.where((x) => x.id == enrollmentId).firstOrNull;
+    if (e == null) throw const AppFailure.notFound('Không tìm thấy chỗ đã giữ.');
+    if (e.memberProfileId != member.id) throw const AppFailure.forbidden();
+    return e;
+  }
+
+  @override
+  Future<void> reportAbsence(String enrollmentId, String reason, {bool requestMakeup = false}) => _server.run(
+    () => reportMemberAbsence(_server.db, _ownEnrollment(enrollmentId), reason, requestMakeup: requestMakeup),
+  );
+
+  @override
+  Future<void> cancelAbsence(String enrollmentId) =>
+      _server.run(() => cancelMemberAbsence(_server.db, _ownEnrollment(enrollmentId)));
 
   // ── Coach ──────────────────────────────────────────────────────────────
 
@@ -209,6 +260,7 @@ class ScheduleMockRepository implements ScheduleRepository {
                 enrollmentStatus: e.status,
                 attendance: att?.status,
                 note: att?.note,
+                absenceReason: memberAbsenceReason(att),
               );
             })
             .toList()

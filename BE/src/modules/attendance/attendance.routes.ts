@@ -9,6 +9,7 @@ import {
   UpdateAttendanceSchema,
   GenerateQrSchema,
   ScanQrSchema,
+  CoachScanSchema,
   AttendanceRosterQuerySchema,
   MyAttendanceQuerySchema,
   PenaltyListQuerySchema,
@@ -156,6 +157,39 @@ router.put("/schedule/:scheduleId", authorize("COACH", "MANAGER"), validate(Bulk
  *       200: { description: "{ revokedManualCodes, qrTokenTtlSeconds }" }
  */
 router.delete("/qr/:scheduleId", authorize("COACH", "MANAGER"), controller.revokeAttendanceCodes);
+
+/**
+ * @swagger
+ * /attendance/coach-scan:
+ *   post:
+ *     summary: "HLV/quản lý quét thẻ thành viên của học viên ⇒ kiểm có trong buổi đang dạy + điểm danh"
+ *     description: |
+ *       - `token`: mã QR động trên thẻ thành viên (JWT `MEMBER_PASS`, 60 giây). Lượt quét được ghi nhật ký vào cửa.
+ *       - `scheduleId` (tùy chọn): buổi đang mở trên màn buổi dạy. Bỏ trống ⇒ tìm buổi SCHEDULED của HLV trong cửa sổ
+ *         điểm danh (30 phút trước giờ bắt đầu → 30 phút sau giờ kết thúc) mà học viên có giữ chỗ.
+ *       - `state`: `CHECKED_IN` (vừa ghi PRESENT, hoặc LATE nếu quá 10 phút sau giờ bắt đầu) · `ALREADY_CHECKED_IN` ·
+ *         `NOT_IN_CLASS` (có buổi đang dạy nhưng học viên không giữ chỗ) · `NO_ACTIVE_SESSION`.
+ *       - Gói thành viên không chặn điểm danh lớp; trạng thái gói nằm trong `pass` (giống `/memberships/pass/verify`).
+ *     tags: [Attendance]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token: { type: string }
+ *               scheduleId: { type: string, format: uuid }
+ *     responses:
+ *       200: { description: "{ state, session, attendance, pass }" }
+ *       400: { description: "Mã thẻ hết hạn (PASS_EXPIRED) / không hợp lệ (PASS_INVALID)" }
+ *       403: { description: "Buổi không thuộc HLV" }
+ *       409: { description: "Buổi (scheduleId) ngoài cửa sổ điểm danh hoặc đã đóng" }
+ */
+router.post("/coach-scan", authorize("COACH", "MANAGER"), validate(CoachScanSchema), controller.coachScan);
 
 /**
  * @swagger

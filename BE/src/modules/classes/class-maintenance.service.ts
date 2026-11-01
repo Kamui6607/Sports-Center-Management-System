@@ -49,7 +49,10 @@ export async function runClassMaintenance(now = new Date()): Promise<ClassMainte
       status: true,
       alertStage: true,
       coach: { select: { userId: true } },
-      schedules: { select: { id: true, startTime: true, endTime: true, status: true, makeupForId: true } },
+      schedules: {
+        where: { isMakeupSlot: false },
+        select: { id: true, startTime: true, endTime: true, status: true, makeupForId: true },
+      },
     },
   });
   if (classes.length === 0) return result;

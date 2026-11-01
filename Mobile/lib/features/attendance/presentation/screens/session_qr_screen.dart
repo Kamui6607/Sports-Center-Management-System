@@ -155,7 +155,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
                   child: Column(
                     children: [
                       Text(
-                        'Mã dự phòng (cho học viên không quét được)',
+                        'Mã dự phòng (cho học viên không quét được) — đổi cùng mã QR',
                         textAlign: TextAlign.center,
                         style: context.text.caption.copyWith(color: c.textMuted),
                       ),
@@ -164,9 +164,10 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
                         t?.manualCode.split('').join(' ') ?? '— — — — — —',
                         style: context.text.display.copyWith(letterSpacing: 4, fontFeatures: kTabularFigures),
                       ),
-                      if (t != null)
+                      // Mã cũ bị thu hồi khi QR đổi ⇒ hạn thực tế là lần đổi kế tiếp (sớm hơn TTL 90s).
+                      if (t != null && _nextRefresh != null)
                         Text(
-                          'Hiệu lực đến ${VnTime.time(t.expiresAt)}',
+                          'Hiệu lực đến ${VnTime.time(t.expiresAt.isBefore(_nextRefresh!) ? t.expiresAt : _nextRefresh!)}',
                           style: context.text.caption.copyWith(color: c.textMuted),
                         ),
                     ],

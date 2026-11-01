@@ -50,6 +50,7 @@ class MockDatabase {
   final memberships = <MembershipRow>[];
   final coachLeaves = <CoachLeaveRow>[];
   final coachCheckIns = <CoachCheckInRow>[];
+  final makeupRequests = <MakeupRequestRow>[];
 
   /// Phí check-in còn nợ theo HLV (ví chưa đủ tiền để trừ).
   final checkinDebts = <String, int>{};
@@ -104,7 +105,8 @@ class MockDatabase {
       sessions.where((s) => s.classId == classId).toList()..sort((a, b) => a.start.compareTo(b.start));
 
   /// Buổi chính (không tính buổi dạy bù).
-  List<SessionRow> mainSessionsOf(String classId) => sessionsOf(classId).where((s) => s.makeupForId == null).toList();
+  List<SessionRow> mainSessionsOf(String classId) =>
+      sessionsOf(classId).where((s) => s.makeupForId == null && !s.isMakeupSlot).toList();
 
   int bookedCount(String sessionId) =>
       enrollments.where((e) => e.sessionId == sessionId && e.status != EnrollmentStatus.cancelled).length;

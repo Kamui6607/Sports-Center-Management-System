@@ -86,7 +86,8 @@ export async function buildClassSummaries(
 
   const [schedules, enrollments, holds] = await Promise.all([
     prisma.classSchedule.findMany({
-      where: { classId: { in: ids } },
+      // Buổi bù mở không tính vào số buổi / chỗ trống / hạn mở bán.
+      where: { classId: { in: ids }, isMakeupSlot: false },
       select: {
         id: true,
         classId: true,
@@ -215,7 +216,7 @@ export async function getMemberPurchase(memberId: string, classId: string, now =
       orderBy: { createdAt: "desc" },
       select: { id: true, createdAt: true },
     }),
-    prisma.classSchedule.count({ where: { classId, status: "SCHEDULED", startTime: { gt: now } } }),
+    prisma.classSchedule.count({ where: { classId, status: "SCHEDULED", startTime: { gt: now }, isMakeupSlot: false } }),
     prisma.enrollment.count({
       where: { memberId, status: "BOOKED", schedule: { classId, status: "SCHEDULED", startTime: { gt: now } } },
     }),

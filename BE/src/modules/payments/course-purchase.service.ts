@@ -84,7 +84,7 @@ export async function prepareCourseCheckout(
   if (Number(cls.price) <= 0) throw new AppError("Khóa học miễn phí, không cần thanh toán.", 400);
 
   const sessions = await tx.classSchedule.findMany({
-    where: { classId },
+    where: { classId, isMakeupSlot: false },
     orderBy: { startTime: "asc" },
     select: {
       id: true,
@@ -167,7 +167,7 @@ export async function enrollPaidCourse(
   await lockMemberClass(tx, memberId, classId);
   const cls = await tx.class.findUnique({ where: { id: classId }, select: { capacity: true, status: true, isActive: true } });
   const sessions = await tx.classSchedule.findMany({
-    where: { classId, status: "SCHEDULED", startTime: { gt: now } },
+    where: { classId, status: "SCHEDULED", startTime: { gt: now }, isMakeupSlot: false },
     orderBy: { startTime: "asc" },
     select: { id: true },
   });

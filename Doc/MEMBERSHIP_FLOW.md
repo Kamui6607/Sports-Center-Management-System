@@ -34,6 +34,7 @@
 - Manager (Web hoặc Mobile chế độ demo) / HLV (Mobile) **quét** ⇒ `POST /memberships/pass/verify` ⇒ trả *Hợp lệ / Hết hạn / Chưa có gói / Tài khoản bị khóa* và **ghi nhật ký vào cửa** (`MemberPassScan`). Hệ thống không tự khóa ai — người quét quyết định.
 - Thẻ cho thấy: tên, ảnh, gói đang dùng, **hiệu lực đến (gồm cả gói xếp hàng)**, số ngày còn lại, thanh tiến độ, các gói xếp hàng.
 - `GET /memberships/verify/:userId` (QR tĩnh cũ) chỉ còn cho **Manager tra cứu** (không dùng để vào cửa).
+- **HLV quét thẻ học viên** trên Mobile dùng `POST /attendance/coach-scan`: điểm danh luôn buổi đang dạy; gói gym không chặn điểm danh lớp.
 
 ### 2.4. Manager hủy gói của hội viên
 - `POST /memberships/:id/cancel { reason, refundAmount? }`: gói → `CANCELLED`; các gói xếp hàng phía sau **dời lên** đúng số ngày bị cắt.
@@ -57,6 +58,7 @@
 | GET | `/memberships/my/history` | MEMBER | mọi gói đã mua + số tiền lúc mua |
 | GET | `/memberships/my/pass` | MEMBER | mã QR động 60 giây |
 | POST | `/memberships/pass/verify` | MANAGER, COACH | quét thẻ ⇒ kết quả + ghi nhật ký |
+| POST | `/attendance/coach-scan` | COACH, MANAGER | quét thẻ học viên ⇒ đối chiếu buổi đang dạy + điểm danh (xem `GYM_SCOPE_CHANGES.md` §26) |
 | GET | `/memberships/pass/scans` | MANAGER | nhật ký vào cửa |
 | GET | `/memberships` | MANAGER | thêm lọc `search`, `planId` |
 | POST | `/memberships/:id/cancel` | MANAGER | hủy + hoàn (tùy chọn) |

@@ -39,6 +39,17 @@ export const ScanQrSchema = z
     message: "Chỉ gửi một trong hai: qrToken hoặc code",
   });
 
+/**
+ * POST /attendance/coach-scan — HLV/quản lý quét mã QR động trên thẻ thành viên của học viên tại lớp.
+ * `scheduleId` (tùy chọn): mở từ màn buổi dạy ⇒ điểm danh đúng buổi đó; bỏ trống ⇒ server tự tìm buổi đang diễn ra.
+ */
+export const CoachScanSchema = z
+  .object({
+    token: z.string().trim().min(10).max(2000),
+    scheduleId: z.string().uuid().optional(),
+  })
+  .strict();
+
 export const AttendanceRosterQuerySchema = z.object({
   scheduleId: z.string().min(1, "scheduleId là bắt buộc"),
 });

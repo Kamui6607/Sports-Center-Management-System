@@ -10,6 +10,9 @@ import { findActivePenalty } from "../attendance/attendance-penalties.service.js
 import { ROLE_NAME_SELECT } from "../../utils/roles.js";
 import { findSessionsBlockedByRefund, throwSessionRefundedError, createMemberSessionRefundTx, notifyManagersNewRefunds, SESSION_REFUND_MIN_HOURS } from "../refunds/refunds.service.js";
 import { vnClock, vnDateKey, vnWeekdayIso, vnWeekdayLabel } from "../../utils/vnTime.js";
+import { absenceQuotaOf, clearMemberAbsenceTx } from "./absence.service.js";
+import { activeRequestOfEnrollment } from "../makeup-requests/makeup-requests.service.js";
+import { guestSeatCap } from "../../config/makeup.js";
 
 type BookableSchedule = {
   id: string;
@@ -29,7 +32,7 @@ type BookableSchedule = {
  * `excludeEnrollmentId`: dùng khi transfer — chỗ cũ sắp được nhả nên không tính là trùng giờ.
  * Trả về enrollment cũ (đang CANCELLED) nếu có, để caller kích hoạt lại theo BR-07.
  */
-async function assertCanBook(
+export async function assertCanBook(
   tx: Prisma.TransactionClient,
   memberProfileId: string,
   schedule: BookableSchedule,
@@ -117,6 +120,8 @@ export async function bookClass(
     throw new AppError("This schedule is not available for booking", 400);
   if (schedule.startTime <= new Date())
     throw new AppError("Cannot book a past class", 400);
+  if (schedule.isMakeupSlot)
+    throw new AppError("Buổi bù chỉ dành cho học viên được xếp học bù.", 400, { code: "MAKEUP_SLOT_NOT_BOOKABLE" });
 
   const booked = await prisma.$transaction(async (tx) => {
     // Serialize booking theo member + schedule để chống overbooking & vượt quota khi concurrent:
@@ -224,6 +229,15 @@ export async function cancelEnrollment(
       data: { status: "CANCELLED", cancelledAt: new Date() },
     });
     if (res.count !== 1) throw new AppError("Only BOOKED enrollments can be cancelled", 409);
+    // Chỗ không còn ở buổi này ⇒ báo vắng (nếu có) không còn ý nghĩa, trả lại lượt báo vắng.
+    await clearMemberAbsenceTx(tx, enrollment.memberId, enrollment.scheduleId);
+    // Hủy chỗ HỌC BÙ ⇒ yêu cầu học bù kết thúc (CANCELLED).
+    if (enrollment.makeupRequestId) {
+      await tx.makeupRequest.updateMany({
+        where: { id: enrollment.makeupRequestId, status: "SCHEDULED" },
+        data: { status: "CANCELLED", resolvedAt: new Date(), resolvedById: userId },
+      });
+    }
     const updated = await tx.enrollment.findUniqueOrThrow({
       where: { id: enrollmentId },
       include: { member: { select: { id: true, userId: true } }, schedule: { include: { class: true } } },
@@ -425,6 +439,10 @@ export async function transferEnrollment(
 
   if (enrollment.status !== "BOOKED")
     throw new AppError("Only BOOKED enrollments can be transferred", 400);
+  if (enrollment.makeupRequestId)
+    throw new AppError("Buổi học bù không đổi được — hủy buổi này nếu không tham gia được.", 400, {
+      code: "MAKEUP_ENROLLMENT_NOT_TRANSFERABLE",
+    });
 
   if (enrollment.scheduleId === targetScheduleId)
     throw new AppError("Target schedule is the same as the current schedule", 409);
@@ -448,7 +466,7 @@ export async function transferEnrollment(
   });
   if (!target) throw new AppError("Target schedule not found", 404);
 
-  if (!isEligibleTarget(enrollment, target)) {
+  if (target.isMakeupSlot || !isEligibleTarget(enrollment, target)) {
     throw new AppError(
       "Chỉ đổi được sang buổi của chính khóa này hoặc khóa tương đương (cùng HLV, cùng hạng, đang mở bán).",
       400,
@@ -497,12 +515,22 @@ export async function transferEnrollment(
         "Enrollment is no longer BOOKED (it may have been transferred or cancelled already)",
         409
       );
+    await clearMemberAbsenceTx(tx, enrollment.memberId, enrollment.scheduleId);
 
     const existingTarget = await assertCanBook(tx, enrollment.memberId, target, {
       excludeEnrollmentId: enrollment.id,
       quotaExemptClassId: paidClassId,
       paidClassId,
     });
+    // Chỗ khách (từ khóa khác) trên buổi chính có giới hạn (Doc/MAKEUP_ABSENCE_PLAN.md §3.5).
+    if (crossClass) {
+      const guests = await tx.enrollment.count({
+        where: { scheduleId: targetScheduleId, status: { in: ["BOOKED", "COMPLETED"] }, sourceClassId: { not: null } },
+      });
+      if (guests >= guestSeatCap(target.class.capacity)) {
+        throw new AppError("Buổi này đã đủ chỗ dành cho học viên khóa khác.", 409, { code: "GUEST_SEATS_FULL" });
+      }
+    }
 
     const enrollmentInclude = { schedule: { include: { class: true, room: true } } };
     const transferData = {
@@ -542,6 +570,27 @@ export async function transferEnrollment(
 }
 
 /**
+ * Vì sao hội viên KHÔNG chọn được buổi nào (null = có buổi chọn được) — để app giải thích + chỉ lối ra:
+ * `TOO_LATE` · `LIMIT` · `NOT_AVAILABLE` (chỗ không còn BOOKED / buổi đã bắt đầu) ·
+ * `NO_MAKEUP_OR_EQUIVALENT` (khóa chưa có buổi bù, HLV không có khóa tương đương) · `ALL_FULL` · `ALL_CONFLICT` ·
+ * `ALL_UNAVAILABLE` (lẫn hết chỗ + trùng giờ).
+ */
+function transferEmptyReason(
+  canTransfer: boolean,
+  blockReason: string | null,
+  options: { canSelect: boolean; isFull: boolean; conflictWith: unknown }[]
+): string | null {
+  if (!canTransfer) {
+    return blockReason === "ENROLLMENT_TRANSFER_TOO_LATE" ? "TOO_LATE" : blockReason === "TRANSFER_LIMIT" ? "LIMIT" : "NOT_AVAILABLE";
+  }
+  if (options.length === 0) return "NO_MAKEUP_OR_EQUIVALENT";
+  if (options.some((o) => o.canSelect)) return null;
+  if (options.every((o) => o.isFull)) return "ALL_FULL";
+  if (options.every((o) => o.conflictWith)) return "ALL_CONFLICT";
+  return "ALL_UNAVAILABLE";
+}
+
+/**
  * Các buổi hội viên có thể ĐỔI SANG: buổi khác của chính khóa + buổi của khóa tương đương (cùng HLV, cùng hạng),
  * còn SCHEDULED và (với hội viên) còn ≥ 24h. Mỗi buổi kèm khóa, thứ/giờ VN, phòng, chỗ trống, xung đột lịch.
  * `date=YYYY-MM-DD` / `weekday=1..7` (tùy chọn) để lọc.
@@ -569,6 +618,7 @@ export async function getTransferOptions(
   let canTransfer = true;
   let blockReason: string | null = null;
   if (enrollment.status !== "BOOKED") { canTransfer = false; blockReason = "ENROLLMENT_NOT_BOOKED"; }
+  else if (enrollment.makeupRequestId) { canTransfer = false; blockReason = "MAKEUP_ENROLLMENT"; }
   else if (hoursLeft <= 0) { canTransfer = false; blockReason = "SESSION_ALREADY_STARTED"; }
   else if (role === "MEMBER" && hoursLeft < SESSION_REFUND_MIN_HOURS) { canTransfer = false; blockReason = "ENROLLMENT_TRANSFER_TOO_LATE"; }
   else if (role === "MEMBER" && transfersUsed >= MAX_TRANSFERS_PER_COURSE) { canTransfer = false; blockReason = "TRANSFER_LIMIT"; }
@@ -581,6 +631,8 @@ export async function getTransferOptions(
         status: "SCHEDULED",
         startTime: { gt: earliest },
         id: { not: enrollment.scheduleId },
+        // Buổi bù mở chỉ dành cho yêu cầu học bù (xem /makeup-requests).
+        isMakeupSlot: false,
         OR: [
           { classId: { in: [...new Set([enrollment.schedule.classId, paidClassId])] } },
           { class: { coachId: cls.coachId, classType: cls.classType, status: "APPROVED", isActive: true } },
@@ -640,6 +692,13 @@ export async function getTransferOptions(
     enrollmentId,
     canTransfer,
     blockReason,
+    emptyReason: transferEmptyReason(canTransfer, blockReason, options),
+    /** Lượt báo vắng còn lại của khóa (Doc/MAKEUP_ABSENCE_PLAN.md §3.1). */
+    absence: await absenceQuotaOf(enrollment),
+    /** Yêu cầu học bù của chỗ này (đang chờ / đã xếp / bị từ chối gần nhất). */
+    makeupRequest: await activeRequestOfEnrollment(enrollmentId),
+    /** Chỗ này là chỗ HỌC BÙ (không đổi được). */
+    isMakeupEnrollment: !!enrollment.makeupRequestId,
     minHoursBefore: SESSION_REFUND_MIN_HOURS,
     transfersUsed,
     transfersLeft: Math.max(0, MAX_TRANSFERS_PER_COURSE - transfersUsed),

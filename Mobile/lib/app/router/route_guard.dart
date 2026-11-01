@@ -83,7 +83,7 @@ abstract final class RouteGuard {
       if (entry.key != role && entry.value.any(location.startsWith)) return home;
     }
     // Chỉ HLV / Quản lý kiểm tra thẻ thành viên.
-    if (role == UserRole.member && location == AppRoutes.membershipScanner) return home;
+    if (role == UserRole.member && location.startsWith(AppRoutes.membershipScanner)) return home;
     // Manager không mua hàng / khóa học trên Mobile.
     if (role == UserRole.manager &&
         (location.startsWith('/payment/') || location == AppRoutes.orders || location == AppRoutes.shop)) {

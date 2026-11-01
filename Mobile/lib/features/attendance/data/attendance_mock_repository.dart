@@ -3,6 +3,9 @@ import 'dart:math';
 import '../../../core/error/app_failure.dart';
 import '../../../mock/mock_server.dart';
 import '../../../mock/mock_tables.dart';
+import '../../auth/domain/entities/app_user.dart';
+import '../../membership/data/membership_mock_repository.dart';
+import '../../schedule/data/absence_mock_rules.dart';
 import '../../schedule/domain/entities/session.dart';
 import '../domain/entities/attendance.dart';
 import '../domain/repositories/attendance_repository.dart';
@@ -44,11 +47,20 @@ class AttendanceMockRepository implements AttendanceRepository {
     );
     if (!enrolled) throw const AppFailure.forbidden('Bạn không có chỗ trong buổi học này.');
     final existing = db.attendance.where((a) => a.sessionId == s.id && a.memberProfileId == member.id).firstOrNull;
-    if (existing != null) {
+    // Đã tự báo vắng nhưng vẫn đến lớp ⇒ cho điểm danh ghi đè.
+    if (existing != null && memberAbsenceReason(existing) == null) {
       throw const AppFailure.conflict('Bạn đã điểm danh buổi học này rồi.', code: 'ALREADY_CHECKED_IN');
     }
     final status = now.isAfter(s.start.add(lateAfter)) ? AttendanceStatus.late : AttendanceStatus.present;
-    db.attendance.add(AttendanceRow(id: db.nextId('att'), sessionId: s.id, memberProfileId: member.id, status: status));
+    if (existing != null) {
+      existing
+        ..status = status
+        ..note = null;
+    } else {
+      db.attendance.add(
+        AttendanceRow(id: db.nextId('att'), sessionId: s.id, memberProfileId: member.id, status: status),
+      );
+    }
     return CheckInResult(
       className: db.classRow(s.classId).name,
       startTime: s.start,
@@ -194,4 +206,85 @@ class AttendanceMockRepository implements AttendanceRepository {
         )
         .length,
   );
+
+  /// BE `ATTENDANCE.LATE_AFTER_MINUTES` cho HLV quét thẻ.
+  static const coachScanLateAfter = Duration(minutes: 10);
+
+  @override
+  Future<CoachScanResult> coachScan(String passToken, {String? sessionId}) => _server.run(() {
+    final db = _server.db;
+    final me = _server.requireRole(UserRole.coach);
+    final coach = db.coachOfUser(me.id)!;
+    final now = db.now();
+    bool inWindow(SessionRow s) =>
+        s.status == ScheduleStatus.scheduled &&
+        !now.isBefore(s.start.subtract(const Duration(minutes: 30))) &&
+        !now.isAfter(s.end.add(const Duration(minutes: 30)));
+
+    SessionRow? fixed;
+    if (sessionId != null) {
+      fixed = _server.requireOwnedSession(sessionId);
+      if (!inWindow(fixed)) throw const AppFailure.conflict('Buổi học không trong khung giờ điểm danh.');
+    }
+    final pass = MembershipMockRepository.verifyUser(
+      db,
+      MembershipMockRepository.userIdOfPass(db, passToken),
+      scannerUserId: me.id,
+      scannerRole: me.role,
+    );
+    final member = db.memberOfUser(pass.userId);
+    final candidates = fixed != null
+        ? [fixed]
+        : db.sessions.where((s) => inWindow(s) && db.classRow(s.classId).coachProfileId == coach.id).toList();
+    CoachScanSession view(SessionRow s) => CoachScanSession(
+      id: s.id,
+      className: db.classRow(s.classId).name,
+      startTime: s.start,
+      endTime: s.end,
+      roomName: db.room(s.roomId).name,
+    );
+    final s = member == null
+        ? null
+        : candidates
+              .where(
+                (c) => db.enrollments.any(
+                  (e) =>
+                      e.sessionId == c.id && e.memberProfileId == member.id && e.status != EnrollmentStatus.cancelled,
+                ),
+              )
+              .firstOrNull;
+    if (s == null) {
+      return CoachScanResult(
+        state: candidates.isEmpty ? CoachScanState.noActiveSession : CoachScanState.notInClass,
+        session: candidates.length == 1 ? view(candidates.first) : null,
+        pass: pass,
+      );
+    }
+    final status = now.isAfter(s.start.add(coachScanLateAfter)) ? AttendanceStatus.late : AttendanceStatus.present;
+    final existing = db.attendance.where((a) => a.sessionId == s.id && a.memberProfileId == member!.id).firstOrNull;
+    if (existing != null && (existing.status == AttendanceStatus.present || existing.status == AttendanceStatus.late)) {
+      return CoachScanResult(
+        state: CoachScanState.alreadyCheckedIn,
+        session: view(s),
+        attendanceStatus: existing.status,
+        pass: pass,
+      );
+    }
+    if (existing != null) {
+      existing
+        ..status = status
+        ..note = 'HLV quét thẻ thành viên';
+    } else {
+      db.attendance.add(
+        AttendanceRow(
+          id: db.nextId('att'),
+          sessionId: s.id,
+          memberProfileId: member!.id,
+          status: status,
+          note: 'HLV quét thẻ thành viên',
+        ),
+      );
+    }
+    return CoachScanResult(state: CoachScanState.checkedIn, session: view(s), attendanceStatus: status, pass: pass);
+  });
 }

@@ -35,6 +35,9 @@ abstract final class AppRoutes {
   /// HLV / Quản lý quét QR thẻ thành viên của hội viên.
   static const membershipScanner = '/membership/scan';
 
+  /// HLV quét thẻ học viên để điểm danh đúng buổi đang mở.
+  static String membershipScannerFor(String sessionId) => '$membershipScanner?session=$sessionId';
+
   // Coach onboarding
   static const onboardingCv = '/onboarding/cv';
   static const onboardingStatus = '/onboarding/status';
@@ -90,6 +93,15 @@ abstract final class AppRoutes {
   static const coachPass = '/coach/pass';
   static const coachCheckin = '/coach/checkin';
   static const coachCheckinScan = '/coach/checkin/scan';
+
+  /// HLV: yêu cầu học bù (Doc/MAKEUP_ABSENCE_PLAN.md).
+  static const coachMakeupRequests = '/coach/makeup';
+  static String coachMakeupRequest(String id) => '/coach/makeup/$id';
+  static String coachOpenMakeupSlot(String classId, {String? requestId}) =>
+      '/coach/makeup-slot/$classId${requestId == null ? '' : '?request=$requestId'}';
+
+  /// Học viên: yêu cầu học bù của tôi.
+  static const myMakeupRequests = '/member/makeup';
 
   // Manager — tab
   static const managerHome = '/r/home';

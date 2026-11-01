@@ -1,3 +1,4 @@
+import '../../../api/membership_json.dart';
 import '../../../api/payment_json.dart';
 import '../../../core/error/app_failure.dart';
 import '../../../core/network/api_client.dart';
@@ -88,23 +89,6 @@ class MembershipApiRepository implements MembershipRepository {
   }
 
   @override
-  Future<MembershipVerifyResult> verifyPass(String token) async {
-    final j = (await _api.post('/memberships/pass/verify', body: {'token': token})).json;
-    final member = j.obj('member');
-    final m = j.objOrNull('membership');
-    final valid = j.boolean('valid');
-    return MembershipVerifyResult(
-      userId: member.str('userId'),
-      fullName: member.str('fullName'),
-      avatarUrl: ApiClient.absoluteUrl(member.strOrNull('avatarUrl')),
-      isActive: valid,
-      status: valid ? MembershipStatus.active : (m == null ? null : MembershipStatus.expired),
-      planName: m?.strOrNull('planName'),
-      endDate: j.dateOrNull('validUntil') ?? m?.dateOrNull('endDate'),
-      daysLeft: j.integer('totalDaysLeft'),
-      reason: j.strOrNull('reason'),
-      entriesToday: j.integer('entriesToday'),
-      isMyStudent: j['isMyStudent'] is bool ? j['isMyStudent'] as bool : null,
-    );
-  }
+  Future<MembershipVerifyResult> verifyPass(String token) async =>
+      MembershipJson.verify((await _api.post('/memberships/pass/verify', body: {'token': token})).json);
 }

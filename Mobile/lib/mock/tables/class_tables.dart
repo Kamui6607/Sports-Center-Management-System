@@ -4,6 +4,7 @@
 import '../../features/attendance/domain/entities/attendance.dart';
 import '../../features/catalog/domain/entities/catalog.dart';
 import '../../features/classes/domain/entities/course.dart';
+import '../../features/makeup/domain/entities/makeup.dart';
 import '../../features/schedule/domain/entities/session.dart';
 
 class ClassRow {
@@ -45,6 +46,8 @@ class SessionRow {
     required this.end,
     this.status = ScheduleStatus.scheduled,
     this.makeupForId,
+    this.isMakeupSlot = false,
+    this.slotCapacity,
   });
 
   final String id;
@@ -54,6 +57,10 @@ class SessionRow {
   DateTime end;
   ScheduleStatus status;
   final String? makeupForId;
+
+  /// Buổi bù mở do HLV tạo (không phải buổi chính).
+  final bool isMakeupSlot;
+  final int? slotCapacity;
   String? cancelReason;
   CancelResolutionMode? resolution;
 }
@@ -65,6 +72,7 @@ class EnrollmentRow {
     required this.sessionId,
     required this.bookedAt,
     this.status = EnrollmentStatus.booked,
+    this.makeupRequestId,
   });
 
   final String id;
@@ -73,6 +81,39 @@ class EnrollmentRow {
   EnrollmentStatus status;
   final DateTime bookedAt;
   DateTime? cancelledAt;
+
+  /// Chỗ học bù được xếp theo yêu cầu này.
+  final String? makeupRequestId;
+}
+
+/// `MakeupRequest` — yêu cầu học bù cho buổi đã báo vắng.
+class MakeupRequestRow {
+  MakeupRequestRow({
+    required this.id,
+    required this.memberProfileId,
+    required this.missedEnrollmentId,
+    required this.missedSessionId,
+    required this.paidClassId,
+    required this.coachProfileId,
+    required this.reason,
+    required this.requestedAt,
+    required this.expiresAt,
+    required this.refundEligible,
+  });
+
+  final String id;
+  final String memberProfileId;
+  final String missedEnrollmentId;
+  final String missedSessionId;
+  final String paidClassId;
+  final String coachProfileId;
+  final String reason;
+  final DateTime requestedAt;
+  final DateTime expiresAt;
+  final bool refundEligible;
+  MakeupStatus status = MakeupStatus.pending;
+  String? targetSessionId;
+  String? rejectReason;
 }
 
 class AttendanceRow {

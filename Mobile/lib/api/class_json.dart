@@ -201,6 +201,7 @@ abstract final class ClassJson {
       capacity: cls.integer('capacity', room?.integer('capacity') ?? 0),
       makeupForId: s.strOrNull('makeupForId'),
       makeupSessionId: makeupSessionId,
+      isMakeupSlot: s.boolean('isMakeupSlot'),
       // BE-20: lý do & phương án hủy được lưu ở buổi học.
       cancelReason: s.strOrNull('cancelReason'),
       cancelResolution:

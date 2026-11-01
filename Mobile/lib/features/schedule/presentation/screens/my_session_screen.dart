@@ -13,6 +13,8 @@ import '../../data/schedule_repository_provider.dart';
 import '../../domain/entities/session.dart';
 import '../providers/schedule_providers.dart';
 import '../session_labels.dart';
+import '../widgets/session_change_sheets.dart';
+import '../widgets/session_makeup_card.dart';
 
 /// M10 — Chi tiết buổi học của Member (+ M16 hủy buổi, M17 đổi buổi).
 class MySessionScreen extends ConsumerWidget {
@@ -57,7 +59,7 @@ class _Content extends ConsumerWidget {
     final cancelled = s.status == ScheduleStatus.cancelled;
     final canCheckIn =
         !cancelled &&
-        item.attendance == null &&
+        (item.attendance == null || item.hasReportedAbsence) &&
         item.enrollmentStatus != EnrollmentStatus.cancelled &&
         !now.isBefore(s.startTime.subtract(MySessionScreen.checkInWindow)) &&
         now.isBefore(s.endTime);
@@ -74,6 +76,7 @@ class _Content extends ConsumerWidget {
                 children: [
                   sessionStatus(s, now).tag(),
                   if (s.isMakeup) const StatusLabel('Buổi dạy bù', StatusTone.brand).tag(),
+                  if (item.isMakeupEnrollment) const StatusLabel('Học bù', StatusTone.brand).tag(),
                   (item.attendance?.status ??
                           (s.hasEnded(now) && !cancelled ? notCheckedIn : item.enrollmentStatus.status))
                       .tag(),
@@ -120,6 +123,24 @@ class _Content extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.md),
         ],
+        if (item.hasReportedAbsence && !cancelled) ...[
+          AlertBanner.info(
+            title: 'Bạn đã báo vắng buổi này',
+            message: [
+              if (item.absenceReason!.isNotEmpty) 'Lý do: ${item.absenceReason}.',
+              'Buổi được ghi "Vắng có phép" — không tính vào chuyên cần, không hoàn tiền. '
+                  'Nếu vẫn đến được, bạn quét QR điểm danh như bình thường.',
+            ].join(' '),
+            action: s.hasStarted(now)
+                ? null
+                : TextButton(onPressed: () => _cancelAbsence(context, ref), child: const Text('Hủy báo vắng')),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
+        if (item.hasReportedAbsence && !cancelled && !item.isMakeupEnrollment) ...[
+          SessionMakeupCard(item: item),
+          const SizedBox(height: AppSpacing.md),
+        ],
         if (canCheckIn) ...[
           AppButton(
             label: 'Quét QR điểm danh',
@@ -134,14 +155,24 @@ class _Content extends ConsumerWidget {
           _ActionRow(
             icon: AppIcons.transfer,
             title: 'Đổi sang buổi khác',
-            subtitle:
-                item.transferBlockReason ??
-                'Sang buổi khác của khóa hoặc khóa tương đương cùng HLV · trước giờ học ≥ 24h · tối đa $kMaxTransfersPerCourse lần/khóa.',
-
-            enabled: item.canTransfer,
-            onTap: () => _transfer(context, ref),
+            subtitle: item.canTransfer
+                ? 'Sang buổi dạy bù hoặc khóa tương đương cùng HLV · trước giờ học ≥ 24h · tối đa $kMaxTransfersPerCourse lần/khóa.'
+                : item.transferBlockReason ?? '',
+            // Không có buổi để đổi nhưng buổi còn thay đổi được ⇒ vẫn mở để giải thích + chỉ lối ra.
+            enabled: item.canTransfer || item.canCancel,
+            onTap: () => item.canTransfer ? _transfer(context, ref) : _explainNoTransfer(context, ref),
           ),
           const SizedBox(height: AppSpacing.xs),
+          if (!item.hasReportedAbsence) ...[
+            _ActionRow(
+              icon: AppIcons.absence,
+              title: 'Báo vắng',
+              subtitle: _absenceNote(),
+              enabled: _canReportAbsence,
+              onTap: () => _reportAbsence(context, ref),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
           _ActionRow(
             icon: AppIcons.ban,
             title: 'Hủy buổi này',
@@ -169,6 +200,15 @@ class _Content extends ConsumerWidget {
     );
   }
 
+  bool get _canReportAbsence => item.canCancel && item.attendance == null && item.absencesLeft > 0;
+
+  String _absenceNote() {
+    if (!item.canCancel) return item.cancelBlockReason ?? 'Chỉ báo vắng được trước giờ học.';
+    if (item.attendance != null) return 'Buổi này đã được điểm danh.';
+    if (item.absencesLeft == 0) return 'Bạn đã dùng hết $kMaxAbsencesPerCourse lần báo vắng của khóa này.';
+    return 'Không tính vắng · không hoàn tiền · còn ${item.absencesLeft}/$kMaxAbsencesPerCourse lần cho khóa này.';
+  }
+
   /// Chính sách hoàn tiền nếu hủy buổi NGAY BÂY GIỜ (BE tính chính thức khi hủy).
   String _refundPolicy(DateTime now) {
     final s = item.session;
@@ -177,6 +217,11 @@ class _Content extends ConsumerWidget {
       return 'Hủy trước giờ học ≥ ${MySessionScreen.refundMinHours}h — hoàn ${MySessionScreen.refundPercent}% tiền buổi.';
     }
     return 'Còn dưới ${MySessionScreen.refundMinHours}h — hủy được nhưng không hoàn tiền.';
+  }
+
+  void _refresh(WidgetRef ref) {
+    ref.invalidate(mySessionProvider(item.session.id));
+    ref.read(dataRevisionProvider.notifier).bump();
   }
 
   Future<void> _cancel(BuildContext context, WidgetRef ref) async {
@@ -203,12 +248,71 @@ class _Content extends ConsumerWidget {
     }
   }
 
+  Future<void> _reportAbsence(BuildContext context, WidgetRef ref) async {
+    final input = await showAppBottomSheet<AbsenceInput>(
+      context: context,
+      title: 'Báo vắng buổi học',
+      subtitle: VnTime.sessionLabel(item.session.startTime, item.session.endTime),
+      builder: (_) => AbsenceForm(absencesLeft: item.absencesLeft),
+    );
+    if (input == null || !context.mounted) return;
+    final done = await runAction(
+      context,
+      () => ref
+          .read(scheduleRepositoryProvider)
+          .reportAbsence(item.enrollmentId, input.reason, requestMakeup: input.requestMakeup)
+          .then((_) => true),
+      success: input.requestMakeup
+          ? 'Đã báo vắng và gửi yêu cầu học bù. HLV đã nhận được thông báo.'
+          : 'Đã báo vắng. HLV đã nhận được thông báo.',
+    );
+    if (done == true && context.mounted) _refresh(ref);
+  }
+
+  Future<void> _cancelAbsence(BuildContext context, WidgetRef ref) async {
+    final done = await runAction(
+      context,
+      () => ref.read(scheduleRepositoryProvider).cancelAbsence(item.enrollmentId).then((_) => true),
+      success: 'Đã hủy báo vắng.',
+    );
+    if (done == true && context.mounted) _refresh(ref);
+  }
+
+  /// Không có buổi để đổi ⇒ giải thích lý do + lối ra: nhắn HLV (tin soạn sẵn), báo vắng, hủy buổi.
+  Future<void> _explainNoTransfer(BuildContext context, WidgetRef ref) async {
+    final s = item.session;
+    final exit = await showAppBottomSheet<NoTransferExit>(
+      context: context,
+      title: 'Chưa có buổi để đổi',
+      builder: (_) => NoTransferSheet(
+        message: noTransferMessage(item.transferEmptyReason, item.transferBlockReason),
+        canReportAbsence: !item.hasReportedAbsence && _canReportAbsence,
+        absenceNote: item.hasReportedAbsence ? 'Bạn đã báo vắng buổi này.' : _absenceNote(),
+        cancelNote: _refundPolicy(DateTime.now()),
+      ),
+    );
+    if (exit == null || !context.mounted) return;
+    switch (exit) {
+      case NoTransferExit.chat:
+        await context.push<void>(
+          AppRoutes.chatRoom(s.coachUserId),
+          extra:
+              'Chào HLV, em không tham gia được buổi ${VnTime.sessionLabel(s.startTime, s.endTime)} '
+              'của khóa "${s.className}". HLV có buổi nào để em học bù không ạ?',
+        );
+      case NoTransferExit.absence:
+        await _reportAbsence(context, ref);
+      case NoTransferExit.cancel:
+        await _cancel(context, ref);
+    }
+  }
+
   Future<void> _transfer(BuildContext context, WidgetRef ref) async {
     final target = await showAppBottomSheet<TransferOption>(
       context: context,
       title: 'Đổi buổi học',
-      subtitle: 'Buổi của khóa này hoặc khóa tương đương cùng HLV',
-      builder: (_) => _TransferPicker(enrollmentId: item.enrollmentId),
+      subtitle: 'Buổi dạy bù của khóa này hoặc khóa tương đương cùng HLV',
+      builder: (_) => TransferPicker(enrollmentId: item.enrollmentId),
     );
     if (target == null || !context.mounted) return;
     final s = target.session;
@@ -271,88 +375,6 @@ class _ActionRow extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _TransferPicker extends ConsumerStatefulWidget {
-  const _TransferPicker({required this.enrollmentId});
-
-  final String enrollmentId;
-
-  @override
-  ConsumerState<_TransferPicker> createState() => _TransferPickerState();
-}
-
-class _TransferPickerState extends ConsumerState<_TransferPicker> {
-  TransferOption? _selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final value = ref.watch(transferOptionsProvider(widget.enrollmentId));
-    final c = context.colors;
-    return value.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(AppSpacing.xl),
-        child: Center(child: CircularProgressIndicator.adaptive()),
-      ),
-      error: (e, _) => ErrorState(
-        error: e,
-        compact: true,
-        onRetry: () => ref.invalidate(transferOptionsProvider(widget.enrollmentId)),
-      ),
-      data: (t) {
-        final options = t.options;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Còn ${t.transfersLeft}/${t.maxTransfers} lần đổi buổi cho khóa này. Đổi buổi không hoàn tiền.',
-              style: context.text.small.copyWith(color: c.textMuted),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            if (t.blockReason != null) ...[
-              AlertBanner.warning(message: t.blockReason!),
-              const SizedBox(height: AppSpacing.sm),
-            ],
-            if (options.isEmpty) const EmptyState(compact: true, title: 'Không còn buổi nào phù hợp để đổi'),
-            RadioGroup<String>(
-              groupValue: _selected?.session.id,
-              onChanged: (id) => setState(() => _selected = options.firstWhere((o) => o.session.id == id)),
-              child: Column(
-                children: [
-                  for (final o in options)
-                    RadioListTile<String>(
-                      value: o.session.id,
-                      enabled: o.blockReason == null,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        VnTime.sessionLabel(o.session.startTime, o.session.endTime),
-                        style: context.text.bodyStrong,
-                      ),
-                      subtitle: Text(
-                        [
-                          if (!o.isSameClass) 'Khóa ${o.session.className}',
-                          if (o.session.isMakeup) 'Buổi dạy bù',
-                          o.blockReason ?? '${o.session.room.name} · Còn ${o.remaining} chỗ',
-                        ].join(' · '),
-                        style: context.text.caption.copyWith(
-                          color: o.blockReason == null ? c.textMuted : context.tones.of(StatusTone.danger).foreground,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            AppButton(
-              label: 'Xác nhận đổi buổi',
-              expand: true,
-              onPressed: _selected == null ? null : () => Navigator.of(context).pop(_selected),
-            ),
-          ],
-        );
-      },
     );
   }
 }

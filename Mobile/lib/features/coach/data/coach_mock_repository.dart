@@ -6,6 +6,7 @@ import '../../../mock/mock_tables.dart';
 import '../../attendance/domain/entities/attendance.dart';
 import '../../classes/domain/entities/coach_class.dart';
 import '../../classes/domain/entities/course.dart';
+import '../../makeup/domain/entities/makeup.dart';
 import '../../schedule/domain/entities/session.dart';
 import '../domain/entities/coach_dashboard.dart';
 import '../domain/entities/wallet.dart';
@@ -176,6 +177,14 @@ class CoachMockRepository implements CoachRepository {
           kind: CoachTodoKind.refundHold,
           title: 'Đang tạm giữ ${Money.format(wallet.pendingRefundHold)}',
           subtitle: 'Cho yêu cầu hoàn tiền chờ Quản lý duyệt.',
+          targetId: '',
+        ),
+      if (db.makeupRequests.where((r) => r.coachProfileId == coach.id && r.status == MakeupStatus.pending).length
+          case final n when n > 0)
+        CoachTodo(
+          kind: CoachTodoKind.makeupRequests,
+          title: '$n yêu cầu học bù',
+          subtitle: 'Học viên báo vắng đang chờ bạn xếp buổi học bù.',
           targetId: '',
         ),
     ];

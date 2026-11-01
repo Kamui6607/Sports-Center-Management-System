@@ -81,11 +81,12 @@ class _MemberScheduleScreenState extends ConsumerState<MemberScheduleScreen> {
                   itemCount: today.length,
                   itemBuilder: (context, i) => SessionTile(
                     session: today[i].session,
-                    trailingTag:
-                        today[i].attendance?.status ??
-                        (today[i].session.hasEnded(now) && today[i].session.status != ScheduleStatus.cancelled
-                            ? notCheckedIn
-                            : null),
+                    trailingTag: today[i].hasReportedAbsence
+                        ? memberAbsent
+                        : today[i].attendance?.status ??
+                              (today[i].session.hasEnded(now) && today[i].session.status != ScheduleStatus.cancelled
+                                  ? notCheckedIn
+                                  : null),
                     onTap: () => context.push(AppRoutes.mySession(today[i].session.id)),
                   ),
                 );

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticate } from "../../middlewares/authenticate.js";
 import { authorize } from "../../middlewares/authorize.js";
 import { validate } from "../../middlewares/validate.js";
-import { CreateEnrollmentSchema, TransferEnrollmentSchema, EnrollmentQuerySchema, EnrollWholeCourseSchema, MyCoursesQuerySchema, TransferOptionsQuerySchema } from "./enrollments.schema.js";
+import { CreateEnrollmentSchema, TransferEnrollmentSchema, EnrollmentQuerySchema, EnrollWholeCourseSchema, MyCoursesQuerySchema, TransferOptionsQuerySchema, ReportAbsenceSchema } from "./enrollments.schema.js";
 import * as enrollmentsController from "./enrollments.controller.js";
 
 const router = Router();
@@ -417,5 +417,67 @@ router.post(
   validate(TransferEnrollmentSchema),
   enrollmentsController.transferEnrollment
 );
+
+/**
+ * @swagger
+ * /enrollments/{id}/absence:
+ *   post:
+ *     summary: "Học viên báo vắng một buổi đang giữ chỗ (trước giờ học)"
+ *     description: |
+ *       Ghi điểm danh `EXCUSED` (không tính chuyên cần / phạt), chỗ vẫn `BOOKED`, KHÔNG hoàn tiền.
+ *       Tối đa 2 lần còn hiệu lực / khóa đã mua (`ABSENCE_LIMIT`). Đã có điểm danh ⇒ 409
+ *       (`ABSENCE_ALREADY_REPORTED` / `ATTENDANCE_ALREADY_RECORDED`). Buổi đã bắt đầu ⇒ 400 `ABSENCE_TOO_LATE`.
+ *       HLV phụ trách khóa nhận thông báo. Vẫn đến lớp ⇒ tự quét QR hoặc HLV quét thẻ ghi đè thành có mặt.
+ *     tags: [Enrollments]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, minLength: 5, maxLength: 300 }
+ *     responses:
+ *       201: { description: "{ attendance, absence: { used, max, left } }" }
+ *   delete:
+ *     summary: "Học viên hủy báo vắng (trước giờ học) — trả lại lượt báo vắng"
+ *     tags: [Enrollments]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: "{ absence: { used, max, left } }" }
+ *       404: { description: "ABSENCE_NOT_FOUND" }
+ */
+router.post(
+  "/:id/absence",
+  authenticate, authorize("MEMBER"),
+  validate(ReportAbsenceSchema),
+  enrollmentsController.reportAbsence
+);
+router.delete("/:id/absence", authenticate, authorize("MEMBER"), enrollmentsController.cancelAbsence);
+
+/**
+ * @swagger
+ * /enrollments/{id}/makeup-request:
+ *   post:
+ *     summary: "Học viên xin học bù cho buổi ĐÃ báo vắng (xem /makeup-requests)"
+ *     tags: [Enrollments]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       201: { description: "Yêu cầu học bù (PENDING)" }
+ *       400: { description: "ABSENCE_REQUIRED · MAKEUP_WINDOW_CLOSED" }
+ *       409: { description: "MAKEUP_ALREADY_REQUESTED" }
+ */
+router.post("/:id/makeup-request", authenticate, authorize("MEMBER"), enrollmentsController.requestMakeup);
 
 export default router;

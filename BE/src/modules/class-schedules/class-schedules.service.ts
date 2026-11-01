@@ -19,7 +19,7 @@ function sortedUnique(values: string[]): string[] {
 // Advisory lock theo resource để serialize Room/Coach trong cùng transaction.
 // Tự release khi transaction commit/rollback (pg_advisory_xact_lock).
 // Dùng $executeRaw thay vì $queryRaw vì function trả về void, không có row để deserialize.
-async function lockScheduleResources(db: DbClient, roomIds: string[], coachIds: string[]) {
+export async function lockScheduleResources(db: DbClient, roomIds: string[], coachIds: string[]) {
   for (const roomId of sortedUnique(roomIds)) {
     await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('schedule:room:' || ${roomId}::text))`;
   }
@@ -47,7 +47,7 @@ function fmtVn(d: Date): string {
  * Manager chỉ quản lý nền tảng, không thao tác lịch học.
  * Chặn Coach A tạo/dời/hủy/hoàn tất buổi học (và giữ phòng) dưới tên lớp của Coach B.
  */
-async function assertCanManageClassSchedule(db: DbClient, actor: ScheduleActor, classId: string) {
+export async function assertCanManageClassSchedule(db: DbClient, actor: ScheduleActor, classId: string) {
   if (actor.role !== "COACH") throw new AppError("Forbidden", 403);
   const assigned = await db.class.findFirst({
     where: { id: classId, coach: { userId: actor.id } },
@@ -317,7 +317,7 @@ function buildWhereSql(where: any): { fragment: Prisma.Sql } {
   return { fragment: Prisma.sql`WHERE ${Prisma.join(conds, " AND ")}` };
 }
 
-function assertClassRoomAreaMatch(classAreaType: string, roomAreaType: string) {
+export function assertClassRoomAreaMatch(classAreaType: string, roomAreaType: string) {
   if (classAreaType !== roomAreaType) {
     throw new AppError(
       `Class area type "${classAreaType}" does not match Room area type "${roomAreaType}"`,
@@ -437,7 +437,8 @@ function planScheduleSummary(slots: { startTime: Date; endTime: Date }[]) {
  */
 export async function refreshClassDateRange(db: DbClient, classId: string) {
   const agg = await db.classSchedule.aggregate({
-    where: { classId, status: { not: "CANCELLED" } },
+    // Buổi bù mở (có thể sau ngày kết thúc khóa) không kéo dài ngày khóa.
+    where: { classId, status: { not: "CANCELLED" }, isMakeupSlot: false },
     _min: { startTime: true },
     _max: { endTime: true },
   });

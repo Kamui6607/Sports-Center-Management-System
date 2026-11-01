@@ -25,6 +25,9 @@ import '../domain/entities/app_notification.dart';
   NotificationType.paymentSuccess => (AppIcons.payment, StatusTone.success),
   NotificationType.paymentRefunded => (AppIcons.refund, StatusTone.info),
   NotificationType.orderUpdated => (AppIcons.order, StatusTone.brand),
+  NotificationType.memberAbsence || NotificationType.makeupRequested => (AppIcons.absence, StatusTone.info),
+  NotificationType.makeupScheduled || NotificationType.makeupSlotOpened => (AppIcons.calendar, StatusTone.success),
+  NotificationType.makeupRejected => (AppIcons.error, StatusTone.warning),
   NotificationType.memberRegistered || NotificationType.general => (AppIcons.notification, StatusTone.neutral),
 };
 
@@ -35,6 +38,10 @@ String? notificationTarget(AppNotification n, UserRole role) {
   switch (role) {
     case UserRole.member:
       if (m['senderId'] != null) return AppRoutes.chatRoom(m['senderId']!);
+      if (n.type == NotificationType.makeupRejected && m['refundId'] != null) return AppRoutes.refunds;
+      if (n.type == NotificationType.makeupRejected || n.type == NotificationType.makeupSlotOpened) {
+        return AppRoutes.myMakeupRequests;
+      }
       if (m['orderId'] != null) return AppRoutes.order(m['orderId']!);
       if (m['refundId'] != null) return AppRoutes.refunds;
       if (m['penaltyId'] != null || n.type == NotificationType.attendanceWarning) return AppRoutes.attendance;
@@ -44,6 +51,10 @@ String? notificationTarget(AppNotification n, UserRole role) {
       if (classId != null) return AppRoutes.myCourse(classId);
     case UserRole.coach:
       if (m['senderId'] != null) return AppRoutes.chatRoom(m['senderId']!);
+      if (m['makeupRequestId'] != null) return AppRoutes.coachMakeupRequest(m['makeupRequestId']!);
+      if (n.type == NotificationType.memberAbsence && m['scheduleId'] != null) {
+        return AppRoutes.teachingSession(m['scheduleId']!);
+      }
       if (m['orderId'] != null) return AppRoutes.order(m['orderId']!);
       if (n.type == NotificationType.withdrawalApproved || n.type == NotificationType.withdrawalRejected) {
         return AppRoutes.coachWallet;

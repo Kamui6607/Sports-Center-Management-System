@@ -22,6 +22,13 @@ enum NotificationType {
 
   /// Cửa hàng: đơn hàng đổi trạng thái.
   orderUpdated,
+
+  /// Báo vắng & học bù (Doc/MAKEUP_ABSENCE_PLAN.md).
+  memberAbsence,
+  makeupRequested,
+  makeupScheduled,
+  makeupRejected,
+  makeupSlotOpened,
   general,
 }
 

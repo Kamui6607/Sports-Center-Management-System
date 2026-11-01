@@ -1,3 +1,5 @@
+import '../../../membership/domain/entities/membership.dart';
+
 /// Trạng thái điểm danh (`AttendanceStatus`).
 enum AttendanceStatus { present, absent, late, excused }
 
@@ -117,8 +119,10 @@ class QrTicket {
   final String sessionId;
   final String qrToken;
 
-  /// Mã dự phòng 6 ký tự (TTL 90s ở BE).
+  /// Mã dự phòng 6 ký tự (TTL 90s ở BE; bị thu hồi khi QR đổi mã).
   final String manualCode;
+
+  /// Hạn của MÃ DỰ PHÒNG (`manualCodeExpiresIn`), không phải hạn JWT của QR.
   final DateTime expiresAt;
 }
 
@@ -137,6 +141,53 @@ class CheckInResult {
   final DateTime endTime;
   final String roomName;
   final AttendanceStatus status;
+}
+
+/// Kết quả HLV quét thẻ thành viên của học viên (`POST /attendance/coach-scan` → `state`).
+enum CoachScanState {
+  /// Vừa ghi Có mặt / Đi muộn.
+  checkedIn,
+
+  /// Đã điểm danh trước đó — giữ nguyên.
+  alreadyCheckedIn,
+
+  /// HLV có buổi đang dạy nhưng học viên không giữ chỗ.
+  notInClass,
+
+  /// HLV không có buổi nào trong khung điểm danh.
+  noActiveSession,
+}
+
+/// Buổi học được đối chiếu khi HLV quét thẻ.
+class CoachScanSession {
+  const CoachScanSession({
+    required this.id,
+    required this.className,
+    required this.startTime,
+    required this.endTime,
+    this.roomName,
+  });
+
+  final String id;
+  final String className;
+  final DateTime startTime;
+  final DateTime endTime;
+  final String? roomName;
+}
+
+/// HLV quét thẻ thành viên ⇒ có trong buổi đang dạy không + điểm danh.
+/// Gói gym ([pass]) chỉ để tham khảo — không chặn điểm danh lớp.
+class CoachScanResult {
+  const CoachScanResult({required this.state, required this.pass, this.session, this.attendanceStatus});
+
+  final CoachScanState state;
+  final CoachScanSession? session;
+
+  /// Trạng thái điểm danh sau lượt quét (`null` khi không có trong lớp / không có buổi).
+  final AttendanceStatus? attendanceStatus;
+  final MembershipVerifyResult pass;
+
+  bool get inClass => state == CoachScanState.checkedIn || state == CoachScanState.alreadyCheckedIn;
 }
 
 /// Trạng thái một buổi trong bảng chuyên cần RIÊNG của một khóa.

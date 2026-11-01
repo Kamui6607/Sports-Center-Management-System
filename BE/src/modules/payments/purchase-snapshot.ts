@@ -84,7 +84,7 @@ export async function buildClassSnapshot(
       startDate: true,
       endDate: true,
       coach: { select: { id: true, userId: true, user: { select: { fullName: true } } } },
-      _count: { select: { schedules: { where: { status: { not: "CANCELLED" }, makeupForId: null } } } },
+      _count: { select: { schedules: { where: { status: { not: "CANCELLED" }, makeupForId: null, isMakeupSlot: false } } } },
     },
   });
   if (!cls) return null;

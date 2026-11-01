@@ -230,6 +230,7 @@ class _TodoCard extends StatelessWidget {
       CoachTodoKind.classRejected => (AppIcons.error, StatusTone.danger, AppRoutes.coachClass(todo.targetId)),
       CoachTodoKind.classPending => (AppIcons.pending, StatusTone.info, AppRoutes.coachClass(todo.targetId)),
       CoachTodoKind.refundHold => (AppIcons.refund, StatusTone.neutral, AppRoutes.coachWallet),
+      CoachTodoKind.makeupRequests => (AppIcons.absence, StatusTone.warning, AppRoutes.coachMakeupRequests),
     };
     return AppCard(
       onTap: () => todo.kind == CoachTodoKind.refundHold ? context.go(route) : context.push(route),

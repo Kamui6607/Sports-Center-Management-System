@@ -15,6 +15,7 @@ import { runShopMaintenance } from "./modules/shop/orders.service.js";
 import { runTermMaintenance } from "./modules/terms/term-notifications.js";
 import { COACH_TERM } from "./config/coach-term.js";
 import { runClassMaintenance } from "./modules/classes/class-maintenance.service.js";
+import { expireMakeupRequests } from "./modules/makeup-requests/makeup-requests.service.js";
 import { runMembershipMaintenance } from "./modules/memberships/memberships.service.js";
 import { COURSE_SALE } from "./config/course-sale.js";
 
@@ -76,6 +77,8 @@ async function main() {
   const classJob = () => {
     void runClassMaintenance().catch((err: any) => console.warn("[CLASSES] job khóa học lỗi:", (err as Error).message));
     void runMembershipMaintenance().catch((err: any) => console.warn("[MEMBERSHIP] job gói thành viên lỗi:", (err as Error).message));
+    // Học bù (Doc/MAKEUP_ABSENCE_PLAN.md §3.3): yêu cầu quá hạn ⇒ EXPIRED (+ hoàn 80% nếu đủ điều kiện).
+    void expireMakeupRequests().catch((err: any) => console.warn("[MAKEUP] job học bù lỗi:", (err as Error).message));
   };
   const classTimer = setInterval(classJob, COURSE_SALE.MAINTENANCE_INTERVAL_MS);
   classTimer.unref();

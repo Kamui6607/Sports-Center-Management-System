@@ -235,7 +235,7 @@ class _CodeFormState extends State<_CodeForm> {
       CodeInput(numeric: false, errorText: _error, onChanged: (v) => _code = v, onCompleted: (v) => _code = v),
       const SizedBox(height: AppSpacing.xs),
       Text(
-        'Mã không dùng các ký tự 0, O, 1, I. Mã có hiệu lực khoảng 90 giây.',
+        'Mã không dùng các ký tự 0, O, 1, I. Mã đổi cùng mã QR (khoảng mỗi phút) — nhập mã HLV đang hiển thị.',
         style: context.text.caption.copyWith(color: context.colors.textMuted),
       ),
       const SizedBox(height: AppSpacing.lg),

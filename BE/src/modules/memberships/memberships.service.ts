@@ -601,11 +601,18 @@ export async function verifyMemberPass(token: string, scannerUserId: string, sca
   };
 }
 
-/** HLV quét thẻ: hội viên có ghi danh (BOOKED/COMPLETED) vào buổi của khóa do HLV này phụ trách không. Vai trò khác ⇒ null. */
+/**
+ * HLV quét thẻ: hội viên đang giữ chỗ (BOOKED) một buổi CHƯA kết thúc của khóa do HLV này phụ trách không.
+ * Khóa đã học xong từ lâu không tính. Điểm danh theo buổi đang dạy: `POST /attendance/coach-scan`. Vai trò khác ⇒ null.
+ */
 async function isStudentOfCoach(memberId: string, scannerUserId: string, scannerRole?: string): Promise<boolean | null> {
   if (scannerRole !== "COACH") return null;
   const hit = await prisma.enrollment.findFirst({
-    where: { memberId, status: { in: ["BOOKED", "COMPLETED"] }, schedule: { class: { coach: { userId: scannerUserId } } } },
+    where: {
+      memberId,
+      status: "BOOKED",
+      schedule: { status: "SCHEDULED", endTime: { gte: new Date() }, class: { coach: { userId: scannerUserId } } },
+    },
     select: { id: true },
   });
   return hit !== null;

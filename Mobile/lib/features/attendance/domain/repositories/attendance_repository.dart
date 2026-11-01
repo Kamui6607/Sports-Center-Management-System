@@ -28,4 +28,8 @@ abstract interface class AttendanceRepository {
 
   /// Số học viên đã check-in của buổi (`GET /attendance?scheduleId=`).
   Future<int> checkedInCount(String sessionId);
+
+  /// HLV quét thẻ thành viên của học viên ⇒ đối chiếu buổi đang dạy + điểm danh (`POST /attendance/coach-scan`).
+  /// [sessionId]: mở từ màn buổi dạy ⇒ đúng buổi đó; `null` ⇒ BE tự tìm buổi đang diễn ra.
+  Future<CoachScanResult> coachScan(String passToken, {String? sessionId});
 }

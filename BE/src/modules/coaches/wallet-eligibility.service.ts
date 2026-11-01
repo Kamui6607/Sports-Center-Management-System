@@ -48,7 +48,7 @@ export async function computeWithdrawEligibility(
   const [classes, byType, holds, withdrawals] = await Promise.all([
     db.class.findMany({
       where: { coachId: wallet.coachId },
-      select: { id: true, name: true, status: true, schedules: { select: { status: true } } },
+      select: { id: true, name: true, status: true, schedules: { where: { isMakeupSlot: false }, select: { status: true } } },
       orderBy: { createdAt: "asc" },
     }),
     db.walletTransaction.groupBy({

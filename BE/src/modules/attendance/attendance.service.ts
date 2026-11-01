@@ -4,11 +4,12 @@ import { Prisma } from "@prisma/client";
 import { AppError } from "../../middlewares/errorHandler.js";
 import jwt from "jsonwebtoken";
 import { env } from "../../config/env.js";
-import { ATTENDANCE } from "../../config/attendance.js";
+import { ATTENDANCE, isMemberAbsence, withAbsenceInfo } from "../../config/attendance.js";
 import { buildPaginationMeta } from "../../utils/pagination.js";
 import { createNotification } from "../notifications/notifications.service.js";
 import { computeAttendanceBuckets } from "./attendance-analytics.service.js";
 import { expireStalePenalties } from "./attendance-penalties.service.js";
+import { verifyMemberPass } from "../memberships/memberships.service.js";
 
 /**
  * §5 + L5: MEMBER không có quyền ghi attendance. `EXCUSED` (vắng có phép) do MANAGER hoặc COACH
@@ -78,19 +79,22 @@ export const getAttendancesBySchedule = async (
   } else if (actor.role === "MEMBER") {
     const memberProfile = await prisma.memberProfile.findUnique({ where: { userId: actor.id } });
     if (!memberProfile) throw new AppError("Member profile not found", 404);
-    return prisma.attendance.findMany({
+    const own = await prisma.attendance.findMany({
       where: { scheduleId, memberId: memberProfile.id },
       include: { member: { include: { user: { select: { id: true, fullName: true } } } } },
     });
+    return own.map(withAbsenceInfo);
   } else if (actor.role !== "MANAGER") {
     throw new AppError("Forbidden: bạn không có quyền xem điểm danh của buổi này", 403);
   }
 
   // DTO roster: CHỈ trường cần cho UI — không bao giờ trả password/token của user.
-  return prisma.attendance.findMany({
+  // `reportedByMember` + `absenceReason`: học viên tự báo vắng (HLV thấy tag "Báo vắng" + lý do).
+  const roster = await prisma.attendance.findMany({
     where: { scheduleId },
     include: { member: { include: { user: { select: { id: true, fullName: true } } } } },
   });
+  return roster.map(withAbsenceInfo);
 };
 
 export const updateAttendance = async (id: string, data: Prisma.AttendanceUpdateInput, user: any) => {
@@ -283,6 +287,19 @@ export const generateQrToken = async (scheduleId: string, user: any) => {
   };
 };
 
+/** Kèm buổi học trong kết quả quét ⇒ app hiện tên khóa/giờ/phòng mà không cần gọi thêm request. */
+const SCAN_RESULT_INCLUDE = {
+  schedule: {
+    select: {
+      id: true,
+      startTime: true,
+      endTime: true,
+      class: { select: { id: true, name: true } },
+      room: { select: { name: true } },
+    },
+  },
+} satisfies Prisma.AttendanceInclude;
+
 /**
  * Điểm danh self-service cho MEMBER bằng ĐÚNG MỘT trong hai credential:
  * - `qrToken`: JWT trong mã QR (luồng cũ, giữ nguyên semantics).
@@ -335,6 +352,14 @@ export const scanQr = async (input: { qrToken?: string; code?: string }, user: a
     where: { scheduleId_memberId: { memberId: memberProfile.id, scheduleId } },
   });
 
+  // Học viên đã tự báo vắng nhưng vẫn đến lớp ⇒ cho tự điểm danh ghi đè thành PRESENT.
+  if (existing && existing.status === "EXCUSED" && isMemberAbsence(existing.note)) {
+    return prisma.attendance.update({
+      where: { id: existing.id },
+      data: { status: "PRESENT", note },
+      include: SCAN_RESULT_INCLUDE,
+    });
+  }
   if (existing) {
     if (existing.status !== "PRESENT") {
       throw new AppError(
@@ -342,17 +367,142 @@ export const scanQr = async (input: { qrToken?: string; code?: string }, user: a
         409
       );
     }
-    return prisma.attendance.update({ where: { id: existing.id }, data: { note } });
+    return prisma.attendance.update({ where: { id: existing.id }, data: { note }, include: SCAN_RESULT_INCLUDE });
   }
 
-  return prisma.attendance.create({
-    data: {
-      scheduleId,
-      memberId: memberProfile.id,
-      status: "PRESENT",
-      note,
-    },
-  });
+  try {
+    return await prisma.attendance.create({
+      data: {
+        scheduleId,
+        memberId: memberProfile.id,
+        status: "PRESENT",
+        note,
+      },
+      include: SCAN_RESULT_INCLUDE,
+    });
+  } catch (err) {
+    // Hai lần quét gần như cùng lúc: lần sau đụng UNIQUE (scheduleId, memberId) ⇒ trả bản ghi lần trước.
+    if ((err as { code?: string }).code !== "P2002") throw err;
+    return prisma.attendance.findUniqueOrThrow({
+      where: { scheduleId_memberId: { memberId: memberProfile.id, scheduleId } },
+      include: SCAN_RESULT_INCLUDE,
+    });
+  }
+};
+
+// ─── HLV QUÉT THẺ THÀNH VIÊN CỦA HỌC VIÊN ⇒ ĐIỂM DANH ─────────────────────
+
+export type CoachScanState = "CHECKED_IN" | "ALREADY_CHECKED_IN" | "NOT_IN_CLASS" | "NO_ACTIVE_SESSION";
+
+const COACH_SCAN_SCHEDULE_INCLUDE = {
+  class: { select: { id: true, name: true, coach: { select: { userId: true } } } },
+  room: { select: { name: true } },
+} satisfies Prisma.ClassScheduleInclude;
+
+type CoachScanSchedule = Prisma.ClassScheduleGetPayload<{ include: typeof COACH_SCAN_SCHEDULE_INCLUDE }>;
+
+function coachScanSessionView(s: CoachScanSchedule) {
+  return {
+    id: s.id,
+    classId: s.class.id,
+    className: s.class.name,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    roomName: s.room?.name ?? null,
+  };
+}
+
+/**
+ * HLV (hoặc quản lý) quét mã QR động trên thẻ thành viên của học viên ⇒ kiểm học viên có trong buổi đang dạy
+ * không và điểm danh luôn.
+ *
+ * - Buổi học: `scheduleId` (mở từ màn buổi dạy, phải là buổi của HLV + đang trong cửa sổ điểm danh) hoặc
+ *   buổi SCHEDULED của HLV đang trong cửa sổ (quản lý: mọi buổi) mà học viên có giữ chỗ.
+ * - Có chỗ (BOOKED/COMPLETED) ⇒ PRESENT, hoặc LATE nếu quét sau giờ bắt đầu quá `LATE_AFTER_MINUTES`.
+ *   Đã PRESENT/LATE ⇒ giữ nguyên. Đang ABSENT/EXCUSED ⇒ người quét đang đứng lớp xác nhận học viên có mặt ⇒ ghi đè.
+ * - Gói thành viên (tập gym tự do, §21) KHÔNG chặn điểm danh lớp — trả kèm trong `pass` để tham khảo.
+ * - Lượt quét vẫn ghi nhật ký vào cửa như `POST /memberships/pass/verify`.
+ */
+export const coachScanMemberPass = async (input: { token: string; scheduleId?: string }, user: any) => {
+  const now = new Date();
+  let fixed: CoachScanSchedule | null = null;
+  if (input.scheduleId) {
+    // Kiểm buổi TRƯỚC khi đọc thẻ: buổi sai/ngoài giờ ⇒ báo lỗi, không ghi nhật ký vào cửa.
+    await verifyCoachAccess(input.scheduleId, user);
+    fixed = await prisma.classSchedule.findUnique({ where: { id: input.scheduleId }, include: COACH_SCAN_SCHEDULE_INCLUDE });
+    if (!fixed) throw new AppError("Schedule not found", 404);
+    assertAttendanceWindow(fixed, now);
+  }
+
+  const pass = await verifyMemberPass(input.token, user.id, user.role);
+  const memberId = pass.member.id;
+
+  const candidates = fixed
+    ? [fixed]
+    : await prisma.classSchedule.findMany({
+        where: {
+          status: "SCHEDULED",
+          startTime: { lte: new Date(now.getTime() + ATTENDANCE.SCAN_OPEN_MINUTES_BEFORE * 60_000) },
+          endTime: { gte: new Date(now.getTime() - ATTENDANCE.SCAN_CLOSE_MINUTES_AFTER * 60_000) },
+          ...(user.role === "MANAGER" ? {} : { class: { coach: { userId: user.id } } }),
+        },
+        include: COACH_SCAN_SCHEDULE_INCLUDE,
+        orderBy: { startTime: "asc" },
+      });
+
+  const enrollment =
+    candidates.length === 0
+      ? null
+      : await prisma.enrollment.findFirst({
+          where: { memberId, scheduleId: { in: candidates.map((s) => s.id) }, status: { in: ["BOOKED", "COMPLETED"] } },
+          select: { scheduleId: true },
+        });
+  const schedule = enrollment ? candidates.find((s) => s.id === enrollment.scheduleId)! : null;
+
+  if (!schedule) {
+    const state: CoachScanState = candidates.length === 0 ? "NO_ACTIVE_SESSION" : "NOT_IN_CLASS";
+    return {
+      state,
+      // Một buổi duy nhất ⇒ cho HLV biết học viên KHÔNG có trong buổi nào; nhiều buổi ⇒ không đoán.
+      session: candidates.length === 1 ? coachScanSessionView(candidates[0]) : null,
+      attendance: null,
+      pass,
+    };
+  }
+
+  const late = now.getTime() > schedule.startTime.getTime() + ATTENDANCE.LATE_AFTER_MINUTES * 60_000;
+  const status = late ? "LATE" : "PRESENT";
+  const where = { scheduleId_memberId: { scheduleId: schedule.id, memberId } };
+  const existing = await prisma.attendance.findUnique({ where });
+
+  let record;
+  let state: CoachScanState = "CHECKED_IN";
+  if (existing && (existing.status === "PRESENT" || existing.status === "LATE")) {
+    record = existing;
+    state = "ALREADY_CHECKED_IN";
+  } else if (existing) {
+    record = await prisma.attendance.update({ where: { id: existing.id }, data: { status, note: ATTENDANCE.COACH_SCAN_NOTE } });
+  } else {
+    try {
+      record = await prisma.attendance.create({
+        data: { scheduleId: schedule.id, memberId, status, note: ATTENDANCE.COACH_SCAN_NOTE },
+      });
+    } catch (err) {
+      if ((err as { code?: string }).code !== "P2002") throw err;
+      record = await prisma.attendance.findUniqueOrThrow({ where });
+      state = "ALREADY_CHECKED_IN";
+    }
+  }
+  if (state === "CHECKED_IN" && record.status === "LATE") {
+    notifyMemberAttendanceStatus(memberId, schedule.id, "LATE", record.note).catch(() => {});
+  }
+
+  return {
+    state,
+    session: coachScanSessionView(schedule),
+    attendance: { id: record.id, status: record.status, note: record.note },
+    pass,
+  };
 };
 
 // ─── MEMBER SELF-SERVICE (§16) + WARNING (§7) ─────────────────────────────
@@ -389,7 +539,7 @@ export const getMyAttendance = async (userId: string, query: any) => {
       },
     }),
   ]);
-  return { records, pagination: buildPaginationMeta(total, page, limit) };
+  return { records: records.map(withAbsenceInfo), pagination: buildPaginationMeta(total, page, limit) };
 };
 
 /** Tổng hợp chuyên cần theo (member × class) + penalty của chính member (§23). */

@@ -31,6 +31,9 @@ import '../../features/dev/dev_tools_screen.dart';
 import '../../features/feedbacks/presentation/coach_feedback_screen.dart';
 import '../../features/home/presentation/explore_screen.dart';
 import '../../features/home/presentation/member_home_screen.dart';
+import '../../features/makeup/presentation/screens/coach_makeup_screens.dart';
+import '../../features/makeup/presentation/screens/my_makeup_screen.dart';
+import '../../features/makeup/presentation/screens/open_makeup_slot_screen.dart';
 import '../../features/manager/presentation/approvals_screen.dart';
 import '../../features/manager/presentation/manager_home_screen.dart';
 import '../../features/manager/presentation/money_review_screens.dart';
@@ -123,7 +126,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       page('/payment/:id', (s) => PaymentScreen(paymentId: s.pathParameters['id']!)),
       page(AppRoutes.notifications, (_) => const NotificationsScreen()),
       page(AppRoutes.chat, (_) => const ConversationsScreen()),
-      page('/chat/:peerId', (s) => ChatRoomScreen(peerId: s.pathParameters['peerId']!)),
+      page(
+        '/chat/:peerId',
+        (s) =>
+            ChatRoomScreen(peerId: s.pathParameters['peerId']!, draft: s.extra is String ? s.extra! as String : null),
+      ),
       page(AppRoutes.profileEdit, (_) => const EditProfileScreen()),
       page(AppRoutes.centerInfo, (_) => const CenterInfoScreen()),
       page(AppRoutes.changePassword, (_) => const ChangePasswordScreen()),
@@ -142,7 +149,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       page(AppRoutes.invoices, (_) => const InvoicesScreen()),
       page('/invoices/:id', (s) => InvoiceDetailScreen(invoiceId: s.pathParameters['id']!)),
       page(AppRoutes.devTools, (_) => const DevToolsScreen()),
-      page(AppRoutes.membershipScanner, (_) => const MembershipScannerScreen()),
+      page(AppRoutes.membershipScanner, (s) => MembershipScannerScreen(sessionId: s.uri.queryParameters['session'])),
 
       // ── Coach onboarding ─────────────────────────────────────────────
       page(AppRoutes.onboardingCv, (_) => const CvUploadScreen()),
@@ -210,6 +217,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       page(AppRoutes.coachPass, (_) => const CoachPassScreen()),
       page(AppRoutes.coachCheckin, (_) => const CoachCheckInScreen()),
       page(AppRoutes.coachCheckinScan, (_) => const CoachCheckInScanScreen()),
+      page(AppRoutes.coachMakeupRequests, (_) => const CoachMakeupRequestsScreen()),
+      page('/coach/makeup/:id', (s) => CoachMakeupRequestScreen(requestId: s.pathParameters['id']!)),
+      page(
+        '/coach/makeup-slot/:classId',
+        (s) => OpenMakeupSlotScreen(classId: s.pathParameters['classId']!, requestId: s.uri.queryParameters['request']),
+      ),
+      page(AppRoutes.myMakeupRequests, (_) => const MyMakeupRequestsScreen()),
 
       // ── Manager (bản rút gọn) ────────────────────────────────────────
       StatefulShellRoute.indexedStack(

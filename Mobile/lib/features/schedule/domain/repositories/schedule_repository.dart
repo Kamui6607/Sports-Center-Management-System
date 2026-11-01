@@ -19,6 +19,13 @@ abstract interface class ScheduleRepository {
   /// `POST /enrollments/:id/transfer`.
   Future<void> transferEnrollment(String enrollmentId, String targetSessionId);
 
+  /// `POST /enrollments/:id/absence` — báo vắng trước giờ học (EXCUSED, không hoàn tiền, tối đa 2 lần/khóa).
+  /// [requestMakeup] ⇒ xin luôn buổi học bù.
+  Future<void> reportAbsence(String enrollmentId, String reason, {bool requestMakeup = false});
+
+  /// `DELETE /enrollments/:id/absence` — hủy báo vắng trước giờ học.
+  Future<void> cancelAbsence(String enrollmentId);
+
   /// Buổi dạy của HLV (`GET /class-schedules`).
   Future<List<ClassSession>> teachingSessions(DateTime from, DateTime to, {String? classId});
 

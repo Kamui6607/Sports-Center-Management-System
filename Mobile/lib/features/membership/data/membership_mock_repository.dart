@@ -3,6 +3,7 @@ import '../../../mock/mock_server.dart';
 import '../../../mock/mock_tables.dart';
 import '../../auth/domain/entities/app_user.dart';
 import '../../payments/domain/entities/payment.dart';
+import '../../schedule/domain/entities/session.dart';
 import '../domain/entities/membership.dart';
 import '../domain/repositories/membership_repository.dart';
 
@@ -132,20 +133,27 @@ class MembershipMockRepository implements MembershipRepository {
     final db = _server.db;
     final me = _server.requireUser();
     if (me.role == UserRole.member) throw const AppFailure.forbidden();
-    // Nút DEV ở màn quét gửi thẳng userId; mã thật dạng MOCKPASS:<userId>:<hạn>.
-    var userId = token;
-    if (token.startsWith(_passPrefix)) {
-      final parts = token.substring(_passPrefix.length).split(':');
-      final exp = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0;
-      if (DateTime.fromMillisecondsSinceEpoch(exp).isBefore(db.now())) {
-        throw const AppFailure.validation('Mã thẻ đã hết hạn. Nhờ hội viên mở lại thẻ trên ứng dụng.');
-      }
-      userId = parts.first;
-    }
-    return _verify(db, userId);
+    return verifyUser(db, userIdOfPass(db, token), scannerUserId: me.id, scannerRole: me.role);
   });
 
-  MembershipVerifyResult _verify(MockDatabase db, String userId) {
+  /// Nút DEV ở màn quét gửi thẳng userId; mã thật dạng `MOCKPASS:<userId>:<hạn>`.
+  static String userIdOfPass(MockDatabase db, String token) {
+    if (!token.startsWith(_passPrefix)) return token;
+    final parts = token.substring(_passPrefix.length).split(':');
+    final exp = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0;
+    if (DateTime.fromMillisecondsSinceEpoch(exp).isBefore(db.now())) {
+      throw const AppFailure.validation('Mã thẻ đã hết hạn. Nhờ hội viên mở lại thẻ trên ứng dụng.');
+    }
+    return parts.first;
+  }
+
+  /// Như BE `verifyMemberPass`; HLV quét ⇒ `isMyStudent` = đang giữ chỗ buổi chưa kết thúc của khóa HLV đó.
+  static MembershipVerifyResult verifyUser(
+    MockDatabase db,
+    String userId, {
+    required String scannerUserId,
+    required UserRole scannerRole,
+  }) {
     final u = db.users.where((x) => x.id == userId).firstOrNull;
     if (u == null) throw const AppFailure.validation('Mã thẻ không hợp lệ.');
     final member = db.memberOfUser(u.id);
@@ -164,6 +172,15 @@ class MembershipMockRepository implements MembershipRepository {
           ? 'Gói thành viên còn hiệu lực.'
           : (shown == null ? 'Hội viên chưa có gói thành viên.' : 'Gói đã hết hạn.'),
       entriesToday: active == null ? 0 : 1,
+      isMyStudent: scannerRole != UserRole.coach || member == null
+          ? null
+          : db.enrollments.any(
+              (e) =>
+                  e.memberProfileId == member.id &&
+                  e.status == EnrollmentStatus.booked &&
+                  db.session(e.sessionId).end.isAfter(db.now()) &&
+                  db.classRow(db.session(e.sessionId).classId).coachProfileId == db.coachOfUser(scannerUserId)?.id,
+            ),
     );
   }
 }

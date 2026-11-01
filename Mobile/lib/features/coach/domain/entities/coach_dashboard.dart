@@ -4,7 +4,7 @@ import '../../../schedule/domain/entities/session.dart';
 import '../../../training/domain/entities/training.dart';
 
 /// Loại việc cần làm của HLV.
-enum CoachTodoKind { completeSession, classRejected, classPending, refundHold }
+enum CoachTodoKind { completeSession, classRejected, classPending, refundHold, makeupRequests }
 
 class CoachTodo {
   const CoachTodo({required this.kind, required this.title, required this.subtitle, required this.targetId});

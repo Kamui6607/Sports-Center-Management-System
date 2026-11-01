@@ -98,6 +98,7 @@ class SessionTile extends StatelessWidget {
                       children: [
                         status.tag(dense: true),
                         if (session.isMakeup) const StatusLabel('Buổi dạy bù', StatusTone.brand).tag(dense: true),
+                        if (session.isMakeupSlot) const StatusLabel('Buổi bù mở', StatusTone.brand).tag(dense: true),
                         ?trailingTag?.tag(dense: true),
                       ],
                     ),

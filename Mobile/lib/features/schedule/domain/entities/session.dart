@@ -1,5 +1,6 @@
 import '../../../attendance/domain/entities/attendance.dart';
 import '../../../catalog/domain/entities/catalog.dart';
+import '../../../makeup/domain/entities/makeup.dart';
 
 /// Trạng thái buổi học (`ScheduleStatus`).
 enum ScheduleStatus { scheduled, cancelled, completed }
@@ -17,6 +18,27 @@ const kMaxReschedules = 2;
 /// Luật đổi buổi của học viên (BE `MAX_TRANSFERS_PER_COURSE`).
 const kMaxTransfersPerCourse = 2;
 
+/// Số lần báo vắng còn hiệu lực tối đa / khóa (BE `ATTENDANCE.MEMBER_ABSENCE_MAX_PER_COURSE`).
+const kMaxAbsencesPerCourse = 2;
+
+/// Vì sao không chọn được buổi nào để đổi (BE `transfer-options.emptyReason`).
+enum TransferEmptyReason {
+  /// Buổi hiện tại còn < 24h.
+  tooLate,
+
+  /// Đã dùng hết lượt đổi của khóa.
+  limit,
+
+  /// Chỗ không còn giữ / buổi đã bắt đầu.
+  notAvailable,
+
+  /// Khóa chưa có buổi bù, HLV không có khóa tương đương.
+  noMakeupOrEquivalent,
+  allFull,
+  allConflict,
+  allUnavailable,
+}
+
 /// Một buổi học (`ClassSchedule`).
 class ClassSession {
   const ClassSession({
@@ -33,6 +55,7 @@ class ClassSession {
     required this.capacity,
     this.makeupForId,
     this.makeupSessionId,
+    this.isMakeupSlot = false,
     this.cancelReason,
     this.cancelResolution,
     this.originalStartTime,
@@ -55,6 +78,9 @@ class ClassSession {
 
   /// Buổi này là buổi dạy bù cho buổi [makeupForId].
   final String? makeupForId;
+
+  /// Buổi bù MỞ do HLV tạo cho học viên xin học bù (không phải buổi chính, không bán).
+  final bool isMakeupSlot;
 
   /// Buổi bị hủy này đã có buổi dạy bù [makeupSessionId].
   final String? makeupSessionId;
@@ -90,12 +116,34 @@ class MySession {
     this.cancelBlockReason,
     this.transferBlockReason,
     this.refundId,
+    this.absenceReason,
+    this.absencesLeft = kMaxAbsencesPerCourse,
+    this.transferEmptyReason,
+    this.makeupRequest,
+    this.isMakeupEnrollment = false,
   });
 
   final ClassSession session;
   final String enrollmentId;
   final EnrollmentStatus enrollmentStatus;
   final AttendanceStatus? attendance;
+
+  /// Học viên đã tự báo vắng buổi này (lý do); `null` ⇒ chưa báo.
+  final String? absenceReason;
+
+  /// Lượt báo vắng còn lại của khóa.
+  final int absencesLeft;
+
+  /// Có giá trị ⇒ không có buổi nào chọn được để đổi (app giải thích + chỉ lối ra).
+  final TransferEmptyReason? transferEmptyReason;
+
+  /// Yêu cầu học bù của buổi này (đang chờ / đã xếp / bị từ chối gần nhất).
+  final MakeupRequest? makeupRequest;
+
+  /// Chỗ này là chỗ HỌC BÙ (không đổi buổi được).
+  final bool isMakeupEnrollment;
+
+  bool get hasReportedAbsence => absenceReason != null;
 
   /// `null` ⇒ được hủy buổi.
   final String? cancelBlockReason;
@@ -133,6 +181,7 @@ class RosterEntry {
     this.avatarUrl,
     this.attendance,
     this.note,
+    this.absenceReason,
   });
 
   final String memberProfileId;
@@ -142,6 +191,9 @@ class RosterEntry {
   final EnrollmentStatus enrollmentStatus;
   final AttendanceStatus? attendance;
   final String? note;
+
+  /// Học viên tự báo vắng (lý do) — HLV thấy tag "Báo vắng".
+  final String? absenceReason;
 }
 
 /// Buổi dạy (góc nhìn HLV) + danh sách học viên.
@@ -193,14 +245,26 @@ class TransferOptions {
     this.transfersLeft = kMaxTransfersPerCourse,
     this.maxTransfers = kMaxTransfersPerCourse,
     this.blockReason,
+    this.emptyReason,
+    this.absencesLeft = kMaxAbsencesPerCourse,
+    this.makeupRequest,
   });
 
   final List<TransferOption> options;
   final int transfersLeft;
   final int maxTransfers;
 
+  /// `null` ⇒ có buổi chọn được.
+  final TransferEmptyReason? emptyReason;
+
+  /// Lượt báo vắng còn lại của khóa.
+  final int absencesLeft;
+
   /// Lý do không đổi được (null ⇒ được chọn buổi).
   final String? blockReason;
+
+  /// Yêu cầu học bù của chỗ này.
+  final MakeupRequest? makeupRequest;
 }
 
 /// Dữ liệu dời buổi (`POST /class-schedules/:id/reschedule`).

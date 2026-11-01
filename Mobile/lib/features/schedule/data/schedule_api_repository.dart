@@ -1,9 +1,11 @@
 import '../../../api/class_json.dart';
+import '../../../api/makeup_json.dart';
 import '../../../core/error/app_failure.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/json.dart';
 import '../../attendance/domain/entities/attendance.dart';
 import '../../catalog/domain/entities/catalog.dart';
+import '../../makeup/domain/entities/makeup.dart';
 import '../domain/entities/session.dart';
 import '../domain/repositories/schedule_repository.dart';
 
@@ -19,7 +21,7 @@ class ScheduleApiRepository implements ScheduleRepository {
   // ── Member ─────────────────────────────────────────────────────────────
 
   /// Chỗ đã giữ ⇒ [MySession] (lý do chặn hủy/đổi buổi tính như mock; BE kiểm tra lại khi gửi).
-  MySession _toMySession(Json e, Map<String, AttendanceStatus> attendance) {
+  MySession _toMySession(Json e, Map<String, Json> attendance) {
     final s = e.obj('schedule');
     // BE-14: `schedule.class` kèm `coach.user` ⇒ không phải tra thêm khóa học.
     final session = ClassJson.session(s);
@@ -32,22 +34,23 @@ class ScheduleApiRepository implements ScheduleRepository {
     } else if (session.hasStarted(_now())) {
       block = 'Buổi học đã bắt đầu hoặc đã kết thúc.';
     }
+    final a = attendance[session.id];
     return MySession(
       session: session,
       enrollmentId: e.str('id'),
       enrollmentStatus: status,
-      attendance: attendance[session.id],
+      attendance: a?.enumOrNull('status', AttendanceStatus.values),
       cancelBlockReason: block,
       transferBlockReason: block,
+      absenceReason: a != null && a.boolean('reportedByMember') ? a.strOrNull('absenceReason') ?? '' : null,
+      isMakeupEnrollment: e.strOrNull('makeupRequestId') != null,
     );
   }
 
-  Future<Map<String, AttendanceStatus>> _myAttendance() async {
+  /// Điểm danh của tôi theo buổi (kèm cờ `reportedByMember` / `absenceReason` khi tự báo vắng).
+  Future<Map<String, Json>> _myAttendance() async {
     final rows = await _api.getAll('/attendance/my');
-    return {
-      for (final a in rows)
-        a.str('scheduleId', a.obj('schedule').str('id')): ?parseBeEnum(a.strOrNull('status'), AttendanceStatus.values),
-    };
+    return {for (final a in rows) a.str('scheduleId', a.obj('schedule').str('id')): a};
   }
 
   /// Ẩn chỗ đã hủy, trừ buổi bị HLV hủy mà không có buổi bù (hoàn tiền / hủy thẳng).
@@ -71,7 +74,7 @@ class ScheduleApiRepository implements ScheduleRepository {
       final start = e.obj('schedule').date('startTime');
       return !start.isBefore(from) && start.isBefore(to);
     });
-    final attendance = results[1] as Map<String, AttendanceStatus>;
+    final attendance = results[1] as Map<String, Json>;
     return enrollments.map((e) => _toMySession(e, attendance)).toList()
       ..sort((a, b) => a.session.startTime.compareTo(b.session.startTime));
   }
@@ -86,9 +89,15 @@ class ScheduleApiRepository implements ScheduleRepository {
     if (makeup != null && (e == null || e.str('status') == 'CANCELLED')) e = makeup;
     if (e == null) throw const AppFailure.notFound('Bạn không có chỗ trong buổi học này.');
 
-    var mine = _toMySession(e, results[1] as Map<String, AttendanceStatus>);
+    var mine = _toMySession(e, results[1] as Map<String, Json>);
     if (mine.canTransfer) {
       final t = await _transferOptions(e.str('id'));
+      mine = _copy(
+        mine,
+        absencesLeft: t.absencesLeft,
+        transferEmptyReason: t.emptyReason,
+        makeupRequest: t.makeupRequest,
+      );
       if (t.blockReason != null) {
         mine = _copy(mine, transferBlockReason: t.blockReason);
       } else if (t.options.every((o) => o.blockReason != null)) {
@@ -103,7 +112,14 @@ class ScheduleApiRepository implements ScheduleRepository {
     return mine;
   }
 
-  static MySession _copy(MySession m, {String? transferBlockReason, String? refundId}) => MySession(
+  static MySession _copy(
+    MySession m, {
+    String? transferBlockReason,
+    String? refundId,
+    int? absencesLeft,
+    TransferEmptyReason? transferEmptyReason,
+    MakeupRequest? makeupRequest,
+  }) => MySession(
     session: m.session,
     enrollmentId: m.enrollmentId,
     enrollmentStatus: m.enrollmentStatus,
@@ -111,6 +127,11 @@ class ScheduleApiRepository implements ScheduleRepository {
     cancelBlockReason: m.cancelBlockReason,
     transferBlockReason: transferBlockReason ?? m.transferBlockReason,
     refundId: refundId ?? m.refundId,
+    absenceReason: m.absenceReason,
+    absencesLeft: absencesLeft ?? m.absencesLeft,
+    transferEmptyReason: transferEmptyReason ?? m.transferEmptyReason,
+    makeupRequest: makeupRequest ?? m.makeupRequest,
+    isMakeupEnrollment: m.isMakeupEnrollment,
   );
 
   @override
@@ -125,6 +146,7 @@ class ScheduleApiRepository implements ScheduleRepository {
         'Bạn đã dùng hết ${d.integer('maxTransfers', kMaxTransfersPerCourse)} lần đổi buổi của khóa này.',
       'ENROLLMENT_TRANSFER_TOO_LATE' => 'Chỉ đổi được khi buổi học còn ít nhất ${d.integer('minHoursBefore', 24)} giờ.',
       'SESSION_ALREADY_STARTED' => 'Buổi học đã bắt đầu.',
+      'MAKEUP_ENROLLMENT' => 'Buổi học bù không đổi được — hủy buổi này nếu không tham gia được.',
       _ => 'Chỉ đổi được buổi đang giữ chỗ.',
     };
     final options = [
@@ -166,6 +188,9 @@ class ScheduleApiRepository implements ScheduleRepository {
       transfersLeft: d.integer('transfersLeft', kMaxTransfersPerCourse),
       maxTransfers: d.integer('maxTransfers', kMaxTransfersPerCourse),
       blockReason: block,
+      emptyReason: d.enumOrNull('emptyReason', TransferEmptyReason.values),
+      absencesLeft: d.obj('absence').integer('left', kMaxAbsencesPerCourse),
+      makeupRequest: d.objOrNull('makeupRequest') == null ? null : MakeupJson.request(d.obj('makeupRequest')),
     );
   }
 
@@ -175,6 +200,15 @@ class ScheduleApiRepository implements ScheduleRepository {
   @override
   Future<void> transferEnrollment(String enrollmentId, String targetSessionId) =>
       _api.post('/enrollments/$enrollmentId/transfer', body: {'targetScheduleId': targetSessionId});
+
+  @override
+  Future<void> reportAbsence(String enrollmentId, String reason, {bool requestMakeup = false}) => _api.post(
+    '/enrollments/$enrollmentId/absence',
+    body: {'reason': reason.trim(), if (requestMakeup) 'requestMakeup': true},
+  );
+
+  @override
+  Future<void> cancelAbsence(String enrollmentId) => _api.delete('/enrollments/$enrollmentId/absence');
 
   // ── Coach ──────────────────────────────────────────────────────────────
 
@@ -223,6 +257,9 @@ class ScheduleApiRepository implements ScheduleRepository {
             enrollmentStatus: e.enumOr('status', EnrollmentStatus.values, EnrollmentStatus.booked),
             attendance: attendance[e.str('memberId')]?.enumOrNull('status', AttendanceStatus.values),
             note: attendance[e.str('memberId')]?.strOrNull('note'),
+            absenceReason: attendance[e.str('memberId')]?.boolean('reportedByMember') == true
+                ? attendance[e.str('memberId')]!.strOrNull('absenceReason')
+                : null,
           ),
     ]..sort((a, b) => a.fullName.compareTo(b.fullName));
     return TeachingSession(

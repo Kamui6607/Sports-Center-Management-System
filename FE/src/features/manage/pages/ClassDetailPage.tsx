@@ -153,6 +153,7 @@ function ClassDetail({ cls }: { cls: Row }) {
                         <span style={{ display: "inline-flex", gap: 6 }}>
                           <SchedulePill status={s.status} />
                           {s.makeupForId ? <Pill tone="warn">Dạy bù</Pill> : null}
+                          {s.isMakeupSlot ? <Pill tone="warn">Buổi bù mở</Pill> : null}
                         </span>
                       ),
                     },

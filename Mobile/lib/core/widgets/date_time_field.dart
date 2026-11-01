@@ -36,11 +36,18 @@ class DateTimeField extends StatelessWidget {
     final initialWall = VnTime.wall(value ?? now);
     DateTime? day;
     if (mode != DateTimeFieldMode.time) {
+      final first = firstDate ?? DateTime(1940);
+      final last = lastDate ?? DateTime(now.year + 2);
+      // Ngày mở picker phải nằm trong [first, last] — VD dời lịch cấm 24h tới (first = ngày mai) mà chưa chọn
+      // ⇒ mở ở "hôm nay" làm showDatePicker assert và không hiện gì.
+      var initial = DateTime(initialWall.year, initialWall.month, initialWall.day);
+      if (initial.isBefore(DateUtils.dateOnly(first))) initial = DateUtils.dateOnly(first);
+      if (initial.isAfter(DateUtils.dateOnly(last))) initial = DateUtils.dateOnly(last);
       final picked = await showDatePicker(
         context: context,
-        initialDate: DateTime(initialWall.year, initialWall.month, initialWall.day),
-        firstDate: firstDate ?? DateTime(1940),
-        lastDate: lastDate ?? DateTime(now.year + 2),
+        initialDate: initial,
+        firstDate: first,
+        lastDate: last,
         locale: const Locale('vi'),
       );
       if (picked == null) return;

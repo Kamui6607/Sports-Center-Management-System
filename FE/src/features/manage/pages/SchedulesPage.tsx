@@ -154,6 +154,7 @@ function TableView({
                   <span style={{ display: "inline-flex", gap: 6 }}>
                     <SchedulePill status={r.status} />
                     {r.makeupForId ? <Pill tone="warn">Dạy bù</Pill> : null}
+                    {r.isMakeupSlot ? <Pill tone="warn">Buổi bù mở</Pill> : null}
                   </span>
                 ),
               },

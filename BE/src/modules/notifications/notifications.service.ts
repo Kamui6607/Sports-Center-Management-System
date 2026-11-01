@@ -39,6 +39,11 @@ export type NotificationTypeEnum =
   | "PAYMENT_REFUNDED"
   // Cửa hàng
   | "ORDER_UPDATED"
+  | "MEMBER_ABSENCE"
+  | "MAKEUP_REQUESTED"
+  | "MAKEUP_SCHEDULED"
+  | "MAKEUP_REJECTED"
+  | "MAKEUP_SLOT_OPENED"
   // Chung
   | "GENERAL";
 

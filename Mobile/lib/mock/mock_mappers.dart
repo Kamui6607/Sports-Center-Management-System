@@ -70,7 +70,7 @@ extension MockEntityMappers on MockDatabase {
   CourseClass toCourse(ClassRow c) {
     final t = now();
     final all = sessionsOf(c.id);
-    final main = all.where((s) => s.makeupForId == null).toList();
+    final main = all.where((s) => s.makeupForId == null && !s.isMakeupSlot).toList();
     final upcoming = all.where((s) => s.status == ScheduleStatus.scheduled && s.start.isAfter(t)).toList();
     final active = all.where((s) => s.status != ScheduleStatus.cancelled).toList();
     final students = studentsOf(c.id);
@@ -122,6 +122,7 @@ extension MockEntityMappers on MockDatabase {
       capacity: c.capacity,
       makeupForId: s.makeupForId,
       makeupSessionId: makeup?.id,
+      isMakeupSlot: s.isMakeupSlot,
       cancelReason: s.cancelReason,
       cancelResolution: s.resolution,
     );

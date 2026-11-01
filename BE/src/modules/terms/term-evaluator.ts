@@ -161,6 +161,8 @@ export async function evaluateCoaches(
       where: {
         class: { coachId: { in: coachIds }, status: { in: [...COUNTED_CLASS_STATUSES] } },
         startTime: { gte: term.startDate, lte: term.endDate },
+        // Buổi bù mở là phần thêm, không tính vào số buổi / tỷ lệ hủy của HLV.
+        isMakeupSlot: false,
       },
       select: {
         classId: true,

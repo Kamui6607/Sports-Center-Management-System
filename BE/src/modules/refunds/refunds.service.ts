@@ -33,7 +33,7 @@ async function sessionValueOf(
 ): Promise<{ value: number; purchased: number; fromSnapshot: boolean }> {
   const k = readClassSnapshot(payment.purchaseSnapshot)?.pricing?.sessionsPurchased;
   if (k && k > 0) return { value: money(payment.amount) / k, purchased: k, fromSnapshot: true };
-  const main = await db.classSchedule.count({ where: { classId, makeupForId: null } });
+  const main = await db.classSchedule.count({ where: { classId, makeupForId: null, isMakeupSlot: false } });
   return { value: money(payment.amount) / Math.max(1, main), purchased: main, fromSnapshot: false };
 }
 
@@ -46,7 +46,7 @@ async function memberCourseStart(db: DbClient, memberId: string, classId: string
   });
   if (mine) return mine.schedule.startTime;
   const first = await db.classSchedule.findFirst({
-    where: { classId, makeupForId: null, status: { not: "CANCELLED" } },
+    where: { classId, makeupForId: null, isMakeupSlot: false, status: { not: "CANCELLED" } },
     orderBy: { startTime: "asc" },
     select: { startTime: true },
   });
@@ -77,8 +77,10 @@ async function lateRefundGross(
     );
   } else {
     [totalMain, futureMain] = await Promise.all([
-      db.classSchedule.count({ where: { classId, makeupForId: null } }),
-      db.classSchedule.count({ where: { classId, makeupForId: null, status: "SCHEDULED", startTime: { gt: now } } }),
+      db.classSchedule.count({ where: { classId, makeupForId: null, isMakeupSlot: false } }),
+      db.classSchedule.count({
+        where: { classId, makeupForId: null, isMakeupSlot: false, status: "SCHEDULED", startTime: { gt: now } },
+      }),
     ]);
   }
   const proportional = totalMain > 0 ? Math.floor((money(payment.amount) * futureMain) / totalMain) : 0;
@@ -477,6 +479,8 @@ export async function createMemberSessionRefundTx(
     now?: Date;
     /** Buổi đã bị HLV dời lịch sau khi hội viên giữ chỗ ⇒ hoàn 100%, không áp hạn 24h. */
     rescheduledByCoach?: boolean;
+    /** Ghi chú thay mặc định (VD yêu cầu học bù bị từ chối / hết hạn). */
+    note?: string;
   }
 ) {
   const now = params.now ?? new Date();
@@ -514,9 +518,11 @@ export async function createMemberSessionRefundTx(
       amount,
       coachWalletId: debit.coachWalletId,
       coachDebitAmount: debit.coachDebitAmount,
-      note: rescheduled
-        ? "Hội viên hủy buổi đã bị HLV dời lịch — hoàn 100% tiền buổi học."
-        : `Hội viên hủy 1 buổi trước ${SESSION_REFUND_MIN_HOURS}h — hoàn ${SESSION_REFUND_PERCENT}% tiền buổi học.`,
+      note:
+        params.note ??
+        (rescheduled
+          ? "Hội viên hủy buổi đã bị HLV dời lịch — hoàn 100% tiền buổi học."
+          : `Hội viên hủy 1 buổi trước ${SESSION_REFUND_MIN_HOURS}h — hoàn ${SESSION_REFUND_PERCENT}% tiền buổi học.`),
       requestedById: params.userId,
     },
     include: refundInclude,

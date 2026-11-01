@@ -38,3 +38,12 @@ export const TransferOptionsQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   weekday: z.string().regex(/^[1-7]$/).optional(),
 });
+
+// POST /enrollments/:id/absence — học viên báo vắng (Doc/MAKEUP_ABSENCE_PLAN.md §3.1).
+export const ReportAbsenceSchema = z
+  .object({
+    reason: z.string().trim().min(5, "Lý do báo vắng tối thiểu 5 ký tự").max(300),
+    /** Xin luôn buổi học bù (HLV xếp / học viên tự chọn buổi bù mở). */
+    requestMakeup: z.boolean().optional(),
+  })
+  .strict();

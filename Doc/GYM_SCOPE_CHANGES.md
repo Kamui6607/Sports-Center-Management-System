@@ -233,3 +233,23 @@ Xem `Doc/MEMBERSHIP_FLOW.md`: CRUD gói trên Web, thẻ thành viên Mobile thi
 - Dùng chung `Dialog size="detail"` + `DetailColumns` / `DetailSection` / `DetailTotal` (`FE/src/features/manage/kit.tsx`): rộng tối đa 1200px, cao tối đa một màn hình, **hai cột** — trái: thông tin (người mua/nhận, hình thức, địa chỉ, sản phẩm, hoàn tiền, lịch sử); phải: tổng tiền + trạng thái, hành động (Đã nhận, chuyển trạng thái, duyệt), thanh toán. Màn ≤ 960px xếp một cột. Trạng thái hiện ngay cạnh tiêu đề.
 - Áp dụng: chi tiết **Đơn hàng**, **Yêu cầu hoàn tiền**, **Chi tiết buổi học** (Lịch học/Phòng), **Đánh giá HLV theo kỳ**. Các popup nhập liệu (thêm/sửa) giữ kích thước cũ.
 - **Đóng popup**: mọi popup Manager (`Dialog` dùng chung) đóng bằng nút X, phím Esc hoặc **click ra vùng nền**. Nếu đã gõ/chọn trong popup thì Esc/click nền hỏi xác nhận trước khi đóng; đang gửi (busy) thì không đóng.
+
+## 26. HLV quét thẻ thành viên của học viên ⇒ điểm danh lớp (02/11/2026)
+
+- **API mới** `POST /attendance/coach-scan { token, scheduleId? }` (COACH, MANAGER): `token` là mã QR động 60 giây trên thẻ thành viên. Lượt quét vẫn ghi nhật ký vào cửa như `/memberships/pass/verify`.
+- **Chọn buổi**: có `scheduleId` (HLV mở từ màn buổi dạy) ⇒ đúng buổi đó, phải là buổi của HLV và đang trong khung điểm danh (30 phút trước giờ bắt đầu → 30 phút sau giờ kết thúc), nếu không ⇒ 403 / 409. Không có ⇒ buổi `SCHEDULED` của HLV trong khung đó mà học viên có giữ chỗ (Quản lý: mọi buổi).
+- **Kết quả** `state`: `CHECKED_IN` (ghi **Có mặt**, quét sau giờ bắt đầu quá `ATTENDANCE.LATE_AFTER_MINUTES` = 10 phút ⇒ **Đi trễ** + thông báo cho học viên) · `ALREADY_CHECKED_IN` (đã Có mặt/Đi trễ ⇒ giữ nguyên) · `NOT_IN_CLASS` (có buổi đang dạy nhưng học viên không giữ chỗ — không ghi gì) · `NO_ACTIVE_SESSION`. Đang **Vắng / Vắng có phép** ⇒ HLV quét ghi đè thành Có mặt/Đi trễ (người quét đang đứng lớp). Ghi chú bản ghi: "HLV quét thẻ thành viên".
+- **Gói gym không chặn điểm danh lớp** (§21: gói chỉ cho tập tự do) — trạng thái gói trả trong `pass` để tham khảo.
+- `isMyStudent` của `/memberships/pass/verify` thu hẹp: chỉ `true` khi học viên đang giữ chỗ (BOOKED) một buổi **chưa kết thúc** của khóa HLV đó (trước đây: từng học bất kỳ buổi nào, kể cả khóa xong từ lâu).
+- `POST /attendance/scan-qr` trả kèm `schedule { startTime, endTime, class, room }`; hai lần quét cùng lúc không còn lỗi 500 (trả bản ghi lần trước).
+- **Mobile**: màn "Quét thẻ" của HLV gọi `coach-scan`; thẻ kết quả tách **Lớp** (đã điểm danh / không có trong lớp / không có buổi đang dạy) khỏi **Gói gym** (chỉ tham khảo). Màn buổi dạy thêm nút **"Quét thẻ học viên"** (gắn đúng buổi). Quản lý vẫn quét kiểm vào cửa như cũ; thẻ không hợp lệ hiện lý do của BE (hết hạn ngày …, chưa có gói, tài khoản bị khóa). Màn QR HLV: hạn mã dự phòng hiện đúng (trước hiện +10 phút theo hạn JWT của QR) — mã đổi cùng QR mỗi ~55 giây.
+- Kiểm thử: BE `npm run test:local -- attendance-coach-scan` (24/24); Mobile `flutter test` (168 pass).
+
+## 27. Báo vắng · Học bù · Buổi bù mở (02/11/2026)
+
+Chi tiết + quyết định: `Doc/MAKEUP_ABSENCE_PLAN.md`.
+- **Báo vắng** (`POST/DELETE /enrollments/:id/absence`): trước giờ học, lý do bắt buộc ⇒ `EXCUSED` (không tính chuyên cần/phạt, không hoàn tiền), chỗ vẫn giữ, tối đa 2 lần/khóa; HLV nhận thông báo; vẫn đến lớp thì tự quét QR / HLV quét thẻ ghi đè có mặt.
+- **Không có buổi để đổi**: `transfer-options.emptyReason` + app giải thích, kèm lối ra Nhắn HLV (tin soạn sẵn) / Báo vắng / Hủy buổi.
+- **Học bù** (`/makeup-requests`): báo vắng kèm "Xin buổi học bù" ⇒ HLV xếp vào buổi có sẵn (cùng khóa / khóa cùng HLV, cùng hạng), **mở buổi bù** (không bán, không tính buổi chính, tới ngày kết thúc khóa + 14 ngày) hoặc từ chối; học viên tự chọn buổi bù mở. Từ chối / hết hạn mà báo trước ≥ 24h ⇒ hoàn 80% tiền buổi.
+- **Chỗ khách** trên buổi chính (người từ khóa khác sang): tối đa max(1, 10% sức chứa).
+- Migration `20261102000000_makeup_absence` (chỉ thêm) — cần áp lên Render.

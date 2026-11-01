@@ -68,10 +68,10 @@ export function WeekCalendar({ week, rows, onSelect, showRoom = true }: { week: 
             <div className="cr-day-body">
               {items.length ? (
                 items.map((r) => (
-                  <button key={str(r.id)} className={`cr-event ${str(r.status)}${r.makeupForId ? " makeup" : ""}`} onClick={() => onSelect(str(r.id))}>
+                  <button key={str(r.id)} className={`cr-event ${str(r.status)}${r.makeupForId || r.isMakeupSlot ? " makeup" : ""}`} onClick={() => onSelect(str(r.id))}>
                     <b>
                       {clock(r.startTime)}–{clock(r.endTime)}
-                      {r.makeupForId ? " · Dạy bù" : r.status === "CANCELLED" ? " · Đã hủy" : r.status === "COMPLETED" ? " · Xong" : ""}
+                      {r.makeupForId ? " · Dạy bù" : r.isMakeupSlot ? " · Buổi bù" : r.status === "CANCELLED" ? " · Đã hủy" : r.status === "COMPLETED" ? " · Xong" : ""}
                     </b>
                     <span>{str(get(r, "class.name"))}</span>
                     <small>
@@ -95,7 +95,7 @@ export function ScheduleLegend() {
   return (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
       <Pill tone="info">Đã lên lịch</Pill>
-      <Pill tone="warn">Buổi dạy bù</Pill>
+      <Pill tone="warn">Buổi dạy bù / buổi bù mở</Pill>
       <Pill tone="plain">Hoàn thành</Pill>
       <Pill tone="bad">Đã hủy</Pill>
     </div>
@@ -112,6 +112,12 @@ export function ScheduleDetailDialog({ id, onClose }: { id: string; onClose: () 
     queryKey: ["admin", "schedules", "enrollments", id],
     queryFn: ({ signal }) => allPages<Row>("GET /enrollments/schedule/{scheduleId}", { params: { scheduleId: id }, signal }),
   });
+  // Điểm danh của buổi — để hiện "Báo vắng" (học viên tự báo, kèm lý do).
+  const att = useQuery({
+    queryKey: ["admin", "schedules", "attendance", id],
+    queryFn: ({ signal }) => api<Row[]>("GET /attendance", { query: { scheduleId: id }, signal }),
+  });
+  const absenceOf = new Map((att.data?.data ?? []).filter((a) => a.reportedByMember).map((a) => [str(a.memberId), str(a.absenceReason)]));
   return (
     <Dialog title="Chi tiết buổi học" eyebrow="Lịch học" onClose={onClose} size="detail">
       <DetailColumns
@@ -132,7 +138,10 @@ export function ScheduleDetailDialog({ id, onClose }: { id: string; onClose: () 
                         ["Thời gian", `${dateTime(s.startTime)} → ${clock(s.endTime)}`],
                         ["Phòng", <Link key="r" to={`/manager/rooms/${str(s.roomId)}`} onClick={onClose}>{str(get(s, "room.name"))}</Link>],
                         ["Trạng thái", <SchedulePill key="s" status={s.status} />],
-                        ["Đã giữ chỗ", `${num(get(s, "_count.enrollments"))} / ${num(get(s, "class.capacity"))}`],
+                        ...(s.isMakeupSlot
+                          ? ([["Loại buổi", "Buổi bù mở — không bán, chỉ dành cho học viên xin học bù"]] as [string, string][])
+                          : []),
+                        ["Đã giữ chỗ", `${num(get(s, "_count.enrollments"))} / ${num(s.isMakeupSlot && s.slotCapacity ? s.slotCapacity : get(s, "class.capacity"))}`],
                         ...(s.status === "CANCELLED"
                           ? ([
                               ["Lý do hủy", str(s.cancelReason) || "—"],
@@ -176,7 +185,14 @@ export function ScheduleDetailDialog({ id, onClose }: { id: string; onClose: () 
                       title: "Trạng thái",
                       render: (r) => {
                         const [t, l] = ENROLL[str(r.status)] ?? ["info", str(r.status)];
-                        return <Pill tone={t}>{l}</Pill>;
+                        const absence = absenceOf.get(str(r.memberId));
+                        return (
+                          <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+                            <Pill tone={t}>{l}</Pill>
+                            {r.makeupRequestId ? <Pill tone="warn">Học bù</Pill> : null}
+                            {absence !== undefined ? <Pill tone="info">{absence ? `Báo vắng: ${absence}` : "Báo vắng"}</Pill> : null}
+                          </span>
+                        );
                       },
                     },
                     { key: "b", title: "Giữ chỗ lúc", render: (r) => dateTime(r.bookedAt) },

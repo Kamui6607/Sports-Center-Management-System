@@ -234,6 +234,7 @@ model MemberProfile {
   refunds            Refund[]
   memberships        Membership[]
   passScans          MemberPassScan[]
+  makeupRequests     MakeupRequest[]
 }
 
 enum CoachApprovalStatus {
@@ -399,9 +400,15 @@ model ClassSchedule {
   rescheduleCount   Int       @default(0)
   rescheduleReason  String?
   rescheduledAt     DateTime?
+  /// Buổi bù MỞ do HLV tạo cho học viên xin học bù (Doc/MAKEUP_ABSENCE_PLAN.md §3.4): không thay buổi nào,
+  /// KHÔNG phải buổi chính (không bán, không tính đơn giá / số buổi / ngày khóa / đánh giá kỳ HLV).
+  isMakeupSlot Boolean @default(false)
+  /// Sức chứa riêng của buổi bù mở (null = sức chứa khóa).
+  slotCapacity Int?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @default(now()) @updatedAt
 
+  makeupTargets MakeupRequest[] @relation("MakeupTarget")
   enrollments Enrollment[]
   attendances Attendance[]
   manualCodes AttendanceManualCode[]
@@ -430,12 +437,58 @@ model Enrollment {
   sourceClassId     String?
   /// Chỗ cũ mà chỗ này được đổi từ đó (null = không phải đổi buổi).
   transferredFromId String?
+  /// Chỗ HỌC BÙ được xếp theo yêu cầu này (null = không phải học bù).
+  makeupRequestId   String?          @unique
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @default(now()) @updatedAt
+
+  makeupRequests MakeupRequest[] @relation("MakeupMissed")
 
   @@unique([memberId, scheduleId])
   @@index([memberId])
   @@index([scheduleId])
+}
+
+enum MakeupRequestStatus {
+  PENDING // Chờ HLV xếp buổi
+  SCHEDULED // Đã xếp vào một buổi
+  REJECTED // HLV từ chối (gửi ≥ 24h trước buổi vắng ⇒ hoàn 80%)
+  EXPIRED // Quá hạn (khóa kết thúc + N ngày) mà chưa xếp ⇒ như từ chối
+  CANCELLED // Học viên rút / hủy báo vắng / hủy buổi học bù
+}
+
+/// Yêu cầu học bù cho một buổi học viên đã báo vắng (Doc/MAKEUP_ABSENCE_PLAN.md §3.3).
+model MakeupRequest {
+  id                 String              @id @default(uuid())
+  memberId           String
+  member             MemberProfile       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// Chỗ ở buổi học viên vắng (vẫn BOOKED + EXCUSED).
+  missedEnrollmentId String
+  missedEnrollment   Enrollment          @relation("MakeupMissed", fields: [missedEnrollmentId], references: [id], onDelete: Cascade)
+  missedScheduleId   String
+  /// Khóa học viên đã trả tiền (tiền + chuyên cần tính theo khóa này).
+  paidClassId        String
+  /// CoachProfile phụ trách khóa đã trả tiền — người xử lý yêu cầu.
+  coachId            String
+  reason             String
+  status             MakeupRequestStatus @default(PENDING)
+  requestedAt        DateTime            @default(now())
+  /// Gửi trước buổi vắng ≥ 24h ⇒ từ chối / hết hạn được hoàn 80% tiền buổi.
+  refundEligible     Boolean             @default(false)
+  expiresAt          DateTime
+  resolvedAt         DateTime?
+  resolvedById       String?
+  targetScheduleId   String?
+  targetSchedule     ClassSchedule?      @relation("MakeupTarget", fields: [targetScheduleId], references: [id], onDelete: SetNull)
+  rejectReason       String?
+  refundId           String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @default(now()) @updatedAt
+
+  @@index([coachId, status])
+  @@index([memberId, status])
+  @@index([paidClassId, status])
+  @@index([missedEnrollmentId])
 }
 
 // ─────────────────────────────────────────
@@ -841,6 +894,12 @@ enum NotificationType {
   PAYMENT_REFUNDED // Hoàn tiền
   // ── Cửa hàng ──
   ORDER_UPDATED // Đơn hàng đổi trạng thái (đã thanh toán, sẵn sàng nhận, đang giao, hết hạn…)
+  // ── Báo vắng & học bù ──
+  MEMBER_ABSENCE // (HLV) học viên báo vắng
+  MAKEUP_REQUESTED // (HLV) học viên xin học bù
+  MAKEUP_SCHEDULED // (Học viên) đã được xếp buổi học bù
+  MAKEUP_REJECTED // (Học viên) yêu cầu học bù bị từ chối / hết hạn
+  MAKEUP_SLOT_OPENED // (Học viên đang chờ) HLV mở buổi bù cho khóa
   // ── Chung ──
   GENERAL
 }

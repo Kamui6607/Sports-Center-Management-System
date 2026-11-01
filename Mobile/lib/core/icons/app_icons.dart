@@ -88,6 +88,7 @@ abstract final class AppIcons {
   static const IconData refund = LucideIcons.undo2;
   static const IconData attendance = LucideIcons.calendarCheck;
   static const IconData sessionCancelled = LucideIcons.calendarX;
+  static const IconData absence = LucideIcons.calendarMinus;
   static const IconData ban = LucideIcons.ban;
   static const IconData verified = LucideIcons.shieldCheck;
   static const IconData trend = LucideIcons.trendingUp;

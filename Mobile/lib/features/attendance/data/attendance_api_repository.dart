@@ -1,3 +1,4 @@
+import '../../../api/membership_json.dart';
 import '../../../core/error/app_failure.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/json.dart';
@@ -11,16 +12,26 @@ class AttendanceApiRepository implements AttendanceRepository {
   final ApiClient _api;
   final DateTime Function() _now;
 
-  /// BE chỉ trả bản ghi điểm danh ⇒ tra buổi học (`GET /class-schedules/:id`) để hiện tên khóa, phòng.
+  /// BE trả bản ghi điểm danh kèm `schedule` (tên khóa, giờ, phòng). BE cũ không kèm ⇒ tra `GET /class-schedules/:id`;
+  /// tra lỗi thì vẫn báo thành công (điểm danh đã ghi xong).
   Future<CheckInResult> _checkIn(Map<String, Object?> body) async {
     final record = (await _api.post('/attendance/scan-qr', body: body)).json;
-    final s = (await _api.get('/class-schedules/${record.str('scheduleId')}')).json;
+    final status = record.enumOr('status', AttendanceStatus.values, AttendanceStatus.present);
+    var s = record.objOrNull('schedule');
+    if (s == null) {
+      try {
+        s = (await _api.get('/class-schedules/${record.str('scheduleId')}')).json;
+      } on AppFailure {
+        final now = _now();
+        return CheckInResult(className: 'Buổi học', startTime: now, endTime: now, roomName: '—', status: status);
+      }
+    }
     return CheckInResult(
       className: s.obj('class').str('name'),
       startTime: s.date('startTime'),
       endTime: s.date('endTime'),
       roomName: s.obj('room').str('name'),
-      status: record.enumOr('status', AttendanceStatus.values, AttendanceStatus.present),
+      status: status,
     );
   }
 
@@ -96,7 +107,7 @@ class AttendanceApiRepository implements AttendanceRepository {
       sessionId: sessionId,
       qrToken: j.str('qrToken'),
       manualCode: j.str('manualCode'),
-      expiresAt: _now().add(Duration(seconds: j.integer('expiresIn', 600))),
+      expiresAt: _now().add(Duration(seconds: j.integer('manualCodeExpiresIn', 90))),
     );
   }
 
@@ -118,5 +129,25 @@ class AttendanceApiRepository implements AttendanceRepository {
     } on AppFailure {
       return 0; // Đếm phụ trợ trên màn QR — không chặn màn hình.
     }
+  }
+
+  @override
+  Future<CoachScanResult> coachScan(String passToken, {String? sessionId}) async {
+    final j = (await _api.post('/attendance/coach-scan', body: {'token': passToken, 'scheduleId': ?sessionId})).json;
+    final s = j.objOrNull('session');
+    return CoachScanResult(
+      state: j.enumOr('state', CoachScanState.values, CoachScanState.noActiveSession),
+      session: s == null
+          ? null
+          : CoachScanSession(
+              id: s.str('id'),
+              className: s.str('className'),
+              startTime: s.date('startTime'),
+              endTime: s.date('endTime'),
+              roomName: s.strOrNull('roomName'),
+            ),
+      attendanceStatus: j.objOrNull('attendance')?.enumOrNull('status', AttendanceStatus.values),
+      pass: MembershipJson.verify(j.obj('pass')),
+    );
   }
 }

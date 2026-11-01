@@ -79,6 +79,7 @@ type BaseEntityModels = {
   CoachPassScan: Models.CoachPassScan;
   MemberPassScan: Models.MemberPassScan;
   CoachCheckIn: Models.CoachCheckIn;
+  MakeupRequest: Models.MakeupRequest;
 };
 
 // ── Kiểm tra lúc biên dịch (không sinh code chạy) ────────────────────────────

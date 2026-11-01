@@ -22,7 +22,8 @@ const CLASS_COACH_INCLUDE = {
 
 const classInclude = {
   coach: CLASS_COACH_INCLUDE,
-  _count: { select: { schedules: true } },
+  // Số buổi của khóa — không gồm buổi bù mở.
+  _count: { select: { schedules: { where: { isMakeupSlot: false } } } },
 };
 
 /**
@@ -32,7 +33,7 @@ const classInclude = {
 async function countEnrollmentsByClass(classIds: string[]): Promise<Map<string, number>> {
   if (classIds.length === 0) return new Map();
   const rows = await prisma.classSchedule.findMany({
-    where: { classId: { in: classIds } },
+    where: { classId: { in: classIds }, isMakeupSlot: false },
     select: { classId: true, _count: { select: { enrollments: true } } },
   });
   const map = new Map<string, number>();
@@ -233,7 +234,7 @@ export async function reviewClass(classId: string, action: "APPROVE" | "REJECT",
   // Không duyệt khóa đã quá giờ khai giảng / không còn buổi / đã qua hạn mở bán (khóa vừa duyệt đã "chết").
   if (action === "APPROVE") {
     const sessions = await prisma.classSchedule.findMany({
-      where: { classId },
+      where: { classId, isMakeupSlot: false },
       select: { id: true, startTime: true, status: true, makeupForId: true },
     });
     const progress = saleProgressOf(sessions, new Date());
@@ -298,7 +299,7 @@ export async function getClassById(id: string, actor?: Actor) {
     include: {
       ...classInclude,
       schedules: {
-        where: { status: "SCHEDULED", startTime: { gte: new Date() } },
+        where: { status: "SCHEDULED", startTime: { gte: new Date() }, isMakeupSlot: false },
         orderBy: { startTime: "asc" },
         take: 10,
         include: { room: true, _count: { select: { enrollments: true } } },
@@ -364,8 +365,9 @@ export async function updateClass(id: string, data: any, actor?: { id: string; r
 
   // A11: KHÔNG cho giảm sức chứa xuống dưới số chỗ đã giữ ở các buổi sắp tới.
   if (data.capacity !== undefined && data.capacity < cls.capacity) {
+    // Buổi bù mở dùng sức chứa riêng (slotCapacity) ⇒ không chặn giảm sức chứa khóa.
     const upcomingSchedules = await prisma.classSchedule.findMany({
-      where: { classId: id, status: "SCHEDULED", startTime: { gte: new Date() } },
+      where: { classId: id, status: "SCHEDULED", startTime: { gte: new Date() }, isMakeupSlot: false },
       select: {
         id: true,
         _count: {
@@ -511,9 +513,9 @@ export async function getClassCoursePlan(
   // BE-1: Guest chỉ xem lộ trình của khóa đang mở bán.
   if (!actor && (cls.status !== "APPROVED" || !cls.isActive)) throw new AppError("Class not found", 404);
 
-  // Khóa học = toàn bộ buổi SCHEDULED chưa bắt đầu, sắp theo thời gian.
+  // Khóa học = toàn bộ buổi SCHEDULED chưa bắt đầu, sắp theo thời gian (không gồm buổi bù mở).
   const schedules = await prisma.classSchedule.findMany({
-    where: { classId, status: "SCHEDULED", startTime: { gt: now } },
+    where: { classId, status: "SCHEDULED", startTime: { gt: now }, isMakeupSlot: false },
     orderBy: { startTime: "asc" },
     select: {
       id: true,
@@ -672,7 +674,7 @@ export async function getClassCoursePlan(
   const lastSession = sessions[sessions.length - 1];
   const memberGoals = await memberGoalsOf(actor);
   const pastSessionCount = await prisma.classSchedule.count({
-    where: { classId, status: { not: "CANCELLED" }, startTime: { lte: now } },
+    where: { classId, status: { not: "CANCELLED" }, startTime: { lte: now }, isMakeupSlot: false },
   });
 
   return {

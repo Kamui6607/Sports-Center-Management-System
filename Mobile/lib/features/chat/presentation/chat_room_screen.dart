@@ -19,9 +19,12 @@ import 'message_composer.dart';
 
 /// C02 — Phòng chat 1-1: realtime (đang soạn, tin mới), đính kèm ≤ 10MB, gửi lại khi lỗi.
 class ChatRoomScreen extends ConsumerStatefulWidget {
-  const ChatRoomScreen({super.key, required this.peerId});
+  const ChatRoomScreen({super.key, required this.peerId, this.draft});
 
   final String peerId;
+
+  /// Tin soạn sẵn đặt vào ô nhập (VD học viên xin học bù từ màn chi tiết buổi) — người dùng tự bấm gửi.
+  final String? draft;
 
   @override
   ConsumerState<ChatRoomScreen> createState() => _ChatRoomScreenState();
@@ -41,6 +44,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.draft != null) _input.text = widget.draft!;
     _load();
     _sub = ref.read(chatRepositoryProvider).events().where((e) => e.conversationId == widget.peerId).listen(_onEvent);
   }

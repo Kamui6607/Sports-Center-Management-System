@@ -383,6 +383,54 @@ void main() {
         ],
       });
     });
+
+    test('báo vắng: đọc cờ reportedByMember + lượt còn lại + emptyReason; gửi lý do', () async {
+      final api = FakeApi(storedTokens: authed);
+      api.backend
+        ..on(
+          'GET /enrollments/my',
+          (_) async => FakeReply.ok([
+            {
+              'id': 'e2',
+              'status': 'BOOKED',
+              'bookedAt': _iso(const Duration(days: -10)),
+              'schedule': _schedule('s2', const Duration(days: 2)),
+            },
+          ], pagination: _paged),
+        )
+        ..on(
+          'GET /attendance/my',
+          (_) async => FakeReply.ok([
+            {'scheduleId': 's2', 'status': 'EXCUSED', 'reportedByMember': true, 'absenceReason': 'Bị ốm'},
+          ], pagination: _paged),
+        )
+        ..on(
+          'GET /enrollments/e2/transfer-options',
+          (_) async => FakeReply.ok({
+            'canTransfer': true,
+            'blockReason': null,
+            'emptyReason': 'NO_MAKEUP_OR_EQUIVALENT',
+            'absence': {'used': 1, 'max': 2, 'left': 1},
+            'transfersLeft': 2,
+            'maxTransfers': 2,
+            'options': <Object>[],
+          }),
+        )
+        ..on('POST /enrollments/e2/absence', (_) async => FakeReply.ok({}))
+        ..on('DELETE /enrollments/e2/absence', (_) async => FakeReply.ok({}));
+      final repo = ScheduleApiRepository(api.client, clock: () => _now);
+      final m = await repo.mySession('s2');
+      expect(m.hasReportedAbsence, isTrue);
+      expect(m.absenceReason, 'Bị ốm');
+      expect(m.attendance, AttendanceStatus.excused);
+      expect(m.absencesLeft, 1);
+      expect(m.transferEmptyReason, TransferEmptyReason.noMakeupOrEquivalent);
+      expect(m.canTransfer, isFalse);
+      await repo.reportAbsence('e2', '  Có việc gia đình ');
+      expect(api.backend.requests.last.body, {'reason': 'Có việc gia đình'});
+      await repo.cancelAbsence('e2');
+      expect(api.backend.requests.last.method, 'DELETE');
+    });
   });
 
   test('AttendanceApiRepository: phạt PENDING hiển thị (L13), dừng QR ⇒ thu hồi mã (BE-18)', () async {

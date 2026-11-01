@@ -128,6 +128,10 @@ class CoachApiRepository implements CoachRepository {
     final wallet = results[2] as CoachWallet;
     final coachProfileId = (results[3] as ApiResponse).json.obj('coachProfile').str('id');
     final rating = (await _api.get('/feedbacks', query: {'coachId': coachProfileId, 'limit': 1})).json.obj('summary');
+    // Yêu cầu học bù đang chờ (Doc/MAKEUP_ABSENCE_PLAN.md) — chỉ cần tổng số.
+    final makeupPending =
+        (await _api.get('/makeup-requests', query: {'status': 'PENDING', 'limit': 1})).pagination?.intOrNull('total') ??
+        0;
     final week = sessions.where(
       (s) => !s.startTime.isBefore(weekStart) && s.startTime.isBefore(weekEnd) && s.status != ScheduleStatus.cancelled,
     );
@@ -160,6 +164,13 @@ class CoachApiRepository implements CoachRepository {
           kind: CoachTodoKind.refundHold,
           title: 'Đang tạm giữ ${Money.format(wallet.pendingRefundHold)}',
           subtitle: 'Cho yêu cầu hoàn tiền chờ Quản lý duyệt.',
+          targetId: '',
+        ),
+      if (makeupPending > 0)
+        CoachTodo(
+          kind: CoachTodoKind.makeupRequests,
+          title: '$makeupPending yêu cầu học bù',
+          subtitle: 'Học viên báo vắng đang chờ bạn xếp buổi học bù.',
           targetId: '',
         ),
     ];

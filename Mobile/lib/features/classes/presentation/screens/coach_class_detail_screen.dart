@@ -44,6 +44,16 @@ class _CoachClassDetailScreenState extends ConsumerState<CoachClassDetailScreen>
                 onPressed: () => context.push(AppRoutes.editClass(widget.classId)),
               ),
             )
+          // Khóa đang dạy: mở buổi bù cho học viên đã báo vắng xin học bù.
+          : d?.course.status == ClassStatus.approved
+          ? StickyBottomBar(
+              child: AppButton.secondary(
+                label: 'Mở buổi bù',
+                icon: AppIcons.absence,
+                expand: true,
+                onPressed: () => context.push(AppRoutes.coachOpenMakeupSlot(widget.classId)),
+              ),
+            )
           : null,
       body: AsyncValueView(
         value: value,

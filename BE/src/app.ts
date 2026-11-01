@@ -35,6 +35,7 @@ import locationRoutes from "./modules/locations/locations.routes.js";
 import centerRoutes from "./modules/center/center.routes.js";
 import membershipRoutes, { membershipPlanRouter } from "./modules/memberships/memberships.routes.js";
 import termRoutes from "./modules/terms/terms.routes.js";
+import makeupRoutes from "./modules/makeup-requests/makeup-requests.routes.js";
 
 // Lỗi validate (Zod) bằng tiếng Việt cho mọi schema.
 z.setErrorMap(viZodErrorMap);
@@ -118,6 +119,7 @@ app.use(`${v1}/center`, centerRoutes);
 app.use(`${v1}/membership-plans`, membershipPlanRouter);
 app.use(`${v1}/memberships`, membershipRoutes);
 app.use(`${v1}/terms`, termRoutes);
+app.use(`${v1}/makeup-requests`, makeupRoutes);
 
 // Static files for uploads
 // D03: CHỈ avatar là tài nguyên công khai (hiển thị qua <img src>). File chat riêng tư nằm ở

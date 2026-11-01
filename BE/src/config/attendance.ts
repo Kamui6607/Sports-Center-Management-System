@@ -21,6 +21,14 @@ export const ATTENDANCE = {
   QR_NOTE: "Tự động điểm danh qua QR",
   /** Marker trên Attendance.note khi member nhập mã dự phòng vì không quét được QR. */
   MANUAL_CODE_NOTE: "Điểm danh bằng mã dự phòng (nhập tay)",
+  /** Marker trên Attendance.note khi HLV/quản lý quét thẻ thành viên của học viên tại lớp. */
+  COACH_SCAN_NOTE: "HLV quét thẻ thành viên",
+  /** HLV quét thẻ sau startTime quá số phút này ⇒ ghi LATE thay vì PRESENT. */
+  LATE_AFTER_MINUTES: 10,
+  /** Tiền tố Attendance.note của bản ghi EXCUSED do HỌC VIÊN tự báo vắng (phân biệt với EXCUSED do HLV/quản lý). */
+  MEMBER_ABSENCE_NOTE_PREFIX: "Học viên báo vắng: ",
+  /** Số lần báo vắng còn hiệu lực tối đa trong MỘT khóa đã mua (Doc/MAKEUP_ABSENCE_PLAN.md §3.1). */
+  MEMBER_ABSENCE_MAX_PER_COURSE: 2,
   /** TTL của JWT trong mã QR (giây) — giữ nguyên hành vi hiện tại: 600s = 10 phút, FE tự refresh 55s. */
   QR_TTL_SECONDS: 600,
   /** TTL của mã dự phòng nhập tay (giây) — ngắn hơn QR để hạn chế chia sẻ. */
@@ -60,4 +68,20 @@ export function addDays(date: Date, days: number): Date {
 
 export function isSystemNoShow(note: string | null | undefined): boolean {
   return note === ATTENDANCE.SYSTEM_NO_SHOW_NOTE;
+}
+
+/** Bản ghi EXCUSED do học viên tự báo vắng? */
+export function isMemberAbsence(note: string | null | undefined): boolean {
+  return !!note && note.startsWith(ATTENDANCE.MEMBER_ABSENCE_NOTE_PREFIX);
+}
+
+/** Lý do học viên báo vắng (null nếu bản ghi không phải báo vắng của học viên). */
+export function memberAbsenceReason(note: string | null | undefined): string | null {
+  return isMemberAbsence(note) ? note!.slice(ATTENDANCE.MEMBER_ABSENCE_NOTE_PREFIX.length) : null;
+}
+
+/** Gắn cờ báo vắng cho bản ghi điểm danh trả về client. */
+export function withAbsenceInfo<T extends { status: string; note: string | null }>(record: T) {
+  const reason = record.status === "EXCUSED" ? memberAbsenceReason(record.note) : null;
+  return { ...record, reportedByMember: reason !== null, absenceReason: reason };
 }

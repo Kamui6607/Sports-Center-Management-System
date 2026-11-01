@@ -3,6 +3,8 @@ import * as enrollmentsService from "./enrollments.service.js";
 import * as quotaService from "./enrollment-quota.service.js";
 import * as myCoursesService from "./my-courses.service.js";
 import * as courseEnrollmentService from "./course-enrollment.service.js";
+import * as absenceService from "./absence.service.js";
+import { requestMakeupForAbsence } from "../makeup-requests/makeup-requests.service.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import { prisma } from "../../config/prisma.js";
@@ -130,5 +132,29 @@ export async function getTransferOptions(req: Request, res: Response, next: Next
       weekday: q.weekday ? Number(q.weekday) : undefined,
     });
     sendSuccess(res, data, "Transfer options retrieved successfully");
+  } catch (err) { next(err); }
+}
+
+export async function reportAbsence(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await absenceService.reportAbsence(
+      req.params.id as string,
+      req.user!.id,
+      req.body as { reason: string; requestMakeup?: boolean }
+    );
+    sendCreated(res, data, "Đã báo vắng");
+  } catch (err) { next(err); }
+}
+
+export async function cancelAbsence(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await absenceService.cancelAbsence(req.params.id as string, req.user!.id);
+    sendSuccess(res, data, "Đã hủy báo vắng");
+  } catch (err) { next(err); }
+}
+
+export async function requestMakeup(req: Request, res: Response, next: NextFunction) {
+  try {
+    sendCreated(res, await requestMakeupForAbsence(req.params.id as string, req.user!.id), "Đã gửi yêu cầu học bù");
   } catch (err) { next(err); }
 }

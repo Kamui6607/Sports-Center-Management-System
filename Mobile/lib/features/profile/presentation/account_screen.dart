@@ -99,6 +99,11 @@ class AccountScreen extends ConsumerWidget {
                     label: 'Hủy khóa & hoàn tiền',
                     onTap: () => go(AppRoutes.refunds),
                   ),
+                  MenuItemData(
+                    icon: AppIcons.absence,
+                    label: 'Học bù của tôi',
+                    onTap: () => go(AppRoutes.myMakeupRequests),
+                  ),
                 ],
               ),
             ],

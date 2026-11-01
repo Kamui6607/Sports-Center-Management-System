@@ -61,6 +61,7 @@ class _Body extends StatelessWidget {
                 children: [
                   sessionStatus(s, now).tag(),
                   if (s.isMakeup) const StatusLabel('Buổi dạy bù', StatusTone.brand).tag(),
+                  if (s.isMakeupSlot) const StatusLabel('Buổi bù mở', StatusTone.brand).tag(),
                   if (s.isRescheduled) const StatusLabel('Đã dời lịch', StatusTone.warning).tag(),
                 ],
               ),
@@ -112,10 +113,16 @@ class _Body extends StatelessWidget {
                   ListTile(
                     leading: AppAvatar(name: detail.roster[i].fullName, imageUrl: detail.roster[i].avatarUrl),
                     title: Text(detail.roster[i].fullName),
-                    subtitle: detail.roster[i].note == null ? null : Text(detail.roster[i].note!),
+                    subtitle: detail.roster[i].absenceReason != null
+                        ? Text('Lý do: ${detail.roster[i].absenceReason}')
+                        : detail.roster[i].note == null
+                        ? null
+                        : Text(detail.roster[i].note!),
                     trailing:
-                        (detail.roster[i].attendance?.status ??
-                                (s.hasStarted(now) ? notCheckedIn : detail.roster[i].enrollmentStatus.status))
+                        (detail.roster[i].absenceReason != null
+                                ? memberAbsent
+                                : detail.roster[i].attendance?.status ??
+                                      (s.hasStarted(now) ? notCheckedIn : detail.roster[i].enrollmentStatus.status))
                             .tag(dense: true),
                     onTap: () => context.push(AppRoutes.student(detail.roster[i].memberProfileId)),
                   ),
@@ -179,11 +186,26 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (qrWindow) ...[
-            AppButton.secondary(
-              label: 'Mở QR điểm danh',
-              icon: AppIcons.qr,
-              expand: true,
-              onPressed: () => context.push(AppRoutes.sessionQr(s.id)),
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton.secondary(
+                    label: 'Mở QR điểm danh',
+                    icon: AppIcons.qr,
+                    size: AppButtonSize.small,
+                    onPressed: () => context.push(AppRoutes.sessionQr(s.id)),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: AppButton.secondary(
+                    label: 'Quét thẻ học viên',
+                    icon: AppIcons.scan,
+                    size: AppButtonSize.small,
+                    onPressed: () => context.push(AppRoutes.membershipScannerFor(s.id)),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: AppSpacing.xs),
           ],

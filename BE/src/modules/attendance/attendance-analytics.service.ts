@@ -44,6 +44,7 @@ export async function computeAttendanceBuckets(
     },
     select: {
       memberId: true,
+      sourceClassId: true,
       schedule: { select: { id: true, startTime: true, classId: true } },
     },
     orderBy: { schedule: { startTime: "desc" } },
@@ -55,8 +56,10 @@ export async function computeAttendanceBuckets(
     { memberId: string; classId: string; schedules: { id: string; startTime: Date }[] }
   >();
   for (const e of enrollments) {
-    const key = `${e.memberId}|${e.schedule.classId}`;
-    const entry = grouped.get(key) ?? { memberId: e.memberId, classId: e.schedule.classId, schedules: [] };
+    // Đổi buổi / học bù sang khóa khác ⇒ tính cho khóa đã trả tiền.
+    const classId = e.sourceClassId ?? e.schedule.classId;
+    const key = `${e.memberId}|${classId}`;
+    const entry = grouped.get(key) ?? { memberId: e.memberId, classId, schedules: [] };
     if (entry.schedules.length < ATTENDANCE.SAMPLE_WINDOW) entry.schedules.push({ id: e.schedule.id, startTime: e.schedule.startTime });
     grouped.set(key, entry);
   }

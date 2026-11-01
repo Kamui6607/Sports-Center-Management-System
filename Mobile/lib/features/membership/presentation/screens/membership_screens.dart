@@ -16,7 +16,11 @@ import '../../../../core/theme/theme.dart';
 import '../../../../core/utils/money.dart';
 import '../../../../core/utils/vn_time.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../attendance/data/attendance_repository_provider.dart';
+import '../../../attendance/domain/entities/attendance.dart';
+import '../../../auth/domain/entities/app_user.dart';
 import '../../../auth/presentation/providers/session_provider.dart';
+import '../../../schedule/presentation/session_labels.dart';
 import '../../data/membership_repository_provider.dart';
 import '../../domain/entities/membership.dart';
 import '../providers/membership_providers.dart';
@@ -590,10 +594,14 @@ class _HistorySection extends ConsumerWidget {
   }
 }
 
-/// HLV / Quản lý quét QR động trên thẻ thành viên ⇒ hợp lệ hay không (BE ghi nhật ký vào cửa).
+/// HLV / Quản lý quét QR động trên thẻ thành viên (BE ghi nhật ký vào cửa).
+/// - HLV: đối chiếu buổi đang dạy + điểm danh luôn (`POST /attendance/coach-scan`); [sessionId] ⇒ đúng buổi đó.
+/// - Quản lý: kiểm gói vào cửa (`POST /memberships/pass/verify`).
 /// Kết quả tự ẩn sau 5 giây để quét tiếp.
 class MembershipScannerScreen extends ConsumerStatefulWidget {
-  const MembershipScannerScreen({super.key});
+  const MembershipScannerScreen({super.key, this.sessionId});
+
+  final String? sessionId;
 
   @override
   ConsumerState<MembershipScannerScreen> createState() => _MembershipScannerScreenState();
@@ -608,7 +616,10 @@ class _MembershipScannerScreenState extends ConsumerState<MembershipScannerScree
   );
   bool _processing = false;
   MembershipVerifyResult? _result;
+  CoachScanResult? _scan;
   Timer? _resetTimer;
+
+  bool get _isCoach => ref.read(currentUserProvider)?.role == UserRole.coach;
 
   @override
   void dispose() {
@@ -619,16 +630,26 @@ class _MembershipScannerScreenState extends ConsumerState<MembershipScannerScree
 
   Future<void> _verify(String raw) async {
     final token = raw.trim();
-    if (_processing || _result != null || token.isEmpty) return;
+    if (_processing || _result != null || _scan != null || token.isEmpty) return;
     setState(() => _processing = true);
     await _controller.stop();
     try {
-      final result = await ref.read(membershipRepositoryProvider).verifyPass(token);
-      if (!mounted) return;
-      setState(() {
-        _processing = false;
-        _result = result;
-      });
+      if (_isCoach) {
+        final scan = await ref.read(attendanceRepositoryProvider).coachScan(token, sessionId: widget.sessionId);
+        if (scan.state == CoachScanState.checkedIn) ref.read(dataRevisionProvider.notifier).bump();
+        if (!mounted) return;
+        setState(() {
+          _processing = false;
+          _scan = scan;
+        });
+      } else {
+        final result = await ref.read(membershipRepositoryProvider).verifyPass(token);
+        if (!mounted) return;
+        setState(() {
+          _processing = false;
+          _result = result;
+        });
+      }
       _resetTimer = Timer(_resultDuration, _reset);
     } on Object catch (e) {
       if (!mounted) return;
@@ -647,6 +668,7 @@ class _MembershipScannerScreenState extends ConsumerState<MembershipScannerScree
     setState(() {
       _processing = false;
       _result = null;
+      _scan = null;
     });
     await _controller.start();
   }
@@ -655,12 +677,14 @@ class _MembershipScannerScreenState extends ConsumerState<MembershipScannerScree
   Widget build(BuildContext context) {
     final c = context.colors;
     final result = _result;
+    final scan = _scan;
+    final coach = _isCoach;
     return Scaffold(
       backgroundColor: AppPalette.cameraOverlay,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: c.onPrimary,
-        title: const Text('Quét thẻ thành viên'),
+        title: Text(coach ? 'Quét thẻ học viên' : 'Quét thẻ thành viên'),
         leading: IconButton(tooltip: 'Đóng', icon: const Icon(AppIcons.close), onPressed: () => context.pop()),
       ),
       extendBodyBehindAppBar: true,
@@ -692,12 +716,16 @@ class _MembershipScannerScreenState extends ConsumerState<MembershipScannerScree
             right: AppSpacing.lg,
             bottom: AppSpacing.xl,
             child: SafeArea(
-              child: result != null
+              child: scan != null
+                  ? _CoachScanCard(result: scan, onScanNext: _reset)
+                  : result != null
                   ? _VerifyResultCard(result: result, onScanNext: _reset)
                   : Column(
                       children: [
                         Text(
-                          'Quét mã QR trong màn "Thẻ thành viên" của hội viên (mã tự đổi mỗi phút).',
+                          coach
+                              ? 'Quét mã QR trong "Thẻ thành viên" của học viên để điểm danh buổi bạn đang dạy.'
+                              : 'Quét mã QR trong màn "Thẻ thành viên" của hội viên (mã tự đổi mỗi phút).',
                           textAlign: TextAlign.center,
                           style: context.text.small.copyWith(color: c.onPrimary),
                         ),
@@ -737,54 +765,119 @@ class _VerifyResultCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = result;
     final tone = context.tones.of(r.isActive ? StatusTone.success : StatusTone.danger);
-    final message = r.isActive
-        ? 'Hợp lệ · còn ${r.daysLeft} ngày'
-        : r.status == null
-        ? 'Chưa có gói thành viên'
-        : 'Gói đã hết hạn';
+    // Không hợp lệ ⇒ lý do của BE (hết hạn ngày …, chưa có gói, tài khoản bị khóa) là thông điệp chính.
+    final message = r.isActive ? 'Hợp lệ · còn ${r.daysLeft} ngày' : (r.reason ?? 'Không hợp lệ');
     return AppCard(
       color: tone.background,
       borderColor: tone.border,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _ScannedPerson(name: r.fullName, avatarUrl: r.avatarUrl, subtitle: r.planName),
+          const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
-              AppAvatar(name: r.fullName, imageUrl: r.avatarUrl, size: AppSizes.avatarLg),
-              const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(r.fullName, style: context.text.bodyStrong),
-                    if (r.planName != null) Text(r.planName!, style: context.text.small),
-                  ],
-                ),
+                child: Text(message, style: context.text.title.copyWith(color: tone.foreground)),
               ),
               Icon(r.isActive ? AppIcons.success : AppIcons.error, color: tone.foreground, size: AppSizes.iconXl),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(message, style: context.text.title.copyWith(color: tone.foreground)),
-          if (r.reason != null && !r.isActive) Text(r.reason!, style: context.text.small),
           if (r.endDate != null && r.isActive)
             Text('Hiệu lực đến ${VnTime.date(r.endDate!)}', style: context.text.small),
           if (r.isActive && r.entriesToday > 1)
             Text('Lượt vào thứ ${r.entriesToday} trong hôm nay', style: context.text.small),
-          if (r.isMyStudent != null)
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.xs),
-              child: StatusLabel(
-                r.isMyStudent! ? 'Học viên của bạn' : 'Không phải học viên của bạn',
-                r.isMyStudent! ? StatusTone.info : StatusTone.neutral,
-              ).tag(dense: true),
-            ),
           const SizedBox(height: AppSpacing.sm),
           AppButton.secondary(label: 'Quét tiếp', icon: AppIcons.scan, expand: true, onPressed: onScanNext),
         ],
       ),
     );
   }
+}
+
+/// Kết quả HLV quét thẻ: phần "Lớp" (quyết định cho vào lớp) tách khỏi phần "Gói gym" (chỉ tham khảo).
+class _CoachScanCard extends StatelessWidget {
+  const _CoachScanCard({required this.result, required this.onScanNext});
+
+  final CoachScanResult result;
+  final VoidCallback onScanNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = result;
+    final p = r.pass;
+    final s = r.session;
+    final attendance = r.attendanceStatus?.status;
+    final attendanceLabel = attendance?.label ?? 'Có mặt';
+    final (StatusTone toneKey, String headline) = switch (r.state) {
+      CoachScanState.checkedIn => (attendance?.tone ?? StatusTone.success, 'Đã điểm danh · $attendanceLabel'),
+      CoachScanState.alreadyCheckedIn => (StatusTone.info, 'Đã điểm danh trước đó · $attendanceLabel'),
+      CoachScanState.notInClass => (
+        StatusTone.danger,
+        s != null ? 'Không có trong lớp này' : 'Không có trong buổi bạn đang dạy',
+      ),
+      CoachScanState.noActiveSession => (StatusTone.neutral, 'Bạn không có buổi dạy nào đang diễn ra'),
+    };
+    final tone = context.tones.of(toneKey);
+    final muted = context.text.caption.copyWith(color: context.colors.textMuted);
+    return AppCard(
+      color: tone.background,
+      borderColor: tone.border,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ScannedPerson(name: p.fullName, avatarUrl: p.avatarUrl),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: Text(headline, style: context.text.title.copyWith(color: tone.foreground)),
+              ),
+              Icon(r.inClass ? AppIcons.success : AppIcons.error, color: tone.foreground, size: AppSizes.iconXl),
+            ],
+          ),
+          if (s != null)
+            Text(
+              [s.className, VnTime.sessionLabel(s.startTime, s.endTime), ?s.roomName].join(' · '),
+              style: context.text.small,
+            ),
+          if (r.state == CoachScanState.noActiveSession && p.isMyStudent == true)
+            Text('Học viên có buổi sắp tới trong khóa của bạn.', style: context.text.small),
+          const SizedBox(height: AppSpacing.xs),
+          Text(p.isActive ? 'Gói gym còn ${p.daysLeft} ngày' : 'Gói gym: ${p.reason ?? 'không hợp lệ'}', style: muted),
+          if (r.inClass && !p.isActive)
+            Text('Không ảnh hưởng điểm danh lớp — gói gym chỉ dùng cho tập tự do.', style: muted),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton.secondary(label: 'Quét tiếp', icon: AppIcons.scan, expand: true, onPressed: onScanNext),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScannedPerson extends StatelessWidget {
+  const _ScannedPerson({required this.name, this.avatarUrl, this.subtitle});
+
+  final String name;
+  final String? avatarUrl;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      AppAvatar(name: name, imageUrl: avatarUrl, size: AppSizes.avatarLg),
+      const SizedBox(width: AppSpacing.sm),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(name, style: context.text.bodyStrong),
+            if (subtitle != null) Text(subtitle!, style: context.text.small),
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
 /// Chip trạng thái gói ở trang chủ Member: còn hạn ⇒ mở thẻ, chưa có ⇒ mở danh sách gói.

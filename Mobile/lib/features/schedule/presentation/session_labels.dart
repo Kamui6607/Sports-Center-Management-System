@@ -31,6 +31,9 @@ extension AttendanceStatusLabel on AttendanceStatus {
 
 const notCheckedIn = StatusLabel('Chưa điểm danh', StatusTone.neutral);
 
+/// Học viên tự báo vắng (EXCUSED do chính học viên tạo).
+const memberAbsent = StatusLabel('Báo vắng', StatusTone.info);
+
 extension CancelResolutionLabel on CancelResolutionMode {
   String get label => switch (this) {
     CancelResolutionMode.makeup => 'Dạy bù',

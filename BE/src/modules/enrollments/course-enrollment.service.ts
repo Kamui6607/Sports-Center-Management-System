@@ -360,7 +360,8 @@ export async function enrollWholeCourse(classId: string, memberProfileId: string
   }
 
   const sessions = await prisma.classSchedule.findMany({
-    where: { classId, status: "SCHEDULED", startTime: { gt: new Date() } },
+    // Buổi bù mở (isMakeupSlot) không thuộc "trọn khóa".
+    where: { classId, status: "SCHEDULED", startTime: { gt: new Date() }, isMakeupSlot: false },
     orderBy: { startTime: "asc" },
     select: {
       id: true,

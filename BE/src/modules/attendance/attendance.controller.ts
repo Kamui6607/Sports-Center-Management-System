@@ -44,6 +44,13 @@ export const scanQr = async (req: Request, res: Response, next: NextFunction) =>
   } catch (error) { next(error); }
 };
 
+export const coachScan = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await service.coachScanMemberPass(req.body as { token: string; scheduleId?: string }, req.user);
+    sendSuccess(res, data, "Đã quét thẻ học viên");
+  } catch (error) { next(error); }
+};
+
 // ─── MEMBER SELF-SERVICE ───────────────────────────────────────────────────
 export const getMyAttendance = async (req: Request, res: Response, next: NextFunction) => {
   try {

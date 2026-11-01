@@ -40,7 +40,7 @@ export async function hasMemberCompletedClass(memberId: string, classId: string,
   const [paid, sessions, active] = await Promise.all([
     prisma.payment.findFirst({ where: { memberId, classId, status: "SUCCESS" }, select: { id: true } }),
     prisma.classSchedule.findMany({
-      where: { classId },
+      where: { classId, isMakeupSlot: false },
       select: { id: true, startTime: true, endTime: true, status: true },
     }),
     prisma.enrollment.count({
@@ -150,7 +150,7 @@ export async function getMyCourses(userId: string, query: MyCoursesQuery) {
       },
     }),
     prisma.classSchedule.findMany({
-      where: { classId: { in: classIds } },
+      where: { classId: { in: classIds }, isMakeupSlot: false },
       select: { id: true, classId: true, startTime: true, endTime: true, status: true, makeupForId: true },
       orderBy: { startTime: "asc" },
     }),
