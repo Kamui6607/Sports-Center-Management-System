@@ -423,7 +423,7 @@ export async function requestPasswordResetByManager(targetId: string, managerId:
   };
 
   const resetUrl = `${env.FRONTEND_URL}/reset-password?email=${encodeURIComponent(user.email)}`;
-  const { subject, html } = buildAdminResetPasswordEmail(user.fullName, otp, resetUrl);
+  const { subject, html, otpCode } = buildAdminResetPasswordEmail(user.fullName, otp, resetUrl);
   let outboxId: string;
   try {
     outboxId = await prisma.$transaction(async (tx) => {
@@ -443,6 +443,8 @@ export async function requestPasswordResetByManager(targetId: string, managerId:
         subject,
         html,
         type: "EMAIL_ADMIN_RESET_PASSWORD",
+        otpCode,            // EmailJS template param {{passcode}}
+        expiryLabel: "15 phút", // EmailJS template param {{time}}
         metadata: { requestedById: managerId, requestedAt: now.toISOString() },
       });
       return row.id;

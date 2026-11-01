@@ -2,15 +2,29 @@ import { env } from "../config/env.js";
 
 const RESEND_URL = "https://api.resend.com/emails";
 const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
+const EMAILJS_REST_URL = "https://api.emailjs.com/api/v1.0/email/send";
 const REQUEST_TIMEOUT_MS = 10_000;
 
 export interface SendEmailInput {
   to: string;
   subject: string;
   html: string;
+  /** OTP code — template param `{{passcode}}` trong EmailJS template. */
+  otpCode?: string;
+  /** Nhãn thời gian hết hạn — template param `{{time}}` (vd. "15 phút"). Mặc định "15 phút". */
+  expiryLabel?: string;
 }
 
 // ─── provider checks ────────────────────────────────────────────────────────
+
+function emailjsConfigured(): boolean {
+  return Boolean(
+    env.EMAILJS_SERVICE_ID &&
+    env.EMAILJS_TEMPLATE_ID &&
+    env.EMAILJS_PUBLIC_KEY &&
+    env.EMAILJS_PRIVATE_KEY
+  );
+}
 
 function resendConfigured(): boolean {
   return Boolean(env.RESEND_API_KEY && env.RESEND_FROM);
@@ -25,6 +39,45 @@ function smtpConfigured(): boolean {
 }
 
 // ─── providers ──────────────────────────────────────────────────────────────
+
+/**
+ * Gửi qua EmailJS REST API (server-side).
+ *
+ * Template "One-Time Password" (template_f8a5vl6) dùng 3 biến:
+ *   {{to_email}}  → địa chỉ nhận (To Email field trong EmailJS)
+ *   {{passcode}}  → mã OTP 6 số
+ *   {{time}}      → thời gian hết hạn (vd. "15 phút")
+ *
+ * Tài liệu: https://www.emailjs.com/docs/rest-api/send/
+ */
+async function sendViaEmailJS(input: SendEmailInput): Promise<void> {
+  // Template params khớp với EmailJS template "One-Time Password":
+  //   {{to_email}}  → địa chỉ nhận
+  //   {{passcode}}  → mã OTP 6 số
+  //   {{time}}      → thời gian hết hạn (vd. "15 phút")
+  const payload = {
+    service_id: env.EMAILJS_SERVICE_ID,
+    template_id: env.EMAILJS_TEMPLATE_ID,
+    user_id: env.EMAILJS_PUBLIC_KEY,
+    accessToken: env.EMAILJS_PRIVATE_KEY, // bắt buộc khi gọi từ server (private key)
+    template_params: {
+      to_email: input.to,
+      passcode: input.otpCode ?? "",      // {{passcode}} trong template
+      time: input.expiryLabel ?? "15 phút", // {{time}} trong template
+    },
+  };
+
+  const res = await fetch(EMAILJS_REST_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "http://localhost" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  const body = await res.text().catch(() => "");
+  if (!res.ok) throw new Error(`EmailJS ${res.status}: ${body.slice(0, 300)}`);
+  console.log(`[MAIL] EmailJS response ${res.status}: ${body.slice(0, 200)}`);
+}
 
 /**
  * Gửi qua Resend (https://resend.com) — hoạt động tốt trên cloud, ít bị chặn IP.
@@ -93,54 +146,67 @@ async function sendViaSmtp({ to, subject, html }: SendEmailInput): Promise<void>
 // ─── public API ─────────────────────────────────────────────────────────────
 
 /**
- * Gửi email: ưu tiên Resend → Brevo → SMTP (nodemailer).
+ * Gửi email: chọn provider theo MAIL_DRIVER (hoặc MAIL_PROVIDER cũ).
  *
- * Thứ tự chọn provider:
- * 1. Nếu `MAIL_PROVIDER` được đặt rõ ("resend" | "brevo" | "smtp") → dùng đúng provider đó.
- * 2. Nếu "auto": Resend (nếu có key) → Brevo (nếu có key) → SMTP (nếu có credentials).
- * 3. Không có provider nào → THROW để outbox giữ lỗi trong `lastError` và retry.
+ * Thứ tự ưu tiên khi driver = "auto":
+ *   EmailJS (nếu đủ 4 key) → Resend → Brevo → SMTP.
+ *
+ * Đặt rõ MAIL_DRIVER=emailjs | smtp | resend | brevo để bỏ qua tự chọn.
  */
 export async function sendEmail(input: SendEmailInput): Promise<void> {
-  const forced = env.MAIL_PROVIDER;
+  const driver = env.MAIL_DRIVER;
 
-  if (forced === "resend") {
-    if (!resendConfigured()) throw new Error("MAIL_PROVIDER=resend nhưng thiếu RESEND_API_KEY / RESEND_FROM.");
+  // ─── forced driver ──────────────────────────────────────────────────────
+  if (driver === "emailjs") {
+    if (!emailjsConfigured())
+      throw new Error("MAIL_DRIVER=emailjs nhưng thiếu EMAILJS_SERVICE_ID / EMAILJS_TEMPLATE_ID / EMAILJS_PUBLIC_KEY / EMAILJS_PRIVATE_KEY.");
+    await sendViaEmailJS(input);
+    console.log(`[MAIL] Đã gửi qua EmailJS tới ${input.to} (subject: ${input.subject})`);
+    return;
+  }
+  if (driver === "resend") {
+    if (!resendConfigured()) throw new Error("MAIL_DRIVER=resend nhưng thiếu RESEND_API_KEY / RESEND_FROM.");
     await sendViaResend(input);
     console.log(`[MAIL] Đã gửi qua Resend tới ${input.to} (subject: ${input.subject})`);
     return;
   }
-  if (forced === "brevo") {
-    if (!brevoConfigured()) throw new Error("MAIL_PROVIDER=brevo nhưng thiếu BREVO_API_KEY / BREVO_SENDER_EMAIL.");
+  if (driver === "brevo") {
+    if (!brevoConfigured()) throw new Error("MAIL_DRIVER=brevo nhưng thiếu BREVO_API_KEY / BREVO_SENDER_EMAIL.");
     await sendViaBrevo(input);
     console.log(`[MAIL] Brevo đã NHẬN yêu cầu gửi tới ${input.to} (subject: ${input.subject})`);
     return;
   }
-  if (forced === "smtp") {
-    if (!smtpConfigured()) throw new Error("MAIL_PROVIDER=smtp nhưng thiếu SMTP_USER / SMTP_PASS.");
+  if (driver === "smtp") {
+    if (!smtpConfigured()) throw new Error("MAIL_DRIVER=smtp nhưng thiếu SMTP_USER / SMTP_PASS.");
     await sendViaSmtp(input);
     console.log(`[MAIL] Đã gửi qua SMTP tới ${input.to} (subject: ${input.subject})`);
     return;
   }
 
-  // "auto": Resend → Brevo → SMTP
+  // ─── auto: EmailJS → Resend → Brevo → SMTP ─────────────────────────────
+  if (emailjsConfigured()) {
+    await sendViaEmailJS(input);
+    console.log(`[MAIL] (auto) Đã gửi qua EmailJS tới ${input.to} (subject: ${input.subject})`);
+    return;
+  }
   if (resendConfigured()) {
     await sendViaResend(input);
-    console.log(`[MAIL] Resend đã NHẬN yêu cầu gửi tới ${input.to} (subject: ${input.subject})`);
+    console.log(`[MAIL] (auto) Resend đã NHẬN yêu cầu gửi tới ${input.to} (subject: ${input.subject})`);
     return;
   }
   if (brevoConfigured()) {
     await sendViaBrevo(input);
-    console.log(`[MAIL] Brevo đã NHẬN yêu cầu gửi tới ${input.to} (subject: ${input.subject})`);
+    console.log(`[MAIL] (auto) Brevo đã NHẬN yêu cầu gửi tới ${input.to} (subject: ${input.subject})`);
     return;
   }
   if (smtpConfigured()) {
     await sendViaSmtp(input);
-    console.log(`[MAIL] Đã gửi qua SMTP tới ${input.to} (subject: ${input.subject})`);
+    console.log(`[MAIL] (auto) Đã gửi qua SMTP tới ${input.to} (subject: ${input.subject})`);
     return;
   }
 
   throw new Error(
-    "Chưa cấu hình email: cần RESEND_API_KEY + RESEND_FROM, hoặc BREVO_API_KEY + BREVO_SENDER_EMAIL, hoặc SMTP_USER + SMTP_PASS."
+    "Chưa cấu hình email: cần EMAILJS_*, hoặc RESEND_API_KEY + RESEND_FROM, hoặc BREVO_API_KEY + BREVO_SENDER_EMAIL, hoặc SMTP_USER + SMTP_PASS."
   );
 }
 
@@ -149,7 +215,7 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
 /**
  * Email đặt lại mật khẩu: mã OTP 6 số (nhập trong app Mobile) + liên kết (Web). Cả hai hết hạn sau 15 phút.
  */
-export function buildResetPasswordEmail(resetLink: string, otp?: string): { subject: string; html: string } {
+export function buildResetPasswordEmail(resetLink: string, otp?: string): { subject: string; html: string; otpCode?: string; resetLink: string } {
   const otpBlock = otp
     ? `
       <p>Mã xác nhận của bạn (nhập trong ứng dụng Pulse):</p>
@@ -173,6 +239,8 @@ export function buildResetPasswordEmail(resetLink: string, otp?: string): { subj
         <p style="color:#aaa;font-size:12px;">Pulse Sports Center</p>
       </div>
     `,
+    otpCode: otp,
+    resetLink,
   };
 }
 
@@ -181,7 +249,7 @@ export function buildResetPasswordEmail(resetLink: string, otp?: string): { subj
  * email + mã + mật khẩu mới). Mã cũng dùng được ở màn "Quên mật khẩu" của ứng dụng Mobile.
  * Liên kết KHÔNG chứa mã/token — lộ link không đủ để đổi mật khẩu. Không bao giờ chứa mật khẩu.
  */
-export function buildAdminResetPasswordEmail(fullName: string, otp: string, resetUrl: string): { subject: string; html: string } {
+export function buildAdminResetPasswordEmail(fullName: string, otp: string, resetUrl: string): { subject: string; html: string; otpCode: string; resetLink: string } {
   const safeName = fullName.replace(/[<>&"]/g, "");
   return {
     subject: "Yêu cầu đặt lại mật khẩu - Pulse Sports Center",
@@ -203,6 +271,8 @@ export function buildAdminResetPasswordEmail(fullName: string, otp: string, rese
         <p style="color:#aaa;font-size:12px;">Pulse Sports Center</p>
       </div>
     `,
+    otpCode: otp,
+    resetLink: resetUrl,
   };
 }
 

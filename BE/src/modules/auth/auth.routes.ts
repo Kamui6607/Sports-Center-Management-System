@@ -13,6 +13,7 @@ import {
   ResetPasswordSchema,
 } from "./auth.schema.js";
 import * as authController from "./auth.controller.js";
+import { verifyTurnstile } from "../../middlewares/turnstile.js";
 
 // C1: chống dò mật khẩu / OTP — theo IP + email (và trần theo IP). Cần `trust proxy` (app.ts) để req.ip là IP thật sau proxy.
 const byIpAndEmail = (req: Request) => `${req.ip}|${String(req.body?.email ?? "").trim().toLowerCase()}`;
@@ -81,7 +82,7 @@ router.post("/register", validate(RegisterSchema), authController.register);
  *       401: { $ref: "#/components/responses/Unauthorized" }
  *       500: { $ref: "#/components/responses/ServerError" }
  */
-router.post("/login", loginIpLimit, loginLimit, validate(LoginSchema), authController.login);
+router.post("/login", loginIpLimit, loginLimit, verifyTurnstile, validate(LoginSchema), authController.login);
 
 /**
  * @swagger
@@ -149,7 +150,7 @@ router.post("/refresh-token", refreshLimit, validate(RefreshTokenSchema), authCo
  *     responses:
  *       200: { $ref: "#/components/responses/MessageOk" }
  */
-router.post("/forgot-password", otpLimit, validate(ForgotPasswordSchema), authController.forgotPassword);
+router.post("/forgot-password", otpLimit, verifyTurnstile, validate(ForgotPasswordSchema), authController.forgotPassword);
 
 /**
  * @swagger

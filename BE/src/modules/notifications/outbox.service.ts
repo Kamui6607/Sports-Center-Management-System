@@ -51,12 +51,22 @@ export interface OutboxEmailInput {
   html: string;
   /** Nhãn loại email (vd. "EMAIL_RESET_PASSWORD") để tra cứu/debug. */
   type: string;
+  /** OTP code — truyền tới EmailJS template param {{passcode}}. */
+  otpCode?: string;
+  /** Nhãn thời gian hết hạn — template param {{time}} (vd. "15 phút"). */
+  expiryLabel?: string;
   /** Vết nghiệp vụ (VD người khởi tạo) — KHÔNG chứa mật khẩu/mã/token. */
   metadata?: Record<string, unknown>;
 }
 
-/** Ghi EMAIL vào outbox (gọi được trong transaction). Worker gửi qua Brevo và retry khi lỗi. */
+/** Ghi EMAIL vào outbox (gọi được trong transaction). Worker gửi sau commit, retry khi lỗi. */
 export async function enqueueEmail(db: DbClient, input: OutboxEmailInput) {
+  // otpCode và expiryLabel được lưu vào metadata để worker đọc lại khi gửi qua EmailJS.
+  const mergedMeta: Record<string, unknown> = {
+    ...(input.metadata ?? {}),
+    ...(input.otpCode !== undefined ? { _otpCode: input.otpCode } : {}),
+    ...(input.expiryLabel !== undefined ? { _expiryLabel: input.expiryLabel } : {}),
+  };
   return db.notificationOutbox.create({
     data: {
       userId: input.userId,
@@ -66,7 +76,7 @@ export async function enqueueEmail(db: DbClient, input: OutboxEmailInput) {
       title: input.subject,
       body: input.html,
       availableAt: new Date(),
-      ...(input.metadata ? { metadata: input.metadata as object } : {}),
+      ...(Object.keys(mergedMeta).length > 0 ? { metadata: mergedMeta as object } : {}),
     },
   });
 }
@@ -107,7 +117,15 @@ export async function flushNotificationOutbox(limit = OUTBOX_BATCH_SIZE): Promis
     try {
       if (row.channel === "EMAIL") {
         if (!row.email) throw new Error("Outbox EMAIL thiếu địa chỉ người nhận");
-        await sendEmail({ to: row.email, subject: row.title, html: row.body });
+        // Đọc otpCode / expiryLabel từ metadata (được lưu bởi enqueueEmail) để gửi đúng template params EmailJS.
+        const meta = (row.metadata as Record<string, unknown> | null) ?? {};
+        await sendEmail({
+          to: row.email,
+          subject: row.title,
+          html: row.body,
+          otpCode: typeof meta._otpCode === "string" ? meta._otpCode : undefined,
+          expiryLabel: typeof meta._expiryLabel === "string" ? meta._expiryLabel : undefined,
+        });
       } else {
         await createNotification(
           row.userId,

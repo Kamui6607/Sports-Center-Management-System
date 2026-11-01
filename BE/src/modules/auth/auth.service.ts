@@ -88,8 +88,16 @@ export async function forgotPassword(data: ForgotPasswordInput) {
   const resetLink = `${env.FRONTEND_URL}/reset-password?token=${token}`;
 
   // Đưa email vào OUTBOX: lỗi mạng/nhà cung cấp mail không làm hỏng request, worker sẽ retry.
-  const { subject, html } = buildResetPasswordEmail(resetLink, otp);
-  await enqueueEmail(prisma, { userId: user.id, to: user.email, subject, html, type: "EMAIL_RESET_PASSWORD" });
+  const { subject, html, otpCode } = buildResetPasswordEmail(resetLink, otp);
+  await enqueueEmail(prisma, {
+    userId: user.id,
+    to: user.email,
+    subject,
+    html,
+    type: "EMAIL_RESET_PASSWORD",
+    otpCode,            // EmailJS template param {{passcode}}
+    expiryLabel: "15 phút", // EmailJS template param {{time}}
+  });
   void flushNotificationOutbox().catch((err) => console.error("[OUTBOX] flush error:", err));
 
   return result;
