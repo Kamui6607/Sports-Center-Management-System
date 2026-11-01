@@ -104,6 +104,7 @@ class MembershipApiRepository implements MembershipRepository {
       daysLeft: j.integer('totalDaysLeft'),
       reason: j.strOrNull('reason'),
       entriesToday: j.integer('entriesToday'),
+      isMyStudent: j['isMyStudent'] is bool ? j['isMyStudent'] as bool : null,
     );
   }
 }

@@ -544,7 +544,7 @@ export async function issueMemberPass(userId: string) {
  * MANAGER/COACH quét mã QR động của hội viên ⇒ hợp lệ hay không + ghi nhật ký vào cửa.
  * Không tự khóa gì — người quét quyết định cho vào hay không.
  */
-export async function verifyMemberPass(token: string, scannerUserId: string) {
+export async function verifyMemberPass(token: string, scannerUserId: string, scannerRole?: string) {
   let payload: Partial<MemberPassPayload>;
   try {
     payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as Partial<MemberPassPayload>;
@@ -594,9 +594,21 @@ export async function verifyMemberPass(token: string, scannerUserId: string) {
       : null,
     validUntil: overview.validUntil,
     totalDaysLeft: overview.totalDaysLeft,
-    /** Số lượt vào hợp lệ trong hôm nay (gồm lượt này). */
-    entriesToday: valid ? entriesToday + 1 : entriesToday,
+    /** Số lượt vào hợp lệ trong hôm nay (gồm lượt này — lượt quét vừa ghi đã nằm trong phép đếm). */
+    entriesToday,
+    /** Chỉ có khi người quét là HLV: hội viên này có đang/đã học khóa nào của HLV đó không (Manager ⇒ null). */
+    isMyStudent: await isStudentOfCoach(member.id, scannerUserId, scannerRole),
   };
+}
+
+/** HLV quét thẻ: hội viên có ghi danh (BOOKED/COMPLETED) vào buổi của khóa do HLV này phụ trách không. Vai trò khác ⇒ null. */
+async function isStudentOfCoach(memberId: string, scannerUserId: string, scannerRole?: string): Promise<boolean | null> {
+  if (scannerRole !== "COACH") return null;
+  const hit = await prisma.enrollment.findFirst({
+    where: { memberId, status: { in: ["BOOKED", "COMPLETED"] }, schedule: { class: { coach: { userId: scannerUserId } } } },
+    select: { id: true },
+  });
+  return hit !== null;
 }
 
 /** MANAGER: nhật ký quét thẻ hội viên. */
@@ -617,7 +629,16 @@ export async function listMemberPassScans(query: { page?: string; limit?: string
       take: limit,
     }),
   ]);
-  return { scans: rows, pagination: buildPaginationMeta(total, page, limit) };
+  // `scannedBy` chỉ là id người dùng (không có quan hệ) ⇒ tra tên + vai trò để Manager biết ai quét.
+  const scanners = await prisma.user.findMany({
+    where: { id: { in: [...new Set(rows.map((r) => r.scannedBy))] } },
+    select: { id: true, fullName: true, role: { select: { name: true } } },
+  });
+  const byId = new Map(scanners.map((u) => [u.id, { id: u.id, fullName: u.fullName, role: u.role.name }]));
+  return {
+    scans: rows.map((r) => ({ ...r, scanner: byId.get(r.scannedBy) ?? null })),
+    pagination: buildPaginationMeta(total, page, limit),
+  };
 }
 
 /** MANAGER tra cứu nhanh theo userId (KHÔNG dùng để vào cửa — vào cửa dùng mã QR động `verifyMemberPass`). */

@@ -11,7 +11,9 @@ const selected = filter ? SUITES.filter((s) => s.includes(filter)) : SUITES;
 const results = [];
 for (const suite of selected) {
   console.log(`\n════════ ${suite} ════════`);
-  const r = spawnSync("npx", ["tsx", `tests/${suite}.e2e.ts`], { stdio: "inherit", shell: true, env: process.env });
+  // E2E không được đẩy ảnh lên Cloudinary thật (BE/.env có thể bật cloud): ép lưu ảnh ra đĩa local.
+  const env = { ...process.env, AVATAR_STORAGE: "local" };
+  const r = spawnSync("npx", ["tsx", `tests/${suite}.e2e.ts`], { stdio: "inherit", shell: true, env });
   results.push([suite, r.status === 0]);
 }
 console.log("\nKết quả:");

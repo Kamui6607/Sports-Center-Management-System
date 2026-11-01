@@ -99,15 +99,19 @@ async function main() {
     const pass = await call("GET", "/memberships/my/pass", member);
     check("cấp mã QR động 60s", pass.status === 200 && pass.body.data.expiresIn === 60 && pass.body.data.isActive === true, pass.body);
     const scan = await call("POST", "/memberships/pass/verify", manager, { token: pass.body.data.token });
-    check("Manager quét ⇒ hợp lệ + ghi nhật ký", scan.status === 200 && scan.body.data.valid === true && scan.body.data.entriesToday >= 1, scan.body);
+    check("Manager quét ⇒ hợp lệ + ghi nhật ký", scan.status === 200 && scan.body.data.valid === true && scan.body.data.entriesToday === 1, scan.body);
+    check("Manager quét ⇒ isMyStudent = null (không áp dụng)", scan.body.data.isMyStudent === null, scan.body.data.isMyStudent);
     const scanCoach = await call("POST", "/memberships/pass/verify", coach, { token: pass.body.data.token });
-    check("HLV quét được", scanCoach.status === 200 && scanCoach.body.data.valid === true, scanCoach.body);
+    check("HLV quét được", scanCoach.status === 200 && scanCoach.body.data.valid === true && scanCoach.body.data.entriesToday === 2, scanCoach.body);
+    check("HLV quét hội viên không học khóa của mình ⇒ isMyStudent=false", scanCoach.body.data.isMyStudent === false, scanCoach.body.data.isMyStudent);
     const bad = await call("POST", "/memberships/pass/verify", manager, { token: "abc.def.ghijklmnop" });
     check("mã rác ⇒ 400 PASS_INVALID", bad.status === 400 && bad.body.errors?.code === "PASS_INVALID", bad.body);
     const memberScan = await call("POST", "/memberships/pass/verify", member, { token: pass.body.data.token });
     check("Member không tự quét được", memberScan.status === 403);
     const scans = await call("GET", "/memberships/pass/scans?limit=5", manager);
     check("nhật ký vào cửa", scans.status === 200 && scans.body.data.length >= 2, scans.body);
+    const roles = new Set(scans.body.data.map((x: any) => x.scanner?.role));
+    check("nhật ký cho biết ai quét (tên + vai trò)", roles.has("MANAGER") && roles.has("COACH") && scans.body.data.every((x: any) => x.scanner?.fullName), scans.body.data.map((x: any) => x.scanner));
 
     console.log("• Manager hủy gói + hoàn tiền, gói xếp hàng dời lên");
     const current = my.body.data.current;

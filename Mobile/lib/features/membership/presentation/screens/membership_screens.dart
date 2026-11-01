@@ -771,6 +771,14 @@ class _VerifyResultCard extends StatelessWidget {
             Text('Hiệu lực đến ${VnTime.date(r.endDate!)}', style: context.text.small),
           if (r.isActive && r.entriesToday > 1)
             Text('Lượt vào thứ ${r.entriesToday} trong hôm nay', style: context.text.small),
+          if (r.isMyStudent != null)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
+              child: StatusLabel(
+                r.isMyStudent! ? 'Học viên của bạn' : 'Không phải học viên của bạn',
+                r.isMyStudent! ? StatusTone.info : StatusTone.neutral,
+              ).tag(dense: true),
+            ),
           const SizedBox(height: AppSpacing.sm),
           AppButton.secondary(label: 'Quét tiếp', icon: AppIcons.scan, expand: true, onPressed: onScanNext),
         ],

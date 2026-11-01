@@ -118,6 +118,7 @@ class MembershipVerifyResult {
     this.daysLeft = 0,
     this.reason,
     this.entriesToday = 0,
+    this.isMyStudent,
   });
 
   final String userId;
@@ -136,4 +137,7 @@ class MembershipVerifyResult {
 
   /// Số lượt vào hợp lệ hôm nay (gồm lượt này).
   final int entriesToday;
+
+  /// Chỉ khi người quét là HLV: hội viên có học khóa của HLV đó không (`null` ⇒ không áp dụng, VD Manager quét).
+  final bool? isMyStudent;
 }

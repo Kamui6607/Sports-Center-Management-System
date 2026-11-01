@@ -267,15 +267,18 @@ class _CartLineCard extends ConsumerWidget {
           if (hasPriceChange)
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.xs),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              // Wrap: máy nhỏ / chữ lớn thì nút xuống dòng thay vì tràn ngang.
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xxs,
                 children: [
                   AppButton.ghost(
                     label: 'Xem sản phẩm',
                     size: AppButtonSize.small,
                     onPressed: () => context.push(AppRoutes.productDetail(l.productId)),
                   ),
-                  const SizedBox(width: AppSpacing.xs),
                   AppButton.outline(
                     label: 'Cập nhật giá mới',
                     size: AppButtonSize.small,

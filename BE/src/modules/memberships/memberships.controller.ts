@@ -86,7 +86,7 @@ export async function getMyPass(req: Request, res: Response, next: NextFunction)
 
 export async function verifyPass(req: Request, res: Response, next: NextFunction) {
   try {
-    sendSuccess(res, await membershipsService.verifyMemberPass(req.body.token, req.user!.id), "Member pass verified");
+    sendSuccess(res, await membershipsService.verifyMemberPass(req.body.token, req.user!.id, req.user!.role), "Member pass verified");
   } catch (err) { next(err); }
 }
 

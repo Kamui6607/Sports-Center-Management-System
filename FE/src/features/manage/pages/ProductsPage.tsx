@@ -1,4 +1,3 @@
-import { resolveAssetUrl } from "../../../shared/resolveAssetUrl";
 import { useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";

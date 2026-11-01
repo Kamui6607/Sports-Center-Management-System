@@ -200,6 +200,14 @@ function ScanLog() {
               { key: "t", title: "Thời điểm", render: (x) => <span className="cr-mono">{dateTime(x.createdAt)}</span> },
               { key: "m", title: "Hội viên", render: (x) => str(get(x, "member.user.fullName")) },
               { key: "p", title: "Gói", render: (x) => str(get(x, "membership.plan.name")) || "—" },
+              {
+                key: "s",
+                title: "Người quét",
+                render: (x) => {
+                  const name = str(get(x, "scanner.fullName"));
+                  return name ? `${name} · ${get(x, "scanner.role") === "COACH" ? "HLV" : "Quản lý"}` : "—";
+                },
+              },
               { key: "v", title: "Kết quả", render: (x) => (x.valid ? <Pill tone="ok">Hợp lệ</Pill> : <Pill tone="bad">Không hợp lệ</Pill>) },
               { key: "r", title: "Ghi chú", render: (x) => str(x.reason) },
             ]}

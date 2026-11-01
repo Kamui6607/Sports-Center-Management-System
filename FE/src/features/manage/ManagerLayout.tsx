@@ -186,13 +186,6 @@ function NavSection({ group, open, rail, active, onToggle }: { group: NavGroup; 
   );
 }
 
-const initials = (name: string) =>
-  name
-    .trim()
-    .split(/\s+/)
-    .slice(-2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
 
 /** Thẻ "Hôm nay" cuối sidebar: số buổi, tỷ lệ lấp đầy, việc chờ duyệt — dữ liệu thật, dùng chung cache với Tổng quan. */
 function TodayCard() {
