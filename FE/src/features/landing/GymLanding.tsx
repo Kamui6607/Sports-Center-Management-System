@@ -152,6 +152,7 @@ type ProductRow = {
   id: string;
   name: string;
   description?: string | null;
+  imageUrl?: string | null;
   price: string | number;
   availableStock?: number;
   stockQuantity?: number;
@@ -1691,10 +1692,14 @@ export default function GymLanding({ signedIn }: { signedIn: boolean }) {
                   <span className="gl-prod-stock">
                     {selected ? "Đã chọn nhận tại quầy" : `Còn ${stock} tại quầy`}
                   </span>
-                  <strong className="gl-prod-price">{money(prod.price)}</strong>
-                  <span className="gl-wall-cap">
-                    <b>{prod.name}</b>
-                    {prod.description ? ` · ${prod.description}` : ""}
+                  {"imageUrl" in prod && prod.imageUrl ? (
+                    <img className="gl-prod-img" src={prod.imageUrl} alt="" loading="lazy" />
+                  ) : null}
+                  <span className="gl-prod-body">
+                    <strong className="gl-prod-price">{money(prod.price)}</strong>
+                    {/* Mô tả sản phẩm có thể rất dài (nhập từ trang bán hàng) — cắt 2 dòng để ô không kéo cả hàng lưới */}
+                    <b className="gl-prod-name">{prod.name}</b>
+                    {prod.description ? <span className="gl-prod-desc">{prod.description}</span> : null}
                   </span>
                 </button>
               );

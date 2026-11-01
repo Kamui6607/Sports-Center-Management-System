@@ -11,20 +11,20 @@
 @import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap");
 
 .gl {
-  /* Bảng màu độ tương phản cao (>= 10.5:1 cho toàn bộ văn bản) */
-  --ground: #f3f7f4;
-  --surface-soft: #e3ece7;
+  /* Soft Blush — nền berry đậm + hồng nhấn (chữ >= 7:1, xem Doc/PINK_THEME_PLAN.md) */
+  --ground: #faf4f5;
+  --surface-soft: #f1e6e8;
   --surface-card: #ffffff;
-  --forest: #0d1f17;
-  --forest-2: #152e23;
-  --deep: #08140f;
-  --lime: #b8f246;
-  --lime-soft: #d9f99d;
+  --forest: #4a1229;
+  --forest-2: #5c1a35;
+  --deep: #330b1c;
+  --lime: #ff9ec2;
+  --lime-soft: #ffd6e4;
 
-  --ink: #0c1c15;
-  --ink-2: #1b352a;
-  --snow: #f4f8f5;
-  --snow-2: #d6e6dd;
+  --ink: #221317;
+  --ink-2: #3f272d;
+  --snow: #fbf5f6;
+  --snow-2: #eedce0;
 
   /* 6 cấp cỡ chữ duy nhất trên toàn trang (giữ size-count <= 6 ở mọi độ phân giải) */
   --fs-giant: clamp(3rem, 5.6vw, 4.75rem);
@@ -625,7 +625,7 @@
   border-radius: 24px;
   padding: 20px 22px;
   border: 1px solid var(--forest-2);
-  box-shadow: 0 20px 44px -20px rgba(8, 20, 15, 0.45);
+  box-shadow: 0 20px 44px -20px rgba(25, 13, 16, 0.45);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1197,7 +1197,7 @@
   border-radius: 22px;
   padding: 20px 22px;
   border: 1px solid var(--forest-2);
-  box-shadow: 0 20px 40px -20px rgba(8, 20, 15, 0.35);
+  box-shadow: 0 20px 40px -20px rgba(25, 13, 16, 0.35);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1337,7 +1337,7 @@
   border-radius: 28px;
   padding: clamp(20px, 3vw, 28px);
   border: 1px solid var(--surface-soft);
-  box-shadow: 0 24px 48px -20px rgba(8, 20, 15, 0.5);
+  box-shadow: 0 24px 48px -20px rgba(25, 13, 16, 0.5);
   min-height: 360px;
   display: flex;
   flex-direction: column;
@@ -2103,20 +2103,65 @@
   color: var(--lime);
 }
 
+.gl-wall-cell.is-product {
+  gap: 12px;
+}
+
+.gl-prod-img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 16px;
+  background-color: var(--surface-card);
+}
+
+.gl-prod-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: auto;
+  min-width: 0;
+}
+
+.gl-prod-name,
+.gl-prod-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.gl-prod-name {
+  font-size: var(--fs-body);
+  color: var(--ink);
+}
+
+.gl-prod-desc {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  white-space: normal;
+}
+
+.gl-wall-cell.is-product.is-picked .gl-prod-name {
+  color: var(--snow);
+}
+
+.gl-wall-cell.is-product.is-picked .gl-prod-desc {
+  color: var(--snow-2);
+}
+
 .gl-wall-cap {
   font-size: var(--fs-body);
   color: var(--ink-2);
 }
 
 .gl-wall-cap.light,
-.gl-wall-cell.is-forest .gl-wall-cap,
-.gl-wall-cell.is-product.is-picked .gl-wall-cap {
+.gl-wall-cell.is-forest .gl-wall-cap {
   color: var(--snow-2);
 }
 
-.gl-wall-cell.is-product.is-picked .gl-wall-cap b {
-  color: var(--snow);
-}
 
 /* ── MỤC 6 (CONTACT): Clip-out coupon form — Phiếu hẹn tư vấn 2 nửa cân xứng ── */
 .gl-coupon-sec {

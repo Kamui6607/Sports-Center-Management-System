@@ -103,7 +103,7 @@ export function AIAssistantPage() {
           background: "#ffffff",
           borderRadius: 16,
           padding: "16px 24px",
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -115,8 +115,8 @@ export function AIAssistantPage() {
               width: 38,
               height: 38,
               borderRadius: 10,
-              backgroundColor: "#203d31",
-              color: "#d3f879",
+              backgroundColor: "#c9356a",
+              color: "#fff0f5",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -129,7 +129,7 @@ export function AIAssistantPage() {
               style={{
                 fontSize: 16,
                 fontWeight: 800,
-                color: "#203d31",
+                color: "#a82a58",
                 margin: 0,
               }}
             >
@@ -161,10 +161,10 @@ export function AIAssistantPage() {
           }
           style={{
             background: "none",
-            border: "1px solid #e7ece9",
+            border: "1px solid #f5e6ec",
             padding: "6px 12px",
             borderRadius: 8,
-            color: "#54655d",
+            color: "#6d5b5f",
             fontSize: 12,
             fontWeight: 600,
             cursor: "pointer",
@@ -183,7 +183,7 @@ export function AIAssistantPage() {
           flex: 1,
           backgroundColor: "#ffffff",
           borderRadius: 18,
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
           padding: 20,
           display: "flex",
           flexDirection: "column",
@@ -209,8 +209,8 @@ export function AIAssistantPage() {
                     width: 34,
                     height: 34,
                     borderRadius: "50%",
-                    backgroundColor: "#203d31",
-                    color: "#d3f879",
+                    backgroundColor: "#c9356a",
+                    color: "#fff0f5",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -226,8 +226,8 @@ export function AIAssistantPage() {
                   style={{
                     padding: "12px 16px",
                     borderRadius: 14,
-                    backgroundColor: isAi ? "#f4f7f5" : "#203d31",
-                    color: isAi ? "#203d31" : "#ffffff",
+                    backgroundColor: isAi ? "#fcf4f7" : "#c9356a",
+                    color: isAi ? "#c9356a" : "#ffffff",
                     fontSize: 13,
                     lineHeight: 1.5,
                   }}
@@ -237,7 +237,7 @@ export function AIAssistantPage() {
                 <span
                   style={{
                     fontSize: 11,
-                    color: "#58695f",
+                    color: "#6e5864",
                     marginTop: 4,
                     display: "block",
                     textAlign: isAi ? "left" : "right",
@@ -257,8 +257,8 @@ export function AIAssistantPage() {
                 width: 34,
                 height: 34,
                 borderRadius: "50%",
-                backgroundColor: "#203d31",
-                color: "#d3f879",
+                backgroundColor: "#c9356a",
+                color: "#fff0f5",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -270,8 +270,8 @@ export function AIAssistantPage() {
               style={{
                 padding: "10px 16px",
                 borderRadius: 14,
-                backgroundColor: "#f4f7f5",
-                color: "#58695f",
+                backgroundColor: "#fcf4f7",
+                color: "#6e5864",
                 fontSize: 13,
                 fontStyle: "italic",
               }}
@@ -293,11 +293,11 @@ export function AIAssistantPage() {
             style={{
               padding: "6px 12px",
               backgroundColor: "#ffffff",
-              border: "1px solid #d4ebbf",
+              border: "1px solid #ffd5de",
               borderRadius: 999,
               fontSize: 12,
               fontWeight: 600,
-              color: "#376228",
+              color: "#a82a58",
               cursor: "pointer",
               whiteSpace: "nowrap",
               flexShrink: 0,
@@ -316,7 +316,7 @@ export function AIAssistantPage() {
           backgroundColor: "#ffffff",
           padding: 8,
           borderRadius: 14,
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
         }}
       >
         <input
@@ -339,7 +339,7 @@ export function AIAssistantPage() {
           disabled={!input.trim() || loading}
           style={{
             padding: "10px 18px",
-            backgroundColor: "#203d31",
+            backgroundColor: "#c9356a",
             color: "#ffffff",
             border: "none",
             borderRadius: 10,

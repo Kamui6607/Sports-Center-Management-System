@@ -70,7 +70,7 @@ export function SchedulePage() {
           background: "#ffffff",
           borderRadius: 16,
           padding: "20px 24px",
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -83,13 +83,13 @@ export function SchedulePage() {
             style={{
               fontSize: 24,
               fontWeight: 800,
-              color: "#203d31",
+              color: "#a82a58",
               margin: "0 0 4px",
             }}
           >
             Lịch tập cá nhân
           </h1>
-          <p style={{ margin: 0, color: "#58695f", fontSize: 13 }}>
+          <p style={{ margin: 0, color: "#6e5864", fontSize: 13 }}>
             Thời khóa biểu các ca học đã đặt của bạn theo tuần
           </p>
         </div>
@@ -107,7 +107,7 @@ export function SchedulePage() {
             style={{
               display: "flex",
               alignItems: "center",
-              backgroundColor: "#f2f5f3",
+              backgroundColor: "#f7f3f4",
               borderRadius: 10,
               padding: 3,
             }}
@@ -120,7 +120,7 @@ export function SchedulePage() {
                 padding: "6px 8px",
                 cursor: "pointer",
                 display: "flex",
-                color: "#203d31",
+                color: "#a82a58",
               }}
               title="Tuần trước"
             >
@@ -134,7 +134,7 @@ export function SchedulePage() {
                 padding: "6px 12px",
                 fontSize: 12,
                 fontWeight: 700,
-                color: "#203d31",
+                color: "#a82a58",
                 cursor: "pointer",
               }}
             >
@@ -148,7 +148,7 @@ export function SchedulePage() {
                 padding: "6px 8px",
                 cursor: "pointer",
                 display: "flex",
-                color: "#203d31",
+                color: "#a82a58",
               }}
               title="Tuần sau"
             >
@@ -156,7 +156,7 @@ export function SchedulePage() {
             </button>
           </div>
 
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#203d31" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#a82a58" }}>
             {weekDays[0].toLocaleDateString("vi-VN", {
               timeZone: MEMBER_TIME_ZONE,
               day: "numeric",
@@ -175,7 +175,7 @@ export function SchedulePage() {
           <div
             style={{
               display: "flex",
-              backgroundColor: "#f2f5f3",
+              backgroundColor: "#f7f3f4",
               borderRadius: 8,
               padding: 2,
             }}
@@ -185,7 +185,7 @@ export function SchedulePage() {
               style={{
                 border: "none",
                 background: viewMode === "calendar" ? "#ffffff" : "transparent",
-                color: viewMode === "calendar" ? "#203d31" : "#58695f",
+                color: viewMode === "calendar" ? "#c9356a" : "#6e5864",
                 fontWeight: 600,
                 fontSize: 12,
                 padding: "6px 12px",
@@ -203,7 +203,7 @@ export function SchedulePage() {
               style={{
                 border: "none",
                 background: viewMode === "list" ? "#ffffff" : "transparent",
-                color: viewMode === "list" ? "#203d31" : "#58695f",
+                color: viewMode === "list" ? "#c9356a" : "#6e5864",
                 fontWeight: 600,
                 fontSize: 12,
                 padding: "6px 12px",
@@ -248,7 +248,7 @@ export function SchedulePage() {
                 style={{
                   backgroundColor: "#ffffff",
                   borderRadius: 14,
-                  border: isToday ? "2px solid #376228" : "1px solid #e7ece9",
+                  border: isToday ? "2px solid #a82a58" : "1px solid #f5e6ec",
                   minHeight: 320,
                   display: "flex",
                   flexDirection: "column",
@@ -260,15 +260,15 @@ export function SchedulePage() {
                   style={{
                     padding: "10px 12px",
                     textAlign: "center",
-                    backgroundColor: isToday ? "#f2f8eb" : "#f8faf9",
-                    borderBottom: "1px solid #edf2ee",
+                    backgroundColor: isToday ? "#fff2f4" : "#f8faf9",
+                    borderBottom: "1px solid #f5eef0",
                   }}
                 >
                   <div
                     style={{
                       fontSize: 11,
                       fontWeight: 700,
-                      color: isToday ? "#376228" : "#58695f",
+                      color: isToday ? "#a82a58" : "#6e5864",
                       textTransform: "uppercase",
                     }}
                   >
@@ -281,7 +281,7 @@ export function SchedulePage() {
                     style={{
                       fontSize: 16,
                       fontWeight: 800,
-                      color: isToday ? "#203d31" : "#475467",
+                      color: isToday ? "#c9356a" : "#475467",
                     }}
                   >
                     {date.getUTCDate()}/{date.getUTCMonth() + 1}
@@ -305,7 +305,7 @@ export function SchedulePage() {
                         alignItems: "center",
                         justifyContent: "center",
                         flex: 1,
-                        color: "#58695f",
+                        color: "#6e5864",
                         fontSize: 11,
                       }}
                     >
@@ -324,8 +324,8 @@ export function SchedulePage() {
                             navigate(`/member/classes/${item.classId}`)
                           }
                           style={{
-                            backgroundColor: "#f2f8eb",
-                            border: "1px solid #d4ebbf",
+                            backgroundColor: "#fff2f4",
+                            border: "1px solid #ffd5de",
                             borderRadius: 10,
                             padding: "8px 10px",
                             cursor: "pointer",
@@ -339,7 +339,7 @@ export function SchedulePage() {
                             style={{
                               fontSize: 12,
                               fontWeight: 700,
-                              color: "#203d31",
+                              color: "#a82a58",
                               lineHeight: 1.2,
                             }}
                           >
@@ -354,7 +354,7 @@ export function SchedulePage() {
                               gap: 4,
                             }}
                           >
-                            <Clock size={12} color="#58695f" />
+                            <Clock size={12} color="#6e5864" />
                             {formatMemberDate(startTime, {
                               hour: "2-digit",
                               minute: "2-digit",
@@ -374,7 +374,7 @@ export function SchedulePage() {
                               gap: 4,
                             }}
                           >
-                            <MapPin size={11} color="#58695f" />
+                            <MapPin size={11} color="#6e5864" />
                             {sch.room?.name}
                           </div>
                         </div>
@@ -402,7 +402,7 @@ export function SchedulePage() {
                 style={{
                   backgroundColor: "#ffffff",
                   borderRadius: 14,
-                  border: "1px solid #e7ece9",
+                  border: "1px solid #f5e6ec",
                   padding: "16px 20px",
                   display: "flex",
                   alignItems: "center",
@@ -413,7 +413,7 @@ export function SchedulePage() {
               >
                 <div>
                   <div
-                    style={{ fontSize: 16, fontWeight: 700, color: "#203d31" }}
+                    style={{ fontSize: 16, fontWeight: 700, color: "#a82a58" }}
                   >
                     {item.schedule?.class?.name}
                   </div>
@@ -447,9 +447,9 @@ export function SchedulePage() {
                   onClick={() => navigate(`/member/classes/${item.classId}`)}
                   style={{
                     padding: "8px 16px",
-                    backgroundColor: "#f2f8eb",
-                    color: "#203d31",
-                    border: "1px solid #d4ebbf",
+                    backgroundColor: "#fff2f4",
+                    color: "#a82a58",
+                    border: "1px solid #ffd5de",
                     borderRadius: 8,
                     fontSize: 12,
                     fontWeight: 600,

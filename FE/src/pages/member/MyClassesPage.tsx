@@ -107,7 +107,7 @@ export function MyClassesPage() {
           background: "#ffffff",
           borderRadius: 16,
           padding: "24px 28px",
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -116,10 +116,10 @@ export function MyClassesPage() {
         }}
       >
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#203d31", margin: "0 0 6px" }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#a82a58", margin: "0 0 6px" }}>
             Lớp học của tôi
           </h1>
-          <p style={{ margin: 0, color: "#58695f", fontSize: 13 }}>
+          <p style={{ margin: 0, color: "#6e5864", fontSize: 13 }}>
             Theo dõi danh sách các buổi học bạn đã đăng ký, buổi đã tham gia và lịch sử hủy lớp
           </p>
         </div>
@@ -131,7 +131,7 @@ export function MyClassesPage() {
             alignItems: "center",
             gap: 8,
             padding: "10px 18px",
-            backgroundColor: "#203d31",
+            backgroundColor: "#c9356a",
             color: "#ffffff",
             border: "none",
             borderRadius: 10,
@@ -172,13 +172,13 @@ export function MyClassesPage() {
             aria-valuemin={0}
             aria-valuemax={Math.max(1, quota.data.limit)}
             aria-valuenow={quota.data.used}
-            style={{ height: 8, borderRadius: 99, background: "#e7ece9", overflow: "hidden" }}
+            style={{ height: 8, borderRadius: 99, background: "#f5e6ec", overflow: "hidden" }}
           >
             <div
               style={{
                 height: "100%",
                 width: `${quota.data.limit ? Math.min(100, (quota.data.used / quota.data.limit) * 100) : 100}%`,
-                background: quota.data.remaining ? "#376228" : "#d97706",
+                background: quota.data.remaining ? "#a82a58" : "#d97706",
               }}
             />
           </div>
@@ -190,7 +190,7 @@ export function MyClassesPage() {
         style={{
           display: "flex",
           gap: 8,
-          borderBottom: "1px solid #e7ece9",
+          borderBottom: "1px solid #f5e6ec",
           paddingBottom: 2,
         }}
       >
@@ -217,13 +217,13 @@ export function MyClassesPage() {
                 background: "none",
                 fontSize: 14,
                 fontWeight: isActive ? 700 : 500,
-                color: isActive ? "#203d31" : "#58695f",
-                borderBottom: isActive ? "3px solid #203d31" : "3px solid transparent",
+                color: isActive ? "#c9356a" : "#6e5864",
+                borderBottom: isActive ? "3px solid #c9356a" : "3px solid transparent",
                 cursor: "pointer",
                 borderRadius: "4px 4px 0 0",
               }}
             >
-              <Icon size={16} color={isActive ? "#203d31" : "#58695f"} />
+              <Icon size={16} color={isActive ? "#c9356a" : "#6e5864"} />
               <span>{tab.label}</span>
             </button>
           );
@@ -259,7 +259,7 @@ export function MyClassesPage() {
                 onClick={() => navigate("/member/classes")}
                 style={{
                   padding: "9px 18px",
-                  backgroundColor: "#203d31",
+                  backgroundColor: "#c9356a",
                   color: "#ffffff",
                   border: "none",
                   borderRadius: 8,
@@ -288,7 +288,7 @@ export function MyClassesPage() {
                 style={{
                   backgroundColor: "#ffffff",
                   borderRadius: 16,
-                  border: "1px solid #e7ece9",
+                  border: "1px solid #f5e6ec",
                   padding: "20px 24px",
                   display: "flex",
                   alignItems: "center",
@@ -304,16 +304,16 @@ export function MyClassesPage() {
                       style={{
                         textAlign: "center",
                         minWidth: 68,
-                        backgroundColor: "#f2f8eb",
-                        border: "1px solid #d4ebbf",
+                        backgroundColor: "#fff2f4",
+                        border: "1px solid #ffd5de",
                         borderRadius: 12,
                         padding: "10px 8px",
                       }}
                     >
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#376228", textTransform: "uppercase" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#a82a58", textTransform: "uppercase" }}>
                         {startTime.toLocaleDateString("vi-VN", { weekday: "short" })}
                       </div>
-                      <div style={{ fontSize: 19, fontWeight: 800, color: "#203d31" }}>
+                      <div style={{ fontSize: 19, fontWeight: 800, color: "#a82a58" }}>
                         {startTime.getDate()}/{startTime.getMonth() + 1}
                       </div>
                     </div>
@@ -321,22 +321,22 @@ export function MyClassesPage() {
 
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                      <span style={{ fontSize: 16, fontWeight: 800, color: "#203d31" }}>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: "#a82a58" }}>
                         {sch?.class?.name || "Lớp học thể thao"}
                       </span>
                       <StatusBadge status={item.status} />
                     </div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 13, color: "#54655d", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 13, color: "#6d5b5f", flexWrap: "wrap" }}>
                       {startTime && endTime && (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                          <Clock size={15} color="#58695f" />
+                          <Clock size={15} color="#6e5864" />
                           {formatMemberDate(startTime, { hour: "2-digit", minute: "2-digit" })} -{" "}
                           {formatMemberDate(endTime, { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       )}
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <MapPin size={15} color="#58695f" />
+                        <MapPin size={15} color="#6e5864" />
                         Phòng: <strong>{sch?.room?.name || "Sân tập"}</strong>
                       </span>
                       <span>
@@ -353,9 +353,9 @@ export function MyClassesPage() {
                     style={{
                       padding: "8px 14px",
                       borderRadius: 8,
-                      border: "1px solid #d0d7d3",
+                      border: "1px solid #dbd3d4",
                       backgroundColor: "#ffffff",
-                      color: "#203d31",
+                      color: "#a82a58",
                       fontSize: 12,
                       fontWeight: 600,
                       cursor: "pointer",
@@ -387,9 +387,9 @@ export function MyClassesPage() {
                       style={{
                         padding: "8px 14px",
                         borderRadius: 8,
-                        border: "1px solid #fecdca",
-                        backgroundColor: "#fef3f2",
-                        color: "#d92d20",
+                        border: "1px solid #fed7aa",
+                        backgroundColor: "#fff4ed",
+                        color: "#c2410c",
                         fontSize: 12,
                         fontWeight: 600,
                         cursor: "pointer",

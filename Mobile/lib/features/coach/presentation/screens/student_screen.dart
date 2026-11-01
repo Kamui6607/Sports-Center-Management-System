@@ -53,7 +53,7 @@ class _StudentScreenState extends ConsumerState<StudentScreen> {
                 ),
               ),
               backgroundColor: context.colors.primary,
-              foregroundColor: context.colors.accent,
+              foregroundColor: context.colors.highlight,
               icon: const Icon(AppIcons.add),
               label: const Text('Lập lộ trình'),
             ),

@@ -125,7 +125,7 @@ class _DayCell extends StatelessWidget {
                 children: [
                   Text(
                     VnTime.weekdayLabel(wall.weekday, short: true),
-                    style: context.text.caption.copyWith(color: selected ? c.accent : c.textMuted),
+                    style: context.text.caption.copyWith(color: selected ? c.highlight : c.textMuted),
                   ),
                   Text('${wall.day}', style: context.text.bodyStrong.copyWith(color: fg)),
                   Container(

@@ -87,11 +87,14 @@ class OrderItemsCard extends StatelessWidget {
               total: l.total,
               footer: l.review == null
                   ? (l.isReviewExpired
-                      ? Padding(
-                          padding: const EdgeInsets.only(top: AppSpacing.xxs),
-                          child: Text('Đã hết hạn đánh giá (quá 30 ngày)', style: context.text.caption.copyWith(color: context.colors.textMuted)),
-                        )
-                      : null)
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: AppSpacing.xxs),
+                            child: Text(
+                              'Đã hết hạn đánh giá (quá 30 ngày)',
+                              style: context.text.caption.copyWith(color: context.colors.textMuted),
+                            ),
+                          )
+                        : null)
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -106,7 +109,10 @@ class OrderItemsCard extends StatelessWidget {
                             ],
                             if (l.review!.editCount > 0) ...[
                               const SizedBox(width: AppSpacing.xs),
-                              Text('(Đã sửa 1 lần)', style: context.text.caption.copyWith(color: context.colors.textMuted)),
+                              Text(
+                                '(Đã sửa 1 lần)',
+                                style: context.text.caption.copyWith(color: context.colors.textMuted),
+                              ),
                             ],
                           ],
                         ),

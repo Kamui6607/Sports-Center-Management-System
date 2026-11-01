@@ -17,8 +17,8 @@ abstract final class QrImageRenderer {
       version: QrVersions.auto,
       gapless: true,
       errorCorrectionLevel: QrErrorCorrectLevel.M,
-      eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: AppPalette.forest),
-      dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: AppPalette.forest),
+      eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: AppPalette.text),
+      dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: AppPalette.text),
     );
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder)

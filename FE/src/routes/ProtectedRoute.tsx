@@ -14,8 +14,8 @@ export function ProtectedRoute({ allowedRoles = ["MEMBER"] }: ProtectedRouteProp
   if (loading) {
     return (
       <div className="fullscreen" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-        <div style={{ width: 42, height: 42, border: "4px solid #e7ece9", borderTopColor: "#203d31", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-        <p style={{ color: "#7b8982", fontSize: 14 }}>Đang tải thông tin tài khoản...</p>
+        <div style={{ width: 42, height: 42, border: "4px solid #f5e6ec", borderTopColor: "#c9356a", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        <p style={{ color: "#908184", fontSize: 14 }}>Đang tải thông tin tài khoản...</p>
       </div>
     );
   }
@@ -32,9 +32,9 @@ export function ProtectedRoute({ allowedRoles = ["MEMBER"] }: ProtectedRouteProp
 
     return (
       <div className="fullscreen" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24 }}>
-        <ShieldAlert size={48} color="#e53e3e" style={{ marginBottom: 16 }} />
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, color: "#203d31" }}>Không có quyền truy cập</h1>
-        <p style={{ color: "#7b8982", maxWidth: 420, marginBottom: 24 }}>
+        <ShieldAlert size={48} color="#c2410c" style={{ marginBottom: 16 }} />
+        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, color: "#a82a58" }}>Không có quyền truy cập</h1>
+        <p style={{ color: "#908184", maxWidth: 420, marginBottom: 24 }}>
           Tài khoản của bạn ({user.email} - Vai trò: <strong>{user.role}</strong>) không có quyền truy cập khu vực này.
         </p>
         <button
@@ -44,7 +44,7 @@ export function ProtectedRoute({ allowedRoles = ["MEMBER"] }: ProtectedRouteProp
             alignItems: "center",
             gap: 8,
             padding: "10px 20px",
-            background: "#203d31",
+            background: "#c9356a",
             color: "white",
             border: "none",
             borderRadius: 8,

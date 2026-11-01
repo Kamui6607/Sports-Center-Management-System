@@ -101,7 +101,7 @@ class _Hero extends StatelessWidget {
             ),
             child: Text(
               'GYM · HỘI VIÊN & HLV',
-              style: context.text.caption.copyWith(color: c.accent, letterSpacing: 1),
+              style: context.text.caption.copyWith(color: c.highlight, letterSpacing: 1),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -111,7 +111,7 @@ class _Hero extends StatelessWidget {
               children: [
                 TextSpan(
                   text: 'nhịp',
-                  style: TextStyle(color: c.accent),
+                  style: TextStyle(color: c.highlight),
                 ),
                 const TextSpan(text: '.'),
               ],

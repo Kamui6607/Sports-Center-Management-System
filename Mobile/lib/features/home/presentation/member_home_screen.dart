@@ -135,7 +135,8 @@ class _AttendanceAlerts extends ConsumerWidget {
       child: AlertBanner(
         tone: StatusTone.warning,
         title: 'Nhắc nhở chuyên cần',
-        message: 'Tỷ lệ tham gia khóa "${warnings.first.className}" đạt ${(warnings.first.rate * 100).round()}%. Hãy sắp xếp tham gia các buổi tới nhé!',
+        message:
+            'Tỷ lệ tham gia khóa "${warnings.first.className}" đạt ${(warnings.first.rate * 100).round()}%. Hãy sắp xếp tham gia các buổi tới nhé!',
         action: TextButton(onPressed: () => context.push(AppRoutes.attendance), child: const Text('Xem chuyên cần')),
       ),
     );
@@ -170,10 +171,7 @@ class _QuickActions extends StatelessWidget {
                 Container(
                   width: 36,
                   height: 36,
-                  decoration: BoxDecoration(
-                    color: c.surfaceMuted,
-                    borderRadius: AppRadius.controlAll,
-                  ),
+                  decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: AppRadius.controlAll),
                   alignment: Alignment.center,
                   child: Icon(icon, size: AppSizes.icon, color: c.primary),
                 ),

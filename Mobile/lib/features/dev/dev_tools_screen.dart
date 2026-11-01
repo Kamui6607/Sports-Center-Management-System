@@ -124,6 +124,7 @@ class _GalleryState extends State<_Gallery> {
               ('primary', c.primary),
               ('accent', c.accent),
               ('accentStrong', c.accentStrong),
+              ('highlight', c.highlight),
               ('background', c.background),
               ('surface', c.surface),
               ('border', c.border),

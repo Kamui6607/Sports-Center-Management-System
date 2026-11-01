@@ -174,9 +174,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
                     const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: [
-                        Expanded(
-                          child: Text('HÓA ĐƠN BÁN HÀNG', style: context.text.titleSmall),
-                        ),
+                        Expanded(child: Text('HÓA ĐƠN BÁN HÀNG', style: context.text.titleSmall)),
                         if (isCancelled || isRefunded || isPartiallyRefunded)
                           Builder(
                             builder: (context) {
@@ -236,7 +234,16 @@ class InvoiceDetailScreen extends ConsumerWidget {
                     ),
                     Text(inv.invoiceNumber, style: context.text.title),
                     const SizedBox(height: AppSpacing.md),
-                    KeyValueRow(label: 'Trạng thái', value: isCancelled ? 'Đã hủy' : isRefunded ? 'Đã hoàn tiền' : isPartiallyRefunded ? 'Hoàn một phần' : (inv.statusLabel ?? 'Đã thanh toán')),
+                    KeyValueRow(
+                      label: 'Trạng thái',
+                      value: isCancelled
+                          ? 'Đã hủy'
+                          : isRefunded
+                          ? 'Đã hoàn tiền'
+                          : isPartiallyRefunded
+                          ? 'Hoàn một phần'
+                          : (inv.statusLabel ?? 'Đã thanh toán'),
+                    ),
                     KeyValueRow(label: 'Ngày thanh toán', value: VnTime.dateTime(inv.issuedAt)),
                     KeyValueRow(label: 'Phương thức', value: inv.paymentMethod.label),
                     if (inv.transactionCode != null) KeyValueRow(label: 'Mã giao dịch', value: inv.transactionCode!),

@@ -92,7 +92,7 @@ class _BalanceCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('SỐ DƯ KHẢ DỤNG', style: context.text.caption.copyWith(color: c.accent, letterSpacing: 1)),
+          Text('SỐ DƯ KHẢ DỤNG', style: context.text.caption.copyWith(color: c.highlight, letterSpacing: 1)),
           MoneyText(wallet.available, style: context.text.display.copyWith(color: c.onPrimary)),
           const SizedBox(height: AppSpacing.md),
           Row(

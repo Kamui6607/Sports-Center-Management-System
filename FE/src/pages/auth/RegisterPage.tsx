@@ -54,7 +54,7 @@ export function RegisterPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #f6f8f7 0%, #e8efe9 100%)",
+        background: "linear-gradient(135deg, #fff8fa 0%, #f4eaec 100%)",
         padding: 24,
       }}
     >
@@ -65,8 +65,8 @@ export function RegisterPage() {
           background: "#ffffff",
           borderRadius: 20,
           padding: "36px 32px",
-          boxShadow: "0 20px 25px -5px rgba(32, 61, 49, 0.08), 0 8px 10px -6px rgba(32, 61, 49, 0.04)",
-          border: "1px solid #e2eae5",
+          boxShadow: "0 20px 25px -5px rgba(201, 53, 106, 0.08), 0 8px 10px -6px rgba(201, 53, 106, 0.04)",
+          border: "1px solid #efe5e7",
         }}
       >
         <div style={{ textAlign: "center", marginBottom: 24 }}>
@@ -75,20 +75,20 @@ export function RegisterPage() {
               width: 48,
               height: 48,
               borderRadius: 14,
-              backgroundColor: "#203d31",
+              backgroundColor: "#c9356a",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#d3f879",
+              color: "#fff0f5",
               marginBottom: 12,
             }}
           >
             <Activity size={26} strokeWidth={2.6} />
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#203d31", letterSpacing: -0.6, margin: "0 0 6px" }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#a82a58", letterSpacing: -0.6, margin: "0 0 6px" }}>
             Tạo tài khoản Hội viên
           </h1>
-          <p style={{ margin: 0, color: "#7b8982", fontSize: 13 }}>
+          <p style={{ margin: 0, color: "#908184", fontSize: 13 }}>
             Tham gia cộng đồng thể thao hàng đầu tại Pulse Sports Center
           </p>
         </div>
@@ -207,7 +207,7 @@ export function RegisterPage() {
             style={{
               marginTop: 8,
               padding: "13px 20px",
-              backgroundColor: "#203d31",
+              backgroundColor: "#c9356a",
               color: "#ffffff",
               border: "none",
               borderRadius: 10,
@@ -229,7 +229,7 @@ export function RegisterPage() {
           style={{
             marginTop: 20,
             paddingTop: 16,
-            borderTop: "1px solid #f0f4f2",
+            borderTop: "1px solid #f6f2f2",
             textAlign: "center",
             fontSize: 13,
             color: "#667085",
@@ -238,7 +238,7 @@ export function RegisterPage() {
           Đã có tài khoản?{" "}
           <Link
             to="/login"
-            style={{ color: "#203d31", fontWeight: 700, textDecoration: "underline" }}
+            style={{ color: "#a82a58", fontWeight: 700, textDecoration: "underline" }}
           >
             Đăng nhập ngay
           </Link>

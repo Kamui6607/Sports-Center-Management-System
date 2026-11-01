@@ -2,20 +2,20 @@
 
 /*
  * Màn công khai của Web: Đăng nhập, Quên / Đặt lại mật khẩu.
- * Trái: trường màu rêu của thương hiệu (câu chuyện + đường nhịp tim + video). Phải: biểu mẫu đặt thẳng trên nền, không hộp, không bóng.
+ * Trái: trường màu berry của thương hiệu (câu chuyện + đường nhịp tim + video). Phải: biểu mẫu đặt thẳng trên nền, không hộp, không bóng.
  */
 .pa {
-  --pa-field: #203d31;
+  --pa-field: #c9356a;
   --pa-ink: #ffffff;
   --pa-ink-2: rgba(255, 255, 255, 0.78);
-  --pa-lime: #d3f879;
+  --pa-lime: #ffd6e4;
   --pa-display: "Be Vietnam Pro", var(--font);
   min-height: 100vh;
   min-height: 100svh;
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(440px, 1fr);
 }
-html[data-theme="dark"] .pa { --pa-field: #15291f; }
+html[data-theme="dark"] .pa { --pa-field: #311d22; }
 
 /* ── Trái: câu chuyện ───────────────────────────────── */
 .pa-story {
@@ -27,7 +27,7 @@ html[data-theme="dark"] .pa { --pa-field: #15291f; }
   font-family: var(--pa-display); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--pa-ink); text-decoration: none;
 }
 .pa-word span { color: var(--pa-lime); margin-left: -10px; }
-.pa-word .pa-mark { align-self: center; flex: none; --pm-bg: var(--pa-lime); --pm-fg: #203d31; }
+.pa-word .pa-mark { align-self: center; flex: none; --pm-bg: var(--pa-lime); --pm-fg: #c9356a; }
 .pa-word small { font-family: var(--font); font-size: 14px; font-weight: 500; letter-spacing: 0; color: var(--pa-lime); }
 .pa-copy { margin-top: clamp(16px, 6vh, 72px); }
 .pa-story h1 {
@@ -45,7 +45,7 @@ html[data-theme="dark"] .pa { --pa-field: #15291f; }
 .pa-film figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; font-size: 15px; }
 .pa-film figcaption strong { font-weight: 600; color: var(--pa-ink); }
 .pa-film figcaption span { color: var(--pa-lime); font-variant-numeric: tabular-nums; }
-.pa-shutter { position: relative; flex: 1; overflow: hidden; border-radius: 14px 14px 0 0; background: #10211a; }
+.pa-shutter { position: relative; flex: 1; overflow: hidden; border-radius: 14px 14px 0 0; background: #28181b; }
 .pa-shutter video, .pa-shutter img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(0.85); }
 
 /* ── Phải: biểu mẫu ─────────────────────────────────── */

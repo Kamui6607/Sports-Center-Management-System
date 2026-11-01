@@ -559,11 +559,12 @@ class _ReasonFormState extends State<_ReasonForm> {
 }
 
 /// Đánh giá hoặc chỉnh sửa đánh giá một sản phẩm (trong 30 ngày, sửa tối đa 1 lần).
-Future<void> showOrderItemReviewSheet(BuildContext context, {required ShopOrderLine line, bool isEditing = false}) => showAppBottomSheet<void>(
-  context: context,
-  title: isEditing ? 'Chỉnh sửa đánh giá' : 'Đánh giá ${line.productName}',
-  builder: (_) => _ReviewForm(line: line, isEditing: isEditing),
-);
+Future<void> showOrderItemReviewSheet(BuildContext context, {required ShopOrderLine line, bool isEditing = false}) =>
+    showAppBottomSheet<void>(
+      context: context,
+      title: isEditing ? 'Chỉnh sửa đánh giá' : 'Đánh giá ${line.productName}',
+      builder: (_) => _ReviewForm(line: line, isEditing: isEditing),
+    );
 
 class _ReviewForm extends ConsumerStatefulWidget {
   const _ReviewForm({required this.line, this.isEditing = false});
@@ -603,19 +604,13 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
     });
     try {
       if (widget.isEditing) {
-        await ref.read(shopRepositoryProvider).updateReviewItem(
-          widget.line.id,
-          rating: _rating,
-          comment: _comment.text,
-          isAnonymous: _isAnonymous,
-        );
+        await ref
+            .read(shopRepositoryProvider)
+            .updateReviewItem(widget.line.id, rating: _rating, comment: _comment.text, isAnonymous: _isAnonymous);
       } else {
-        await ref.read(shopRepositoryProvider).reviewItem(
-          widget.line.id,
-          _rating,
-          _comment.text,
-          isAnonymous: _isAnonymous,
-        );
+        await ref
+            .read(shopRepositoryProvider)
+            .reviewItem(widget.line.id, _rating, _comment.text, isAnonymous: _isAnonymous);
       }
       ref.read(dataRevisionProvider.notifier).bump();
       if (!mounted) return;

@@ -30,7 +30,7 @@ class AppAvatar extends StatelessWidget {
       child: FittedBox(
         child: Text(
           initials(name),
-          style: (size >= AppSizes.avatarLg ? context.text.headline : context.text.label).copyWith(color: c.accent),
+          style: (size >= AppSizes.avatarLg ? context.text.headline : context.text.label).copyWith(color: c.highlight),
         ),
       ),
     );

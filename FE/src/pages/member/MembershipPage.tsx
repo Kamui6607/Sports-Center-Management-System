@@ -108,7 +108,7 @@ export function MembershipPage() {
           background: "#ffffff",
           borderRadius: 16,
           padding: "24px 28px",
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -121,13 +121,13 @@ export function MembershipPage() {
             style={{
               fontSize: 24,
               fontWeight: 800,
-              color: "#203d31",
+              color: "#a82a58",
               margin: "0 0 6px",
             }}
           >
             Quản lý Gói hội viên
           </h1>
-          <p style={{ margin: 0, color: "#58695f", fontSize: 13 }}>
+          <p style={{ margin: 0, color: "#6e5864", fontSize: 13 }}>
             Xem thông tin gói tập đang sử dụng, thời hạn còn lại và bảng giá các
             gói tập luyện tại Pulse Sports
           </p>
@@ -140,7 +140,7 @@ export function MembershipPage() {
         <div
           style={{
             display: "flex",
-            backgroundColor: "#f2f5f3",
+            backgroundColor: "#f7f3f4",
             borderRadius: 8,
             padding: 3,
           }}
@@ -150,7 +150,7 @@ export function MembershipPage() {
             style={{
               border: "none",
               background: tab === "current" ? "#ffffff" : "transparent",
-              color: tab === "current" ? "#203d31" : "#58695f",
+              color: tab === "current" ? "#c9356a" : "#6e5864",
               fontWeight: 700,
               fontSize: 13,
               padding: "8px 16px",
@@ -165,7 +165,7 @@ export function MembershipPage() {
             style={{
               border: "none",
               background: tab === "plans" ? "#ffffff" : "transparent",
-              color: tab === "plans" ? "#203d31" : "#58695f",
+              color: tab === "plans" ? "#c9356a" : "#6e5864",
               fontWeight: 700,
               fontSize: 13,
               padding: "8px 16px",
@@ -189,11 +189,11 @@ export function MembershipPage() {
             /* ACTIVE MEMBERSHIP HERO */
             <div
               style={{
-                background: "linear-gradient(135deg, #203d31 0%, #152720 100%)",
+                background: "linear-gradient(135deg, #c9356a 0%, #2e1d21 100%)",
                 borderRadius: 20,
                 padding: "32px",
                 color: "#ffffff",
-                boxShadow: "0 10px 25px -5px rgba(32, 61, 49, 0.2)",
+                boxShadow: "0 10px 25px -5px rgba(201, 53, 106, 0.2)",
               }}
             >
               <div
@@ -209,8 +209,8 @@ export function MembershipPage() {
                 <div>
                   <span
                     style={{
-                      backgroundColor: "#d3f879",
-                      color: "#203d31",
+                      backgroundColor: "#ffd6e4",
+                      color: "#a82a58",
                       fontSize: 12,
                       fontWeight: 800,
                       padding: "4px 10px",
@@ -231,7 +231,7 @@ export function MembershipPage() {
                   >
                     {activeSub.plan?.name}
                   </h2>
-                  <p style={{ margin: 0, color: "#b2c5bc", fontSize: 14 }}>
+                  <p style={{ margin: 0, color: "#cebabe", fontSize: 14 }}>
                     {activeSub.plan?.description ||
                       "Toàn quyền sử dụng trang thiết bị và đăng ký các lớp học tiêu chuẩn."}
                   </p>
@@ -239,12 +239,12 @@ export function MembershipPage() {
 
                 <div style={{ textAlign: "right" }}>
                   <div
-                    style={{ fontSize: 13, color: "#b2c5bc", marginBottom: 4 }}
+                    style={{ fontSize: 13, color: "#cebabe", marginBottom: 4 }}
                   >
                     Thời hạn còn lại
                   </div>
                   <div
-                    style={{ fontSize: 32, fontWeight: 800, color: "#d3f879" }}
+                    style={{ fontSize: 32, fontWeight: 800, color: "#fff0f5" }}
                   >
                     {daysRemaining}{" "}
                     <span
@@ -270,7 +270,7 @@ export function MembershipPage() {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 12, color: "#8ca89b" }}>
+                  <div style={{ fontSize: 12, color: "#b5979e" }}>
                     Hạng hội viên
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>
@@ -278,7 +278,7 @@ export function MembershipPage() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, color: "#8ca89b" }}>
+                  <div style={{ fontSize: 12, color: "#b5979e" }}>
                     Ngày bắt đầu
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>
@@ -286,7 +286,7 @@ export function MembershipPage() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, color: "#8ca89b" }}>
+                  <div style={{ fontSize: 12, color: "#b5979e" }}>
                     Ngày kết thúc
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>
@@ -294,7 +294,7 @@ export function MembershipPage() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, color: "#8ca89b" }}>
+                  <div style={{ fontSize: 12, color: "#b5979e" }}>
                     Trạng thái
                   </div>
                   <div style={{ marginTop: 4 }}>
@@ -313,7 +313,7 @@ export function MembershipPage() {
                   onClick={() => setTab("plans")}
                   style={{
                     padding: "10px 20px",
-                    backgroundColor: "#203d31",
+                    backgroundColor: "#c9356a",
                     color: "#ffffff",
                     borderRadius: 8,
                     border: "none",
@@ -332,7 +332,7 @@ export function MembershipPage() {
             style={{
               background: "#ffffff",
               borderRadius: 16,
-              border: "1px solid #e7ece9",
+              border: "1px solid #f5e6ec",
               padding: 24,
             }}
           >
@@ -340,7 +340,7 @@ export function MembershipPage() {
               style={{
                 fontSize: 16,
                 fontWeight: 700,
-                color: "#203d31",
+                color: "#a82a58",
                 margin: "0 0 16px",
               }}
             >
@@ -348,7 +348,7 @@ export function MembershipPage() {
             </h3>
 
             {subscriptions.length === 0 ? (
-              <div style={{ color: "#58695f", fontSize: 13 }}>
+              <div style={{ color: "#6e5864", fontSize: 13 }}>
                 Chưa có lịch sử đăng ký gói nào.
               </div>
             ) : (
@@ -364,8 +364,8 @@ export function MembershipPage() {
                       justifyContent: "space-between",
                       padding: "12px 16px",
                       borderRadius: 10,
-                      backgroundColor: "#f9fbfa",
-                      border: "1px solid #edf2ee",
+                      backgroundColor: "#fffbfc",
+                      border: "1px solid #f5eef0",
                       flexWrap: "wrap",
                       gap: 12,
                     }}
@@ -375,13 +375,13 @@ export function MembershipPage() {
                         style={{
                           fontWeight: 700,
                           fontSize: 14,
-                          color: "#203d31",
+                          color: "#a82a58",
                         }}
                       >
                         {sub.plan?.name || "Gói tập"} ({sub.tier})
                       </div>
                       <div
-                        style={{ fontSize: 12, color: "#58695f", marginTop: 2 }}
+                        style={{ fontSize: 12, color: "#6e5864", marginTop: 2 }}
                       >
                         {formatMemberDate(sub.startDate)} -{" "}
                         {formatMemberDate(sub.endDate)}
@@ -458,15 +458,15 @@ export function MembershipPage() {
                       backgroundColor: "#ffffff",
                       borderRadius: 18,
                       border: isPremium
-                        ? "2px solid #203d31"
-                        : "1px solid #e7ece9",
+                        ? "2px solid #c9356a"
+                        : "1px solid #f5e6ec",
                       padding: 28,
                       display: "flex",
                       flexDirection: "column",
                       justifyContent: "space-between",
                       position: "relative",
                       boxShadow: isPremium
-                        ? "0 10px 25px -5px rgba(32, 61, 49, 0.12)"
+                        ? "0 10px 25px -5px rgba(201, 53, 106, 0.12)"
                         : "0 2px 4px rgba(0, 0, 0, 0.02)",
                     }}
                   >
@@ -476,8 +476,8 @@ export function MembershipPage() {
                           position: "absolute",
                           top: -12,
                           right: 24,
-                          backgroundColor: "#203d31",
-                          color: "#d3f879",
+                          backgroundColor: "#c9356a",
+                          color: "#fff0f5",
                           fontSize: 11,
                           fontWeight: 800,
                           padding: "3px 12px",
@@ -494,7 +494,7 @@ export function MembershipPage() {
                         style={{
                           fontSize: 13,
                           fontWeight: 700,
-                          color: "#376228",
+                          color: "#a82a58",
                           marginBottom: 6,
                         }}
                       >
@@ -504,7 +504,7 @@ export function MembershipPage() {
                         style={{
                           fontSize: 22,
                           fontWeight: 800,
-                          color: "#203d31",
+                          color: "#a82a58",
                           margin: "0 0 8px",
                         }}
                       >
@@ -545,7 +545,7 @@ export function MembershipPage() {
                           style={{
                             fontSize: 32,
                             fontWeight: 900,
-                            color: "#203d31",
+                            color: "#a82a58",
                           }}
                         >
                           {priceFormatted}
@@ -553,7 +553,7 @@ export function MembershipPage() {
                         <span
                           style={{
                             fontSize: 14,
-                            color: "#58695f",
+                            color: "#6e5864",
                             marginLeft: 4,
                           }}
                         >
@@ -631,7 +631,7 @@ export function MembershipPage() {
                       style={{
                         marginTop: 28,
                         paddingTop: 18,
-                        borderTop: "1px solid #f2f5f3",
+                        borderTop: "1px solid #f7f3f4",
                       }}
                     >
                       <button

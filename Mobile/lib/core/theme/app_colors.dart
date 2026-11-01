@@ -13,6 +13,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.accent,
     required this.onAccent,
     required this.accentStrong,
+    required this.highlight,
     required this.focus,
     required this.background,
     required this.surface,
@@ -35,6 +36,9 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color accent;
   final Color onAccent;
   final Color accentStrong;
+
+  /// Chữ/icon nhấn trên nền `primary` (accent chỉ dùng làm nền/viền).
+  final Color highlight;
   final Color focus;
   final Color background;
   final Color surface;
@@ -52,12 +56,13 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color skeletonHighlight;
 
   static const light = AppColors(
-    primary: AppPalette.forest,
+    primary: AppPalette.blush,
     onPrimary: AppPalette.white,
-    accent: AppPalette.lime,
-    onAccent: AppPalette.forest,
-    accentStrong: AppPalette.limeStrong,
-    focus: AppPalette.limeFocus,
+    accent: AppPalette.blushSoft,
+    onAccent: AppPalette.onBlushSoft,
+    accentStrong: AppPalette.blushStrong,
+    highlight: AppPalette.blushHighlight,
+    focus: AppPalette.blushFocus,
     background: AppPalette.background,
     surface: AppPalette.surface,
     surfaceMuted: AppPalette.surfaceMuted,
@@ -81,6 +86,7 @@ class AppColors extends ThemeExtension<AppColors> {
     accent: accent ?? this.accent,
     onAccent: onAccent,
     accentStrong: accentStrong,
+    highlight: highlight,
     focus: focus,
     background: background,
     surface: surface,
@@ -108,6 +114,7 @@ class AppColors extends ThemeExtension<AppColors> {
       accent: l(accent, other.accent),
       onAccent: l(onAccent, other.onAccent),
       accentStrong: l(accentStrong, other.accentStrong),
+      highlight: l(highlight, other.highlight),
       focus: l(focus, other.focus),
       background: l(background, other.background),
       surface: l(surface, other.surface),

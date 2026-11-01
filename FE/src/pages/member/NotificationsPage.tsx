@@ -90,13 +90,13 @@ export function NotificationsPage() {
           background: "#ffffff",
           borderRadius: 16,
           padding: "24px 28px",
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
         }}
       >
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#203d31", margin: "0 0 6px" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#a82a58", margin: "0 0 6px" }}>
           Thông báo của bạn
         </h1>
-        <p style={{ margin: 0, color: "#58695f", fontSize: 13 }}>
+        <p style={{ margin: 0, color: "#6e5864", fontSize: 13 }}>
           Nhắc lịch ca học sắp tới, tình trạng gói hội viên và các thông báo mới từ trung tâm
         </p>
       </div>
@@ -110,7 +110,7 @@ export function NotificationsPage() {
               key={n.id}
               style={{
                 backgroundColor: "#ffffff",
-                border: "1px solid #e7ece9",
+                border: "1px solid #f5e6ec",
                 borderRadius: 16,
                 padding: "18px 22px",
                 display: "flex",
@@ -127,13 +127,13 @@ export function NotificationsPage() {
                     n.type === "class"
                       ? "#f4f3ff"
                       : n.type === "membership"
-                      ? "#f2f8eb"
+                      ? "#fff2f4"
                       : "#f8faf9",
                   color:
                     n.type === "class"
                       ? "#5925dc"
                       : n.type === "membership"
-                      ? "#376228"
+                      ? "#a82a58"
                       : "#475467",
                   display: "flex",
                   alignItems: "center",
@@ -152,12 +152,12 @@ export function NotificationsPage() {
 
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                  <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#203d31" }}>
+                  <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#a82a58" }}>
                     {n.title}
                   </h4>
-                  <span style={{ fontSize: 11, color: "#58695f" }}>{n.time}</span>
+                  <span style={{ fontSize: 11, color: "#6e5864" }}>{n.time}</span>
                 </div>
-                <p style={{ margin: "0 0 10px", fontSize: 13, color: "#54655d", lineHeight: 1.5 }}>
+                <p style={{ margin: "0 0 10px", fontSize: 13, color: "#6d5b5f", lineHeight: 1.5 }}>
                   {n.message}
                 </p>
 
@@ -167,7 +167,7 @@ export function NotificationsPage() {
                     style={{
                       fontSize: 12,
                       fontWeight: 700,
-                      color: "#376228",
+                      color: "#a82a58",
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 4,

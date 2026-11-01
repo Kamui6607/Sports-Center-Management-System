@@ -35,7 +35,7 @@ class _CoachClassesScreenState extends ConsumerState<CoachClassesScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push(AppRoutes.createClass),
         backgroundColor: context.colors.primary,
-        foregroundColor: context.colors.accent,
+        foregroundColor: context.colors.highlight,
         icon: const Icon(AppIcons.add),
         label: const Text('Tạo khóa học'),
       ),

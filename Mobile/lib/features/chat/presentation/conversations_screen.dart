@@ -40,7 +40,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
       floatingActionButton: FloatingActionButton(
         tooltip: 'Tin nhắn mới',
         backgroundColor: context.colors.primary,
-        foregroundColor: context.colors.accent,
+        foregroundColor: context.colors.highlight,
         onPressed: _newChat,
         child: const Icon(AppIcons.add),
       ),

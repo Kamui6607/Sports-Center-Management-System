@@ -32,7 +32,7 @@ function CoursePatternSummary({ classId }: { classId: string }) {
       key={`${slot.weekday}-${slot.startTime}-${slot.roomId}`}
       style={{ display: "flex", alignItems: "center", gap: 6 }}
     >
-      <Clock3 size={14} color="#58695f" />
+      <Clock3 size={14} color="#6e5864" />
       <span>
         {slot.weekdayLabel} · {slot.startTime}–{slot.endTime}
       </span>
@@ -94,7 +94,7 @@ export function BrowseClassesPage() {
           background: "#ffffff",
           borderRadius: 16,
           padding: "24px 28px",
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -107,13 +107,13 @@ export function BrowseClassesPage() {
             style={{
               fontSize: 24,
               fontWeight: 800,
-              color: "#203d31",
+              color: "#a82a58",
               margin: "0 0 6px",
             }}
           >
             Khám phá Lớp học Thể thao
           </h1>
-          <p style={{ margin: 0, color: "#58695f", fontSize: 13 }}>
+          <p style={{ margin: 0, color: "#6e5864", fontSize: 13 }}>
             Lựa chọn môn thể thao yêu thích, xem lịch học và đặt chỗ trực tuyến
             nhanh chóng
           </p>
@@ -126,7 +126,7 @@ export function BrowseClassesPage() {
           background: "#ffffff",
           borderRadius: 14,
           padding: "16px 20px",
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
           display: "flex",
           flexWrap: "wrap",
           gap: 12,
@@ -137,7 +137,7 @@ export function BrowseClassesPage() {
         <div style={{ position: "relative", flex: "1 1 260px" }}>
           <Search
             size={17}
-            color="#58695f"
+            color="#6e5864"
             style={{
               position: "absolute",
               left: 12,
@@ -261,7 +261,7 @@ export function BrowseClassesPage() {
               style={{
                 backgroundColor: "#ffffff",
                 borderRadius: 16,
-                border: "1px solid #e7ece9",
+                border: "1px solid #f5e6ec",
                 padding: 22,
                 display: "flex",
                 flexDirection: "column",
@@ -283,11 +283,11 @@ export function BrowseClassesPage() {
                     style={{
                       fontSize: 12,
                       fontWeight: 700,
-                      color: "#203d31",
-                      backgroundColor: "#f2f8eb",
+                      color: "#a82a58",
+                      backgroundColor: "#fff2f4",
                       padding: "3px 9px",
                       borderRadius: 6,
-                      border: "1px solid #d4ebbf",
+                      border: "1px solid #ffd5de",
                     }}
                   >
                     {sportNames(c)}
@@ -299,7 +299,7 @@ export function BrowseClassesPage() {
                   style={{
                     fontSize: 18,
                     fontWeight: 800,
-                    color: "#203d31",
+                    color: "#a82a58",
                     margin: "0 0 8px",
                     lineHeight: 1.3,
                   }}
@@ -338,10 +338,10 @@ export function BrowseClassesPage() {
                       alignItems: "center",
                       gap: 6,
                       fontWeight: 700,
-                      color: "#203d31",
+                      color: "#a82a58",
                     }}
                   >
-                    <CalendarDays size={15} color="#376228" />
+                    <CalendarDays size={15} color="#a82a58" />
                     <span>Lịch học trong tuần</span>
                   </div>
                   <CoursePatternSummary classId={c.id} />
@@ -352,7 +352,7 @@ export function BrowseClassesPage() {
                 style={{
                   marginTop: 20,
                   paddingTop: 16,
-                  borderTop: "1px solid #f2f5f3",
+                  borderTop: "1px solid #f7f3f4",
                 }}
               >
                 <button
@@ -360,9 +360,9 @@ export function BrowseClassesPage() {
                   style={{
                     width: "100%",
                     padding: "10px 16px",
-                    backgroundColor: "#f2f8eb",
-                    color: "#203d31",
-                    border: "1px solid #d4ebbf",
+                    backgroundColor: "#fff2f4",
+                    color: "#a82a58",
+                    border: "1px solid #ffd5de",
                     borderRadius: 10,
                     fontSize: 13,
                     fontWeight: 700,

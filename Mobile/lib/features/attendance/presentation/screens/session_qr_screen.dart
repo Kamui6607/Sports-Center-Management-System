@@ -132,10 +132,10 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
                             child: QrImageView(
                               data: t.qrToken,
                               size: AppSpacing.xxl * 5,
-                              eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: c.primary),
+                              eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: c.text),
                               dataModuleStyle: QrDataModuleStyle(
                                 dataModuleShape: QrDataModuleShape.square,
-                                color: c.primary,
+                                color: c.text,
                               ),
                             ),
                           ),
@@ -147,7 +147,7 @@ class _SessionQrScreenState extends ConsumerState<SessionQrScreen> {
                     child: CountdownText(
                       deadline: _nextRefresh!,
                       prefix: 'Mã tự đổi sau ',
-                      style: context.text.label.copyWith(color: c.accent),
+                      style: context.text.label.copyWith(color: c.highlight),
                     ),
                   ),
                 const SizedBox(height: AppSpacing.lg),

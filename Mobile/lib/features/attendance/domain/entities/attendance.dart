@@ -204,7 +204,9 @@ class CourseAttendance {
   bool get isWarning {
     final recent = recentPast.where((s) => s.mark != CourseSessionMark.excused).toList();
     if (recent.length < ClassAttendanceStat.minSample) return false;
-    final attended = recent.where((s) => s.mark == CourseSessionMark.present || s.mark == CourseSessionMark.late).length;
+    final attended = recent
+        .where((s) => s.mark == CourseSessionMark.present || s.mark == CourseSessionMark.late)
+        .length;
     return attended / recent.length < ClassAttendanceStat.warningThreshold;
   }
 }

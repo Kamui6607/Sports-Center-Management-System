@@ -83,7 +83,7 @@ export function Profile({ user }: { user: ProfileOk["data"] }) {
           </div>
         )}
         {error && (
-          <div className="error" role="alert" style={{ color: "#b42318", marginBottom: 16 }}>
+          <div className="error" role="alert" style={{ color: "#9a3412", marginBottom: 16 }}>
             {error}
           </div>
         )}
@@ -94,7 +94,7 @@ export function Profile({ user }: { user: ProfileOk["data"] }) {
               alignItems: "center",
               gap: 20,
               paddingBottom: 20,
-              borderBottom: "1px solid var(--cr-border, #e7ece9)",
+              borderBottom: "1px solid var(--cr-border, #f5e6ec)",
               marginBottom: 20,
             }}
           >

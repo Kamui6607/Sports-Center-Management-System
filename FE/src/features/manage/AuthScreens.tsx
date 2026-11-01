@@ -42,7 +42,7 @@ function AuthMedia() {
   );
 }
 
-/** Khung chung của màn công khai: trái là câu chuyện thương hiệu (nền rêu + video), phải là biểu mẫu. */
+/** Khung chung của màn công khai: trái là câu chuyện thương hiệu (nền berry + video), phải là biểu mẫu. */
 function AuthFrame({ title, lead, children }: { title: [string, string]; lead: string; children: ReactNode }) {
   useThemePref();
   const center = useCenter().data?.data;

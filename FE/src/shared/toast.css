@@ -13,11 +13,11 @@
   align-items: flex-start;
   gap: 12px;
   padding: 16px;
-  border: 1px solid #dce7df;
+  border: 1px solid #eee0e2;
   border-left: 4px solid currentColor;
   border-radius: 12px;
   background: #fff;
-  box-shadow: 0 8px 32px #182d2426;
+  box-shadow: 0 8px 32px #9e275226;
   pointer-events: auto;
 }
 .toast-notice > svg {
@@ -49,7 +49,7 @@
   color: #267346;
 }
 .toast-error {
-  color: #c43232;
+  color: #c2410c;
 }
 .toast-info {
   color: #026aa2;

@@ -171,7 +171,7 @@ export function SepayCheckoutModal({
               }}
             >
               <div>
-                <strong style={{ color: "#203d31" }}>
+                <strong style={{ color: "#a82a58" }}>
                   {current.plan?.name ?? selectedPlan?.name ?? "Gói hội viên"}
                 </strong>
                 {(current.plan?.durationDays ?? selectedPlan?.durationDays) && (
@@ -193,7 +193,7 @@ export function SepayCheckoutModal({
                     display: "inline-flex",
                     padding: 12,
                     background: "#fff",
-                    border: "1px solid #e7ece9",
+                    border: "1px solid #f5e6ec",
                     borderRadius: 14,
                   }}
                 >

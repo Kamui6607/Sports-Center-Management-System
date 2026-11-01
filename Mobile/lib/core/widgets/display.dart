@@ -148,7 +148,7 @@ class KpiTile extends StatelessWidget {
                         label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: context.text.caption.copyWith(color: highlight ? c.accent : c.textMuted),
+                        style: context.text.caption.copyWith(color: highlight ? c.highlight : c.textMuted),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.xxs),
@@ -243,11 +243,8 @@ class _ExpandableTextState extends State<ExpandableText> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final span = TextSpan(text: text, style: textStyle);
-        final tp = TextPainter(
-          text: span,
-          maxLines: widget.maxLines,
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: constraints.maxWidth);
+        final tp = TextPainter(text: span, maxLines: widget.maxLines, textDirection: TextDirection.ltr)
+          ..layout(maxWidth: constraints.maxWidth);
 
         final isOverflowing = tp.didExceedMaxLines || text.length > widget.trimLength;
 
@@ -280,10 +277,7 @@ class _ExpandableTextState extends State<ExpandableText> {
                   children: [
                     Text(
                       _expanded ? widget.collapseLabel : widget.expandLabel,
-                      style: context.text.caption.copyWith(
-                        color: context.colors.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: context.text.caption.copyWith(color: context.colors.primary, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(width: AppSpacing.xxs),
                     Icon(

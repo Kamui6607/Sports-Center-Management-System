@@ -37,7 +37,12 @@ class ProductMockRepository implements ProductRepository {
   Future<Paged<Product>> products({String search = '', int page = 1}) => _server.run(() {
     final list = _server.db.products
         .where((p) => p.isActive)
-        .where((p) => search.trim().isEmpty || VnText.matches(p.name, search) || (p.description.isNotEmpty && VnText.matches(p.description, search)))
+        .where(
+          (p) =>
+              search.trim().isEmpty ||
+              VnText.matches(p.name, search) ||
+              (p.description.isNotEmpty && VnText.matches(p.description, search)),
+        )
         .map(_toProduct)
         .toList();
     return Paged.slice(list, page: page, limit: _pageSize);
@@ -60,9 +65,7 @@ class ProductMockRepository implements ProductRepository {
       final anon = r.isAnonymous;
       return ProductReview(
         id: r.id,
-        userName: anon && r.userId != me
-            ? 'Người dùng ẩn danh'
-            : (anon ? '${u.fullName} (Ẩn danh)' : u.fullName),
+        userName: anon && r.userId != me ? 'Người dùng ẩn danh' : (anon ? '${u.fullName} (Ẩn danh)' : u.fullName),
         avatarUrl: anon ? null : u.avatarUrl,
         rating: r.rating,
         comment: r.comment,

@@ -6,7 +6,7 @@
   overflow: hidden;
 }
 .floating-chat .floating-chat-header {
-  background: #203d31;
+  background: #c9356a;
   color: white;
 }
 .floating-chat-header .icon-button {
@@ -92,7 +92,7 @@
   display: block;
   background: #f0f2f5;
   border: 0;
-  color: #182d24;
+  color: #9e2752;
 }
 .chat-composer .chat-attach {
   position: relative;
@@ -110,12 +110,12 @@
   overflow-wrap: anywhere;
 }
 .chat-log .workflow-message.own {
-  background: #203d31;
+  background: #c9356a;
   color: white;
 }
 .chat-log .workflow-message.own small,
 .chat-log .workflow-message.own a {
-  color: #e0eddf;
+  color: #f7e3e7;
 }
 .chat-image {
   display: block;
@@ -142,20 +142,20 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid #c2e674;
+  border: 1px solid #ffc3d0;
   border-radius: 30px;
   padding: 13px 16px;
-  background: #d3f879;
-  color: #203d31;
+  background: #ffd6e4;
+  color: #7a1e44;
   font-weight: 750;
-  box-shadow: 0 6px 24px #203d3120;
+  box-shadow: 0 6px 24px #c9356a20;
   cursor: pointer;
 }
 .attendance-quick-intro {
   padding: 20px;
   margin-bottom: 18px;
   border-radius: 16px;
-  background: linear-gradient(120deg, #203d31, #376228);
+  background: linear-gradient(120deg, #c9356a, #a82a58);
   color: white;
 }
 .attendance-quick-intro h2 {

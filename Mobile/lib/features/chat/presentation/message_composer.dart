@@ -75,7 +75,7 @@ class MessageComposer extends StatelessWidget {
                     onPressed: onSend,
                     style: IconButton.styleFrom(
                       backgroundColor: c.primary,
-                      foregroundColor: c.accent,
+                      foregroundColor: c.highlight,
                       minimumSize: const Size.square(AppSizes.touch),
                     ),
                     icon: const Icon(AppIcons.send),

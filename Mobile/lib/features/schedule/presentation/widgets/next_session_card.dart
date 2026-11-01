@@ -60,10 +60,7 @@ class NextSessionCard extends StatelessWidget {
                               color: c.onPrimary.withValues(alpha: 0.12),
                               borderRadius: AppRadius.pillAll,
                             ),
-                            child: Text(
-                              'Buổi sắp tới',
-                              style: context.text.caption.copyWith(color: c.accent),
-                            ),
+                            child: Text('Buổi sắp tới', style: context.text.caption.copyWith(color: c.highlight)),
                           ),
                         if (s.isMakeup) const StatusLabel('Buổi dạy bù', StatusTone.brand).tag(dense: true),
                       ],
@@ -104,7 +101,7 @@ class NextSessionCard extends StatelessWidget {
                     child: CountdownText(
                       deadline: s.startTime,
                       prefix: 'Bắt đầu sau ',
-                      style: context.text.label.copyWith(color: c.accent),
+                      style: context.text.label.copyWith(color: c.highlight),
                     ),
                   ),
             ],
@@ -141,7 +138,7 @@ class _AccentText extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) => Text(text, style: context.text.label.copyWith(color: context.colors.accent));
+  Widget build(BuildContext context) => Text(text, style: context.text.label.copyWith(color: context.colors.highlight));
 }
 
 /// Thẻ thay thế khi chưa có buổi sắp tới (kèm lối tắt).

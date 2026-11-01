@@ -60,7 +60,9 @@ class ProductApiRepository implements ProductRepository {
           id: r.str('id'),
           userName: r.boolean('isAnonymous') && me != r.str('userId')
               ? 'Người dùng ẩn danh'
-              : (r.boolean('isAnonymous') ? '${r.obj('user').str('fullName', 'Người dùng')} (Ẩn danh)' : r.obj('user').str('fullName', 'Người dùng')),
+              : (r.boolean('isAnonymous')
+                    ? '${r.obj('user').str('fullName', 'Người dùng')} (Ẩn danh)'
+                    : r.obj('user').str('fullName', 'Người dùng')),
           avatarUrl: r.boolean('isAnonymous') ? null : ApiClient.absoluteUrl(r.obj('user').strOrNull('avatarUrl')),
           rating: r.integer('rating'),
           comment: r.strOrNull('comment'),

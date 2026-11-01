@@ -50,7 +50,7 @@ export function LoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #f6f8f7 0%, #e8efe9 100%)",
+        background: "linear-gradient(135deg, #fff8fa 0%, #f4eaec 100%)",
         padding: 24,
       }}
     >
@@ -61,8 +61,8 @@ export function LoginPage() {
           background: "#ffffff",
           borderRadius: 20,
           padding: "36px 32px",
-          boxShadow: "0 20px 25px -5px rgba(32, 61, 49, 0.08), 0 8px 10px -6px rgba(32, 61, 49, 0.04)",
-          border: "1px solid #e2eae5",
+          boxShadow: "0 20px 25px -5px rgba(201, 53, 106, 0.08), 0 8px 10px -6px rgba(201, 53, 106, 0.04)",
+          border: "1px solid #efe5e7",
         }}
       >
         <div style={{ textAlign: "center", marginBottom: 28 }}>
@@ -71,20 +71,20 @@ export function LoginPage() {
               width: 52,
               height: 52,
               borderRadius: 14,
-              backgroundColor: "#203d31",
+              backgroundColor: "#c9356a",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#d3f879",
+              color: "#fff0f5",
               marginBottom: 14,
             }}
           >
             <Activity size={28} strokeWidth={2.6} />
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#203d31", letterSpacing: -0.8, margin: "0 0 6px" }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#a82a58", letterSpacing: -0.8, margin: "0 0 6px" }}>
             PULSE SPORTS
           </h1>
-          <p style={{ margin: 0, color: "#7b8982", fontSize: 14 }}>
+          <p style={{ margin: 0, color: "#908184", fontSize: 14 }}>
             Đăng nhập vào cổng thông tin hội viên & quản trị
           </p>
         </div>
@@ -178,7 +178,7 @@ export function LoginPage() {
             style={{
               marginTop: 6,
               padding: "13px 20px",
-              backgroundColor: "#203d31",
+              backgroundColor: "#c9356a",
               color: "#ffffff",
               border: "none",
               borderRadius: 10,
@@ -189,7 +189,7 @@ export function LoginPage() {
               justifyContent: "center",
               gap: 8,
               cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(32, 61, 49, 0.18)",
+              boxShadow: "0 4px 12px rgba(201, 53, 106, 0.18)",
               transition: "background 0.15s, transform 0.15s",
             }}
           >
@@ -202,7 +202,7 @@ export function LoginPage() {
           style={{
             marginTop: 24,
             paddingTop: 18,
-            borderTop: "1px solid #f0f4f2",
+            borderTop: "1px solid #f6f2f2",
             textAlign: "center",
             fontSize: 13,
             color: "#667085",
@@ -211,7 +211,7 @@ export function LoginPage() {
           Chưa có tài khoản hội viên?{" "}
           <Link
             to="/register"
-            style={{ color: "#203d31", fontWeight: 700, textDecoration: "underline" }}
+            style={{ color: "#a82a58", fontWeight: 700, textDecoration: "underline" }}
           >
             Đăng ký tham gia
           </Link>

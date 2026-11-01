@@ -44,7 +44,7 @@ export function MemberLayout() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "#f6f8f7" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "#fff8fa" }}>
       {/* TOP NAVBAR */}
       <header
         style={{
@@ -53,7 +53,7 @@ export function MemberLayout() {
           zIndex: 40,
           height: 64,
           backgroundColor: "#ffffff",
-          borderBottom: "1px solid #e7ece9",
+          borderBottom: "1px solid #f5e6ec",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -68,11 +68,11 @@ export function MemberLayout() {
               alignItems: "center",
               justifyContent: "center",
               background: "transparent",
-              border: "1px solid #e7ece9",
+              border: "1px solid #f5e6ec",
               borderRadius: 8,
               padding: 8,
               cursor: "pointer",
-              color: "#203d31",
+              color: "#a82a58",
             }}
             className="mobile-only-btn"
             aria-label="Toggle Menu"
@@ -95,18 +95,18 @@ export function MemberLayout() {
                 width: 36,
                 height: 36,
                 borderRadius: 10,
-                backgroundColor: "#203d31",
+                backgroundColor: "#c9356a",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#d3f879",
+                color: "#fff0f5",
               }}
             >
               <Activity size={20} strokeWidth={2.5} />
             </div>
             <div>
-              <span style={{ fontSize: 17, fontWeight: 800, color: "#203d31", letterSpacing: -0.5 }}>
-                PULSE<span style={{ color: "#749b38" }}>.</span>
+              <span style={{ fontSize: 17, fontWeight: 800, color: "#a82a58", letterSpacing: -0.5 }}>
+                PULSE<span style={{ color: "#e0457b" }}>.</span>
               </span>
               <span
                 style={{
@@ -115,9 +115,9 @@ export function MemberLayout() {
                   fontSize: 10,
                   fontWeight: 700,
                   letterSpacing: 0.8,
-                  backgroundColor: "#f3fbe8",
-                  color: "#203d31",
-                  border: "1px solid #d3f879",
+                  backgroundColor: "#fff0f5",
+                  color: "#a82a58",
+                  border: "1px solid #ffd6e4",
                   padding: "1px 6px",
                   borderRadius: 4,
                   verticalAlign: "middle",
@@ -136,7 +136,7 @@ export function MemberLayout() {
             style={{
               background: "transparent",
               border: "none",
-              color: "#5b6b63",
+              color: "#736165",
               padding: 8,
               borderRadius: 8,
               cursor: "pointer",
@@ -160,7 +160,7 @@ export function MemberLayout() {
                 gap: 10,
                 padding: "6px 10px 6px 6px",
                 borderRadius: 999,
-                border: "1px solid #e7ece9",
+                border: "1px solid #f5e6ec",
                 background: "#ffffff",
                 cursor: "pointer",
                 transition: "border-color 0.15s",
@@ -171,8 +171,8 @@ export function MemberLayout() {
                   width: 32,
                   height: 32,
                   borderRadius: "50%",
-                  backgroundColor: "#203d31",
-                  color: "#d3f879",
+                  backgroundColor: "#c9356a",
+                  color: "#fff0f5",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -183,12 +183,12 @@ export function MemberLayout() {
                 {user?.fullName ? user.fullName.charAt(0).toUpperCase() : "M"}
               </div>
               <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#203d31", lineHeight: 1.2 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#a82a58", lineHeight: 1.2 }}>
                   {user?.fullName || "Học viên"}
                 </span>
-                <span style={{ fontSize: 11, color: "#7b8982" }}>Hội viên</span>
+                <span style={{ fontSize: 11, color: "#908184" }}>Hội viên</span>
               </div>
-              <ChevronDown size={14} color="#7b8982" />
+              <ChevronDown size={14} color="#908184" />
             </div>
 
             {userDropdownOpen && (
@@ -202,14 +202,14 @@ export function MemberLayout() {
                   backgroundColor: "#ffffff",
                   borderRadius: 12,
                   boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)",
-                  border: "1px solid #e7ece9",
+                  border: "1px solid #f5e6ec",
                   padding: "6px 0",
                   zIndex: 50,
                 }}
               >
-                <div style={{ padding: "8px 16px", borderBottom: "1px solid #f0f4f2" }}>
-                  <div style={{ fontSize: 12, color: "#7b8982" }}>Đăng nhập với email</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#203d31", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div style={{ padding: "8px 16px", borderBottom: "1px solid #f6f2f2" }}>
+                  <div style={{ fontSize: 12, color: "#908184" }}>Đăng nhập với email</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#a82a58", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {user?.email}
                   </div>
                 </div>
@@ -250,7 +250,7 @@ export function MemberLayout() {
                   <CreditCard size={16} /> Gói hội viên
                 </div>
 
-                <div style={{ height: 1, backgroundColor: "#f0f4f2", margin: "4px 0" }} />
+                <div style={{ height: 1, backgroundColor: "#f6f2f2", margin: "4px 0" }} />
 
                 <div
                   onClick={() => {
@@ -260,7 +260,7 @@ export function MemberLayout() {
                   style={{
                     padding: "10px 16px",
                     fontSize: 13,
-                    color: "#d92d20",
+                    color: "#c2410c",
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
@@ -283,7 +283,7 @@ export function MemberLayout() {
           style={{
             width: 240,
             backgroundColor: "#ffffff",
-            borderRight: "1px solid #e7ece9",
+            borderRight: "1px solid #f5e6ec",
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
@@ -308,9 +308,9 @@ export function MemberLayout() {
                     borderRadius: 10,
                     fontSize: 13,
                     fontWeight: isActive ? 700 : 500,
-                    color: isActive ? "#203d31" : "#4a5a52",
-                    backgroundColor: isActive ? "#f1f8e9" : "transparent",
-                    border: isActive ? "1px solid #d7eec4" : "1px solid transparent",
+                    color: isActive ? "#c9356a" : "#625054",
+                    backgroundColor: isActive ? "#fff1f4" : "transparent",
+                    border: isActive ? "1px solid #ffdae2" : "1px solid transparent",
                     textDecoration: "none",
                     transition: "all 0.15s ease",
                   })}
@@ -319,7 +319,7 @@ export function MemberLayout() {
                     <>
                       <Icon
                         size={18}
-                        color={isActive ? "#376228" : "#6c7d75"}
+                        color={isActive ? "#a82a58" : "#857377"}
                         strokeWidth={isActive ? 2.3 : 1.8}
                       />
                       <span>{item.label}</span>
@@ -330,7 +330,7 @@ export function MemberLayout() {
             })}
           </nav>
 
-          <div style={{ paddingTop: 16, borderTop: "1px solid #f0f4f2" }}>
+          <div style={{ paddingTop: 16, borderTop: "1px solid #f6f2f2" }}>
             <button
               onClick={handleLogout}
               style={{
@@ -342,7 +342,7 @@ export function MemberLayout() {
                 borderRadius: 10,
                 border: "none",
                 background: "transparent",
-                color: "#d92d20",
+                color: "#c2410c",
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",

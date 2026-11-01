@@ -21,7 +21,7 @@ function apply(pref: ThemePref) {
   const dark = pref === "dark" || (pref === "system" && Boolean(media()?.matches));
   const root = document.documentElement;
   root.setAttribute("data-theme", dark ? "dark" : "light");
-  root.style.background = dark ? "#0f1a16" : "#f6f8f7";
+  root.style.background = dark ? "#1a1216" : "#fff8fa";
 }
 
 export function setThemePref(pref: ThemePref) {

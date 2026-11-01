@@ -208,7 +208,10 @@ class _CartLineCard extends ConsumerWidget {
                         spacing: AppSpacing.xs,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          MoneyText(l.unitPrice, style: context.text.small.copyWith(color: hasIssues ? c.textMuted : c.primary)),
+                          MoneyText(
+                            l.unitPrice,
+                            style: context.text.small.copyWith(color: hasIssues ? c.textMuted : c.primary),
+                          ),
                           if (l.priceChange?.oldPrice != null)
                             Text(
                               Money.format(l.priceChange!.oldPrice!),
@@ -276,12 +279,7 @@ class _CartLineCard extends ConsumerWidget {
                   AppButton.outline(
                     label: 'Cập nhật giá mới',
                     size: AppButtonSize.small,
-                    onPressed: () => runShopAction(
-                      context,
-                      ref,
-                      () => notifier.acceptPrices(),
-                      refresh: false,
-                    ),
+                    onPressed: () => runShopAction(context, ref, () => notifier.acceptPrices(), refresh: false),
                   ),
                 ],
               ),
@@ -295,7 +293,8 @@ class _CartLineCard extends ConsumerWidget {
                   QuantityStepper(
                     value: l.quantity.clamp(1, l.maxSelectable),
                     max: l.maxSelectable,
-                    onChanged: (v) => runShopAction(context, ref, () => notifier.setQuantity(l.productId, v), refresh: false),
+                    onChanged: (v) =>
+                        runShopAction(context, ref, () => notifier.setQuantity(l.productId, v), refresh: false),
                   )
                 else
                   Text('Số lượng: ${l.quantity}', style: context.text.small),

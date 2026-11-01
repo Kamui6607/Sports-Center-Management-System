@@ -12,10 +12,10 @@ export function Badge({ variant = "neutral", children }: BadgeProps) {
   const styles: Record<string, { bg: string; color: string; border: string }> =
     {
       success: { bg: "#edfcf2", color: "#267346", border: "#abefc6" },
-      warning: { bg: "#fffaeb", color: "#b54708", border: "#fedf89" },
-      danger: { bg: "#fef3f2", color: "#d92d20", border: "#fecdca" },
+      warning: { bg: "#fff8f9", color: "#b54708", border: "#ffd5de" },
+      danger: { bg: "#fff4ed", color: "#c2410c", border: "#fed7aa" },
       info: { bg: "#f0f9ff", color: "#026aa2", border: "#b9e6fe" },
-      primary: { bg: "#f3fbe8", color: "#203d31", border: "#cbe58b" },
+      primary: { bg: "#fff0f5", color: "#a82a58", border: "#f9c2d6" },
       neutral: { bg: "#f8f9fa", color: "#475467", border: "#eaecf0" },
     };
 
@@ -164,7 +164,7 @@ export function ConfirmModal({
               padding: "9px 16px",
               borderRadius: 8,
               border: "none",
-              background: isDanger ? "#d92d20" : "#203d31",
+              background: isDanger ? "#c2410c" : "#c9356a",
               color: "#ffffff",
               fontWeight: 600,
               cursor: "pointer",
@@ -200,7 +200,7 @@ export function EmptyState({
         textAlign: "center",
         background: "#ffffff",
         borderRadius: 14,
-        border: "1px dashed #d0d7d3",
+        border: "1px dashed #dbd3d4",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -208,11 +208,11 @@ export function EmptyState({
         gap: 8,
       }}
     >
-      <div style={{ color: "#9aa6a0", marginBottom: 4 }}>
+      <div style={{ color: "#ac9fa1", marginBottom: 4 }}>
         {icon || <Info size={36} />}
       </div>
       <h3
-        style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#203d31" }}
+        style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#a82a58" }}
       >
         {title}
       </h3>
@@ -259,15 +259,15 @@ export function AlertBanner({
       icon: <CheckCircle2 size={18} />,
     },
     warning: {
-      bg: "#fffaeb",
-      border: "#fedf89",
+      bg: "#fff8f9",
+      border: "#ffd5de",
       color: "#b54708",
       icon: <AlertCircle size={18} />,
     },
     error: {
-      bg: "#fef3f2",
-      border: "#fecdca",
-      color: "#d92d20",
+      bg: "#fff4ed",
+      border: "#fed7aa",
+      color: "#c2410c",
       icon: <XCircle size={18} />,
     },
   }[type];

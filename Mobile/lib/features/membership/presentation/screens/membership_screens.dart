@@ -387,7 +387,7 @@ class _MemberCard extends StatelessWidget {
                         Text(
                           'Còn ${o.totalDaysLeft} ngày',
                           style: context.text.titleSmall.copyWith(
-                            color: o.totalDaysLeft <= 7 ? c.accent : c.onPrimary,
+                            color: o.totalDaysLeft <= 7 ? c.highlight : c.onPrimary,
                             fontFeatures: kTabularFigures,
                           ),
                         ),

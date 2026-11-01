@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Màu thương hiệu Soft Blush (Doc/PINK_THEME_PLAN.md) — đồng bộ AppPalette.blush -->
+    <color name="brand_blush">#C9356A</color>
+</resources>

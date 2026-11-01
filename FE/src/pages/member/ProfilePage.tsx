@@ -138,13 +138,13 @@ export function ProfilePage() {
           background: "#ffffff",
           borderRadius: 16,
           padding: "24px 28px",
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
         }}
       >
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#203d31", margin: "0 0 6px" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#a82a58", margin: "0 0 6px" }}>
           Hồ sơ hội viên
         </h1>
-        <p style={{ margin: 0, color: "#58695f", fontSize: 13 }}>
+        <p style={{ margin: 0, color: "#6e5864", fontSize: 13 }}>
           Quản lý thông tin tài khoản, mục tiêu rèn luyện thể chất và bảo mật mật khẩu
         </p>
       </div>
@@ -154,13 +154,13 @@ export function ProfilePage() {
         style={{
           background: "#ffffff",
           borderRadius: 18,
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
           padding: 28,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-          <UserCircle size={22} color="#203d31" />
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#203d31", margin: 0 }}>
+          <UserCircle size={22} color="#a82a58" />
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#a82a58", margin: 0 }}>
             Thông tin cá nhân & Mục tiêu thể lực
           </h2>
         </div>
@@ -178,13 +178,13 @@ export function ProfilePage() {
             alignItems: "center",
             gap: 20,
             paddingBottom: 20,
-            borderBottom: "1px solid #f0f4f2",
+            borderBottom: "1px solid #f6f2f2",
             marginBottom: 10,
           }}
         >
           <UserAvatar name={user?.fullName || "Member"} url={user?.avatarUrl} size={72} />
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#203d31", marginBottom: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#a82a58", marginBottom: 4 }}>
               Ảnh đại diện
             </div>
             <div style={{ fontSize: 12, color: "#667085", marginBottom: 10 }}>
@@ -289,7 +289,7 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <div style={{ height: 1, backgroundColor: "#f0f4f2", margin: "8px 0" }} />
+          <div style={{ height: 1, backgroundColor: "#f6f2f2", margin: "8px 0" }} />
 
           {/* Fitness Goal & Level */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
@@ -342,7 +342,7 @@ export function ProfilePage() {
               disabled={savingProfile}
               style={{
                 padding: "11px 24px",
-                backgroundColor: "#203d31",
+                backgroundColor: "#c9356a",
                 color: "#ffffff",
                 border: "none",
                 borderRadius: 10,
@@ -366,13 +366,13 @@ export function ProfilePage() {
         style={{
           background: "#ffffff",
           borderRadius: 18,
-          border: "1px solid #e7ece9",
+          border: "1px solid #f5e6ec",
           padding: 28,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-          <KeyRound size={22} color="#203d31" />
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#203d31", margin: 0 }}>
+          <KeyRound size={22} color="#a82a58" />
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#a82a58", margin: 0 }}>
             Đổi mật khẩu tài khoản
           </h2>
         </div>
@@ -433,7 +433,7 @@ export function ProfilePage() {
               disabled={savingPass}
               style={{
                 padding: "11px 24px",
-                backgroundColor: "#203d31",
+                backgroundColor: "#c9356a",
                 color: "#ffffff",
                 border: "none",
                 borderRadius: 10,

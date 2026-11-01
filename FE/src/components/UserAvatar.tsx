@@ -32,7 +32,7 @@ export function UserAvatar({
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "#203d31",
+          backgroundColor: "#c9356a",
           color: "#b0f2b6",
           fontWeight: 700,
           fontSize: Math.max(12, Math.round(size * 0.4)),

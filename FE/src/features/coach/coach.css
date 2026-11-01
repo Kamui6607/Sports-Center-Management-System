@@ -40,18 +40,18 @@
   margin-top: 14px;
 }
 .coach-welcome p {
-  color: #dbe8df;
+  color: #f0dfe3;
 }
 .coach-welcome .eyebrow {
-  color: var(--lime);
+  color: var(--color-highlight);
 }
 .coach-welcome > svg {
-  color: var(--lime);
+  color: var(--color-highlight);
   flex-shrink: 0;
 }
 .coach-welcome .button.primary {
   background: var(--lime);
-  color: var(--forest);
+  color: var(--color-on-secondary);
   margin-top: 12px;
 }
 .coach-stats {
@@ -178,7 +178,7 @@
   color: white;
 }
 .coach-day.is-today > header span {
-  color: var(--lime);
+  color: var(--color-highlight);
 }
 .coach-day > div {
   padding: 8px;
@@ -208,7 +208,7 @@
 }
 .coach-session:hover {
   border-color: var(--forest);
-  box-shadow: 0 3px 10px #203d3110;
+  box-shadow: 0 3px 10px #c9356a10;
 }
 .coach-session:focus-visible,
 .coach-student-link:focus-visible {
@@ -262,7 +262,7 @@
   font-weight: 700;
   line-height: 1.5;
   color: var(--forest);
-  background: #edf4e9;
+  background: #fcedf0;
 }
 .coach-state-cancelled {
   color: var(--color-error);
