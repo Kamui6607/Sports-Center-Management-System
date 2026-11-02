@@ -1147,6 +1147,21 @@ export async function listInventoryTransactions(productId: string, query: { page
  * 3. READY_FOR_PICKUP quá `pickupDeadline` ⇒ NOT_PICKED_UP (đã trả: trả hàng + Refund; chưa trả: nhả hàng) + ghi nhận bùng hàng.
  * 4. DELIVERED quá `SHOP_AUTO_COMPLETE_DAYS` ⇒ COMPLETED.
  */
+/** Đối soát SePay lần cuối cho đơn sắp bị hủy vì hết hạn; true ⇒ đơn đã được chốt thanh toán (đừng hủy). Lỗi API ⇒ coi như chưa chốt. */
+async function settledByLastReconcile(orderId: string): Promise<boolean> {
+  try {
+    const payment = await prisma.payment.findFirst({ where: { orderId, gateway: "SEPAY", status: "PENDING" }, select: { id: true } });
+    if (!payment) return false;
+    const { reconcileSepayPayment } = await import("../payments/sepay-payments.service.js");
+    await reconcileSepayPayment(payment.id, { force: true });
+    const still = await prisma.order.findUnique({ where: { id: orderId }, select: { status: true } });
+    return still !== null && still.status !== "PENDING_PAYMENT";
+  } catch (err) {
+    console.warn("[SHOP] đối soát SePay lần cuối trước khi hết hạn lỗi:", (err as Error).message);
+    return false;
+  }
+}
+
 export async function runShopMaintenance(limit = 50) {
   const now = new Date();
   const result = { expired: 0, reminded: 0, notPickedUp: 0, autoCompleted: 0 };
@@ -1158,6 +1173,9 @@ export async function runShopMaintenance(limit = 50) {
     take: limit,
   });
   for (const { id } of stale) {
+    // Khách có thể đã chuyển tiền đúng hạn nhưng app không còn polling (đang ở app ngân hàng) và webhook chưa tới:
+    // hỏi SePay một lần cuối trước khi hủy, nếu đã khớp tiền thì đơn không còn PENDING_PAYMENT ⇒ bỏ qua.
+    if (await settledByLastReconcile(id)) continue;
     if (await closePendingOrder(id, "EXPIRED")) result.expired += 1;
   }
 

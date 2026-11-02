@@ -786,7 +786,9 @@ const inflightReconcile = new Map<string, Promise<SepayWebhookOutcome | null>>()
  *   về muộn sau đó được ghi `DUPLICATE / PAYMENT_ALREADY_PAID` để đối soát.
  */
 export async function reconcileSepayPayment(
-  paymentId: string
+  paymentId: string,
+  /** `force`: bỏ qua giới hạn tần suất — dùng ngay trước khi hủy đơn hết hạn để không hủy nhầm đơn đã được trả tiền. */
+  opts: { force?: boolean } = {}
 ): Promise<SepayWebhookOutcome | null> {
   const cfg = sepayConfig();
   if (!cfg.apiToken) return null;
@@ -795,7 +797,7 @@ export async function reconcileSepayPayment(
   if (inflight) return inflight; // nhiều request polling cùng lúc ⇒ dùng chung 1 lần gọi API.
 
   const lastAt = lastReconcileAt.get(paymentId) ?? 0;
-  if (Date.now() - lastAt < cfg.reconcileMinSeconds * 1000) return null;
+  if (!opts.force && Date.now() - lastAt < cfg.reconcileMinSeconds * 1000) return null;
 
   lastReconcileAt.set(paymentId, Date.now());
   const task = runSepayReconcile(paymentId).finally(() => {
