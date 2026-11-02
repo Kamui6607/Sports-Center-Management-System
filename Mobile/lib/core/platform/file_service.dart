@@ -11,6 +11,9 @@ class FileService {
   /// Chọn 1 tệp PDF (CV).
   Future<PickedFile?> pickPdf() => _pick(FileType.custom, const ['pdf']);
 
+  /// Chọn 1 tệp PDF/Excel (tài liệu lộ trình tập luyện).
+  Future<PickedFile?> pickPlanDocument() => _pick(FileType.custom, const ['pdf', 'xlsx', 'xls']);
+
   /// Chọn 1 tệp bất kỳ (đính kèm chat).
   Future<PickedFile?> pickAny() => _pick(FileType.any, null);
 

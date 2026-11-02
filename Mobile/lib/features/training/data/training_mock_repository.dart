@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import '../../../core/data/picked_file.dart';
 import '../../../core/error/app_failure.dart';
 import '../../../mock/mock_server.dart';
 import '../../../mock/mock_tables.dart';
@@ -109,4 +113,63 @@ class TrainingMockRepository implements TrainingRepository {
       ),
     );
   });
+
+  /// Lộ trình mà HLV đang đăng nhập phụ trách (thao tác ghi tệp).
+  TrainingPlanRow _ownPlan(String planId) {
+    final coach = _server.requireCoach();
+    final p = _server.db.trainingPlans.where((x) => x.id == planId).firstOrNull;
+    if (p == null) throw const AppFailure.notFound('Không tìm thấy lộ trình.');
+    if (p.coachProfileId != coach.id) {
+      throw const AppFailure.forbidden('Bạn chỉ đính kèm tệp cho lộ trình mình phụ trách.');
+    }
+    return p;
+  }
+
+  @override
+  Future<PlanAttachment> addAttachment(String planId, PickedFile file) => _server.run(() async {
+    final db = _server.db;
+    _ownPlan(planId);
+    // Theo `planAttachmentUploadSingle` + `addAttachment` của BE.
+    if (!const ['pdf', 'xlsx', 'xls'].contains(file.extension)) {
+      throw const AppFailure.validation('Chỉ nhận tệp PDF hoặc Excel (.pdf, .xlsx, .xls).');
+    }
+    if (file.sizeBytes > _maxAttachmentBytes) throw const AppFailure.validation('Tệp đính kèm tối đa 10MB.');
+    if (db.trainingPlanAttachments.where((a) => a.planId == planId).length >= _maxAttachmentsPerPlan) {
+      throw const AppFailure.validation('Mỗi lộ trình tối đa $_maxAttachmentsPerPlan tệp.');
+    }
+    final path = file.path;
+    final row = TrainingPlanAttachmentRow(
+      id: db.nextId('tpa'),
+      planId: planId,
+      name: file.name,
+      mimeType: file.extension == 'pdf'
+          ? 'application/pdf'
+          : (file.extension == 'xls'
+                ? 'application/vnd.ms-excel'
+                : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+      bytes: path == null ? Uint8List(file.sizeBytes) : await File(path).readAsBytes(),
+      createdAt: db.now(),
+    );
+    db.trainingPlanAttachments.add(row);
+    return db.toPlanAttachment(row);
+  });
+
+  @override
+  Future<Uint8List> attachmentFile(String planId, String attachmentId) => _server.run(() async {
+    final p = await plan(planId); // kiểm tra quyền xem như `GET /training-plans/:id`
+    final row = _server.db.trainingPlanAttachments.where((a) => a.id == attachmentId && a.planId == p.id).firstOrNull;
+    if (row == null) throw const AppFailure.notFound('Không tìm thấy tệp.');
+    return row.bytes;
+  });
+
+  @override
+  Future<void> deleteAttachment(String planId, String attachmentId) => _server.run(() {
+    _ownPlan(planId);
+    final removed = _server.db.trainingPlanAttachments.length;
+    _server.db.trainingPlanAttachments.removeWhere((a) => a.id == attachmentId && a.planId == planId);
+    if (_server.db.trainingPlanAttachments.length == removed) throw const AppFailure.notFound('Không tìm thấy tệp.');
+  });
+
+  static const _maxAttachmentBytes = 10 * 1024 * 1024;
+  static const _maxAttachmentsPerPlan = 20;
 }

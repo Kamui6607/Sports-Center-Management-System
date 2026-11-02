@@ -152,7 +152,12 @@ extension MockEntityMappers on MockDatabase {
             )
             .toList()
           ..sort((a, b) => b.date.compareTo(a.date)),
+    attachments: trainingPlanAttachments.where((a) => a.planId == p.id).map(toPlanAttachment).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
   );
+
+  PlanAttachment toPlanAttachment(TrainingPlanAttachmentRow a) =>
+      PlanAttachment(id: a.id, name: a.name, mimeType: a.mimeType, sizeBytes: a.bytes.length, createdAt: a.createdAt);
 }
 
 /// Chỉ số mẫu dạng chữ ("57.6 kg", "Cách 8 cm") ⇒ [TrainingMetric] (không phải số ⇒ ghi chú).

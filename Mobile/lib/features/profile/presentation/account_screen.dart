@@ -49,7 +49,12 @@ class AccountScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(user.fullName, style: context.text.title),
-                      Text(user.email, style: context.text.small.copyWith(color: c.textMuted)),
+                      Text(
+                        user.email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.text.small.copyWith(color: c.textMuted),
+                      ),
                       const SizedBox(height: AppSpacing.xxs),
                       StatusLabel(user.role.label, StatusTone.brand).tag(dense: true),
                     ],

@@ -1,6 +1,8 @@
 // Bảng khóa học & tập luyện: Class, ClassSchedule, Enrollment, Attendance, QR, phạt, lộ trình, đánh giá HLV.
 // Xem ghi chú chung ở `lib/mock/mock_tables.dart`.
 
+import 'dart:typed_data';
+
 import '../../features/attendance/domain/entities/attendance.dart';
 import '../../features/catalog/domain/entities/catalog.dart';
 import '../../features/classes/domain/entities/course.dart';
@@ -201,6 +203,24 @@ class TrainingResultRow {
   final DateTime date;
   final Map<String, String> metrics;
   final String? coachNote;
+}
+
+class TrainingPlanAttachmentRow {
+  TrainingPlanAttachmentRow({
+    required this.id,
+    required this.planId,
+    required this.name,
+    required this.mimeType,
+    required this.bytes,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String planId;
+  final String name;
+  final String mimeType;
+  final Uint8List bytes;
+  final DateTime createdAt;
 }
 
 class FeedbackRow {

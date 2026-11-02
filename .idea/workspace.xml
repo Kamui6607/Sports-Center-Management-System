@@ -6,78 +6,19 @@
   <component name="ChangeListManager">
     <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="Update Web and Mobile UI 1/11">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/BE/prisma/schema.prisma" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/scripts/run-e2e.mjs" beforeDir="false" afterPath="$PROJECT_DIR$/BE/scripts/run-e2e.mjs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/app.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/app.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/config/attendance.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/config/attendance.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/attendance/attendance-analytics.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/attendance/attendance-analytics.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.controller.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.routes.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.routes.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.schema.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/attendance/attendance.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/class-schedules/class-schedules.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/class-schedules/class-schedules.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/classes/class-maintenance.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/classes/class-maintenance.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/classes/class-summary.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/classes/class-summary.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/classes/classes.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/classes/classes.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/coaches/wallet-eligibility.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/coaches/wallet-eligibility.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/enrollments/course-enrollment.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/enrollments/course-enrollment.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.controller.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.routes.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.routes.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.schema.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/enrollments/enrollments.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/enrollments/my-courses.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/enrollments/my-courses.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/memberships/memberships.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/memberships/memberships.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/notifications/notifications.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/notifications/notifications.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/payments/course-purchase.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/payments/course-purchase.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/payments/purchase-snapshot.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/payments/purchase-snapshot.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/refunds/refunds.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/refunds/refunds.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/modules/terms/term-evaluator.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/modules/terms/term-evaluator.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/server.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BE/src/types/base-entity.ts" beforeDir="false" afterPath="$PROJECT_DIR$/BE/src/types/base-entity.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Doc/GYM_SCOPE_CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/Doc/GYM_SCOPE_CHANGES.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Doc/MEMBERSHIP_FLOW.md" beforeDir="false" afterPath="$PROJECT_DIR$/Doc/MEMBERSHIP_FLOW.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Doc/MOBILE_UI_PLAN.md" beforeDir="false" afterPath="$PROJECT_DIR$/Doc/MOBILE_UI_PLAN.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/ClassDetailPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/ClassDetailPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/SchedulesPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/SchedulesPage.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FE/src/features/manage/pages/scheduleKit.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/FE/src/features/manage/pages/scheduleKit.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/env/local.json" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/env/local.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/api/class_json.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/api/class_json.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/app/router/app_router.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/app/router/app_router.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/app/router/app_routes.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/app/router/app_routes.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/app/router/route_guard.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/app/router/route_guard.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/api/training_json.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/api/training_json.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Mobile/lib/core/icons/app_icons.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/icons/app_icons.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/widgets/date_time_field.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/widgets/date_time_field.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/data/attendance_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/data/attendance_api_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/data/attendance_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/data/attendance_mock_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/domain/entities/attendance.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/domain/entities/attendance.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/domain/repositories/attendance_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/domain/repositories/attendance_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/scan_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/scan_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/session_qr_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/attendance/presentation/screens/session_qr_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/chat/presentation/chat_room_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/chat/presentation/chat_room_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/classes/presentation/screens/coach_class_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/classes/presentation/screens/coach_class_detail_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/coach/data/coach_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/coach/data/coach_api_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/coach/data/coach_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/coach/data/coach_mock_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/coach/domain/entities/coach_dashboard.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/coach/domain/entities/coach_dashboard.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/coach/presentation/screens/coach_home_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/coach/presentation/screens/coach_home_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/membership/data/membership_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/membership/data/membership_api_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/membership/data/membership_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/membership/data/membership_mock_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/membership/presentation/screens/membership_screens.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/membership/presentation/screens/membership_screens.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/notifications/domain/entities/app_notification.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/notifications/domain/entities/app_notification.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/notifications/presentation/notification_tile.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/notifications/presentation/notification_tile.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/network/api_client.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/network/api_client.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/platform/file_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/platform/file_service.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Mobile/lib/features/profile/presentation/account_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/profile/presentation/account_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/schedule/data/schedule_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/schedule/data/schedule_api_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/schedule/data/schedule_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/schedule/data/schedule_mock_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/schedule/domain/entities/session.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/schedule/domain/entities/session.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/schedule/domain/repositories/schedule_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/schedule/domain/repositories/schedule_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/schedule/presentation/screens/member_schedule_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/schedule/presentation/screens/member_schedule_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/schedule/presentation/screens/my_session_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/schedule/presentation/screens/my_session_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/schedule/presentation/screens/teaching_session_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/schedule/presentation/screens/teaching_session_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/schedule/presentation/session_labels.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/schedule/presentation/session_labels.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/schedule/presentation/widgets/session_tile.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/schedule/presentation/widgets/session_tile.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/data/training_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/data/training_api_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/data/training_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/data/training_mock_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/domain/entities/training.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/domain/entities/training.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/domain/repositories/training_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/domain/repositories/training_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/presentation/training_screens.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/presentation/training_screens.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Mobile/lib/mock/mock_database.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/mock/mock_database.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Mobile/lib/mock/mock_mappers.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/mock/mock_mappers.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Mobile/lib/mock/tables/class_tables.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/mock/tables/class_tables.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/test/features/api_repositories_test.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/test/features/api_repositories_test.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -88,6 +29,11 @@
     <option name="formatViaClangd" value="false" />
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="develop" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="GitHubPullRequestSearchHistory">{
@@ -130,10 +76,10 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "com.google.cloudcode.ide_session_index": "20261101_0003",
+    "com.google.cloudcode.ide_session_index": "20261102_0002",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "#1 on develop",
+    "git-widget-placeholder": "main",
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "D:/FA26/PRM/Sports-Center-Management-System",
@@ -235,6 +181,8 @@
       <workItem from="1793336343968" duration="5510000" />
       <workItem from="1793530086635" duration="4745000" />
       <workItem from="1793549410095" duration="7420000" />
+      <workItem from="1793614913932" duration="10000" />
+      <workItem from="1793624262791" duration="6661000" />
     </task>
     <task id="LOCAL-00001" summary="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10">
       <option name="closed" value="true" />

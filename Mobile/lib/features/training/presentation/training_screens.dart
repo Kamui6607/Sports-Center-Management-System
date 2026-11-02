@@ -10,6 +10,7 @@ import '../../../core/utils/vn_time.dart';
 import '../../../core/widgets/widgets.dart';
 import '../data/training_repository_provider.dart';
 import '../domain/entities/training.dart';
+import 'plan_attachments.dart';
 import 'result_form.dart';
 
 final myPlansProvider = FutureProvider.autoDispose<List<TrainingPlan>>((ref) {
@@ -182,6 +183,8 @@ class TrainingPlanScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+            const SizedBox(height: AppSpacing.lg),
+            PlanAttachmentsSection(plan: p, coachMode: coachMode),
             const SizedBox(height: AppSpacing.lg),
             SectionHeader(title: 'Kết quả & nhận xét của HLV (${p.results.length})'),
             if (p.results.isEmpty)

@@ -50,6 +50,7 @@ class TrainingPlan {
     this.results = const [],
     this.classId,
     this.className,
+    this.attachments = const [],
   });
 
   final String id;
@@ -67,9 +68,33 @@ class TrainingPlan {
   final String? classId;
   final String? className;
 
+  /// Tệp PDF/Excel HLV đính kèm (mới nhất trước).
+  final List<PlanAttachment> attachments;
+
   bool isActive(DateTime now) => !now.isBefore(startDate) && now.isBefore(endDate);
 
   bool hasEnded(DateTime now) => !now.isBefore(endDate);
+}
+
+/// Tệp đính kèm lộ trình (`TrainingPlanAttachment`) — PDF/Excel do HLV tải lên.
+class PlanAttachment {
+  const PlanAttachment({
+    required this.id,
+    required this.name,
+    required this.mimeType,
+    required this.sizeBytes,
+    required this.createdAt,
+  });
+
+  final String id;
+
+  /// Tên tệp gốc người dùng thấy.
+  final String name;
+  final String mimeType;
+  final int sizeBytes;
+  final DateTime createdAt;
+
+  bool get isPdf => mimeType == 'application/pdf';
 }
 
 class PlanDraft {

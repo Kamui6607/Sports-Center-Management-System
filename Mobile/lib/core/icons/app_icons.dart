@@ -33,6 +33,7 @@ abstract final class AppIcons {
   static const IconData attach = LucideIcons.paperclip;
   static const IconData image = LucideIcons.image;
   static const IconData file = LucideIcons.fileText;
+  static const IconData spreadsheet = LucideIcons.fileSpreadsheet;
   static const IconData read = LucideIcons.checkCheck;
 
   // Hành động

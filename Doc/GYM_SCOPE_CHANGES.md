@@ -253,3 +253,11 @@ Chi tiết + quyết định: `Doc/MAKEUP_ABSENCE_PLAN.md`.
 - **Học bù** (`/makeup-requests`): báo vắng kèm "Xin buổi học bù" ⇒ HLV xếp vào buổi có sẵn (cùng khóa / khóa cùng HLV, cùng hạng), **mở buổi bù** (không bán, không tính buổi chính, tới ngày kết thúc khóa + 14 ngày) hoặc từ chối; học viên tự chọn buổi bù mở. Từ chối / hết hạn mà báo trước ≥ 24h ⇒ hoàn 80% tiền buổi.
 - **Chỗ khách** trên buổi chính (người từ khóa khác sang): tối đa max(1, 10% sức chứa).
 - Migration `20261102000000_makeup_absence` (chỉ thêm) — cần áp lên Render.
+
+## 28. Tài liệu đính kèm lộ trình (PDF/Excel) trên Mobile (02/11/2026)
+
+- BE đã có sẵn `POST/GET/DELETE /training-plans/:id/attachments` (PDF/.xlsx/.xls ≤ 10 MB, kiểm magic bytes, tối đa 20 tệp/lộ trình; ghi/xóa chỉ HLV phụ trách, xem/tải: HLV phụ trách, học viên của lộ trình, Manager). App trước đây chưa dùng.
+- **Mobile — HLV** (chi tiết lộ trình, `coachMode`): mục **"Tài liệu đính kèm"** + nút **"Đính kèm PDF / Excel"** (chặn trước > 10 MB / đủ 20 tệp), xóa tệp có xác nhận. Không giới hạn theo ngày của lộ trình (giống BE).
+- **Mobile — Học viên**: cùng mục, chạm tệp ⇒ tải có xác thực rồi mở bảng chia sẻ của máy (mở bằng app xem PDF/Excel hoặc lưu về máy).
+- Chế độ mock lưu tệp trong bộ nhớ (`trainingPlanAttachments`).
+- Lưu ý triển khai: BE lưu tệp ở ổ đĩa `uploads/plans` — Render Free mất tệp mỗi lần deploy/khởi động lại (bản ghi DB vẫn còn ⇒ tải về báo "Tệp không còn trên máy chủ"). Cần persistent disk hoặc chuyển sang Cloudinary nếu dùng lâu dài.

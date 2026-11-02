@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import '../../../api/training_json.dart';
+import '../../../core/data/picked_file.dart';
 import '../../../core/error/app_failure.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/json.dart';
@@ -64,5 +67,20 @@ class TrainingApiRepository implements TrainingRepository {
         if (note != null && note.isNotEmpty) 'coachNote': note,
       },
     );
+  }
+
+  @override
+  Future<PlanAttachment> addAttachment(String planId, PickedFile file) async {
+    final res = await _api.upload('/training-plans/$planId/attachments', field: 'file', file: file);
+    return TrainingJson.attachment(res.json);
+  }
+
+  @override
+  Future<Uint8List> attachmentFile(String planId, String attachmentId) =>
+      _api.getBytes('/training-plans/$planId/attachments/$attachmentId', auth: true);
+
+  @override
+  Future<void> deleteAttachment(String planId, String attachmentId) async {
+    await _api.delete('/training-plans/$planId/attachments/$attachmentId');
   }
 }

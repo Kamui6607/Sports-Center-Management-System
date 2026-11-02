@@ -17,6 +17,16 @@ abstract final class TrainingJson {
     results: [for (final r in p.objList('results')) result(r)]..sort((a, b) => b.date.compareTo(a.date)),
     classId: p.strOrNull('classId'),
     className: p.objOrNull('class')?.strOrNull('name'),
+    attachments: [for (final a in p.objList('attachments')) attachment(a)],
+  );
+
+  /// `TrainingPlanAttachment` (BE đã bỏ `storedName`).
+  static PlanAttachment attachment(Json a) => PlanAttachment(
+    id: a.str('id'),
+    name: a.str('originalName', 'tep-dinh-kem'),
+    mimeType: a.str('mimeType', 'application/octet-stream'),
+    sizeBytes: a.integer('size'),
+    createdAt: a.date('createdAt'),
   );
 
   /// `metrics` của BE: `[{ name, value:number, unit?, note?, lowerIsBetter? }]` (L9).

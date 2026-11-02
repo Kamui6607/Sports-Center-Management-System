@@ -35,6 +35,7 @@ class MockDatabase {
   final penalties = <PenaltyRow>[];
   final trainingPlans = <TrainingPlanRow>[];
   final trainingResults = <TrainingResultRow>[];
+  final trainingPlanAttachments = <TrainingPlanAttachmentRow>[];
   final feedbacks = <FeedbackRow>[];
   final notifications = <NotificationRow>[];
   final wallets = <WalletRow>[];
