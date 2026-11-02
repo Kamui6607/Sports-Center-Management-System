@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 const numberCoerce = z.preprocess((val) => {
   if (typeof val === "string" && val.trim() !== "") {
     const num = Number(val);
@@ -25,8 +27,6 @@ const imageUrlsCoerce = z.preprocess((val) => {
   }
   return val;
 }, z.array(z.string().trim().url().max(500)).max(10));
-
-import { z } from "zod";
 
 export const CreateProductSchema = z.object({
   name: z.string().min(2),
