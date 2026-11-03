@@ -4,22 +4,7 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="Update Web and Mobile UI 1/11">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/api/training_json.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/api/training_json.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/icons/app_icons.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/icons/app_icons.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/network/api_client.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/network/api_client.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/core/platform/file_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/core/platform/file_service.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/profile/presentation/account_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/profile/presentation/account_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/data/training_api_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/data/training_api_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/data/training_mock_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/data/training_mock_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/domain/entities/training.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/domain/entities/training.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/domain/repositories/training_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/domain/repositories/training_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/features/training/presentation/training_screens.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/features/training/presentation/training_screens.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/mock/mock_database.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/mock/mock_database.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/mock/mock_mappers.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/mock/mock_mappers.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mobile/lib/mock/tables/class_tables.dart" beforeDir="false" afterPath="$PROJECT_DIR$/Mobile/lib/mock/tables/class_tables.dart" afterDir="false" />
-    </list>
+    <list default="true" id="e51ceede-f001-4d6a-90e2-01869516d1d4" name="Changes" comment="Update Mobile UI 2/11" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -182,7 +167,7 @@
       <workItem from="1793530086635" duration="4745000" />
       <workItem from="1793549410095" duration="7420000" />
       <workItem from="1793614913932" duration="10000" />
-      <workItem from="1793624262791" duration="6661000" />
+      <workItem from="1793624262791" duration="8184000" />
     </task>
     <task id="LOCAL-00001" summary="feat(Mobile): add Mobile README, update root README &amp; PROJECT_OVERVIEW tech stack 4/10">
       <option name="closed" value="true" />
@@ -272,7 +257,23 @@
       <option name="project" value="LOCAL" />
       <updated>1793534156163</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="Update Mobile UI 2/11">
+      <option name="closed" value="true" />
+      <created>1793632682148</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1793632682148</updated>
+    </task>
+    <task id="LOCAL-00013" summary="Update Mobile UI 2/11">
+      <option name="closed" value="true" />
+      <created>1793632686658</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1793632686658</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -313,6 +314,7 @@
     <MESSAGE value="Update Web UI 27/10" />
     <MESSAGE value="Update Web UI 30/10" />
     <MESSAGE value="Update Web and Mobile UI 1/11" />
-    <option name="LAST_COMMIT_MESSAGE" value="Update Web and Mobile UI 1/11" />
+    <MESSAGE value="Update Mobile UI 2/11" />
+    <option name="LAST_COMMIT_MESSAGE" value="Update Mobile UI 2/11" />
   </component>
 </project>
